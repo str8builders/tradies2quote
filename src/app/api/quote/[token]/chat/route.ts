@@ -49,6 +49,10 @@ function clientIp(request: NextRequest): string | null {
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Customer-facing LLM call (up to ~50s inside runStructuredAgent); the
+// platform default function timeout would kill it mid-call and the
+// customer's message would never be persisted for the tradie.
+export const maxDuration = 60;
 
 const MAX_MESSAGE_LEN = 1000;
 const MAX_MESSAGES_PER_DAY = 10;

@@ -23,6 +23,7 @@ import { EngagementSettings } from "./_components/EngagementSettings";
 import { paymentsEnabled, getConnectStatus, refreshConnectStatus } from "@/lib/payments";
 import { PaymentsSettings } from "./_components/PaymentsSettings";
 import { ReplayTourButton } from "./_components/ReplayTourButton";
+import { DeleteAccountSection } from "./_components/DeleteAccountSection";
 
 export const metadata: Metadata = {
   title: "Settings",
@@ -304,6 +305,10 @@ export default async function SettingsPage({
             </button>
           </form>
         </section>
+
+        {/* Apple Guideline 5.1.1(v): account deletion must be initiable
+            in-app — a support-email-only path is an automatic rejection. */}
+        <DeleteAccountSection />
       </main>
     </div>
   );

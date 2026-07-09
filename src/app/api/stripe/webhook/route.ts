@@ -219,6 +219,13 @@ export async function POST(request: NextRequest) {
       event.type,
       err instanceof Error ? err.message : String(err),
     );
+    // The ledger row was inserted before processing — remove it, or the
+    // retry this 500 asks for would be deduped as already-processed and
+    // the event lost for good.
+    await admin
+      .from("stripe_webhook_events")
+      .delete()
+      .eq("event_id", event.id);
     return NextResponse.json(
       { error: "handler_failed", type: event.type },
       { status: 500 },

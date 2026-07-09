@@ -17,8 +17,8 @@ self.addEventListener("push", (event) => {
   const title = data.title || "Tradies2Quote";
   const options = {
     body: data.body || "",
-    icon: "/icon.png",
-    badge: "/icon.png",
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
     tag: data.tag,
     data: { url: data.url || "/app" },
   };

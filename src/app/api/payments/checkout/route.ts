@@ -68,6 +68,33 @@ export async function POST(request: NextRequest) {
     const currencyUpper = q.currency ?? "NZD";
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://tradies2quote.com";
 
+    // Only one payable session per quote: expire any earlier pending
+    // sessions (second tab, re-opened link) so the customer can never
+    // hold two live checkout links and pay the deposit twice.
+    const { data: stale } = await admin
+      .from("payments")
+      .select("id, stripe_checkout_session_id")
+      .eq("quote_id", q.id)
+      .eq("status", "pending")
+      .not("stripe_checkout_session_id", "is", null);
+    if (stale && stale.length > 0) {
+      const stripeForExpiry = stripeClient();
+      for (const p of stale) {
+        try {
+          await stripeForExpiry.checkout.sessions.expire(
+            p.stripe_checkout_session_id as string,
+          );
+        } catch {
+          // Already expired or completed — nothing to do.
+        }
+        await admin
+          .from("payments")
+          .update({ status: "expired" })
+          .eq("id", p.id)
+          .eq("status", "pending");
+      }
+    }
+
     // Seed a pending payment row so the webhook can resolve it by id.
     const { data: payRow, error: payErr } = await admin
       .from("payments")
@@ -116,8 +143,10 @@ export async function POST(request: NextRequest) {
   } catch (e) {
     console.error("[payments/checkout] failed", e);
     captureError(e, { route: "/api/payments/checkout" });
+    // Public endpoint — never echo internals (Stripe/Supabase error text
+    // can name account ids and config). Detail lives in captureError/logs.
     return NextResponse.json(
-      { error: "checkout_failed", message: e instanceof Error ? e.message : String(e) },
+      { error: "checkout_failed", message: "Could not start the payment. Please try again." },
       { status: 500 },
     );
   }

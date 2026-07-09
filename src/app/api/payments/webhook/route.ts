@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
       const paymentId = session.metadata?.payment_id;
+      const quoteId = session.metadata?.quote_id;
       if (paymentId && session.payment_status === "paid") {
         await admin
           .from("payments")
@@ -71,14 +72,51 @@ export async function POST(request: NextRequest) {
           // not overwrite paid_at with a fresh timestamp. Only the first
           // delivery (status still pending) performs the write.
           .neq("status", "paid");
+
+        // Close the double-payment window: any OTHER checkout session for
+        // this quote (second tab, stale link) stays payable for up to 24h
+        // after creation — expire them now that the deposit is in.
+        if (quoteId) {
+          const { data: siblings } = await admin
+            .from("payments")
+            .select("id, status, stripe_checkout_session_id")
+            .eq("quote_id", quoteId)
+            .neq("id", paymentId);
+          const stripe = stripeClient();
+          for (const p of siblings ?? []) {
+            if (p.status === "pending" && p.stripe_checkout_session_id) {
+              try {
+                await stripe.checkout.sessions.expire(p.stripe_checkout_session_id);
+              } catch {
+                // Already expired/completed — nothing to do.
+              }
+              await admin
+                .from("payments")
+                .update({ status: "expired" })
+                .eq("id", p.id)
+                .eq("status", "pending");
+            } else if (p.status === "paid") {
+              // Two paid deposits on one quote — surface loudly so the
+              // owner can refund one; never hide taken money.
+              captureError(
+                new Error(`Duplicate paid deposit on quote ${quoteId}`),
+                { route: "payments/webhook" },
+              );
+            }
+          }
+        }
       }
     }
   } catch (e) {
     captureError(e, { route: "payments/webhook" });
     console.error("[payments/webhook] handler failed", e);
-    // Return 500 so Stripe RETRIES. The only write above is the id-keyed,
-    // status-guarded payments UPDATE, which is idempotent — a retry safely
-    // lands the same state instead of the deposit being silently lost.
+    // Return 500 so Stripe RETRIES. The ledger row above must be removed
+    // first, or the retry would be deduped as already-processed and the
+    // deposit silently lost.
+    await admin
+      .from("stripe_webhook_events")
+      .delete()
+      .eq("event_id", event.id);
     return NextResponse.json({ error: "handler_failed" }, { status: 500 });
   }
 

@@ -9,6 +9,7 @@ import {
   logAgentRunStart,
   logAgentRunFinish,
 } from "@/lib/agent-monitor/logger";
+import { isOwnerEmail } from "@/lib/owner";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,6 +33,11 @@ export async function POST(req: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  // Owner-only, matching the /app/agents UI (Wave 13) — this endpoint has
+  // no quota, so leaving it open lets any signup script LLM spend.
+  if (!isOwnerEmail(user.email)) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
   let body: Partial<MaterialsTakeoffInput>;

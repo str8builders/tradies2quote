@@ -14,6 +14,8 @@ import {
   logAgentRunStart,
   logAgentRunFinish,
 } from "@/lib/agent-monitor/logger";
+import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
+import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,6 +42,26 @@ export async function POST(req: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Same spend gates as /api/quotes/generate — this route forwards images
+  // to OpenAI Vision, so an expired trial or a scripted loop costs money.
+  const quota = consumeDailyQuota(`photo-plan:${user.id}`, 100);
+  if (!quota.ok) return tooManyRequestsResponse(quota.resetAt);
+  const sub = await getSubscriptionStatus({
+    userId: user.id,
+    signedUpAt: new Date(user.created_at ?? Date.now()),
+    email: user.email,
+  });
+  if (!canWrite(sub)) {
+    return NextResponse.json(
+      {
+        error: "trial_expired",
+        message: "Your free trial has ended. Subscribe to keep using photo analysis.",
+        upgrade_url: "/app/upgrade",
+      },
+      { status: 402 },
+    );
   }
 
   const contentType = req.headers.get("content-type") ?? "";

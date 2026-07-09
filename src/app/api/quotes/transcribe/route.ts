@@ -7,6 +7,7 @@ import {
   STATIC_TRADE_VOCAB_PROMPT,
 } from "@/lib/transcript/asrHints";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
+import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
 import { fetchWithTimeout, TIMEOUTS } from "@/lib/fetchTimeout";
 
 export const runtime = "nodejs";
@@ -39,6 +40,24 @@ export async function POST(request: NextRequest) {
   // Per-user daily cap — cheap circuit-breaker on transcription spend.
   const quota = consumeDailyQuota(`transcribe:${user.id}`, 150);
   if (!quota.ok) return tooManyRequestsResponse(quota.resetAt);
+
+  // Same plan gate as /api/quotes/generate — an expired trial shouldn't
+  // keep spending Whisper money even though the result would be unusable.
+  const sub = await getSubscriptionStatus({
+    userId: user.id,
+    signedUpAt: new Date(user.created_at ?? Date.now()),
+    email: user.email,
+  });
+  if (!canWrite(sub)) {
+    return NextResponse.json(
+      {
+        error: "trial_expired",
+        message: "Your free trial has ended. Subscribe to keep creating quotes.",
+        upgrade_url: "/app/upgrade",
+      },
+      { status: 402 },
+    );
+  }
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {

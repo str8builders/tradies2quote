@@ -48,7 +48,7 @@ export async function POST() {
   } catch (e) {
     console.error("[payments/connect] failed", e);
     return NextResponse.json(
-      { error: "connect_failed", message: e instanceof Error ? e.message : String(e) },
+      { error: "connect_failed", message: "Could not start Stripe onboarding. Please try again." },
       { status: 500 },
     );
   }

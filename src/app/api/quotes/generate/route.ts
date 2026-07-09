@@ -1061,6 +1061,11 @@ export async function POST(request: NextRequest) {
   parsed.total = totals.total;
 
   if (parsed.line_items.length > 0) {
+    // Two rapid POSTs for the same quote can both pass the early
+    // "already generated" check (the LLM call sits in the window) — a
+    // plain insert then doubles every row. Delete-before-insert makes
+    // the last writer land a single clean set, matching saveQuoteChanges.
+    await supabase.from("quote_items").delete().eq("quote_id", quote.id);
     const { error: iErr } = await supabase.from("quote_items").insert(
       parsed.line_items.map((it) => ({
         quote_id: quote.id,

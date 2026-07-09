@@ -318,6 +318,7 @@ export function ScanPanel({
       const res = await fetch("/api/quotes/scan-drawing", {
         method: "POST",
         body: form,
+        signal: AbortSignal.timeout(90_000),
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -870,7 +871,7 @@ function ScanTranscriptReview({
           onClick={onRedo}
           data-testid="scan-clear"
           aria-label="Remove drawing"
-          className="grid h-9 w-9 place-items-center rounded-sm border border-ink-600 text-ink-300 hover:border-brand hover:text-brand"
+          className="grid h-11 w-11 place-items-center rounded-sm border border-ink-600 text-ink-300 hover:border-brand hover:text-brand"
         >
           <X weight="bold" className="h-4 w-4" />
         </button>

@@ -255,7 +255,7 @@ export function ClarificationModal({
             onClick={onCancel}
             data-testid="clarification-close"
             aria-label="Cancel and generate without answers"
-            className="-mr-2 -mt-2 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-400 hover:text-white"
+            className="-mr-3 -mt-3 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-400 hover:text-white"
           >
             <X size={16} weight="bold" />
           </button>

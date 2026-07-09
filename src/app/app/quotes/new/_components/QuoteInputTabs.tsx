@@ -244,6 +244,7 @@ function VoicePanel({
       const res = await fetch("/api/quotes/transcribe", {
         method: "POST",
         body: form,
+        signal: AbortSignal.timeout(90_000),
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -254,8 +255,12 @@ function VoicePanel({
       const data = (await res.json()) as { transcript?: string };
       setTranscript((data.transcript ?? "").trim());
       setState("idle");
-    } catch {
-      setError("Network error. Check your connection and try again.");
+    } catch (e) {
+      setError(
+        e instanceof DOMException && e.name === "TimeoutError"
+          ? "Transcription is taking too long. Check your connection and try again."
+          : "Network error. Check your connection and try again.",
+      );
       setState("error");
     }
   }
@@ -570,6 +575,9 @@ function ContinueRow({ text, minLength }: { text: string; minLength: number }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transcript: text }),
+        // Stalled cleanup must never strand the Continue button — a
+        // timeout lands in the catch below, which submits directly.
+        signal: AbortSignal.timeout(30_000),
       });
       if (!res.ok) {
         // Cleanup endpoint refused (auth, validation, server) — fall

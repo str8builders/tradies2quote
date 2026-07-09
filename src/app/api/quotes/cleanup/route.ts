@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
+import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
 import { cleanTranscript } from "@/lib/transcriptCleanup";
 import { loadUserVocab } from "@/lib/transcript/vocab";
 import {
@@ -34,6 +36,9 @@ import {
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// The LLM summary inside cleanTranscript can run tens of seconds; the
+// platform default function timeout would kill it mid-call (502).
+export const maxDuration = 60;
 
 type CleanupRequest = {
   transcript?: unknown;
@@ -52,6 +57,20 @@ export async function POST(request: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  // Same spend gates as /api/quotes/generate — cleanup runs an LLM pass,
+  // so cap it per user and refuse expired trials. The client falls back
+  // to direct submission on any non-200, so this never blocks a quote.
+  const quota = consumeDailyQuota(`cleanup:${user.id}`, 150);
+  if (!quota.ok) return tooManyRequestsResponse(quota.resetAt);
+  const sub = await getSubscriptionStatus({
+    userId: user.id,
+    signedUpAt: new Date(user.created_at ?? Date.now()),
+    email: user.email,
+  });
+  if (!canWrite(sub)) {
+    return NextResponse.json({ error: "trial_expired" }, { status: 402 });
   }
 
   let body: CleanupRequest;

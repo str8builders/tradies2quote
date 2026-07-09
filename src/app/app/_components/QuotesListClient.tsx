@@ -176,8 +176,8 @@ export function QuotesListClient({ rows, isHub = false }: Props) {
               onClick={() => setFilter(tab.id)}
               className={
                 active
-                  ? "inline-flex h-9 items-center rounded-sm border border-brand bg-brand/15 px-3 font-mono text-[10px] uppercase tracking-[0.2em] text-brand"
-                  : "inline-flex h-9 items-center rounded-sm border border-ink-700 bg-ink-900 px-3 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-300 transition-colors hover:border-ink-500 hover:text-white"
+                  ? "inline-flex h-11 items-center rounded-sm border border-brand bg-brand/15 px-3 font-mono text-[10px] uppercase tracking-[0.2em] text-brand"
+                  : "inline-flex h-11 items-center rounded-sm border border-ink-700 bg-ink-900 px-3 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-300 transition-colors hover:border-ink-500 hover:text-white"
               }
             >
               {tab.label}

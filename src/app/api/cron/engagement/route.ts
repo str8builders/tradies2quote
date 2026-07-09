@@ -102,6 +102,14 @@ async function handle(request: NextRequest): Promise<NextResponse> {
           if (!client?.email) continue;
 
           const prof = profById.get(s.user_id);
+          // Ledger-first: claim the quote_id (unique) BEFORE sending. If the
+          // run dies after a send, the old send-then-record order re-emailed
+          // the customer on the next run. A failed claim (incl. a concurrent
+          // run's conflict) means someone else owns it — skip.
+          const { error: claimErr } = await admin
+            .from("review_requests")
+            .insert({ user_id: s.user_id, quote_id: q.id, channel: "email" });
+          if (claimErr) continue;
           const result = await sendReviewRequestEmail({
             to: client.email,
             clientName: client.name || "there",
@@ -111,11 +119,10 @@ async function handle(request: NextRequest): Promise<NextResponse> {
           if (!result.ok) {
             counters.failed += 1;
             counters.errors.push({ quote_id: q.id, kind: "review", error: result.error });
+            // Release the claim so the next run can retry the send.
+            await admin.from("review_requests").delete().eq("quote_id", q.id);
             continue;
           }
-          await admin
-            .from("review_requests")
-            .insert({ user_id: s.user_id, quote_id: q.id, channel: "email" });
           counters.reviews_sent += 1;
         }
       }
@@ -157,6 +164,11 @@ async function handle(request: NextRequest): Promise<NextResponse> {
 
           const prof = profById.get(s.user_id);
           const currency = q.currency ?? prof?.currency ?? "NZD";
+          // Ledger-first claim, same as review requests above.
+          const { error: claimErr } = await admin
+            .from("quote_followups")
+            .insert({ user_id: s.user_id, quote_id: q.id, step, channel: "email" });
+          if (claimErr) continue;
           const result = await sendFollowupEmail({
             to: client.email,
             clientName: client.name || "there",
@@ -169,11 +181,13 @@ async function handle(request: NextRequest): Promise<NextResponse> {
           if (!result.ok) {
             counters.failed += 1;
             counters.errors.push({ quote_id: q.id, kind: "followup", error: result.error });
+            await admin
+              .from("quote_followups")
+              .delete()
+              .eq("quote_id", q.id)
+              .eq("step", step);
             continue;
           }
-          await admin
-            .from("quote_followups")
-            .insert({ user_id: s.user_id, quote_id: q.id, step, channel: "email" });
           counters.followups_sent += 1;
         }
       }

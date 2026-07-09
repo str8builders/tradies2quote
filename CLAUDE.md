@@ -67,7 +67,7 @@ src/
 - Components: `t2q-btn-primary`, `t2q-btn-ghost`, `t2q-card`, `t2q-section-label`, `t2q-shadow-brutal`.
 - **Eyebrow labels must be written `{"// label"}` in JSX** (the linter rejects raw `// label` as a comment-text-node).
 
-A few auth/dashboard files reference semantic tokens (`bg-background`, `text-ink`, `bg-surface`) that are **not** defined in `@theme` — prefer the landing/design-system tokens above for new pages.
+Semantic tokens (`bg-background`, `text-ink`, `bg-surface`) were never defined in `@theme` and have been fully cleaned out of auth/dashboard files (verified 2026-07-10) — use the landing/design-system tokens above for new pages.
 
 ## Commands
 

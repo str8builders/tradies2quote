@@ -1401,7 +1401,7 @@ function ItemsSection({
                   onClick={() => onRemove(i)}
                   disabled={disabled}
                   title={disabled ? "Quote already accepted." : undefined}
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-sm border border-ink-700 text-ink-400 hover:border-red-500 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-ink-700 disabled:hover:text-ink-400"
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-sm border border-ink-700 text-ink-400 hover:border-red-500 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-ink-700 disabled:hover:text-ink-400"
                 >
                   <Trash size={16} weight="bold" />
                 </button>
