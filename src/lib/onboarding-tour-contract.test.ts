@@ -55,7 +55,6 @@ describe("first-run coachmark contract", () => {
 
   it("locks highlighted controls, cleans up Driver, and renders Get started", () => {
     expect(tour).toContain("disableActiveInteraction: true");
-    expect(tour).toContain("allowScroll: false");
     expect(tour).toContain("destroyDriverWithoutCompletion()");
     expect(tour).toContain('showButtons: ["previous", "next", "close"]');
     expect(tour).toContain('doneBtnText: "Get started"');

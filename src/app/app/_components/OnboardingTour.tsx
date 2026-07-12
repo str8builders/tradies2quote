@@ -500,7 +500,6 @@ export function OnboardingTour({ onFinished }: OnboardingTourProps) {
           showProgress: true,
           progressText: "Step {{current}} of {{total}}",
           allowClose: true,
-          allowScroll: false,
           overlayClickBehavior: "close",
           overlayOpacity: 0.42,
           stagePadding: 8,
