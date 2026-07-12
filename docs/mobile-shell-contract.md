@@ -34,6 +34,9 @@ fighting over one of these, that is the bug.
 shell job is `padding-bottom: calc(4.05rem + env(safe-area-inset-bottom))` so content
 clears the fixed nav. That `4.05rem` must stay equal to the nav's content height
 (`.t2q-bottomnav-bar { min-height: calc(4.05rem + env(safe-area-inset-bottom)) }`).
+It uses `overflow-x: clip` to prevent sideways page drift without creating another
+scroll container. Never replace `clip` with `hidden`: CSS computes the other axis to
+`auto`, which silently turns the wrapper into a nested scroller on mobile.
 
 ## Canonical pattern (do this)
 
@@ -44,7 +47,8 @@ clears the fixed nav. That `4.05rem` must stay equal to the nav's content height
    - `themeColor` is set **once** at the root (`#0A0A0A`, for the dark landing).
      `/app` does **not** re-declare `themeColor`.
 2. **Canvas** (`.t2q-app-canvas`, the `data-shell="app"` element) is normal flow:
-   `min-h-dvh`, no `position: fixed`, no `inset: 0`.
+   `min-h-dvh`, no `position: fixed`, no `inset: 0`, and `overflow-x: clip` (never
+   `hidden`).
 3. **Bottom nav** (`.t2q-bottomnav-bar`) is the safe-area owner: `position: fixed;
    bottom: 0`, explicit background, `padding-bottom: …env(safe-area-inset-bottom)`.
 4. **Scroll content** (`.t2q-app-scroll`) carries `padding-bottom = nav height +
@@ -57,6 +61,8 @@ clears the fixed nav. That `4.05rem` must stay equal to the nav's content height
 - ❌ A full `/app` shell with `position: fixed; inset: 0` (the regression). Allowed only
   if **proven necessary by device testing**, documented here, and re-verified on iPhone.
 - ❌ `html, body { overflow: hidden; height: 100% }` as a general shell scroll-lock.
+- ❌ `overflow-x: hidden` on `.t2q-app-canvas` or `.t2q-app-scroll`; it creates an
+  implicit cross-axis scroll container. Use `overflow-x: clip`.
 - ❌ Forced white root/page backgrounds (`html`/`body`/`--t2q-app-page: #FFFFFF`) to
   "match the nav". That is masking — it just changes the strip's colour.
 - ❌ Route-level `themeColor` overrides (e.g. an `/app` `theme-color: #FFFFFF`) as a

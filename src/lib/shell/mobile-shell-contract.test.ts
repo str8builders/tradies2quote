@@ -43,20 +43,26 @@ describe("mobile shell contract — single owners", () => {
   });
 
   it("the document is the scroller: .t2q-app-scroll is never a nested scroll owner", () => {
-    // The scroll wrapper may clip horizontal overflow but must NOT become a
-    // vertical scroller (second scroll owner = the regression vector).
+    // `overflow-x:hidden` is banned too: CSS computes the other axis to
+    // `auto`, silently turning this wrapper into a second scroll container.
+    // `clip` prevents horizontal escape without establishing a scroller.
     const scrollRules = css
       .split("}")
       .filter((chunk) => chunk.includes(".t2q-app-scroll"));
     for (const rule of scrollRules) {
-      expect(rule).not.toMatch(/overflow(-y)?:\s*(auto|scroll)/);
+      expect(rule).not.toMatch(/overflow(?:-x|-y)?:\s*(hidden|auto|scroll)/);
     }
+    expect(css).toMatch(/\.t2q-app-scroll\s*\{[^}]*overflow-x:\s*clip/);
   });
 
   it("bottom nav owns the safe area: fixed, bottom 0, inset padding, own background", () => {
     const nav = ruleBody(css, ".t2q-bottomnav-bar {");
     expect(nav).toMatch(/position:\s*fixed/);
+    expect(nav).toMatch(/left:\s*0/);
+    expect(nav).toMatch(/right:\s*0/);
     expect(nav).toMatch(/bottom:\s*0/);
+    expect(nav).toMatch(/width:\s*100%/);
+    expect(nav).toMatch(/max-width:\s*100vw/);
     expect(nav).toMatch(/padding:[^;]*env\(safe-area-inset-bottom/);
     expect(nav).toMatch(/min-height:\s*calc\(4\.05rem \+ env\(safe-area-inset-bottom/);
     expect(nav).toMatch(/background:/);
@@ -98,8 +104,16 @@ describe("mobile shell contract — banned patterns stay banned", () => {
       .find((l) => l.includes("t2q-app-canvas") && l.includes("className"));
     expect(canvasLine, "canvas element must exist in app/layout.tsx").toBeDefined();
     expect(canvasLine!).toContain("min-h-dvh");
+    expect(canvasLine!).toContain("overflow-x-clip");
+    expect(canvasLine!).not.toContain("overflow-x-hidden");
     expect(canvasLine!).not.toMatch(/\bfixed\b/);
     expect(canvasLine!).not.toMatch(/\binset-0\b/);
+  });
+
+  it("bottom-nav press feedback never moves or scales the tabs", () => {
+    const activeRule = ruleBody(css, ".t2q-bottomnav-tab:active");
+    expect(activeRule).not.toMatch(/transform\s*:/);
+    expect(activeRule).not.toMatch(/translate|scale/);
   });
 
   it("no forced-white root/page masking", () => {

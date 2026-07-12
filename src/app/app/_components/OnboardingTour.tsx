@@ -133,157 +133,65 @@ function ensureStyleTag() {
   document.head.appendChild(style);
 }
 
-/** All possible tour steps. Steps whose anchors don't exist on the
- *  current page are filtered out at runtime before driving the tour,
- *  so the user never sees a missing-anchor flash.
- *
- *  Desktop and mobile often keep both nav surfaces in the DOM, with
- *  one hidden. `kickOff` resolves each selector to the first visible
- *  element before Driver.js sees it, so every surviving step points at
- *  something the customer can actually see and tap. */
-const ALL_STEPS: ReadonlyArray<DriveStep> = [
-  {
-    // Welcome step — no element, popover renders centered.
-    popover: {
-      title: "Welcome to Tradies2Quote",
-      description:
-        "This quick tour shows the main work areas: creating quotes, tracking the pipeline, scheduling jobs, finding materials, and opening settings.",
-      showButtons: ["next", "close"],
-      nextBtnText: "Start tour",
-    },
-  },
-  {
-    element: '[data-testid="beta-review-notice"]',
-    popover: {
-      title: "Review beta guidance",
-      description:
-        "During beta, treat generated scopes, quantities, and prices as drafts. This notice links to the checklist to review before sending a quote.",
-      side: "bottom",
-      align: "center",
-    },
-  },
-  {
-    element: '[data-testid="dashboard-actions"]',
-    popover: {
-      title: "Top actions",
-      description:
-        "Use these buttons to open your quote list or start a new quote. The orange action is the main next step on each screen.",
-      side: "bottom",
-      align: "end",
-    },
-  },
-  {
-    element:
-      '[data-testid="dashboard-new-quote"], [data-tour="new-quote"], [data-testid="dashboard-empty-cta"]',
-    popover: {
-      title: "Create a quote",
-      description:
-        "Open New quote to record, type, or scan the job details. This is where the quote workflow begins.",
-      side: "bottom",
-      align: "center",
-    },
-  },
-  {
-    element: '[data-testid="dashboard-kpi-strip"]',
-    popover: {
-      title: "Headline numbers",
-      description:
-        "These cards summarise current quoting activity: this month, replies waiting, accepted work, and drafts needing attention.",
-      side: "bottom",
-      align: "center",
-    },
-  },
-  {
-    // Anchor resolved at runtime to the smallest inner element present.
-    // Pointing at the whole pipeline card was ~400px tall on iPhone,
-    // which left no room for the popover and Driver.js parked it
-    // off-target. The inner grid (or empty-state hint) is much shorter
-    // and lets the popover sit cleanly below it.
-    element: '[data-testid="dashboard-stage-tiles"]',
-    popover: {
-      title: "Quote pipeline",
-      description:
-        "Quotes move through stages from draft to completed. Tap a stage tile to open the quote list filtered to that stage.",
-      side: "bottom",
-      align: "center",
-    },
-  },
-  {
-    // Empty-pipeline fallback for the same step — only one of these
-    // two will exist in the DOM, so only one survives the filter at
-    // drive time. The fallback covers fresh accounts that haven't
-    // created their first quote yet.
-    element: '[data-testid="dashboard-pipeline-empty"]',
-    popover: {
-      title: "Quote pipeline",
-      description:
-        "Your quotes will appear here grouped by stage once you create the first one.",
-      side: "bottom",
-      align: "center",
-    },
-  },
-  {
-    element: '[data-testid="dashboard-calendar"]',
-    popover: {
-      title: "Schedule",
-      description:
-        "Scheduled jobs and personal day notes live here. Select a date to see what is booked and add reminders.",
-      side: "top",
-      align: "center",
-    },
-  },
-  {
-    element: '[data-testid="quotes-list-client"], [data-testid="dashboard-empty"]',
-    popover: {
-      title: "Recent quotes",
-      description:
-        "Your latest quote drafts and sent quotes show here. Open one to review, edit, send, or create a PDF.",
-      side: "top",
-      align: "center",
-    },
-  },
-  {
-    element: '[data-testid="app-header-tabs"], [data-testid="app-bottom-nav"]',
-    popover: {
-      title: "Main navigation",
-      description:
-        "Use the bottom navigation to move between Home, Quotes, New, Invoices, and Materials. Active sections use your orange brand accent.",
-      side: "bottom",
-      align: "center",
-    },
-  },
-  {
-    element:
-      '[data-testid="app-header-tab-materials"], [data-testid="app-bottom-nav-materials"]',
-    popover: {
-      title: "Materials library",
-      description:
-        "Materials is where your commonly used items and prices live. Keeping it updated makes future quotes more accurate.",
-      side: "top",
-      align: "center",
-    },
-  },
-  {
-    element: '[data-tour="account-menu"]',
-    popover: {
-      title: "Account and settings",
-      description:
-        "Open this menu for business details, quote defaults, invoice defaults, clients, the full guide, and sign out.",
-      side: "left",
-      align: "start",
-    },
-  },
-  {
-    // Final wrap-up step — no element, popover renders centered.
-    popover: {
-      title: "You're ready",
-      description:
-        "Start with New quote, then review drafts before sending. You can replay this guided tour or open the full manual from Settings.",
-      showButtons: ["previous", "close"],
-      doneBtnText: "Get started",
-    },
-  },
-];
+const TARGETS = {
+  splash:
+    '[data-testid="loading-screen"], [data-testid="app-splash"]',
+  skeleton: '[data-testid="dashboard-skeleton"]',
+  businessName: '[data-testid="dashboard-business-name-banner"]',
+  materialsQuickStart: '[data-testid="dashboard-quick-start-banner"]',
+  newQuote: '[data-testid="dashboard-new-quote"]',
+  today: '[data-testid="dashboard-today"]',
+  dashboardMore: '[data-testid="dashboard-more"]',
+  dashboardMoreToggle: '[data-testid="dashboard-more-toggle"]',
+  pipeline:
+    '[data-testid="dashboard-stage-tiles"], [data-testid="dashboard-pipeline-empty"]',
+  calendar: '[data-testid="dashboard-calendar"]',
+  recent:
+    '[data-testid="quotes-list-client"], [data-testid="dashboard-empty"]',
+  navigation:
+    '[data-testid="app-header-tabs"], [data-testid="app-bottom-nav"]',
+  materials:
+    '[data-testid="app-header-tab-materials"], [data-testid="app-bottom-nav-materials"]',
+  account: '[data-tour="account-menu"]',
+} as const;
+
+/** Desktop and mobile keep both navigation surfaces in the DOM. Resolve
+ * the first rendered match rather than letting querySelector select a
+ * hidden desktop node on a phone (or the hidden mobile node on desktop). */
+function firstVisible(selector: string): HTMLElement | null {
+  const nodes = Array.from(document.querySelectorAll<HTMLElement>(selector));
+  for (const element of nodes) {
+    const rect = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    if (
+      rect.width > 1 &&
+      rect.height > 1 &&
+      style.visibility !== "hidden" &&
+      style.display !== "none" &&
+      style.opacity !== "0"
+    ) {
+      return element;
+    }
+  }
+  return null;
+}
+
+/** Keep the requested popover side when it fits, but point inward for
+ * controls pinned close to a viewport edge (mobile bottom nav/avatar). */
+function edgeAwareStep(
+  element: HTMLElement,
+  popover: NonNullable<DriveStep["popover"]>,
+): DriveStep {
+  const viewportHeight =
+    window.innerHeight || document.documentElement.clientHeight || 0;
+  const rect = element.getBoundingClientRect();
+  let side = popover.side;
+  if (viewportHeight > 0 && rect.top > viewportHeight * 0.6) side = "top";
+  else if (viewportHeight > 0 && rect.bottom < viewportHeight * 0.25) {
+    side = "bottom";
+  }
+  return { element, popover: { ...popover, side } };
+}
 
 function markDone() {
   try {
@@ -302,20 +210,40 @@ export function OnboardingTour({ onFinished }: OnboardingTourProps) {
   useEffect(() => {
     ensureStyleTag();
 
+    let cancelled = false;
     let finished = false;
-    const finishTour = () => {
+    let tourStarted = false;
+    let suppressDestroyCallback = false;
+    let driverObj: ReturnType<typeof driver> | null = null;
+    let dashboardMore: HTMLDetailsElement | null = null;
+    let dashboardMoreStateCaptured = false;
+    let dashboardMoreWasOpen = false;
+
+    const restoreDashboardMore = () => {
+      if (!dashboardMoreStateCaptured) return;
+      const current = dashboardMore?.isConnected
+        ? dashboardMore
+        : document.querySelector<HTMLDetailsElement>(TARGETS.dashboardMore);
+      if (current) current.open = dashboardMoreWasOpen;
+    };
+
+    /** User close, Escape, overlay-close, and Done are intentional exits. */
+    const completeTour = () => {
       if (finished) return;
       finished = true;
       markDone();
+      restoreDashboardMore();
       onFinished?.();
     };
 
-    // Cancellation flag — set by the cleanup function below. Replaces
-    // the previous single setTimeout / clearTimeout pattern because we
-    // now schedule several timers in sequence (poll loop + settle
-    // delay + driver kick-off) and they all need to bail if the
-    // component unmounts mid-wait.
-    let cancelled = false;
+    /** Startup/time-out/Driver failures must not consume first-run help. */
+    const abandonTour = () => {
+      if (finished) return;
+      finished = true;
+      restoreDashboardMore();
+      onFinished?.();
+    };
+
     const timers = new Set<ReturnType<typeof setTimeout>>();
     const schedule = (fn: () => void, ms: number) => {
       const t = setTimeout(() => {
@@ -325,108 +253,255 @@ export function OnboardingTour({ onFinished }: OnboardingTourProps) {
       timers.add(t);
     };
 
-    /**
-     * Wait until the LoadingScreen (data-testid="loading-screen") is
-     * gone from the DOM before firing. Previously this was a fixed
-     * 300ms delay, which fires inside the 5s tape-measure splash on
-     * first /app entry — Driver.js highlights elements behind the
-     * splash that the user can't see. Polling the DOM covers both
-     * cases:
-     *   - First visit: splash plays ~5s → polls until it unmounts → fire
-     *   - Returning visit (splash skipped via sessionStorage): element
-     *     never appears → polls fall through immediately → fire after
-     *     the settle delay
-     * Hard ceiling of 10s so a bug in the splash can't permanently
-     * block the tour.
-     */
     const POLL_INTERVAL_MS = 200;
-    const MAX_WAIT_MS = 10_000;
-    const SETTLE_AFTER_SPLASH_MS = 350;
+    const MAX_WAIT_MS = 15_000;
+    const SETTLE_AFTER_READY_MS = 250;
+    const MIN_COMPLETE_STEP_COUNT = 11;
     const startedAt = Date.now();
 
-    const waitForSplash = () => {
-      if (cancelled) return;
-      const splash = document.querySelector(
-        '[data-testid="loading-screen"], [data-testid="app-splash"]',
-      );
-      const elapsed = Date.now() - startedAt;
-      if (!splash || elapsed > MAX_WAIT_MS) {
-        schedule(kickOff, SETTLE_AFTER_SPLASH_MS);
-        return;
+    const dashboardIsReady = () => {
+      if (
+        document.querySelector(TARGETS.splash) ||
+        document.querySelector(TARGETS.skeleton)
+      ) {
+        return false;
       }
-      schedule(waitForSplash, POLL_INTERVAL_MS);
+
+      return Boolean(
+        firstVisible(TARGETS.newQuote) &&
+          firstVisible(TARGETS.today) &&
+          firstVisible(TARGETS.dashboardMoreToggle) &&
+          document.querySelector(TARGETS.pipeline) &&
+          document.querySelector(TARGETS.calendar) &&
+          firstVisible(TARGETS.recent) &&
+          firstVisible(TARGETS.navigation) &&
+          firstVisible(TARGETS.materials) &&
+          firstVisible(TARGETS.account),
+      );
+    };
+
+    const buildSteps = (): DriveStep[] | null => {
+      const newQuote = firstVisible(TARGETS.newQuote);
+      const today = firstVisible(TARGETS.today);
+      const more = document.querySelector<HTMLDetailsElement>(
+        TARGETS.dashboardMore,
+      );
+      const moreToggle = firstVisible(TARGETS.dashboardMoreToggle);
+      const pipeline = document.querySelector<HTMLElement>(TARGETS.pipeline);
+      const calendar = document.querySelector<HTMLElement>(TARGETS.calendar);
+      const recent = firstVisible(TARGETS.recent);
+      const navigation = firstVisible(TARGETS.navigation);
+      const materials = firstVisible(TARGETS.materials);
+      const account = firstVisible(TARGETS.account);
+
+      if (
+        !newQuote ||
+        !today ||
+        !more ||
+        !moreToggle ||
+        !pipeline ||
+        !calendar ||
+        !recent ||
+        !navigation ||
+        !materials ||
+        !account
+      ) {
+        return null;
+      }
+
+      dashboardMore = more;
+      if (!dashboardMoreStateCaptured) {
+        dashboardMoreStateCaptured = true;
+        dashboardMoreWasOpen = more.open;
+      }
+
+      const revealMoreTarget = (
+        selector: string,
+        fallback: HTMLElement,
+      ): (() => Element) => {
+        return () => {
+          const current = dashboardMore?.isConnected
+            ? dashboardMore
+            : document.querySelector<HTMLDetailsElement>(TARGETS.dashboardMore);
+          if (current) {
+            dashboardMore = current;
+            current.open = true;
+          }
+          return (
+            firstVisible(selector) ??
+            document.querySelector<HTMLElement>(selector) ??
+            fallback
+          );
+        };
+      };
+
+      const steps: DriveStep[] = [
+        {
+          popover: {
+            title: "Welcome to Tradies2Quote",
+            description:
+              "This quick tour points to the real controls you will use to create quotes, plan work, manage materials, and update your account.",
+            showButtons: ["next", "close"],
+            nextBtnText: "Start tour",
+          },
+        },
+      ];
+
+      const businessName = firstVisible(TARGETS.businessName);
+      if (businessName) {
+        steps.push(
+          edgeAwareStep(businessName, {
+            title: "Add your business name",
+            description:
+              "Set this first so your business name appears correctly on quote PDFs and customer emails.",
+            side: "bottom",
+            align: "center",
+          }),
+        );
+      }
+
+      const quickStart = firstVisible(TARGETS.materialsQuickStart);
+      if (quickStart) {
+        steps.push(
+          edgeAwareStep(quickStart, {
+            title: "Set up common materials",
+            description:
+              "This quick start adds the materials and real prices you use most, which improves every quote that follows.",
+            side: "bottom",
+            align: "center",
+          }),
+        );
+      }
+
+      steps.push(
+        edgeAwareStep(newQuote, {
+          title: "Create a quote",
+          description:
+            "Tap New quote to record, type, or scan the job details. This is where every quote starts.",
+          side: "bottom",
+          align: "center",
+        }),
+        edgeAwareStep(today, {
+          title: "Your work today",
+          description:
+            "Today keeps the next job, follow-ups, material readiness, and site conditions together in one live workboard.",
+          side: "bottom",
+          align: "center",
+        }),
+        edgeAwareStep(moreToggle, {
+          title: "Pipeline, metrics, and calendar",
+          description:
+            "This disclosure keeps deeper planning tools tidy. The tour will open it now and point to each live section.",
+          side: "top",
+          align: "center",
+        }),
+        {
+          element: revealMoreTarget(TARGETS.pipeline, pipeline),
+          popover: {
+            title: "Quote pipeline",
+            description: pipeline.matches('[data-testid="dashboard-stage-tiles"]')
+              ? "Quotes move from draft through to completed. Each tile opens the quote list filtered to that stage."
+              : "Your first quote will appear here and move through each stage as the job progresses.",
+            side: "top",
+            align: "center",
+          },
+        },
+        {
+          element: revealMoreTarget(TARGETS.calendar, calendar),
+          popover: {
+            title: "Schedule",
+            description:
+              "Scheduled jobs and day notes live in this calendar. Select a date to see bookings or add a reminder.",
+            side: "top",
+            align: "center",
+          },
+        },
+        edgeAwareStep(recent, {
+          title: "Recent quotes",
+          description: recent.matches('[data-testid="dashboard-empty"]')
+            ? "Your first quote will appear here once you create it."
+            : "Open any recent quote here to review, edit, send, or create its PDF.",
+          side: "top",
+          align: "center",
+        }),
+        edgeAwareStep(navigation, {
+          title: "Main navigation",
+          description: navigation.matches('[data-testid="app-bottom-nav"]')
+            ? "This bottom bar stays pinned to the phone's bottom edge for Home, Quotes, New, Invoices, and Materials."
+            : "Use these tabs to move between the main work areas without returning to the dashboard first.",
+          side: "top",
+          align: "center",
+        }),
+        edgeAwareStep(materials, {
+          title: "Materials library",
+          description:
+            "Keep commonly used items and prices here so future quote quantities and costs start closer to your real numbers.",
+          side: "top",
+          align: "center",
+        }),
+        edgeAwareStep(account, {
+          title: "Account and settings",
+          description:
+            "Open your account for business details, quote and invoice defaults, clients, the full guide, and sign out.",
+          side: "left",
+          align: "start",
+        }),
+        {
+          popover: {
+            title: "You're ready",
+            description:
+              "Start with New quote and review every draft before sending. You can replay this tour any time from Settings.",
+            showButtons: ["previous", "next", "close"],
+            doneBtnText: "Get started",
+          },
+        },
+      );
+
+      return steps;
+    };
+
+    const destroyDriverWithoutCompletion = () => {
+      const current = driverObj;
+      driverObj = null;
+      if (!current) return;
+      suppressDestroyCallback = true;
+      try {
+        if (current.isActive()) current.destroy();
+      } catch {
+        // Best-effort cleanup after a Driver startup/runtime failure.
+      } finally {
+        suppressDestroyCallback = false;
+      }
     };
 
     const kickOff = () => {
+      if (cancelled || finished) return;
       try {
-        // Resolve each step to the element the user can ACTUALLY SEE.
-        //
-        // The nav steps use comma selectors that list the desktop header
-        // element first (e.g. app-header-tabs, app-header-tab-materials).
-        // On mobile those nodes still exist in the DOM but are
-        // display:none — and Driver.js's querySelector would grab that
-        // first, hidden, zero-size node, parking the popover at the top of
-        // the screen pointing at nothing (the "stuck at the top" bug on
-        // steps 9–12). We pick the first VISIBLE match instead, and pass
-        // the resolved HTMLElement straight to Driver.js.
-        const firstVisible = (selector: string): HTMLElement | null => {
-          const nodes = Array.from(
-            document.querySelectorAll<HTMLElement>(selector),
-          );
-          for (const el of nodes) {
-            const r = el.getBoundingClientRect();
-            const cs = getComputedStyle(el);
-            if (
-              r.width > 1 &&
-              r.height > 1 &&
-              cs.visibility !== "hidden" &&
-              cs.display !== "none"
-            ) {
-              return el;
-            }
+        if (!dashboardIsReady()) {
+          if (Date.now() - startedAt < MAX_WAIT_MS) {
+            schedule(waitForDashboard, POLL_INTERVAL_MS);
+          } else {
+            abandonTour();
           }
-          return null;
-        };
-
-        const vh =
-          window.innerHeight || document.documentElement.clientHeight || 0;
-
-        const steps: DriveStep[] = [];
-        for (const step of ALL_STEPS) {
-          // Welcome + final steps have no element and always run centred.
-          if (typeof step.element !== "string") {
-            steps.push(step);
-            continue;
-          }
-          const el = firstVisible(step.element);
-          if (!el) continue; // no visible anchor right now — skip it
-          // Auto-correct the popover side for elements pinned to a screen
-          // edge so the bubble never lands off-screen.
-          const rect = el.getBoundingClientRect();
-          let side = step.popover?.side;
-          if (vh > 0 && rect.top > vh * 0.6) side = "top";
-          else if (vh > 0 && rect.bottom < vh * 0.25) side = "bottom";
-          steps.push({
-            ...step,
-            element: el,
-            popover: step.popover
-              ? { ...step.popover, side }
-              : step.popover,
-          });
-        }
-
-        // If only the welcome + done steps survived, there's nothing
-        // useful to highlight — skip the tour and mark it done so we
-        // don't keep retrying.
-        if (steps.length <= 2) {
-          finishTour();
           return;
         }
 
-        const driverObj = driver({
+        const steps = buildSteps();
+        if (!steps || steps.length < MIN_COMPLETE_STEP_COUNT) {
+          if (Date.now() - startedAt < MAX_WAIT_MS) {
+            schedule(waitForDashboard, POLL_INTERVAL_MS);
+          } else {
+            abandonTour();
+          }
+          return;
+        }
+
+        driverObj = driver({
           showProgress: true,
           progressText: "Step {{current}} of {{total}}",
           allowClose: true,
+          allowScroll: false,
+          overlayClickBehavior: "close",
           overlayOpacity: 0.42,
           stagePadding: 8,
           stageRadius: 12,
@@ -434,31 +509,49 @@ export function OnboardingTour({ onFinished }: OnboardingTourProps) {
           nextBtnText: "Next",
           prevBtnText: "Back",
           doneBtnText: "Done",
-          // Scroll the highlighted element into view before positioning
-          // the popover. Without this, an anchor that's even partially
-          // offscreen on iPhone gets a popover parked at the screen edge
-          // and the spotlight border looks disconnected from the bubble.
           smoothScroll: true,
+          disableActiveInteraction: true,
           steps,
+          onPopoverRender: (popover) => {
+            popover.closeButton.setAttribute("aria-label", "Skip tutorial");
+          },
           onDestroyed: () => {
-            finishTour();
+            driverObj = null;
+            if (cancelled || suppressDestroyCallback) return;
+            if (tourStarted) completeTour();
+            else abandonTour();
           },
         });
         driverObj.drive();
+        tourStarted = true;
       } catch {
-        // If Driver.js throws (e.g. DOM removed mid-drive), don't
-        // crash the app — just mark the tour done so the user isn't
-        // stuck with a broken state on reload.
-        finishTour();
+        tourStarted = false;
+        destroyDriverWithoutCompletion();
+        abandonTour();
       }
     };
 
-    waitForSplash();
+    const waitForDashboard = () => {
+      if (cancelled || finished) return;
+      if (dashboardIsReady()) {
+        schedule(kickOff, SETTLE_AFTER_READY_MS);
+        return;
+      }
+      if (Date.now() - startedAt >= MAX_WAIT_MS) {
+        abandonTour();
+        return;
+      }
+      schedule(waitForDashboard, POLL_INTERVAL_MS);
+    };
+
+    waitForDashboard();
 
     return () => {
       cancelled = true;
       timers.forEach((t) => clearTimeout(t));
       timers.clear();
+      destroyDriverWithoutCompletion();
+      restoreDashboardMore();
     };
   }, [onFinished]);
 

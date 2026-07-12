@@ -410,7 +410,11 @@ async function DashboardData({
 
       {/* ── Demoted: pipeline, headline metrics & calendar (collapsed) ─────── */}
       <details data-testid="dashboard-more" className="mb-7">
-        <summary className="t2q-section-label-pro cursor-pointer select-none list-none">
+        <summary
+          data-testid="dashboard-more-toggle"
+          data-tour="dashboard-more-toggle"
+          className="t2q-section-label-pro cursor-pointer select-none list-none"
+        >
           {"// pipeline, metrics & calendar"}
         </summary>
         <div className="mt-4 space-y-7">
