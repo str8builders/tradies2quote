@@ -1,0 +1,37 @@
+# ---------------------------------------------------------------------------
+# Caddy reverse proxy — automatic HTTPS (Let's Encrypt) for tradies2quote.
+#
+# Replace the two hostnames below with your real domains, then point their
+# DNS A records at your VPS public IP. Caddy provisions TLS on first request.
+#
+#   tradies2quote.com      -> Next.js app        (app:3000)
+#   api.tradies2quote.com  -> Supabase gateway    (kong:8000)
+#
+# The browser Supabase client (NEXT_PUBLIC_SUPABASE_URL) MUST point at the
+# api.* hostname so auth/storage/postgrest calls resolve publicly over HTTPS.
+# ---------------------------------------------------------------------------
+
+tradies2quote.com, www.tradies2quote.com {
+	encode gzip zstd
+	# Redirect the www apex to the bare domain.
+	@www host www.tradies2quote.com
+	redir @www https://tradies2quote.com{uri} permanent
+	reverse_proxy app:3000
+}
+
+# Self-hosted Supabase public API (Auth / PostgREST / Storage / Realtime),
+# fronted by the stack's Kong gateway.
+api.tradies2quote.com {
+	encode gzip zstd
+	reverse_proxy kong:8000
+}
+
+# OPTIONAL — Supabase Studio, locked behind HTTP basic auth. Generate the hash
+# with:  docker run --rm caddy:2 caddy hash-password --plaintext 'yourpass'
+# then uncomment and replace the placeholder below.
+# studio.tradies2quote.com {
+# 	basic_auth {
+# 		admin <REPLACE_WITH_CADDY_HASH>
+# 	}
+# 	reverse_proxy studio:3000
+# }

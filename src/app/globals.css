@@ -79,6 +79,11 @@ body {
      way `overflow-x: hidden` would. Supported in every browser the
      app targets (Safari 16+, Chrome 90+). */
   overflow-x: clip;
+  /* Kills double-tap-to-zoom (a cause of the "app moves around inside the
+     screen" report) and the legacy 300ms tap delay app-wide. Still allows
+     pan/scroll — only the zoom gestures are removed. Pairs with the
+     viewport maximumScale:1 lock in src/app/layout.tsx. */
+  touch-action: manipulation;
 }
 
 /* Wave 36 — anywhere we declared `min-h-screen` (=100vh), use the
@@ -652,12 +657,21 @@ h1, h2, h3, h4, h5 {
   /* Smoother, warmer canvas — a soft brand glow up top, a faint hi-vis
      wash at the foot and a gentle warm-to-deep vertical fade so the
      screen reads as a calm graded surface instead of flat near-black. */
+  /* 2026-07-17 — user asked for "a little bit more orange with the black":
+     top brand glow lifted 0.22→0.30 and reaches further down, a second soft
+     orange wash added low-left, and the vertical fade starts a shade warmer.
+     Still ambient — content cards stay on near-black. */
   background-image:
     radial-gradient(
-      120% 80% at 85% -8%,
-      rgba(255, 95, 21, 0.22) 0%,
-      rgba(255, 95, 21, 0.07) 30%,
-      transparent 62%
+      120% 82% at 85% -8%,
+      rgba(255, 95, 21, 0.30) 0%,
+      rgba(255, 95, 21, 0.10) 34%,
+      transparent 68%
+    ),
+    radial-gradient(
+      100% 60% at -6% 82%,
+      rgba(255, 95, 21, 0.07) 0%,
+      transparent 58%
     ),
     radial-gradient(
       110% 80% at 10% 108%,
@@ -670,7 +684,7 @@ h1, h2, h3, h4, h5 {
       rgba(255, 255, 255, 0.05) 0%,
       transparent 58%
     ),
-    linear-gradient(180deg, #16110D 0%, #100D0C 26%, #0A0A0A 68%, #070707 100%);
+    linear-gradient(180deg, #1C130C 0%, #140F0C 26%, #0C0A09 68%, #070707 100%);
   /* `scroll`, not `fixed`. `background-attachment: fixed` is notoriously
      janky on iOS Safari — the background desyncs from content during
      momentum scroll and URL-bar collapse, which makes the whole app look
@@ -715,6 +729,75 @@ h1, h2, h3, h4, h5 {
 .t2q-loading-caption {
   animation: t2q-loading-breathe 1.6s ease-in-out infinite;
   will-change: opacity;
+}
+
+/* ─── CSS-only page/section entrance (2026-07-17) ─────────────────────────
+   Replaces the framer-motion `initial={{opacity:0}}` wrappers in
+   template.tsx + StaggerIn. Those serialized opacity:0 into the server
+   HTML, so on a cold launch (or any hydration stall/failure) the
+   dashboard rendered INVISIBLE until the JS bundle arrived — the
+   "everything's missing at the start" bug. CSS animations start the
+   moment the HTML+CSS paint, need no JavaScript, and if the animation
+   can't run for any reason the content simply shows — the safe failure
+   mode server-rendered content must have.
+   Same physics as motion.ts EASE_ENTER (380ms ease-out-quint). */
+@keyframes t2q-enter-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+.t2q-page-enter {
+  animation: t2q-enter-up 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.t2q-stagger {
+  animation: t2q-enter-up 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* Per-section cascade — index set inline as --t2q-stagger-i. */
+  animation-delay: calc(var(--t2q-stagger-i, 0) * 55ms);
+}
+
+/* ─── Tape gauge "alive" layer (2026-07-17) ───────────────────────────────
+   The determinate tape (quote generation etc.) creeps so slowly over a
+   long AI wait that the needle read as frozen. A sweeping sheen over the
+   filled region + a breathing needle glow keep visible motion at ALL
+   times, independent of progress. NOTE: the sheen must NOT sit on the
+   fill itself — the fill uses mix-blend-multiply over the yellow tape,
+   and multiplying by a white highlight is a no-op. */
+@keyframes t2q-tape-sheen-sweep {
+  from { background-position: 140% 0; }
+  to   { background-position: -140% 0; }
+}
+.t2q-tape-sheen {
+  background-image: linear-gradient(
+    105deg,
+    transparent 25%,
+    rgba(255, 255, 255, 0.55) 45%,
+    rgba(255, 255, 255, 0.18) 55%,
+    transparent 75%
+  );
+  background-size: 240% 100%;
+  background-repeat: no-repeat;
+  animation: t2q-tape-sheen-sweep 1.5s linear infinite;
+  opacity: 0.55;
+}
+@keyframes t2q-needle-pulse {
+  0%, 100% { box-shadow: 0 0 12px rgba(255, 95, 21, 0.85); }
+  50%      { box-shadow: 0 0 22px rgba(255, 95, 21, 1), 0 0 42px rgba(255, 95, 21, 0.45); }
+}
+.t2q-tape-needle {
+  animation: t2q-needle-pulse 1.15s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t2q-page-enter,
+  .t2q-stagger {
+    animation: none;
+  }
+  .t2q-tape-sheen {
+    animation: none;
+    opacity: 0;
+  }
+  .t2q-tape-needle {
+    animation: none;
+  }
 }
 
 /* ─── Splash entrance animations (Wave 17 — perf) ─────────────────────────
@@ -928,6 +1011,14 @@ h1, h2, h3, h4, h5 {
 .t2q-card-pro-hover {
   transition: border-color 200ms ease, box-shadow 240ms ease, transform 220ms ease;
 }
+/* Wave 45 — tactile press response on interactive cards (NOT the bottom
+   nav — the shell contract bans transforms there; cards are fair game). */
+@media (prefers-reduced-motion: no-preference) {
+  .t2q-card-pro-hover:active {
+    transform: scale(0.988);
+    transition-duration: 90ms;
+  }
+}
 @media (hover: hover) {
   .t2q-card-pro-hover:hover {
     border-color: rgba(255, 95, 21, 0.28);
@@ -1119,20 +1210,11 @@ h1, h2, h3, h4, h5 {
   color: #FFFFFF;
   background-color: rgba(255, 255, 255, 0.04);
 }
+/* Wave 45 — the active background/border/underline is painted by a
+   framer-motion `layoutId` span inside the tab (AppHeaderClient) so it
+   SLIDES between tabs; the static rules keep only text colour. */
 .t2q-nav-tab[aria-current="page"] {
   color: #FFFFFF;
-  background-color: rgba(255, 95, 21, 0.12);
-  border-color: rgba(255, 95, 21, 0.35);
-}
-.t2q-nav-tab[aria-current="page"]::after {
-  content: "";
-  position: absolute;
-  left: 0.875rem;
-  right: 0.875rem;
-  bottom: -1px;
-  height: 2px;
-  background: #FF5F15;
-  border-radius: 1px;
 }
 [data-theme="light"] .t2q-nav-tab { color: #5C5C5C; }
 [data-theme="light"] .t2q-nav-tab:hover {
@@ -1141,41 +1223,50 @@ h1, h2, h3, h4, h5 {
 }
 [data-theme="light"] .t2q-nav-tab[aria-current="page"] {
   color: #0A0A0A;
-  background-color: rgba(255, 95, 21, 0.10);
-  border-color: rgba(255, 95, 21, 0.40);
 }
 
 /* ─── Mobile bottom navigation ───────────────────────────────────────────
    Wave 44 — light, app-native tab bar: surface + border tokens, orange
    active emphasis, readable muted inactive labels.
 
-   MOBILE SHELL CONTRACT — owner: BOTTOM SAFE-AREA PAINT.
-   See docs/mobile-shell-contract.md. This is the single element that owns the
-   home-indicator zone: `position: fixed; bottom: 0` + an explicit `background`
-   + `padding-bottom: …env(safe-area-inset-bottom)` means the nav's OWN
-   background paints the safe area — no spacer, overlay, or filler band below it.
-   Keep the `4.05rem` in `min-height` in sync with the `.t2q-app-scroll`
-   bottom-padding so content always clears the nav. Do NOT override this to
-   `position: static` / make it a flex child of a fixed canvas — that was the
-   regression. */
+   MOBILE SHELL CONTRACT — FLOATING ISLAND NAV (2026-07-17 redesign).
+   See docs/mobile-shell-contract.md (addendum). The nav is now a floating
+   rounded island lifted `0.75rem` above the home indicator; the BOTTOM
+   SAFE-AREA PAINT owner is therefore the root/canvas dark (#0A0A0A via
+   `html:has([data-shell="app"])` + `.t2q-app-canvas`) which shows around
+   and beneath the island — same colour everywhere, so the white-strip
+   regression cannot recur. Geometry contract (mobile-shell-contract.test.ts
+   asserts these): island occupies `4.15rem` tall at `env(inset) + 0.75rem`
+   from the bottom → total claimed space `4.9rem + env(inset)`; keep
+   `.t2q-app-scroll` bottom padding at `5.8rem + env(inset)` (0.9rem
+   breathing) and fixed sticky bars docked at `5.3rem + env(inset)`.
+   Still `position: fixed` on the document scroller — do NOT make it a
+   flex child of a fixed canvas; that was the original regression. */
 .t2q-bottomnav-bar {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100%;
-  max-width: 100vw;
-  margin: 0;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
+  margin-inline: auto;
+  width: auto;
+  max-width: 26rem;
   box-sizing: border-box;
   z-index: 40;
   display: flex;
-  align-items: stretch;
+  align-items: center;
   justify-content: space-between;
-  min-height: calc(4.05rem + env(safe-area-inset-bottom, 0px));
-  padding: 0.45rem 0.45rem calc(0.45rem + env(safe-area-inset-bottom, 0px));
-  background: var(--t2q-app-surface, #FFFFFF);
-  border-top: 1px solid var(--t2q-app-border, #DDE5EC);
-  box-shadow: 0 -10px 24px -22px rgba(15, 23, 42, 0.32);
+  gap: 0.15rem;
+  min-height: 4.15rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 1.6rem;
+  background: rgba(18, 14, 11, 0.92);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow:
+    0 18px 40px -18px rgba(0, 0, 0, 0.85),
+    0 4px 14px -8px rgba(255, 95, 21, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .t2q-bottomnav-tab {
@@ -1222,12 +1313,13 @@ h1, h2, h3, h4, h5 {
   background: var(--t2q-app-orange-soft, #FFF1EA);
 }
 
+/* Wave 45 — the active pill (background/border/underline) is now painted
+   by a framer-motion `layoutId` span inside the tab so it SLIDES between
+   tabs (see MobileAppMenuClient). The static rule keeps only the text
+   emphasis; keep it in sync with the span's classes. */
 .t2q-bottomnav-tab[aria-current="page"] {
   color: #C2410C;
-  background: var(--t2q-app-orange-soft, #FFF1EA);
-  border-color: #FFD4B8;
   font-weight: 800;
-  box-shadow: inset 0 -2px 0 #FF5F15;
 }
 
 .t2q-bottomnav-tab[aria-current="page"] .t2q-bottomnav-icon {
@@ -1237,6 +1329,36 @@ h1, h2, h3, h4, h5 {
 
 .t2q-bottomnav-tab-primary {
   color: #C2410C;
+}
+
+/* Central circular "+" — the New-quote action as a raised orange disc
+   (mockup parity). Icon-only; the accessible name is the aria-label.
+   No :active transform (shell-contract ban) — feedback via brightness. */
+.t2q-bottomnav-plus {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.35rem;
+  height: 3.35rem;
+  margin-inline: 0.2rem;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #FF7A3D 0%, #FF5F15 55%, #F04E00 100%);
+  color: #14100C;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    0 10px 22px -10px rgba(255, 95, 21, 0.65),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: filter 140ms ease;
+}
+.t2q-bottomnav-plus:active {
+  filter: brightness(1.12);
+}
+.t2q-bottomnav-plus[aria-current="page"] {
+  box-shadow:
+    0 0 0 2px rgba(255, 95, 21, 0.35),
+    0 10px 22px -10px rgba(255, 95, 21, 0.75),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 /* ─── Floating account avatar (mobile only) ───────────────────────────────
@@ -1287,7 +1409,9 @@ h1, h2, h3, h4, h5 {
    white to "match the nav" — that masks the strip instead of removing it. */
 html:has([data-shell="app"]),
 body:has([data-shell="app"]) {
-  background: #F5F4EE;
+  /* Root layer behind the app shell — must match the dark canvas so
+     overscroll / safe-area edges never flash a different colour. */
+  background: #0A0A0A;
 }
 
 /* ── Mobile app-shell (phones ≤639px) — canonical fixed-nav pattern ─────────
@@ -1310,22 +1434,39 @@ body:has([data-shell="app"]) {
 @media (max-width: 639px) {
   /* MOBILE SHELL CONTRACT — owner: SCROLL CLEARANCE (not a scroll owner).
      The document is the single scroll owner; `.t2q-app-scroll` is just the
-     content wrapper. Its only shell job is this bottom padding = nav content
-     height (4.05rem, kept in sync with `.t2q-bottomnav-bar` min-height) +
-     `env(safe-area-inset-bottom)`, so content always clears the fixed nav. Do
-     NOT make this an `overflow-y: auto` nested scroller — that adds a second
-     scroll owner. */
+     content wrapper. Its only shell job is this bottom padding = the floating
+     island's claimed space (0.75rem lift + 4.15rem bar = 4.9rem) + 0.9rem
+     breathing = 5.8rem, plus `env(safe-area-inset-bottom)`, so content always
+     scrolls clear of the island (the old exact-height padding left ZERO
+     breathing — buttons kissed the nav edge). Keep in sync with
+     `.t2q-bottomnav-bar` geometry. Do NOT make this an `overflow-y: auto`
+     nested scroller — that adds a second scroll owner. */
   body:has([data-shell="app"]) .t2q-app-scroll {
     width: 100%;
     max-width: 100%;
     overflow-x: clip;
-    padding-bottom: calc(4.05rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(5.8rem + env(safe-area-inset-bottom, 0px));
   }
   /* During the entry splash the nav + avatar are hidden; the cream splash and
      the cream body own the screen — nothing white anywhere. */
   [data-shell="app"]:has([data-testid="app-splash"]) .t2q-bottomnav-bar,
   [data-shell="app"]:has([data-testid="app-splash"]) .t2q-account-avatar {
     display: none;
+  }
+
+  /* iOS auto-zoom guard (the "app moves around inside the screen" bug):
+     focusing ANY form control whose font-size is < 16px force-zooms the
+     page in the installed iOS shell and never zooms back. Force every
+     input/textarea/select to >=16px on phones. Unlayered → beats the
+     Tailwind text-sm/text-xs utilities without touching a single JSX file;
+     desktop (>=640px) keeps the design's smaller field text. Folded into
+     THIS single 639px block on purpose — the shell contract (and its test)
+     forbids a second one. Global scope so it also covers /login, /signup
+     and the public /quote/[token] page (outside [data-shell="app"]). */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
   }
 }
 
@@ -1775,6 +1916,30 @@ body:has([data-shell="app"]) {
    business logic are touched by this section.
    ========================================================================= */
 
+/* Dark app-shell variable set — the DEFAULT since the dark flip. The
+   bottom nav, header and other shell chrome read var(--t2q-app-*) with
+   light fallbacks; without these the nav painted its #FFFFFF fallback
+   as a white strip on the ink canvas. */
+[data-shell="app"] {
+  --t2q-app-page: #0A0A0A;
+  --t2q-app-surface: rgba(12, 12, 12, 0.94);
+  --t2q-app-surface-muted: #141414;
+  --t2q-app-border: #262626;
+  --t2q-app-border-soft: #1F1F1F;
+  --t2q-app-text: #FFFFFF;
+  --t2q-app-muted: #A8A8A8;
+  --t2q-app-orange-soft: rgba(255, 95, 21, 0.12);
+}
+
+/* Dark-shell readability — the raw ink greys were tuned for the
+   marketing site's large type; at app UI sizes ink-400/500 sit below
+   comfortable contrast on the ink canvas. Lift the muted text tiers.
+   (Scoped to the dark shell only; the light override sheet keeps its
+   own remaps.) */
+[data-shell="app"][data-theme="dark"] .text-ink-500 { color: #8A8A85; }
+[data-shell="app"][data-theme="dark"] .text-ink-400 { color: #A6A6A0; }
+[data-shell="app"][data-theme="dark"] .text-ink-300 { color: #C9C9C3; }
+
 [data-shell="app"][data-theme="light"] {
   --t2q-app-page: #F4F7FA;
   --t2q-app-surface: #FFFFFF;
@@ -1807,7 +1972,8 @@ body:has([data-shell="app"]) {
   -webkit-backdrop-filter: blur(12px) saturate(140%);
 }
 
-[data-shell="app"][data-theme="light"] [data-testid="app-header"] > div {
+/* Layout, not colour — applies to the app shell in every theme. */
+[data-shell="app"] [data-testid="app-header"] > div {
   max-width: 72rem;
 }
 

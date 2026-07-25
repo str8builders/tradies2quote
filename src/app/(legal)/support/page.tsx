@@ -184,10 +184,10 @@ export default function SupportPage() {
                 further 30 days.
               </p>
               <p className="mt-4 text-ink-300 text-sm leading-relaxed">
-                We are still in beta, so deletions are handled manually
-                by a human (Challis) rather than a self-serve button —
-                you&apos;ll get a confirmation reply within one business
-                day.
+                Prefer self-serve? You can delete your account directly
+                in the app — open <strong>Settings</strong> and scroll to
+                the delete-account section. It removes your quotes,
+                clients and account on the spot, no email needed.
               </p>
             </div>
 
@@ -258,8 +258,8 @@ export default function SupportPage() {
             </p>
             <p className="mt-2">
               Support hours are Monday to Friday, 8am – 6pm NZST. We do
-              our best to answer faster, but during the beta one-business-day
-              response is what we promise.
+              our best to answer faster, but one-business-day response is
+              what we promise.
             </p>
           </div>
         </div>

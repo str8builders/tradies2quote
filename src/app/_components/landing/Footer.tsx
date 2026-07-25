@@ -2,7 +2,13 @@ import Link from "next/link";
 import { LEGAL } from "@/lib/legal";
 import { Logo } from "./Logo";
 
-export function Footer() {
+export function Footer({
+  // 3.1.3(f) — set server-side (see src/lib/native-shell.ts) inside the iOS
+  // App Store shell: the "Pricing" footer link must not appear there.
+  hidePricingLinks = false,
+}: {
+  hidePricingLinks?: boolean;
+} = {}) {
   return (
     <footer
       data-testid="site-footer"
@@ -43,15 +49,31 @@ export function Footer() {
                   Features
                 </a>
               </li>
-              <li>
-                <a
-                  href="#pricing"
-                  data-testid="footer-link-pricing"
-                  className="hover:text-white"
-                >
-                  Pricing
-                </a>
-              </li>
+              {/* Both withheld inside the iOS App Store shell: pricing for
+                  3.1.3(f), the calculator app because it is a native iOS app
+                  distributed outside the App Store (2.5.2). */}
+              {hidePricingLinks ? null : (
+                <>
+                  <li>
+                    <Link
+                      href="/calculator"
+                      data-testid="footer-link-calculator"
+                      className="hover:text-white"
+                    >
+                      Calculator app
+                    </Link>
+                  </li>
+                  <li>
+                    <a
+                      href="#pricing"
+                      data-testid="footer-link-pricing"
+                      className="hover:text-white"
+                    >
+                      Pricing
+                    </a>
+                  </li>
+                </>
+              )}
             </ul>
           </div>
           <div>

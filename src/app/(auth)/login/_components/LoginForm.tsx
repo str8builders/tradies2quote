@@ -10,7 +10,7 @@ import {
   Lock,
 } from "@phosphor-icons/react";
 import { Magnetic } from "../../../_components/landing/Magnetic";
-import { loginAction } from "../actions";
+import { loginAction, resendConfirmationAction } from "../actions";
 
 /**
  * Client-side form for /login.
@@ -33,7 +33,13 @@ type Props = {
 export function LoginForm({ next, error, message }: Props) {
   const [show, setShow] = useState(false);
 
+  // Offer a confirmation-email resend whenever the banner is about
+  // confirming (post-signup "check your inbox", Supabase "Email not
+  // confirmed" login error, or the resend action's own neutral reply).
+  const confirmRelated = /confirm/i.test(`${message ?? ""} ${error ?? ""}`);
+
   return (
+    <>
     <form action={loginAction} className="space-y-4" data-testid="login-form">
       <input type="hidden" name="next" value={next ?? "/app"} />
 
@@ -119,6 +125,42 @@ export function LoginForm({ next, error, message }: Props) {
         </span>
       </div>
     </form>
+
+    {/* Wave 40 — resend the signup confirmation email. Its own <form>
+        (outside the login form — nested forms are invalid HTML) posting
+        to a rate-limited, enumeration-safe server action. Only shown
+        when the banner above is confirmation-related, so the login
+        screen stays clean for everyone else. */}
+    {confirmRelated && (
+      <form
+        action={resendConfirmationAction}
+        className="mt-4 border border-ink-700 bg-ink-800/60 rounded-sm p-3 space-y-2"
+        data-testid="resend-confirmation-form"
+      >
+        <div className="text-sm text-ink-300">
+          Didn&apos;t get the confirmation email?
+        </div>
+        <div className="flex gap-2">
+          <input
+            name="email"
+            type="email"
+            required
+            autoComplete="email"
+            placeholder="you@yourbusiness.co.nz"
+            data-testid="resend-confirmation-email"
+            className="flex-1 h-10 rounded-sm border border-ink-600 bg-ink-900 px-3 text-sm text-white placeholder:text-ink-500 focus:border-brand focus:outline-none"
+          />
+          <button
+            type="submit"
+            className="h-10 px-4 rounded-sm border border-brand text-brand hover:bg-brand hover:text-white font-display text-xs uppercase tracking-tight transition-colors"
+            data-testid="resend-confirmation-submit"
+          >
+            Resend
+          </button>
+        </div>
+      </form>
+    )}
+    </>
   );
 }
 

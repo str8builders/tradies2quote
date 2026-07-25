@@ -42,7 +42,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 90;
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-sonnet-4-20250514";
+const MODEL = "claude-sonnet-5";
 // A quote can list 30-40 lines; each JSON row is ~40 tokens. 8192 keeps
 // headroom so a long quote doesn't truncate mid-array.
 const MAX_TOKENS = 8192;
@@ -248,10 +248,10 @@ export async function POST(request: NextRequest) {
           "anthropic-version": "2023-06-01",
           "content-type": "application/json",
         },
+        // Sonnet 5 rejects non-default `temperature` with a 400 — omit it.
         body: JSON.stringify({
           model: MODEL,
           max_tokens: MAX_TOKENS,
-          temperature: 0,
           system: SYSTEM_PROMPT,
           messages: [
             {

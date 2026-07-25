@@ -14,9 +14,13 @@ import { BetaNoticeBanner } from "./_components/BetaNoticeBanner";
  *   • root fallback paint  → html/body (globals.css)
  *   • app page paint       → `.t2q-app-canvas` (this div, `min-h-dvh`; normal flow)
  *   • scrolling            → the document (no nested scroll container)
- *   • bottom safe-area     → `.t2q-bottomnav-bar` (fixed; bottom:0; padding-bottom env)
+ *   • bottom safe-area     → root/canvas dark paint; `.t2q-bottomnav-bar` is a
+ *     FLOATING ISLAND lifted `env(inset) + 0.75rem` above the home indicator
+ *     (2026-07-17 redesign — the page background shows around/under it, same
+ *     #0A0A0A everywhere so no strip can contrast)
  * `.t2q-app-scroll` below is NOT a scroll owner — it only pads content to clear
- * the nav. Do NOT reintroduce a `position: fixed; inset: 0` canvas, an
+ * the island (5.8rem + inset; see globals.css geometry contract). Do NOT
+ * reintroduce a `position: fixed; inset: 0` canvas, an
  * `overflow: hidden; height: 100%` scroll-lock, forced-white backgrounds, or a
  * route-level themeColor override — that combination caused the bottom-strip
  * regression.
@@ -51,9 +55,12 @@ export default function AppLayout({
   children: React.ReactNode;
 }) {
   return (
+    // Dark shell — the app now runs the website's native ink + brand
+    // palette (the `[data-theme="light"]` override sheet in globals.css
+    // stays dormant for a future light option).
     <div
       data-shell="app"
-      data-theme="light"
+      data-theme="dark"
       className="t2q-app-canvas min-h-dvh w-full max-w-full overflow-x-clip lg:grid lg:grid-cols-[24px_1fr_24px]"
     >
       {/*

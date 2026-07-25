@@ -168,7 +168,7 @@ export function classifyFromText(input: HeuristicInput): SheetClassification {
 // ── Vision classifier (Claude) ────────────────────────────────────────────
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const VISION_MODEL = "claude-opus-4-7";
+const VISION_MODEL = "claude-opus-4-8";
 
 const VISION_SYSTEM = `You are a construction-drawing sheet classifier. You are shown ONE page from a set of building plans. Identify which single category best describes the sheet.
 

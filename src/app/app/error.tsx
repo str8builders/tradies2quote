@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import * as Sentry from "@sentry/nextjs";
 import { reportClientError } from "@/lib/observability/clientReport";
+import { maybeRecoverFromStaleDeploy } from "@/lib/staleDeploy";
 import { ArrowClockwise, House, WarningOctagon } from "@phosphor-icons/react";
 
 /**
@@ -32,6 +33,11 @@ export default function AppError({
     Sentry.captureException(error);
     reportClientError(error, "boundary");
     console.error("[/app/* error]", error);
+    // Stale-deploy chunk death during render lands HERE, not on
+    // window.onerror — reload once so the user's next tap works instead
+    // of trapping them on this screen ("Try again" re-imports the same
+    // dead chunk forever).
+    maybeRecoverFromStaleDeploy(`${error.name ?? ""} ${error.message ?? ""}`);
   }, [error]);
 
   return (

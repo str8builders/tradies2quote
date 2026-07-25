@@ -13,6 +13,21 @@ export type SmsSendResult =
   | { ok: true; sid: string }
   | { ok: false; error: string };
 
+/**
+ * Is SMS sending wired at all? Server components use this to decide
+ * whether to render Text-send buttons — an unconfigured platform must
+ * hide the channel rather than show a button that can only fail
+ * (App Review taps every visible control; a dead button is a
+ * Guideline 2.1 rejection).
+ */
+export function smsConfigured(): boolean {
+  return Boolean(
+    process.env.TWILIO_ACCOUNT_SID &&
+      process.env.TWILIO_AUTH_TOKEN &&
+      process.env.TWILIO_FROM_NUMBER,
+  );
+}
+
 export async function sendQuoteSms(args: SendArgs): Promise<SmsSendResult> {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;

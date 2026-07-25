@@ -26,6 +26,8 @@ import {
   uploadAvatarAction,
   type AvatarActionResult,
 } from "./account-hub-actions";
+import { prepareAvatarImage } from "@/lib/imagePrep";
+import { isWeatherImpactEnabled } from "@/lib/weather-impact/feature-flag";
 import { PushToggle } from "./PushToggle";
 
 /**
@@ -134,7 +136,7 @@ const PRIMARY_ITEMS: ReadonlyArray<HubLink> = [
   {
     href: "/app/beta",
     label: "Send feedback",
-    caption: "Tell us what to fix in beta",
+    caption: "Tell us what to fix",
     Icon: ChatCircleDots,
   },
   {
@@ -180,7 +182,11 @@ export function AccountHub({
 }: AccountHubProps) {
   const initial =
     (userEmail ?? "?").trim().charAt(0).toUpperCase() || "?";
-  const items = PRIMARY_ITEMS;
+  // Flag-parked features vanish from the hub — a visible row must never
+  // open a locked "owner testing" screen (App Store Guideline 2.1).
+  const items = PRIMARY_ITEMS.filter(
+    (it) => it.href !== "/app/weather" || isWeatherImpactEnabled(isOwner),
+  );
   const ownerItems = isOwner ? OWNER_ITEMS : [];
 
   return (
@@ -415,22 +421,19 @@ function AccountAvatar({
   );
 }
 
-// Wave 15.3 — broader client-side accept than the server allow-list so
-// the iOS Photos picker actually lets the user pick. We still validate
-// the resulting mime + extension server-side, AND the storage bucket's
-// own allow-list (image/jpeg|png|webp) is the third layer of defence.
-const CLIENT_ACCEPT = "image/jpeg,image/png,image/webp,image/jpg";
-const SAFE_EXT_RE = /\.(jpe?g|png|webp)$/i;
-const MAX_SIZE_BYTES = 2 * 1024 * 1024;
+// Broad client-side accept so the iOS Photos picker lets the user pick —
+// INCLUDING HEIC, which we now convert to JPEG client-side before upload
+// (see prepareAvatarImage). The server action still re-validates the
+// resulting mime + extension.
+const CLIENT_ACCEPT =
+  "image/jpeg,image/png,image/webp,image/jpg,image/heic,image/heif,.heic,.heif";
+const SAFE_EXT_RE = /\.(jpe?g|png|webp|hei[cf])$/i;
 
 function isLikelyImage(file: File): boolean {
   // Some mobile browsers (notably older iOS Safari) hand back an empty
   // file.type. Fall back to the filename's extension so we don't fail
   // a perfectly valid pick.
-  if (file.type === "image/jpeg" || file.type === "image/png" || file.type === "image/webp") {
-    return true;
-  }
-  if (file.type === "image/jpg") return true; // some Android stacks
+  if (/^image\/(jpe?g|png|webp|hei[cf])$/i.test(file.type)) return true;
   if (!file.type) return SAFE_EXT_RE.test(file.name);
   return false;
 }
@@ -463,25 +466,30 @@ function AvatarUploadField({
     if (e.target) e.target.value = "";
     if (!file) return;
     if (!isLikelyImage(file)) {
-      // iPhone photos default to HEIC; if iOS didn't transcode to JPEG
-      // we surface a clear message rather than letting the server
-      // reject silently.
-      setError(
-        /\.hei[cf]$/i.test(file.name)
-          ? "iPhone HEIC photo — open it in Photos, share → save as JPEG, then pick that."
-          : "Use a JPG, PNG, or WebP image.",
-      );
+      setError("Use a JPG, PNG, or WebP image.");
       return;
     }
-    if (file.size > MAX_SIZE_BYTES) {
-      setError("File is over 2 MB.");
-      return;
-    }
-    const fd = new FormData();
-    fd.append("avatar", file);
+    // Compress client-side first: converts an iPhone HEIC to JPEG and
+    // downscales any phone photo to ~512 px, so the old "FILE IS OVER 2 MB"
+    // rejection can't happen. Falls back to the original on any failure —
+    // the server action re-validates format + size regardless.
     startTransition(async () => {
-      const res = await uploadAvatarAction(fd);
-      handleResult(res);
+      let prepared = file;
+      try {
+        prepared = await prepareAvatarImage(file);
+      } catch {
+        /* keep the original; server validation is authoritative */
+      }
+      const fd = new FormData();
+      fd.append("avatar", prepared);
+      try {
+        const res = await uploadAvatarAction(fd);
+        handleResult(res);
+      } catch {
+        // A thrown action (network drop, or a platform 413 on a pathological
+        // file) would otherwise be a silent unhandled rejection.
+        setError("Upload failed — try a smaller image or check your connection.");
+      }
     });
   };
 
@@ -564,7 +572,7 @@ function AvatarUploadField({
         </p>
       ) : (
         <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-ink-400">
-          {"// jpg / png / webp · 2 mb max · stored in profile-avatars bucket"}
+          {"// jpg / png / webp / heic · any phone photo · auto-compressed"}
         </p>
       )}
     </div>

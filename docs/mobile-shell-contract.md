@@ -99,3 +99,31 @@ states — the regression passed three of them and only showed on the fourth:
 
 Before changing anything, confirm the four owners above each still have **exactly one**
 owner afterward. If your change adds a second owner for any of them, it is wrong.
+
+---
+
+## Addendum — 2026-07-17: floating island nav
+
+The bottom nav became a floating rounded island (user-requested mockup
+parity): `left/right 0.75rem; margin-inline auto; max-width 26rem;
+bottom: calc(env(safe-area-inset-bottom) + 0.75rem); min-height 4.15rem;
+border-radius 1.6rem`, with a central circular orange "+" (`.t2q-bottomnav-plus`,
+icon-only, aria-label "New quote").
+
+Ownership change: the nav no longer paints the home-indicator zone — the
+**root/canvas dark paint** (#0A0A0A, already asserted by the contract test)
+owns the bottom edge, and the island floats above it. Same colour everywhere →
+the white-strip regression remains impossible.
+
+Geometry contract (mobile-shell-contract.test.ts asserts the starred rows):
+
+| thing                         | value                                   |
+|-------------------------------|-----------------------------------------|
+| island claimed space          | 4.9rem + env(inset)  (0.75 lift + 4.15) |
+| `.t2q-app-scroll` clearance ★ | 5.8rem + env(inset)  (+0.9 breathing)   |
+| island geometry ★             | left/right 0.75rem, bottom env+0.75rem  |
+| fixed sticky bars dock at     | 5.3rem + env(inset)  (+0.4 gap)         |
+
+Sticky-bar call sites to keep in sync: `StickyActionBar.tsx`,
+`SupplierBrowser.tsx`. Page-tail clearance beyond the shell padding is the
+page's job (e.g. quote preview `<main>` adds `pb-24` for the StickyActionBar).

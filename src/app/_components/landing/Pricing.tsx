@@ -154,7 +154,7 @@ export function Pricing() {
                   data-testid={`pricing-cta-${t.slug}`}
                   className={`${t.highlight && !t.comingSoon ? "t2q-btn-primary" : "t2q-btn-ghost"} w-full`}
                 >
-                  {t.comingSoon ? "Notify me when ready" : "Join the beta"}
+                  {t.comingSoon ? "Notify me when ready" : "Start free trial"}
                 </Link>
               </Magnetic>
             </TiltCard>

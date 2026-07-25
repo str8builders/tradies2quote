@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import * as Sentry from "@sentry/nextjs";
 import { reportClientError } from "@/lib/observability/clientReport";
+import { maybeRecoverFromStaleDeploy } from "@/lib/staleDeploy";
 import {
   ArrowClockwise,
   ArrowLeft,
@@ -35,6 +36,9 @@ export default function RootError({
     Sentry.captureException(error);
     reportClientError(error, "boundary");
     console.error("[root error]", error);
+    // Render-path chunk death after a deploy lands here, not on
+    // window.onerror — reload once instead of stranding the user.
+    maybeRecoverFromStaleDeploy(`${error.name ?? ""} ${error.message ?? ""}`);
   }, [error]);
 
   return (

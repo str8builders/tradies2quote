@@ -85,8 +85,10 @@ export function BetaNoticeBanner() {
           <ShieldCheck size={18} weight="bold" />
         </span>
         <p className="min-w-0 flex-1 text-sm leading-snug text-ink-200">
+          {/* "Beta" labelling invites an App Review 2.1 rejection
+              (betas/demos don't belong on the App Store) — neutral chip. */}
           <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-brand">
-            Beta
+            Heads up
           </span>{" "}
           <span className="text-ink-300">
             Treat T2Q scopes, quantities &amp; prices as drafts — review each
@@ -98,13 +100,13 @@ export function BetaNoticeBanner() {
           data-testid="beta-review-link"
           className="hidden shrink-0 items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-200 transition-colors hover:border-brand/40 hover:text-brand sm:inline-flex"
         >
-          Beta guide
+          How T2Q quotes
           <ArrowRight size={12} weight="bold" />
         </Link>
         <button
           type="button"
           onClick={beginExit}
-          aria-label="Dismiss beta notice"
+          aria-label="Dismiss reminder"
           data-testid="beta-review-dismiss"
           className="shrink-0 rounded-lg p-2 text-ink-400 transition-colors hover:bg-white/[0.04] hover:text-white"
         >

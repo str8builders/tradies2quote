@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { aiConsentGate } from "@/lib/ai-consent";
 import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
 import { cleanTranscript } from "@/lib/transcriptCleanup";
@@ -58,6 +59,12 @@ export async function POST(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+
+  // Guideline 5.1.2(i) — cleanup runs an LLM pass over the transcript, so it
+  // needs recorded consent too (iOS shell only; web unaffected). The client
+  // falls back to direct submission on a non-200, so this never hard-blocks.
+  const consentGate = await aiConsentGate(supabase, user.id);
+  if (consentGate) return consentGate;
 
   // Same spend gates as /api/quotes/generate — cleanup runs an LLM pass,
   // so cap it per user and refuse expired trials. The client falls back

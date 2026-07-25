@@ -3,6 +3,7 @@ import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { generateQuotePdf } from "@/lib/pdf-generator";
+import { loadLogoForPdf } from "@/lib/pdf-logo";
 import { sendQuoteEmail } from "@/lib/email-quote";
 import { uploadPdf } from "@/lib/quote-storage";
 import { generatePublicToken } from "@/lib/quote-tokens";
@@ -90,6 +91,8 @@ export async function POST(
   const token = quote.public_token ?? generatePublicToken();
   const acceptUrl = `${appUrl}/quote/${token}`;
 
+  const logo = await loadLogoForPdf(profile?.logo_url);
+
   let pdfBytes: Uint8Array;
   try {
     pdfBytes = await generateQuotePdf({
@@ -98,6 +101,7 @@ export async function POST(
       quote: quoteData,
       profile: profile ?? { business_name: null },
       acceptUrl,
+      logo,
     });
   } catch (e) {
     captureError(e, { route: "quotes/send" });
@@ -156,6 +160,7 @@ export async function POST(
     quoteNumber: number,
     pdf: pdfBytes,
     pdfFileName: `${number}.pdf`,
+    replyTo: profile?.email ?? null,
   });
   if (!emailResult.ok) {
     // Token + PDF are already saved; status stays as-is so the tradie

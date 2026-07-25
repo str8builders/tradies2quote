@@ -34,8 +34,28 @@ export async function GET(
     return NextResponse.json({ error: "no_logo" }, { status: 404 });
   }
 
+  // Only redirect to OUR storage host. `logo_url` is a profile field, so a
+  // compromised/imported value must not turn this public, token-addressed
+  // route into an open redirect (audit 2026-07-10). Supabase public-object
+  // URLs live under <SUPABASE_URL>/storage/v1/object/public/….
+  const allowedOrigin = (() => {
+    try {
+      return new URL(
+        process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "",
+      ).origin;
+    } catch {
+      return null;
+    }
+  })();
   if (/^https?:\/\//i.test(profile.logo_url)) {
-    return NextResponse.redirect(profile.logo_url, { status: 302 });
+    try {
+      const target = new URL(profile.logo_url);
+      if (allowedOrigin && target.origin === allowedOrigin) {
+        return NextResponse.redirect(target, { status: 302 });
+      }
+    } catch {
+      /* fall through to 404 */
+    }
   }
 
   return NextResponse.json({ error: "logo_not_supported" }, { status: 404 });

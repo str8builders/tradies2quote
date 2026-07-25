@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
+import { aiConsentGate } from "@/lib/ai-consent";
 import { loadUserVocab } from "@/lib/transcript/vocab";
 import {
   buildAsrPrompt,
@@ -36,6 +37,11 @@ export async function POST(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  // Guideline 5.1.2(i) — no audio leaves the device to OpenAI/Anthropic
+  // without recorded consent (iOS shell only; web unaffected).
+  const consentGate = await aiConsentGate(supabase, user.id);
+  if (consentGate) return consentGate;
 
   // Per-user daily cap — cheap circuit-breaker on transcription spend.
   const quota = consumeDailyQuota(`transcribe:${user.id}`, 150);

@@ -206,7 +206,7 @@ export function Hero() {
           >
             <span className="w-2 h-2 rounded-full bg-brand animate-pulse" />
             <span className="font-mono text-[11px] tracking-[0.18em] uppercase text-ink-200">
-              Built by a builder · New Zealand · NZ-first beta
+              Built by a builder · New Zealand · NZ-first
             </span>
           </motion.div>
 
@@ -294,7 +294,7 @@ export function Hero() {
                 data-testid="hero-cta-start-trial"
                 className="t2q-btn-primary"
               >
-                <FileText size={20} weight="bold" /> Get beta access
+                <FileText size={20} weight="bold" /> Start free trial
               </Link>
             </Magnetic>
             <a
@@ -328,7 +328,7 @@ export function Hero() {
             {...trustStripAnim}
             className="mt-10 flex flex-wrap items-center gap-x-3 gap-y-2 text-ink-200 font-mono text-[10px] uppercase tracking-[0.12em] sm:gap-x-6 sm:gap-y-3 sm:text-xs sm:tracking-[0.18em]"
           >
-            <span>Free during beta</span>
+            <span>7-day free trial</span>
             <span aria-hidden="true" className="w-1 h-1 rounded-full bg-ink-500" />
             <span>GST 15% ready</span>
             <span aria-hidden="true" className="w-1 h-1 rounded-full bg-ink-500" />

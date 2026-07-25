@@ -6,6 +6,7 @@ import {
   CircleNotch,
   DownloadSimple,
 } from "@phosphor-icons/react";
+import { isNativeIOSApp } from "@/lib/native-app";
 
 type Props = {
   /** A route that returns an `application/pdf` body (e.g. the owner PDF routes). */
@@ -46,6 +47,37 @@ export function SavePdfButton({ url, filename, label = "Save PDF", className }: 
       const finalName = match?.[1] ?? filename;
 
       const file = new File([blob], finalName, { type: "application/pdf" });
+
+      // iOS App Store shell: `navigator.share({files})` and `a[download]`
+      // are BOTH no-ops inside WKWebView, so bridge to the real native
+      // share sheet via Capacitor (write to cache, hand the file URI to
+      // Share). Dynamic import — the plugin chunk never loads on the web.
+      if (isNativeIOSApp()) {
+        const [{ Filesystem, Directory }, { Share }] = await Promise.all([
+          import("@capacitor/filesystem"),
+          import("@capacitor/share"),
+        ]);
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onerror = () => reject(reader.error);
+          reader.onload = () =>
+            resolve(String(reader.result).split(",", 2)[1] ?? "");
+          reader.readAsDataURL(blob);
+        });
+        const written = await Filesystem.writeFile({
+          path: finalName,
+          data: base64,
+          directory: Directory.Cache,
+        });
+        try {
+          await Share.share({ title: finalName, url: written.uri });
+          setState("done");
+        } catch {
+          // Sheet dismissed — not an error.
+          setState("idle");
+        }
+        return;
+      }
 
       // Native share sheet first — "Save to Files" lives here on mobile.
       if (

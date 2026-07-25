@@ -378,7 +378,8 @@ function nzShortDate(iso: string): string {
   });
 }
 
-function formatDueLabel(iso: string, mounted: boolean): string {
+function formatDueLabel(iso: string | null, mounted: boolean): string {
+  if (!iso) return "on receipt";
   const t = Date.parse(iso);
   if (Number.isNaN(t)) return "—";
   if (!mounted) return nzShortDate(iso); // stable until mounted — no Date.now() in SSR

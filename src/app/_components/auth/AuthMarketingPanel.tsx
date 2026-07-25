@@ -33,7 +33,7 @@ import {
 const TRUST_BULLETS = [
   "Voice in. Quote out. Under 60 seconds.",
   "Built by a builder · Tauranga, NZ.",
-  "Cancel by text — we don't lock you in.",
+  "Cancel anytime — we don't lock you in.",
 ];
 
 const STEPS = [
@@ -60,7 +60,7 @@ const STEPS = [
   {
     icon: Receipt,
     label: "Track + invoice",
-    body: "Accepted quotes convert to invoice drafts (coming soon). Follow-up agent reminds you when to chase.",
+    body: "Accepted quotes convert to invoices you can send in a tap. Follow-up agent reminds you when to chase.",
   },
 ] as const;
 

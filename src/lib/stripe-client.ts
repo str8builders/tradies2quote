@@ -22,7 +22,7 @@ export function stripeClient(): Stripe {
     throw new Error("STRIPE_SECRET_KEY is not set.");
   }
   cached = new Stripe(secret, {
-    apiVersion: "2026-04-22.dahlia",
+    apiVersion: "2026-06-24.dahlia",
     // The SDK auto-reads STRIPE_SECRET_KEY but we pass it explicitly so
     // env-injection mistakes fail loudly here instead of mid-checkout.
     typescript: true,

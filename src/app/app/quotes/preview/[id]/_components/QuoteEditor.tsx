@@ -50,6 +50,7 @@ import { TakeoffPanel } from "./TakeoffPanel";
 import { blockedLineGuide } from "@/lib/takeoff/blockedLineGuide";
 import { PhotoPlanPanel } from "./PhotoPlanPanel";
 import { SendQuoteButton } from "./SendQuoteButton";
+import { MaterialsListButton } from "./MaterialsListButton";
 import { MobileCollapsibleCard } from "./MobileCollapsibleCard";
 import { CsiGroupedView } from "./CsiGroupedView";
 import { StickyActionBar } from "./StickyActionBar";
@@ -64,6 +65,9 @@ type Props = {
   hasPdf: boolean;
   /** Owner-only + flag gated. Enables the on-demand Suggest-a-Price button. */
   suggestPriceEnabled?: boolean;
+  /** Server-decided: Twilio fully configured. When false the Text-send
+   *  button is hidden entirely (never shown-but-broken). */
+  smsEnabled?: boolean;
 };
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -107,6 +111,7 @@ export function QuoteEditor({
   publicToken,
   hasPdf,
   suggestPriceEnabled = false,
+  smsEnabled = true,
 }: Props) {
   const [client, setClient] = useState(() =>
     migrateLegacyContact(initialData.client),
@@ -531,10 +536,10 @@ export function QuoteEditor({
   const clientNameInputValue = clientPlaceholder ? "" : client.name;
 
   return (
-    // pb on mobile reserves space for the fixed StickyActionBar and the
-    // floating Install-App pill so neither covers the last cards. Both go
-    // static/out-of-the-way at sm+.
-    <div className="space-y-6 pb-40 sm:pb-0">
+    // Tail clearance now lives on the page <main> (pb-24 mobile) so cards
+    // rendered AFTER the editor (Review tools, invoice draft) clear the
+    // fixed StickyActionBar too — pb here only cleared the editor's own tail.
+    <div className="space-y-6">
       <section className="t2q-card-pro p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex-1">
@@ -674,6 +679,13 @@ export function QuoteEditor({
           addLabel="Add material"
           disabled={isAccepted}
         />
+        {/* Take the takeoff to the merchant counter — quantities, no prices. */}
+        <div className="mt-3 flex justify-end">
+          <MaterialsListButton
+            items={items}
+            jobSummary={initialData.job_summary}
+          />
+        </div>
       </MobileCollapsibleCard>
 
       <MobileCollapsibleCard
@@ -859,7 +871,7 @@ export function QuoteEditor({
           <div className="mt-3 overflow-hidden rounded-lg border border-[#E8E7E0]">
             <table className="w-full text-sm tabular-nums">
               <thead>
-                <tr className="bg-[#F4F3ED] font-mono text-[10px] uppercase tracking-[0.15em] text-[#8A8A82]">
+                <tr className="bg-ink-900 font-mono text-[10px] uppercase tracking-[0.15em] text-ink-400">
                   <th className="px-3 py-2 text-left font-medium">Field</th>
                   <th className="px-3 py-2 text-right font-medium">Supplier</th>
                   <th className="px-3 py-2 text-right font-medium">App</th>
@@ -1121,7 +1133,7 @@ export function QuoteEditor({
           className="t2q-card-pro border border-brand/25 p-5 sm:p-6"
         >
           <p className="t2q-section-label-pro text-brand">
-            {"// suggest a price (beta)"}
+            {"// suggest a price"}
           </p>
           <p className="mt-2 text-sm text-ink-200">
             {unpricedMaterials.length} material line
@@ -1155,6 +1167,21 @@ export function QuoteEditor({
           label="Materials subtotal"
           value={formatCurrency(materialsOnlySubtotal, currency)}
         />
+        {/* $0 materials with unpriced lines used to render as a bare
+            "$0.00" (and Markup $0.00) with no explanation — read as a
+            broken calculator. The quantities are real; the PRICES are
+            deliberately yours to set. Say so right where the $0 shows. */}
+        {unpricedMaterials.length > 0 && (
+          <p
+            data-testid="quote-totals-unpriced-note"
+            className="mb-2 rounded-sm border border-hivis/30 bg-hivis/10 px-2.5 py-1.5 text-xs text-hivis"
+          >
+            {unpricedMaterials.length} material line
+            {unpricedMaterials.length === 1 ? "" : "s"} counted but not
+            priced yet — they add $0 (and $0 markup) until you set your
+            prices on the lines above.
+          </p>
+        )}
         {otherIndices.length > 0 && (
           <TotalsRow
             label="Other subtotal"
@@ -1261,6 +1288,7 @@ export function QuoteEditor({
         isPending={isPending}
         onSave={handleSave}
         onSaveBeforeSend={saveBeforeSend}
+        smsEnabled={smsEnabled}
       />
     </div>
   );

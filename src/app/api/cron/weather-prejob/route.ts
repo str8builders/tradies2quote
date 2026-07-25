@@ -1,5 +1,5 @@
 // Cron: PRE-JOB check — assess jobs starting within the next ~3h so the tradie
-// gets a final read close to start time. Schedule lives in vercel.json. Gated by
+// gets a final read close to start time. Scheduled by systemd timers on the VPS (tradies2quote-cron@<name>.timer). Gated by
 // CRON_SECRET + the weather-planning flag. Willa drafts only — nothing is sent.
 import { NextResponse, type NextRequest } from "next/server";
 import { isAuthorizedCron } from "@/lib/cron-auth";

@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCachedAuthUser } from "@/lib/supabase/auth";
 import { canWrite, getCachedSubscriptionStatus } from "@/lib/subscription";
+import { createClient } from "@/lib/supabase/server";
+import { isNativeShellRequest } from "@/lib/native-shell";
+import { hasAiConsent } from "@/lib/ai-consent";
 import { AppHeader } from "../../_components/AppHeader";
 import { QuoteInputTabs } from "./_components/QuoteInputTabs";
 
@@ -29,6 +32,14 @@ export default async function NewQuotePage() {
     redirect("/app/upgrade?from=new-quote");
   }
 
+  // Guideline 5.1.2(i) — inside the iOS shell, require explicit AI-processing
+  // consent before the first voice/scan/generate action. Web is unaffected.
+  const [nativeShell, consented] = await Promise.all([
+    isNativeShellRequest(),
+    (async () => hasAiConsent(await createClient(), user.id))(),
+  ]);
+  const needsAiConsent = nativeShell && !consented;
+
   return (
     <div className="min-h-screen text-white">
       <AppHeader context="New quote" />
@@ -45,7 +56,7 @@ export default async function NewQuotePage() {
           </p>
         </div>
 
-        <QuoteInputTabs />
+        <QuoteInputTabs needsAiConsent={needsAiConsent} />
       </main>
     </div>
   );

@@ -71,8 +71,6 @@ interface ConnectorDef {
   >;
 }
 
-const SUPABASE_PROJECT = "guiovuqccbzlbacaxepd";
-
 /** First day of the current month at 00:00 UTC, as a Date. */
 function monthStart(now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0));
@@ -184,6 +182,60 @@ async function fetchAnthropicSpend(
   }
 }
 
+/**
+ * Twilio account balance (works with the NORMAL account SID + auth token —
+ * no extra admin key needed). This is credit REMAINING, not month spend,
+ * so the card shows it with periodLabel "credit remaining" and no cap
+ * gauge (a low number is the warning, not a high one).
+ */
+async function fetchTwilioBalance(): Promise<
+  { ok: true; spend: ConnectorSpend } | { ok: false; note: string }
+> {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  if (!sid || !token) {
+    return { ok: false, note: "Twilio keys missing." };
+  }
+  try {
+    const res = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${sid}/Balance.json`,
+      {
+        headers: {
+          Authorization:
+            "Basic " + Buffer.from(`${sid}:${token}`).toString("base64"),
+        },
+        cache: "no-store",
+      },
+    );
+    if (!res.ok) {
+      return { ok: false, note: `Twilio balance API ${res.status}.` };
+    }
+    const json = (await res.json()) as {
+      balance?: string;
+      currency?: string;
+    };
+    const amount = parseFloat(json.balance ?? "");
+    if (Number.isNaN(amount)) {
+      return { ok: false, note: "Twilio returned no balance." };
+    }
+    return {
+      ok: true,
+      spend: {
+        periodLabel: "credit remaining",
+        amount,
+        currency: (json.currency ?? "USD").toUpperCase(),
+        capNZD: null,
+        pctOfCap: null,
+      },
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      note: err instanceof Error ? err.message : "Twilio balance fetch failed.",
+    };
+  }
+}
+
 /** Rough USD→NZD only used to colour the cap gauge, never shown as money. */
 const USD_TO_NZD = 1.65;
 
@@ -241,11 +293,12 @@ const CONNECTORS: ConnectorDef[] = [
   },
   {
     id: "supabase",
-    label: "Supabase",
-    purpose: "Auth, Postgres database, file storage.",
+    label: "Supabase (self-hosted)",
+    purpose: "Auth, Postgres database, file storage — runs on your VPS.",
     envKeys: ["SUPABASE_SERVICE_ROLE_KEY", "NEXT_PUBLIC_SUPABASE_URL"],
-    billingUrl: `https://supabase.com/dashboard/project/${SUPABASE_PROJECT}/settings/billing`,
-    topUpHint: "Free tier caps on DB size / MAUs — watch usage near limits.",
+    billingUrl: "https://my.contabo.com/",
+    topUpHint:
+      "No subscription — self-hosted on the VPS. Watch disk space; daily backups land in /var/backups/tradies2quote.",
     defaultCapNZD: null,
   },
   {
@@ -258,12 +311,33 @@ const CONNECTORS: ConnectorDef[] = [
     defaultCapNZD: null,
   },
   {
-    id: "vercel",
-    label: "Vercel",
-    purpose: "Hosting, serverless functions, cron.",
+    id: "twilio",
+    label: "Twilio",
+    purpose: "SMS (quote/invoice notifications to clients).",
+    envKeys: ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN"],
+    billingUrl: "https://console.twilio.com/us1/billing/manage-billing/billing-overview",
+    topUpHint: "Prepaid credit — the card shows what's left; top up before $0.",
+    defaultCapNZD: null,
+    fetchSpend: fetchTwilioBalance,
+  },
+  {
+    id: "vps",
+    label: "VPS hosting (Contabo)",
+    purpose: "The server everything runs on — app, Supabase, Caddy, backups.",
     envKeys: [],
-    billingUrl: "https://vercel.com/dashboard/usage",
-    topUpHint: "Hobby/Pro usage limits — watch function + bandwidth usage.",
+    billingUrl: "https://my.contabo.com/",
+    topUpHint:
+      "Monthly invoice — keep the payment method valid; if this lapses the whole site goes down.",
+    defaultCapNZD: null,
+  },
+  {
+    id: "domain",
+    label: "Domain — tradies2quote.com",
+    purpose: "Your web address (registered at Name.com).",
+    envKeys: [],
+    billingUrl: "https://www.name.com/account/domain",
+    topUpHint:
+      "Renews 8 May 2027 — keep auto-renew on and the card valid, or the site and email links die.",
     defaultCapNZD: null,
   },
   {
@@ -272,7 +346,7 @@ const CONNECTORS: ConnectorDef[] = [
     purpose: "Browser push notifications (VAPID keypair).",
     envKeys: ["NEXT_PUBLIC_VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY"],
     billingUrl:
-      "https://vercel.com/dashboard/stores", // managed via env; no billing
+      "https://developer.mozilla.org/en-US/docs/Web/API/Push_API", // no billing — keypair lives in env
     topUpHint: "No cost — just needs the VAPID keypair set.",
     defaultCapNZD: null,
   },

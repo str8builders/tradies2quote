@@ -16,7 +16,7 @@ export const maxDuration = 60;
  *
  * Phase 1. Creates the plan_files + plan_sheets rows for an upload and returns
  * signed Storage upload URLs. The browser (which already split the PDF into
- * page PNGs via pdfSplit.client.ts) then PUTs the original + each page image
+ * page PNGs client-side) then PUTs the original + each page image
  * directly to the private `plan-uploads` bucket.
  *
  * Body (JSON):

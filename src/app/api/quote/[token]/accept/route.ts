@@ -3,6 +3,7 @@ import { captureError } from "@/lib/observability";
 import { adminClient } from "@/lib/supabase/admin";
 import { uploadSignature } from "@/lib/quote-storage";
 import { sendPushToUser } from "@/lib/push";
+import { sanitizeForPush } from "@/lib/moderation";
 import { quoteNumber } from "@/lib/quote-defaults";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
 
@@ -195,9 +196,12 @@ export async function POST(
   // Notify the quote owner via push that their quote was just accepted.
   // sendPushToUser never throws and no-ops when push isn't configured, so
   // this can't break the customer's accept flow.
+  // The name is anonymous free text off the public accept form — sanitise
+  // before it becomes an OS-level notification banner on the tradie's phone
+  // (strips newlines/control chars, caps length).
   await sendPushToUser(quote.user_id, {
     title: "Quote accepted",
-    body: `${name} accepted ${quoteNumber(quote.id, quote.created_at)}`,
+    body: `${sanitizeForPush(name) || "Your client"} accepted ${quoteNumber(quote.id, quote.created_at)}`,
     url: `/app/quotes/preview/${quote.id}`,
     tag: `quote-accepted-${quote.id}`,
   });

@@ -28,14 +28,14 @@ import { fetchWithTimeout, TIMEOUTS } from "@/lib/fetchTimeout";
 export type ModelTier = "fast" | "default" | "deep";
 
 /**
- * Model IDs per tier. `default` is the known-good Sonnet the agents already
- * use — leaving a caller on the default tier changes nothing. `fast`/`deep`
- * are opt-in; adjust these as Anthropic ships new ids.
+ * Model IDs per tier. `fast`/`deep` are opt-in; adjust these as Anthropic
+ * ships new ids. (claude-sonnet-4-20250514 and claude-3-5-haiku-20241022
+ * were retired by Anthropic — the API now 404s on them.)
  */
 export const TIER_MODELS: Record<ModelTier, string> = {
-  fast: "claude-3-5-haiku-20241022",
-  default: "claude-sonnet-4-20250514",
-  deep: "claude-opus-4-7",
+  fast: "claude-haiku-4-5",
+  default: "claude-sonnet-5",
+  deep: "claude-opus-4-8",
 };
 
 export function resolveModel(tier: ModelTier = "default"): string {
@@ -106,7 +106,10 @@ export function buildRequestBody(args: {
   tool: { name: string; description: string; schema: Record<string, unknown> };
   maxTokens: number;
   cacheSystem: boolean;
-  /** Opus 4.x deprecates the temperature knob; omit it for the deep tier. */
+  /**
+   * Only Haiku 4.5 still accepts the temperature knob — Sonnet 5 rejects
+   * non-default sampling params with a 400 and Opus 4.x deprecates them.
+   */
   includeTemperature: boolean;
 }): Record<string, unknown> {
   const systemBlock = [
@@ -225,7 +228,7 @@ export async function runStructuredAgent<T>(
         tool: opts.tool,
         maxTokens,
         cacheSystem,
-        includeTemperature: tier !== "deep",
+        includeTemperature: tier === "fast",
       });
 
       const res = await fetchWithTimeout(

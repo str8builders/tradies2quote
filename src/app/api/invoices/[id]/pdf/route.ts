@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
 import { generateInvoicePdf } from "@/lib/invoice-pdf-generator";
+import { loadLogoForPdf } from "@/lib/pdf-logo";
 import type { InvoiceSnapshot } from "@/lib/types/invoice";
 
 export const runtime = "nodejs";
@@ -43,9 +44,13 @@ export async function GET(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("business_name, email, phone, address, gst_number")
+    .select(
+      "business_name, email, phone, address, gst_number, payment_instructions, logo_url",
+    )
     .eq("id", user.id)
     .maybeSingle();
+
+  const logo = await loadLogoForPdf(profile?.logo_url);
 
   let bytes: Uint8Array;
   try {
@@ -55,7 +60,8 @@ export async function GET(
       dueDate: invoice.due_date,
       snapshot: invoice.invoice_data as InvoiceSnapshot,
       profile: profile ?? { business_name: null },
-      paymentInstructions: null,
+      paymentInstructions: profile?.payment_instructions ?? null,
+      logo,
     });
   } catch (e) {
     captureError(e, { route: "invoices/pdf" });

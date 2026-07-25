@@ -1,5 +1,5 @@
 // Cron: MORNING check — assess today's scheduled jobs for weather risk.
-// Schedule lives in vercel.json. Gated by CRON_SECRET + the weather-planning
+// Scheduled by systemd timers on the VPS (tradies2quote-cron@<name>.timer). Gated by CRON_SECRET + the weather-planning
 // flag. Customer messages are never sent here (Willa drafts only).
 import { NextResponse, type NextRequest } from "next/server";
 import { isAuthorizedCron } from "@/lib/cron-auth";

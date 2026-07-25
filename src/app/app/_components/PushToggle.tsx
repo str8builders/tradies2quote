@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { isNativeIOSApp } from "@/lib/native-app";
 import {
   BellSimple,
   BellSimpleSlash,
@@ -41,12 +42,86 @@ type State =
  * the app is installed to the Home Screen (PushManager is absent in a
  * plain Safari tab) — we surface that as the "unsupported" hint.
  */
+/**
+ * Wave 46 — iOS App Store shell branch. Registers through Apple's push
+ * service via @capacitor/push-notifications (Web Push doesn't exist in
+ * WKWebView). Dynamic import keeps the plugin chunk off the web bundle.
+ */
+async function enableNativePush(): Promise<State> {
+  const { PushNotifications } = await import("@capacitor/push-notifications");
+  const perm = await PushNotifications.requestPermissions();
+  if (perm.receive !== "granted") return "denied";
+
+  const token = await new Promise<string | null>((resolve) => {
+    const timer = setTimeout(() => resolve(null), 15_000);
+    void PushNotifications.addListener("registration", (t) => {
+      clearTimeout(timer);
+      resolve(t.value);
+    });
+    void PushNotifications.addListener("registrationError", () => {
+      clearTimeout(timer);
+      resolve(null);
+    });
+    void PushNotifications.register();
+  });
+  if (!token) return "error";
+
+  const res = await fetch("/api/push/subscribe", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ platform: "ios", token }),
+  });
+  if (!res.ok) return "error";
+  try {
+    localStorage.setItem("t2q-apns-token", token);
+  } catch {
+    /* best effort — disable falls back gracefully */
+  }
+  return "on";
+}
+
+async function disableNativePush(): Promise<State> {
+  let token: string | null = null;
+  try {
+    token = localStorage.getItem("t2q-apns-token");
+  } catch {
+    /* ignore */
+  }
+  if (token) {
+    await fetch("/api/push/subscribe", {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ endpoint: token }),
+    });
+    try {
+      localStorage.removeItem("t2q-apns-token");
+    } catch {
+      /* ignore */
+    }
+  }
+  return "off";
+}
+
 export function PushToggle() {
   const [state, setState] = useState<State>("checking");
+  const [nativeShell, setNativeShell] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // iOS App Store shell: register via APNs instead of Web Push.
+      if (isNativeIOSApp()) {
+        if (cancelled) return;
+        setNativeShell(true);
+        let hasToken = false;
+        try {
+          hasToken = Boolean(localStorage.getItem("t2q-apns-token"));
+        } catch {
+          /* ignore */
+        }
+        setState(hasToken ? "on" : "off");
+        return;
+      }
       if (
         typeof window === "undefined" ||
         !("serviceWorker" in navigator) ||
@@ -75,6 +150,15 @@ export function PushToggle() {
 
   async function enable() {
     setState("enabling");
+    if (nativeShell) {
+      try {
+        setState(await enableNativePush());
+      } catch (e) {
+        console.error("native push enable failed", e);
+        setState("error");
+      }
+      return;
+    }
     try {
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
@@ -105,6 +189,15 @@ export function PushToggle() {
 
   async function disable() {
     setState("enabling");
+    if (nativeShell) {
+      try {
+        setState(await disableNativePush());
+      } catch (e) {
+        console.error("native push disable failed", e);
+        setState("error");
+      }
+      return;
+    }
     try {
       const reg = await navigator.serviceWorker.getRegistration();
       const sub = reg ? await reg.pushManager.getSubscription() : null;

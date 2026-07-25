@@ -3,6 +3,7 @@ import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { generateInvoicePdf } from "@/lib/invoice-pdf-generator";
+import { loadLogoForPdf } from "@/lib/pdf-logo";
 import { sendInvoiceEmail } from "@/lib/email-invoice";
 import { formatCurrency, formatIssueDate } from "@/lib/quote-defaults";
 import type { InvoiceSnapshot } from "@/lib/types/invoice";
@@ -92,15 +93,19 @@ export async function POST(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("business_name, email, phone, address, gst_number")
+    .select(
+      "business_name, email, phone, address, gst_number, payment_instructions, logo_url",
+    )
     .eq("id", user.id)
     .maybeSingle();
 
-  // Payment instructions are pulled from the profile's address field
-  // for now (tradies type their bank details there if they want them
-  // on invoices). A dedicated payment_instructions column is the right
-  // follow-up but the current schema doesn't have one.
-  const paymentInstructions: string | null = null;
+  // Wave 40 — bank/payment details entered once in Settings
+  // (profiles.payment_instructions); the PDF and email renderers omit
+  // their "How to pay" block when null.
+  const paymentInstructions: string | null =
+    profile?.payment_instructions ?? null;
+
+  const logo = await loadLogoForPdf(profile?.logo_url);
 
   let pdfBytes: Uint8Array;
   try {
@@ -111,6 +116,7 @@ export async function POST(
       snapshot,
       profile: profile ?? { business_name: null },
       paymentInstructions,
+      logo,
     });
   } catch (e) {
     captureError(e, { route: "invoices/send" });
@@ -128,7 +134,11 @@ export async function POST(
     Number(invoice.total_amount) || 0,
     invoice.currency,
   );
-  const dueDateLabel = formatIssueDate(invoice.due_date);
+  // due_date is null until the tradie sets one — that means "on receipt",
+  // never the epoch ("01 Jan 1970") that formatIssueDate(null) produces.
+  const dueDateLabel = invoice.due_date
+    ? formatIssueDate(invoice.due_date)
+    : "on receipt";
 
   const emailResult = await sendInvoiceEmail({
     to,
@@ -140,6 +150,7 @@ export async function POST(
     pdf: pdfBytes,
     pdfFileName: `${invoice.invoice_number}.pdf`,
     paymentInstructions,
+    replyTo: profile?.email ?? null,
   });
   if (!emailResult.ok) {
     return NextResponse.json(

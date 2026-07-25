@@ -27,6 +27,8 @@ export interface SettingsInitial {
   phone: string;
   address: string;
   gst_number: string;
+  /** Free-text bank/payment details printed on invoices. */
+  payment_instructions: string;
   country: string;
   currency: string;
   /** Stored as a percentage (e.g. 15 for 15%). */
@@ -55,7 +57,11 @@ export function SettingsForm({ initial }: Props) {
   const taxLabel = (initial.tax_label || "GST").trim();
 
   function setField<K extends keyof SettingsInitial>(key: K) {
-    return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    return (
+      e: React.ChangeEvent<
+        HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+      >,
+    ) => {
       setForm((prev) => ({ ...prev, [key]: e.target.value }));
     };
   }
@@ -130,6 +136,24 @@ export function SettingsForm({ initial }: Props) {
             data-testid="settings-gst-number"
             className={INPUT_CLASS}
             placeholder="123-456-789"
+          />
+        </Field>
+        <Field
+          id="payment_instructions"
+          label="Payment details (shown on invoices)"
+        >
+          <textarea
+            id="payment_instructions"
+            name="payment_instructions"
+            rows={3}
+            maxLength={500}
+            value={form.payment_instructions}
+            onChange={setField("payment_instructions")}
+            data-testid="settings-payment-instructions"
+            className={INPUT_CLASS}
+            placeholder={
+              "Bank: 12-3456-7890123-00\nPlease use the invoice number as the reference."
+            }
           />
         </Field>
       </Section>

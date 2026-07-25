@@ -144,6 +144,8 @@ function ExistingInvoiceBody({ invoice }: { invoice: InvoiceSummary }) {
     try {
       const res = await fetch(`/api/invoices/${invoice.id}/send`, {
         method: "POST",
+        // PDF render + email send — bounded so the button can't wedge.
+        signal: AbortSignal.timeout(60_000),
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as {

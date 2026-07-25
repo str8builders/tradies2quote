@@ -3,12 +3,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
 import { Footer } from "../_components/landing/Footer";
+import { isNativeShellRequest } from "@/lib/native-shell";
 import { InstallGuide } from "./_components/InstallGuide";
 
 export const metadata: Metadata = {
   title: "Install the App",
   description:
-    "Add Tradies2Quote to your phone's home screen in a few taps. Step-by-step install guide for iPhone (Safari) and Android (Chrome) — opens fullscreen, works offline.",
+    "Add Tradies2Quote to your phone's home screen in a few taps. Step-by-step install guide for iPhone (Safari) and Android (Chrome) — opens fullscreen, no download.",
   alternates: { canonical: "/install" },
   openGraph: {
     title: "Install Tradies2Quote on your phone",
@@ -26,7 +27,8 @@ export const metadata: Metadata = {
  * screen. The smart, platform-aware behaviour lives in <InstallGuide>; this
  * server shell handles SEO metadata, the brand lockup, and the footer.
  */
-export default function InstallPage() {
+export default async function InstallPage() {
+  const nativeShell = await isNativeShellRequest();
   return (
     <div className="min-h-screen bg-ink-900 text-white">
       {/* Slim brand bar */}
@@ -75,7 +77,7 @@ export default function InstallPage() {
           </h1>
           <p className="mt-3 max-w-md text-ink-300">
             No app store, no download wait. A few taps and Tradies2Quote opens
-            like a real app — fullscreen, and it works offline on site.
+            like a real app — fullscreen, right there on your home screen.
           </p>
         </div>
 
@@ -93,7 +95,7 @@ export default function InstallPage() {
         </p>
       </main>
 
-      <Footer />
+      <Footer hidePricingLinks={nativeShell} />
     </div>
   );
 }

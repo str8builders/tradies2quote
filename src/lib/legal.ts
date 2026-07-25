@@ -39,13 +39,16 @@ export interface LegalConfig {
 }
 
 export const LEGAL: LegalConfig = {
-  companyName: "tradies2Quote",
+  // Named natural person: the service is operated by a sole trader, and a
+  // privacy policy must identify its actual data controller — a bare product
+  // name is not a legal entity (NZ Privacy Act 2020 / GDPR Art. 13).
+  companyName: "Challis Samu (sole trader), trading as tradies2Quote",
   nzbn: null,
   address: "Tauranga, New Zealand",
   productName: "tradies2Quote",
   siteDomain: "tradies2quote.com",
   supportEmail: "support@tradies2quote.com",
   privacyEmail: "privacy@tradies2quote.com",
-  lastUpdated: "2026-05-12",
-  lastUpdatedDisplay: "12 May 2026",
+  lastUpdated: "2026-07-18",
+  lastUpdatedDisplay: "18 July 2026",
 };

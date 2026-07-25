@@ -102,8 +102,20 @@ export default function TapeProgress({
             transition: isControlled ? "width 60ms linear" : "none",
           }}
         />
+        {/* Always-alive sheen sweeping the filled region — long AI waits
+            move the needle so slowly the gauge read as frozen. Separate
+            layer on purpose: the fill above is mix-blend-multiply, and a
+            white highlight under multiply is invisible (see globals.css). */}
         <div
-          className="absolute top-0 bottom-0 w-[3px] bg-ink-900"
+          aria-hidden="true"
+          className="t2q-tape-sheen pointer-events-none absolute top-0 left-0 h-full"
+          style={{
+            width: `${p * 100}%`,
+            transition: isControlled ? "width 60ms linear" : "none",
+          }}
+        />
+        <div
+          className="t2q-tape-needle absolute top-0 bottom-0 w-[3px] bg-ink-900"
           style={{
             left: `${p * 100}%`,
             transform: "translateX(-1px)",

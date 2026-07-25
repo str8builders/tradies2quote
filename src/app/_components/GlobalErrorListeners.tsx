@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { reportClientError } from "@/lib/observability/clientReport";
+import { maybeRecoverFromStaleDeploy } from "@/lib/staleDeploy";
 
 /**
  * Global window error hooks — the piece clientReport.ts was written for but
@@ -14,6 +15,19 @@ import { reportClientError } from "@/lib/observability/clientReport";
  * per-IP rate-limited server-side; the small local dedupe just stops one
  * tight error loop from spamming the beacon.
  */
+/**
+ * Stale-deployment self-heal. The VPS deploy swaps the whole build, so a
+ * tab left open across a deploy holds server-action IDs and RSC chunks
+ * that no longer exist — its next interaction throws "Failed to find
+ * Server Action" / a chunk 404 and the app looks broken until a manual
+ * refresh (internal monitor, clusters on every deploy day). When we see
+ * that signature, reload ONCE per session: the reload picks up the new
+ * build and the user's tap works on the second try instead of never.
+ */
+// Shared with the /app and root error boundaries — a chunk that dies
+// during render never reaches window.onerror, so the boundaries run the
+// same recovery. See src/lib/staleDeploy.ts.
+
 export function GlobalErrorListeners() {
   useEffect(() => {
     const seen = new Set<string>();
@@ -29,6 +43,7 @@ export function GlobalErrorListeners() {
       if (shouldReport(key)) {
         reportClientError(event.error ?? event.message, "error");
       }
+      maybeRecoverFromStaleDeploy(event.message ?? "");
     };
     const onRejection = (event: PromiseRejectionEvent) => {
       const reason = event.reason;
@@ -36,6 +51,9 @@ export function GlobalErrorListeners() {
       if (shouldReport(key)) {
         reportClientError(reason, "unhandledrejection");
       }
+      maybeRecoverFromStaleDeploy(
+        reason instanceof Error ? reason.message : String(reason),
+      );
     };
 
     window.addEventListener("error", onError);

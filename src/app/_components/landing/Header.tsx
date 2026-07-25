@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { List, X } from "@phosphor-icons/react";
-import { ThemeToggle } from "./ThemeToggle";
 import { Logo } from "./Logo";
 import InstallPWAButton from "./InstallPWAButton";
 
@@ -13,17 +12,40 @@ import InstallPWAButton from "./InstallPWAButton";
 // from the very first frame of the landing. Tap fires the same
 // component's instruction modal (iOS Add-to-Home-Screen steps on
 // Safari, native install prompt on Android Chrome/Edge). Hidden on
-// md+ since the desktop hero already carries an explicit
+// lg+ since the desktop hero already carries an explicit
 // "Install on phone" CTA.
+//
+// The desktop bar switches on at `lg`, not `md`. Between 768px and ~940px the
+// four original nav labels plus Sign in plus the trial button already wrapped
+// onto two lines and collided with the wordmark; adding a fifth made it worse.
+// Below 1024 the hamburger now takes over — and it lists every link, so nothing
+// is lost at those widths.
 
 const LINKS = [
   { href: "#how", label: "How it works" },
   { href: "#features", label: "Features" },
+  { href: "#calculator", label: "Calculator app" },
   { href: "#pricing", label: "Pricing" },
   { href: "#faq", label: "FAQ" },
 ];
 
-export function Header() {
+// Sections the iOS App Store shell must not link to. Pricing and the FAQ carry
+// tier prices (3.1.3(f)); the calculator section advertises a native iOS app
+// distributed outside the App Store (2.5.2). Both are withheld server-side on
+// the page itself — these nav labels have to go with them.
+const NATIVE_SHELL_HIDDEN = new Set(["#pricing", "#faq", "#calculator"]);
+
+export function Header({
+  // 3.1.3(f) — set server-side (see src/lib/native-shell.ts) inside the iOS
+  // App Store shell, where the Pricing/FAQ sections are withheld: the nav
+  // labels pointing at them must vanish from the served HTML too.
+  hidePricingLinks = false,
+}: {
+  hidePricingLinks?: boolean;
+} = {}) {
+  const links = hidePricingLinks
+    ? LINKS.filter((l) => !NATIVE_SHELL_HIDDEN.has(l.href))
+    : LINKS;
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -57,41 +79,43 @@ export function Header() {
               wordmark hides on mobile so the burger menu has room
               to breathe; T2Q alone reads as the brand on a phone
               and TRADIES2QUOTE rejoins it on tablet/desktop. */}
-          <Logo size={44} wordmarkClassName="hidden md:inline" />
+          {/* …and rejoins at xl, not md: the wordmark is the widest item in
+              the bar, and between lg and xl it was overlapping the first nav
+              label. T2Q alone still reads as the brand. */}
+          <Logo size={44} wordmarkClassName="hidden xl:inline" />
         </Link>
 
-        <nav className="hidden md:flex items-center gap-8" data-testid="nav-primary">
-          {LINKS.map((l) => (
+        <nav className="hidden lg:flex items-center gap-8" data-testid="nav-primary">
+          {links.map((l) => (
             <a
               key={l.href}
               href={l.href}
               data-testid={`nav-link-${l.href.replace("#", "")}`}
-              className="text-sm font-medium text-ink-200 hover:text-white transition-colors"
+              className="whitespace-nowrap text-sm font-medium text-ink-200 hover:text-white transition-colors"
             >
               {l.label}
             </a>
           ))}
         </nav>
 
-        <div className="hidden md:flex items-center gap-3">
-          <ThemeToggle />
+        <div className="hidden lg:flex items-center gap-3">
           <Link
             href="/login"
             data-testid="nav-sign-in"
-            className="text-sm font-semibold text-ink-200 hover:text-white px-3"
+            className="whitespace-nowrap text-sm font-semibold text-ink-200 hover:text-white px-3"
           >
             Sign in
           </Link>
           <Link
             href="/signup"
             data-testid="nav-start-free"
-            className="inline-flex items-center h-10 px-4 bg-brand text-ink-900 font-display text-sm tracking-tight uppercase rounded-sm hover:bg-hivis transition-colors"
+            className="inline-flex items-center h-10 whitespace-nowrap px-4 bg-brand text-ink-900 font-display text-sm tracking-tight uppercase rounded-sm hover:bg-hivis transition-colors"
           >
-            Get beta access
+            Start free trial
           </Link>
         </div>
 
-        <div className="flex items-center gap-2 md:hidden">
+        <div className="flex items-center gap-2 lg:hidden">
           <InstallPWAButton variant="icon" />
           <button
             className="text-white"
@@ -109,9 +133,9 @@ export function Header() {
       </div>
 
       {open && (
-        <div className="md:hidden border-t border-ink-600 bg-ink-950">
+        <div className="lg:hidden border-t border-ink-600 bg-ink-950">
           <div className="flex flex-col px-6 py-4 gap-3">
-            {LINKS.map((l) => (
+            {links.map((l) => (
               <a
                 key={l.href}
                 href={l.href}
@@ -137,7 +161,7 @@ export function Header() {
                 className="flex-1 t2q-btn-primary text-center"
                 onClick={() => setOpen(false)}
               >
-                Get beta access
+                Start free trial
               </Link>
             </div>
             {/* Install CTA moved to the floating bottom-right pill —

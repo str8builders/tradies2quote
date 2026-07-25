@@ -12,6 +12,13 @@ type SendArgs = {
   quoteNumber: string;
   pdf: Uint8Array;
   pdfFileName: string;
+  /**
+   * The tradie's own address. The body invites the customer to "reply to
+   * this email", but `from` is the platform's no-mailbox sending address
+   * — without this, every customer reply is silently lost. Omitted only
+   * when the tradie has no email on their profile.
+   */
+  replyTo?: string | null;
 };
 
 export async function sendQuoteEmail(args: SendArgs): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -52,6 +59,7 @@ If you have any questions, reply to this email.
   const body = {
     from,
     to: [args.to],
+    ...(args.replyTo ? { reply_to: args.replyTo } : {}),
     subject,
     text,
     html,

@@ -709,20 +709,19 @@ const SECTIONS: ReadonlyArray<Section> = [
   },
   {
     id: "billing",
-    title: "Beta access",
+    title: "Your plan",
     icon: Money,
     intro: (
       <>
         <p>
-          T2Q is currently in private beta. There&apos;s no payment system
-          and no card on file — the app is fully functional for trial
-          users with no time limit during the beta window. When the public
-          launch happens, beta users get notified before pricing kicks in.
+          Every account starts with a 7-day free trial — every feature
+          unlocked, no card needed. After the trial your existing quotes
+          and invoices stay viewable and downloadable, whatever you decide.
         </p>
       </>
     ),
     tips: [
-      "Your data stays yours regardless of whether you stay on for the paid tier. Export your quotes and materials any time from the database (contact us if needed).",
+      "Your data stays yours. Export your quotes and materials any time — contact support if you need a hand.",
     ],
   },
 ];

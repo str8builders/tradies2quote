@@ -1,5 +1,5 @@
 // Cron: EVENING check — assess tomorrow's scheduled jobs for weather risk.
-// Schedule lives in vercel.json. Gated by CRON_SECRET + the weather-planning
+// Scheduled by systemd timers on the VPS (tradies2quote-cron@<name>.timer). Gated by CRON_SECRET + the weather-planning
 // flag. Runs the deterministic engine and (for risky jobs) Pat/Willa drafts.
 // Sends nothing to customers — Willa only writes drafts.
 import { NextResponse, type NextRequest } from "next/server";

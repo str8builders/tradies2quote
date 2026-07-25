@@ -7,6 +7,7 @@ import type { LibraryMaterial, QuoteData, QuoteStatus } from "@/lib/quote-types"
 import { quoteNumber } from "@/lib/quote-defaults";
 import type { ComplianceLineItem, ComplianceReview } from "@/lib/compliance";
 import { isOwnerEmail } from "@/lib/owner";
+import { smsConfigured } from "@/lib/sms-quote";
 import { suggestPriceAgentEnabledFromEnv } from "@/lib/agents/suggestPrice";
 import type { InvoiceSummary, InvoiceStatus } from "@/lib/types/invoice";
 import { orchestrate } from "@/lib/lifecycle/orchestrator";
@@ -63,7 +64,7 @@ export default async function QuotePreviewPage({
   const { data: quote, error } = await supabase
     .from("quotes")
     .select(
-      "id, voice_transcript, quote_data, created_at, status, public_token, pdf_path, sent_at, viewed_at, accepted_at, expires_at",
+      "id, voice_transcript, quote_data, created_at, status, public_token, pdf_path, sent_at, viewed_at, accepted_at, expires_at, chat_disabled",
     )
     .eq("id", id)
     .single();
@@ -75,7 +76,17 @@ export default async function QuotePreviewPage({
   // job's own evidence never licensed are STRIPPED (and logged below);
   // legacy AI lines are normalized into the explicit confirm workflow. The
   // guard never mutates the stored row — it sanitizes what review renders.
-  const rawQuoteData = (quote.quote_data ?? null) as QuoteData | null;
+  // Wave 47 — treat a quote_data without a line_items ARRAY as "not
+  // generated yet". The self-hosted base schema shipped a `DEFAULT '{}'`
+  // on the column (since removed by migration), which made every fresh
+  // draft look generated and crashed the editor against an empty object.
+  // Shape-checking here keeps any legacy/poisoned row on the generator
+  // path instead of a render crash.
+  const storedQuoteData = (quote.quote_data ?? null) as QuoteData | null;
+  const rawQuoteData =
+    storedQuoteData && Array.isArray(storedQuoteData.line_items)
+      ? storedQuoteData
+      : null;
   const guard = rawQuoteData
     ? guardQuoteForReview(rawQuoteData, {
         description: quote.voice_transcript ?? rawQuoteData.job_summary,
@@ -324,7 +335,10 @@ export default async function QuotePreviewPage({
 
       <main
         data-preview-quote-number={headerNumber}
-        className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14"
+        // pb-24 (mobile): the fixed StickyActionBar covers ~3.5rem above the
+        // island nav — page-tail cards (Review tools, invoice draft) need
+        // their own clearance beyond the shell's global 5.8rem nav padding.
+        className="mx-auto max-w-3xl px-4 pt-10 pb-24 sm:px-6 sm:py-14"
       >
         <div className="mb-8">
           <Link href="/app/quotes" className="t2q-btn-back mb-4">
@@ -400,6 +414,7 @@ export default async function QuotePreviewPage({
               suggestPriceEnabled={
                 suggestPriceAgentEnabledFromEnv() && isOwnerEmail(user.email)
               }
+              smsEnabled={smsConfigured()}
             />
 
             {/* Wave 14 — Invoice draft card. Self-hides unless the
@@ -430,7 +445,11 @@ export default async function QuotePreviewPage({
                 title="Customer chat"
                 defaultOpen
               >
-                <CustomerChatPanel quoteData={quoteData} />
+                <CustomerChatPanel
+                  quoteData={quoteData}
+                  quoteId={quote.id}
+                  chatDisabled={quote.chat_disabled === true}
+                />
               </CollapsibleSection>
 
               <CollapsibleSection

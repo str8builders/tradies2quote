@@ -77,7 +77,12 @@ export function candidateQueries(address: string): string[] {
     .map((p) => p.trim())
     .filter((p) => p.length > 0 && !/^(new zealand|nz|australia|au|aus|united kingdom|uk|usa|us|canada|ca)$/i.test(p));
   // Drop a leading street segment that contains a number (e.g. "12 Example St").
-  const placeParts = parts.length > 1 && /\d/.test(parts[0]) ? parts.slice(1) : parts;
+  const placeParts = (parts.length > 1 && /\d/.test(parts[0]) ? parts.slice(1) : parts)
+    // NZ/AU addresses glue the postcode to the locality inside one comma
+    // segment ("Mount Maunganui 3116") and the place-name geocoder returns
+    // nothing for that — strip a trailing 3-5 digit postcode from each part.
+    .map((p) => p.replace(/\s+\d{3,5}$/, "").trim())
+    .filter((p) => p.length > 0);
   const candidates: string[] = [];
   if (placeParts.length >= 2) candidates.push(`${placeParts[0]}, ${placeParts[1]}`);
   for (const p of placeParts) candidates.push(p);

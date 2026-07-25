@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import {
   DownloadSimple,
   Check,
   DeviceMobile,
   ShareNetwork,
 } from "@phosphor-icons/react";
+import { isNativeIOSApp } from "@/lib/native-app";
+
+const emptySubscribe = () => () => {};
 
 /**
  * "Install app" button. Two surfaces:
@@ -48,6 +51,15 @@ export default function InstallPWAButton({
 }: Props) {
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
+  // Inside the iOS App Store shell the app IS installed — a PWA
+  // install button there is nonsense and a guaranteed review flag.
+  // (useSyncExternalStore split keeps SSR + browser hydration aligned;
+  // the Capacitor bridge exists before hydration, so no flash.)
+  const nativeShell = useSyncExternalStore(
+    emptySubscribe,
+    isNativeIOSApp,
+    () => false,
+  );
   const [installed, setInstalled] = useState(false);
   const [showIosHelp, setShowIosHelp] = useState(false);
   const [platform, setPlatform] = useState<"desktop" | "ios" | "android">(
@@ -107,6 +119,7 @@ export default function InstallPWAButton({
     setShowIosHelp(true);
   }
 
+  if (nativeShell) return null;
   if (installed) return null;
 
   return (

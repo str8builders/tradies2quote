@@ -69,13 +69,13 @@ const SLIDES: Slide[] = [
     ),
     feats: [
       "Voice in. Quote out. Under 60 seconds.",
-      "NZ-first beta · GST 15% baked in",
+      "NZ-first · GST 15% baked in",
       "Quote → invoice in one tap",
     ],
     screen: "/screens/screen-1.jpg",
     callouts: [
       { style: { top: "14%", left: "-10%" }, pre: "// MADE IN NZ", text: "By a builder, for builders." },
-      { cls: "green", style: { bottom: "18%", right: "-10%" }, pre: "// BETA · OPEN NOW", text: "$0 until launch." },
+      { cls: "green", style: { bottom: "18%", right: "-10%" }, pre: "// FREE TRIAL", text: "7 days on us." },
     ],
   },
   {
@@ -300,8 +300,8 @@ const SLIDES: Slide[] = [
     ],
   },
   {
-    tag: "// JOIN THE BETA",
-    label: "// JOIN THE BETA",
+    tag: "// START YOUR TRIAL",
+    label: "// START YOUR TRIAL",
     cta: true,
     headline: (
       <>
@@ -312,13 +312,13 @@ const SLIDES: Slide[] = [
     ),
     sub: (
       <>
-        NZ beta is open. <strong>$0 until launch</strong> — and the rate locks
-        when we go live. No credit card. Cancel by text. We onboard you
+        Start with a <strong>7-day free trial</strong> — every feature
+        unlocked, no credit card to start, cancel anytime. We onboard you
         personally.
       </>
     ),
     callouts: [
-      { style: { top: "18%", left: "-10%" }, pre: "// $0 UNTIL LAUNCH", text: "Beta rate locks at launch" },
+      { style: { top: "18%", left: "-10%" }, pre: "// 7-DAY FREE TRIAL", text: "No credit card to start" },
       { cls: "green", style: { bottom: "18%", right: "-10%" }, pre: "// PERSONAL ONBOARDING", text: "We’ll walk you through" },
     ],
   },
@@ -481,10 +481,16 @@ export function AppShowcase() {
       });
     });
 
-    // Three.js hero background.
+    // Three.js hero background. PURELY decorative — some devices can't
+    // create a WebGL context at all (blocklisted GPUs, low-memory Safari,
+    // too many live contexts) and `new WebGLRenderer` THROWS there. That
+    // crash was reaching the page error boundary and killing the whole
+    // showcase (internal monitor, 2026-07-15). Guarded: on failure we
+    // hide the canvas and the section renders fine without the backdrop.
     let threeCleanup: (() => void) | null = null;
     const canvas = canvasRef.current;
     if (canvas) {
+      try {
       const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       const fit = () => renderer.setSize(stage.clientWidth, stage.clientHeight, false);
@@ -555,6 +561,11 @@ export function AppShowcase() {
         (ring.material as LineBasicMaterial).dispose();
         renderer.dispose();
       };
+      } catch {
+        // No WebGL on this device — hide the (decorative) canvas and
+        // move on. The showcase is fully functional without it.
+        canvas.style.display = "none";
+      }
     }
 
     go(0);
@@ -615,8 +626,8 @@ export function AppShowcase() {
                 <p className="slide-sub">{s.sub}</p>
                 {s.cta ? (
                   <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "8px" }}>
-                    <a className="btn" href="#beta">
-                      GET BETA ACCESS →
+                    <a className="btn" href="/signup">
+                      START FREE TRIAL →
                     </a>
                     <a className="btn ghost" href="#how-it-works">
                       SEE HOW IT WORKS
@@ -636,9 +647,9 @@ export function AppShowcase() {
                     <div className="cta-screen">
                       <div className="pre">{"// READY TO ROLL"}</div>
                       <div className="big">
-                        JOIN
+                        START
                         <br />
-                        THE <span className="o">BETA.</span>
+                        YOUR <span className="o">TRIAL.</span>
                       </div>
                       <div className="bar" />
                       <div className="cta-list">
@@ -679,8 +690,8 @@ export function AppShowcase() {
             </div>
             <div className="dots" id="t2q-dots" />
             <div className="right">
-              <a className="nav-cta" href="#beta">
-                GET BETA ACCESS →
+              <a className="nav-cta" href="/signup">
+                START FREE TRIAL →
               </a>
             </div>
           </div>

@@ -62,6 +62,7 @@ export async function saveSettings(
   const phone = fdString(formData, "phone");
   const address = fdString(formData, "address");
   const gstNumber = fdString(formData, "gst_number");
+  const paymentInstructions = fdString(formData, "payment_instructions");
   const country = fdString(formData, "country");
   const currency = fdString(formData, "currency");
   const gstRate = fdNumber(formData, "tax_rate");
@@ -81,6 +82,12 @@ export async function saveSettings(
   if (email !== null && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { status: "error", message: "That email doesn't look right." };
   }
+  if (paymentInstructions !== null && paymentInstructions.length > 500) {
+    return {
+      status: "error",
+      message: "Payment instructions must be 500 characters or fewer.",
+    };
+  }
 
   const { error } = await supabase
     .from("profiles")
@@ -92,6 +99,7 @@ export async function saveSettings(
         phone,
         address,
         gst_number: gstNumber,
+        payment_instructions: paymentInstructions,
         country,
         currency,
         tax_rate: gstRate,

@@ -13,6 +13,12 @@ type SendArgs = {
   pdf: Uint8Array;
   pdfFileName: string;
   paymentInstructions?: string | null;
+  /**
+   * The tradie's own address — the body says "just reply to this email",
+   * but `from` is the platform's no-mailbox sending address. See the
+   * matching note in email-quote.ts.
+   */
+  replyTo?: string | null;
 };
 
 /**
@@ -64,6 +70,7 @@ If anything looks off, reply to this email and we'll sort it.
   const body = {
     from,
     to: [args.to],
+    ...(args.replyTo ? { reply_to: args.replyTo } : {}),
     subject,
     text,
     html,

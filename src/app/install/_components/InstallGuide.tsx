@@ -362,8 +362,8 @@ function WhatYouGet() {
     },
     {
       icon: <WifiHigh size={20} weight="bold" />,
-      title: "Works offline",
-      body: "Start a quote with no signal; it syncs when you're back.",
+      title: "One-tap access",
+      body: "Right there on your home screen — no browser, no login hunt.",
     },
   ];
   return (

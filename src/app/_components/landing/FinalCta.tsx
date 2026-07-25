@@ -23,8 +23,8 @@ export function FinalCta() {
                 <span className="text-brand">at site speed.</span>
               </h2>
               <p className="mt-5 text-lg text-ink-200 max-w-md leading-relaxed">
-                Beta access for NZ tradies. No credit card. Cancel by text. We&apos;ll
-                onboard you personally.
+                Built for NZ tradies. 7-day free trial — no credit card to
+                start, cancel anytime. We&apos;ll onboard you personally.
               </p>
               <ul className="mt-6 grid sm:grid-cols-2 gap-2 text-sm text-ink-100">
                 <li className="flex items-center gap-2">
@@ -52,7 +52,7 @@ export function FinalCta() {
                   data-testid="final-cta-primary"
                   className="t2q-btn-primary"
                 >
-                  <Microphone size={20} weight="bold" /> Get beta access
+                  <Microphone size={20} weight="bold" /> Start free trial
                 </Link>
               </Magnetic>
               <Link

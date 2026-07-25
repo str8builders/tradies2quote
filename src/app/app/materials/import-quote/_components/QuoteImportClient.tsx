@@ -517,7 +517,7 @@ export function QuoteImportClient({ currency }: { currency: string }) {
           {previewUrl && (
             <div
               data-testid="quote-import-preview"
-              className="mt-4 flex items-center gap-3 rounded-lg border border-[#E8E7E0] bg-[#F4F3ED] p-3"
+              className="mt-4 flex items-center gap-3 rounded-lg border border-ink-800 bg-ink-900/70 p-3"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -844,7 +844,7 @@ export function QuoteImportClient({ currency }: { currency: string }) {
               <div className="mt-3 overflow-hidden rounded-lg border border-[#E8E7E0]">
                 <table className="w-full text-sm tabular-nums">
                   <thead>
-                    <tr className="bg-[#F4F3ED] font-mono text-[10px] uppercase tracking-[0.15em] text-[#8A8A82]">
+                    <tr className="bg-ink-900 font-mono text-[10px] uppercase tracking-[0.15em] text-ink-400">
                       <th className="px-3 py-2 text-left font-medium">Field</th>
                       <th className="px-3 py-2 text-right font-medium">Supplier</th>
                       <th className="px-3 py-2 text-right font-medium">App</th>

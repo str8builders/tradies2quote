@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Lightning, ShieldCheck } from "@phosphor-icons/react/dist/ssr";
+import { HideInNativeApp } from "@/app/_components/HideInNativeApp";
+import { isNativeShellRequest } from "@/lib/native-shell";
 import { getCachedAuthUser } from "@/lib/supabase/auth";
 import {
   getCachedSubscriptionStatus,
@@ -46,10 +48,10 @@ export async function TrialBanner() {
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2">
           <p className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-200">
             <ShieldCheck size={14} weight="bold" className="text-brand" />
-            Beta access active until {endsLabel}
+            Free access active until {endsLabel}
           </p>
           <span className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-brand">
-            Review beta guidance
+            Pre-send checklist
             <ArrowRight size={12} weight="bold" />
           </span>
         </div>
@@ -59,11 +61,18 @@ export async function TrialBanner() {
 
   if (sub.state === "paid") return null;
 
+  // 3.1.3(f) — the two banners below carry "$49/mo" + an upgrade link, so
+  // the iOS App Store shell must never receive their HTML at all. The
+  // server-side UA gate is authoritative; the <HideInNativeApp> wrappers
+  // below stay as defence-in-depth for pre-marker shells.
+  if (await isNativeShellRequest()) return null;
+
   // Show big red banner for expired users (they're locked out of
   // creating new quotes) and a softer hivis banner during the last
   // 2 days of trial.
   if (sub.state === "expired") {
     return (
+      <HideInNativeApp>
       <Link
         href="/app/upgrade"
         data-testid="trial-banner-expired"
@@ -80,6 +89,7 @@ export async function TrialBanner() {
           </span>
         </div>
       </Link>
+      </HideInNativeApp>
     );
   }
 
@@ -94,6 +104,7 @@ export async function TrialBanner() {
         : `Trial ends in ${daysLeft} days`;
 
   return (
+    <HideInNativeApp>
     <Link
       href="/app/upgrade"
       data-testid="trial-banner-warning"
@@ -110,5 +121,6 @@ export async function TrialBanner() {
         </span>
       </div>
     </Link>
+    </HideInNativeApp>
   );
 }

@@ -57,6 +57,9 @@ export function CustomerChat({ token, businessName, clientName }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [hasSeenWelcome, setHasSeenWelcome] = useState(false);
   const [hintVisible, setHintVisible] = useState(false);
+  const [reportState, setReportState] = useState<"idle" | "sending" | "sent">(
+    "idle",
+  );
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -173,6 +176,34 @@ export function CustomerChat({ token, businessName, clientName }: Props) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
+    }
+  }
+
+  // Guideline 1.2 — report control. One tap + confirm flags the whole
+  // conversation to the operator (reviewed within 24 hours).
+  async function reportChat() {
+    if (reportState !== "idle") return;
+    const confirmed = window.confirm(
+      "Report this chat as offensive or inappropriate? The Tradies2Quote team reviews reports within 24 hours.",
+    );
+    if (!confirmed) return;
+    setReportState("sending");
+    try {
+      const lastAssistant = [...messages]
+        .reverse()
+        .find((m) => m.role === "assistant");
+      await fetch(`/api/quote/${encodeURIComponent(token)}/chat/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reason: "reported_from_chat_ui",
+          messagePreview: lastAssistant?.content.slice(0, 300) ?? null,
+        }),
+      });
+      setReportState("sent");
+    } catch {
+      setReportState("idle");
+      setError("Couldn't send the report — try again.");
     }
   }
 
@@ -313,9 +344,27 @@ export function CustomerChat({ token, businessName, clientName }: Props) {
                   <PaperPlaneRight size={18} weight="bold" />
                 </button>
               </div>
-              <p className="mt-2 font-mono text-[9px] uppercase tracking-[0.2em] text-ink-500">
-                {"// answers powered by t2q · the tradie sees this chat"}
-              </p>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                {/* 5.1.2 AI disclosure — the customer must know they're
+                    talking to an AI and that messages are processed by our
+                    AI provider + shared with the tradie. */}
+                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-ink-500">
+                  {"// ai assistant · answers may contain mistakes · the tradie sees this chat"}
+                </p>
+                <button
+                  type="button"
+                  onClick={reportChat}
+                  disabled={reportState !== "idle"}
+                  data-testid="customer-chat-report"
+                  className="shrink-0 font-mono text-[9px] uppercase tracking-[0.2em] text-ink-500 underline underline-offset-2 hover:text-red-300 disabled:no-underline disabled:opacity-70"
+                >
+                  {reportState === "sent"
+                    ? "Reported ✓"
+                    : reportState === "sending"
+                      ? "Reporting…"
+                      : "Report"}
+                </button>
+              </div>
             </footer>
           </div>
         </div>

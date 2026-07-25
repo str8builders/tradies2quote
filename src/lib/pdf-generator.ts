@@ -7,6 +7,7 @@ import {
 } from "pdf-lib";
 import { formatCurrency, formatIssueDate, quoteNumber, splitDisplaySubtotals, validUntilDate } from "./quote-defaults";
 import type { QuoteData, QuoteLineItem, QuoteProfile } from "./quote-types";
+import { drawPdfLogo, type PdfLogo } from "./pdf-logo";
 
 type GenerateArgs = {
   quoteId: string;
@@ -19,6 +20,8 @@ type GenerateArgs = {
     address?: string | null;
   };
   acceptUrl: string | null;
+  /** Optional business logo drawn top-left of the letterhead. */
+  logo?: PdfLogo | null;
 };
 
 const ORANGE = rgb(1.0, 0.373, 0.082); // #FF5F15
@@ -69,7 +72,7 @@ function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
 }
 
 export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> {
-  const { quoteId, createdAt, quote, profile, acceptUrl } = args;
+  const { quoteId, createdAt, quote, profile, acceptUrl, logo } = args;
 
   const pdf = await PDFDocument.create();
   const helv = await pdf.embedFont(StandardFonts.Helvetica);
@@ -121,6 +124,8 @@ export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> 
   }
 
   // ===== Header =====
+  // Optional logo top-left; pushes the business name down by whatever it used.
+  y -= await drawPdfLogo(pdf, page, logo, MARGIN_X, y);
   const businessName = profile.business_name || "Your business";
   drawText(businessName.toUpperCase(), MARGIN_X, y, { font: bold, size: 18 });
   y -= 24;

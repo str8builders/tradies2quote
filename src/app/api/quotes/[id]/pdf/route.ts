@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
 import { generateQuotePdf } from "@/lib/pdf-generator";
+import { loadLogoForPdf } from "@/lib/pdf-logo";
 import { quoteNumber } from "@/lib/quote-defaults";
 import type { QuoteData } from "@/lib/quote-types";
 
@@ -60,6 +61,8 @@ export async function GET(
     ? `${appUrl}/quote/${quote.public_token}`
     : null;
 
+  const logo = await loadLogoForPdf(profile?.logo_url);
+
   let bytes: Uint8Array;
   try {
     bytes = await generateQuotePdf({
@@ -68,6 +71,7 @@ export async function GET(
       quote: quote.quote_data as QuoteData,
       profile: profile ?? { business_name: null },
       acceptUrl,
+      logo,
     });
   } catch (e) {
     captureError(e, { route: "quotes/pdf" });

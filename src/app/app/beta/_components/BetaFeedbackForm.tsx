@@ -22,7 +22,7 @@ const FIELDS = [
   },
   {
     key: "wouldPay" as const,
-    label: "What feature would make you pay?",
+    label: "What feature would make T2Q a must-have?",
     placeholder: "The one thing that would make this a no-brainer…",
   },
 ];
@@ -85,8 +85,8 @@ export function BetaFeedbackForm() {
         {"// send feedback"}
       </p>
       <p className="mt-2 text-sm text-ink-300">
-        You&apos;re in beta. Test the quote flow and tell us what to fix — fill
-        in any box, skip the rest.
+        Tell us what to fix or what&apos;s working — fill in any box, skip
+        the rest. It goes straight to the builder who made this.
       </p>
 
       <div className="mt-5 space-y-4">

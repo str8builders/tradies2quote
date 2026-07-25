@@ -60,8 +60,9 @@ export function FounderStory() {
           <div className="lg:col-span-7 lg:pt-4">
             <p className="text-lg text-ink-200 leading-relaxed">
               I&apos;m Challis — a qualified builder based in New Zealand. I built
-              this for myself first because I was sick of losing Sundays to quoting. Now it&apos;s
-              in beta with a small crew of mates and I&apos;m opening it up.
+              this for myself first because I was sick of losing Sundays to
+              quoting. It&apos;s been proven on real jobs with a small crew of
+              mates — now I&apos;m opening it up.
             </p>
           </div>
         </div>
@@ -87,7 +88,7 @@ export function FounderStory() {
         <div className="mt-8 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-ink-900 px-4 py-2">
           <span className="w-2 h-2 rounded-full bg-hivis animate-pulse" />
           <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-ink-200">
-            Beta · NZ tradies only · onboarding new crews each week
+            NZ tradies only · onboarding new crews each week
           </span>
         </div>
       </div>

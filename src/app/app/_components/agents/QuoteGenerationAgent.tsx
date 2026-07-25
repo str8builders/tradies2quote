@@ -22,7 +22,7 @@ import type {
  * NZ-builder quote back.
  *
  * Real backend: POSTs to `/api/agents/quote-generation` which calls
- * Anthropic Claude `claude-sonnet-4-20250514`. Returns line items with
+ * Anthropic Claude (`claude-sonnet-5`). Returns line items with
  * NZ trade vocab, 15% GST, and standard payment terms. NEVER writes
  * to the database — the tradie reviews + pastes the result into a
  * draft quote on `/app/quotes/new`.

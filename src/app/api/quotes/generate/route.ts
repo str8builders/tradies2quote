@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
+import { parseModelJsonObject } from "@/lib/modelJson";
 import { FetchTimeoutError, fetchWithTimeout, TIMEOUTS } from "@/lib/fetchTimeout";
 import { createClient } from "@/lib/supabase/server";
+import { aiConsentGate } from "@/lib/ai-consent";
 import { DEFAULT_NZ_CONTRACT_TERMS } from "@/lib/default-contract";
 import {
   NZ_DEFAULTS,
@@ -11,7 +13,7 @@ import {
   round2,
 } from "@/lib/quote-defaults";
 import { buildQuotePrompt, type PastQuoteSummary } from "@/lib/quote-prompt";
-import { matchToLibrary } from "@/lib/materials";
+import { matchToLibrary, matchToLibraryScored } from "@/lib/materials";
 import {
   canRunCalculator,
   parseTakeoffDescription,
@@ -116,10 +118,12 @@ export const dynamic = "force-dynamic";
 // transcript cleanup, plus optional matcher/compliance passes). Give it
 // headroom so a slow-but-succeeding generation isn't killed by Vercel's
 // default function timeout and surfaced to the client as a gateway 502.
-export const maxDuration = 60;
+// Self-hosted (systemd) so nothing enforces this locally, but keep it
+// truthful for any platform that does: it must exceed TIMEOUTS.generation.
+export const maxDuration = 180;
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-sonnet-4-20250514";
+const MODEL = "claude-sonnet-5";
 // Bumped 8192 → 16384 defensively after the scan-drawing route's
 // 2048 cap surfaced as the misleading "Drawing was too detailed"
 // error. The same `stop_reason === "max_tokens"` branch below would
@@ -150,7 +154,7 @@ async function fetchWithRetry(
     try {
       // Bound each attempt so a hung upstream socket can't eat the whole
       // function budget — a timed-out attempt falls into the retry path.
-      const res = await fetchWithTimeout(url, init, TIMEOUTS.llm);
+      const res = await fetchWithTimeout(url, init, TIMEOUTS.generation);
       if (res.ok || !RETRYABLE_STATUSES.has(res.status) || isLast) {
         return res;
       }
@@ -158,8 +162,8 @@ async function fetchWithRetry(
         `Claude API ${res.status}; retrying (${i + 1}/${attempts - 1})`,
       );
     } catch (e) {
-      // A 50s timeout already spent the function budget — retrying would
-      // just get the function killed mid-attempt. Fail fast and clean.
+      // A timed-out attempt already spent the request budget — retrying
+      // would just leave the client hanging past its own abort. Fail fast.
       if (e instanceof FetchTimeoutError) throw e;
       if (isLast) throw e;
       console.warn(
@@ -181,6 +185,11 @@ export async function POST(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  // Guideline 5.1.2(i) — no transcript/prompt goes to Anthropic without
+  // recorded consent (iOS shell only; web unaffected).
+  const consentGate = await aiConsentGate(supabase, user.id);
+  if (consentGate) return consentGate;
 
   // Per-user daily cap — cheap circuit-breaker on quote-generation spend.
   const quota = consumeDailyQuota(`generate:${user.id}`, 150);
@@ -238,7 +247,12 @@ export async function POST(request: NextRequest) {
   if (!transcript) {
     return NextResponse.json({ error: "Quote has no transcript" }, { status: 400 });
   }
-  if (quote.quote_data) {
+  // Wave 47 — "already generated" means a REAL payload (has a line_items
+  // array), not merely non-null. The self-hosted schema briefly defaulted
+  // quote_data to '{}' (drift, since migrated away); shape-checking lets
+  // any row poisoned by that default regenerate instead of 409ing forever.
+  const existingData = quote.quote_data as { line_items?: unknown } | null;
+  if (existingData && Array.isArray(existingData.line_items)) {
     return NextResponse.json(
       { error: "Quote has already been generated" },
       { status: 409 },
@@ -411,19 +425,17 @@ export async function POST(request: NextRequest) {
         "anthropic-version": "2023-06-01",
         "content-type": "application/json",
       },
+      // Sonnet 5 rejects non-default `temperature` and assistant
+      // prefills (both 400) — the old `{"role":"assistant","content":"{"}`
+      // JSON-forcing trick is gone; parseModelJsonObject handles fences.
       body: JSON.stringify({
         model: MODEL,
         max_tokens: MAX_TOKENS,
-        temperature: 0,
         system: systemPrompt,
         messages: [
           {
             role: "user",
             content: userMessage,
-          },
-          {
-            role: "assistant",
-            content: "{",
           },
         ],
       }),
@@ -484,11 +496,9 @@ export async function POST(request: NextRequest) {
       { status: 502 },
     );
   }
-  const fullJson = "{" + text;
-
   let parsed: QuoteData;
   try {
-    parsed = JSON.parse(fullJson) as QuoteData;
+    parsed = parseModelJsonObject<QuoteData>(text);
   } catch (e) {
     captureError(e, { route: "quotes/generate" });
     console.error(
@@ -497,7 +507,7 @@ export async function POST(request: NextRequest) {
       "stop_reason:",
       claudePayload.stop_reason,
       "raw (first 800):",
-      fullJson.slice(0, 800),
+      text.slice(0, 800),
     );
     return NextResponse.json(
       { error: "Quote response was malformed. Please try again." },
@@ -821,12 +831,21 @@ export async function POST(request: NextRequest) {
     const qty = Number(it.quantity) || 0;
     let price = Number(it.unit_price) || 0;
     if (it.type === "material") {
-      const match = matchToLibrary(it.description, library);
-      if (match) {
+      const scored = matchToLibraryScored(it.description, library);
+      const match = scored?.item ?? null;
+      if (match && scored) {
         it.library_id = match.id;
         it.is_ai_estimated = false;
         if (match.default_unit_price !== null) {
           price = Number(match.default_unit_price);
+          // A STRONG match (≥2 specific tokens) to a library row the
+          // tradie priced themselves is trustworthy enough to keep
+          // through the PRICES_OFF pass below — it's their number, not
+          // an AI guess. Single-token matches ("screws") stay unpriced.
+          if (scored.specificity >= 2 && price > 0) {
+            it.price_source = "user_library";
+            it.price_confidence = "high";
+          }
         }
         usedLibraryIds.add(match.id);
       } else {
@@ -1029,18 +1048,40 @@ export async function POST(request: NextRequest) {
   }
 
   // ───────────────────────────────────────────────────────────────────────
-  // PRICES OFF — until ITM / supplier integration lands, every line in a
-  // newly-generated quote is emitted with NO pre-filled price. The tradie
-  // fills in unit prices manually, or imports a real supplier quote via
-  // /app/materials/import-quote (which keeps its source prices). This
-  // avoids shipping AI-guessed or stale-library prices to a customer.
+  // AI PRICES OFF — material lines the model priced itself are emitted
+  // with NO pre-filled price: AI-guessed numbers never reach a customer.
   //
-  // Flip PRICES_OFF to `false` (or remove this block) once a real supplier
-  // pricing source is wired in.
+  // Two sources of REAL prices survive this pass, because they're the
+  // tradie's own numbers, not guesses:
+  //   1. LABOUR at profiles.default_labour_rate.
+  //   2. MATERIALS strongly matched (specificity ≥ 2) to a library row
+  //      with a price — tagged price_source="user_library" above. The
+  //      library is fed by the tradie's own entries and scanned supplier
+  //      quotes, so this is the "real supplier pricing source" the old
+  //      comment was waiting for. Weak matches stay unpriced.
   // ───────────────────────────────────────────────────────────────────────
   const PRICES_OFF = true;
   if (PRICES_OFF) {
+    const labourRate = Number(profile.default_labour_rate) || 0;
     for (const it of parsed.line_items) {
+      if (it.type === "labour" && labourRate > 0) {
+        it.unit_price = labourRate;
+        it.line_total = round2((Number(it.quantity) || 0) * labourRate);
+        it.is_ai_estimated = false;
+        it.is_missing_price = false;
+        continue;
+      }
+      if (
+        it.type === "material" &&
+        it.price_source === "user_library" &&
+        it.price_confidence === "high" &&
+        Number(it.unit_price) > 0
+      ) {
+        it.line_total = round2((Number(it.quantity) || 0) * Number(it.unit_price));
+        it.is_ai_estimated = false;
+        it.is_missing_price = false;
+        continue;
+      }
       it.unit_price = 0;
       it.line_total = 0;
       it.is_ai_estimated = false;

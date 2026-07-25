@@ -25,16 +25,44 @@ export async function register() {
 
 /**
  * Captures errors thrown inside React Server Components and route
- * handlers so they end up in Sentry alongside the client + edge
- * traces. Short-circuits with zero overhead when the DSN isn't set,
- * and only loads `@sentry/nextjs` at runtime (not bundled in cold
- * paths) when it is.
+ * handlers.
+ *
+ * Two sinks, independently gated:
+ *   1. The INTERNAL error monitor (own Supabase, owner dashboard) —
+ *      always on. Without this, self-hosted deploys with no Sentry DSN
+ *      had zero visibility into unhandled server errors: `captureError`
+ *      only covers errors caught inside route handlers, while errors
+ *      that BUBBLE OUT of a handler only ever reach this hook.
+ *   2. Sentry — only when `NEXT_PUBLIC_SENTRY_DSN` is set, lazily
+ *      imported so it stays out of the bundle on cold paths.
  */
 export async function onRequestError(
   err: unknown,
   request: Parameters<typeof _captureNoop>[1],
   context: Parameters<typeof _captureNoop>[2],
 ): Promise<void> {
+  try {
+    // Node runtime only — the internal sink hashes fingerprints with
+    // node:crypto, which the Edge runtime (proxy only) can't load.
+    if (process.env.NEXT_RUNTIME !== "nodejs") throw new Error("edge");
+    const { captureError } = await import("@/lib/observability");
+    captureError(err, {
+      route: request.path,
+      surface:
+        context.routerKind === "App Router" &&
+        context.routeType === "action"
+          ? "server_action"
+          : "api",
+      extra: {
+        unhandled: true,
+        routeType: context.routeType,
+        method: request.method,
+      },
+    });
+  } catch {
+    /* reporting must never affect the request */
+  }
+
   if (!process.env.NEXT_PUBLIC_SENTRY_DSN) return;
   const Sentry = await import("@sentry/nextjs");
   Sentry.captureRequestError(err, request, context);

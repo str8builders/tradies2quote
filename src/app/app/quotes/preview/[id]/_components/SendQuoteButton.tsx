@@ -26,6 +26,13 @@ type Props = {
    * the StickyActionBar can own the primary send action. Link / PDF
    * affordances (status pill, public link, copy) still render so the
    * operator can manage a sent quote without the duplicate trigger.
+   *
+   * NOTE (2026-07-17): QuoteEditor — the only call site — always passes
+   * this, so the send/Text triggers below are currently unreachable.
+   * That matters if you ever un-hide them: this component does NOT
+   * implement the device-SMS handoff (`mode: "device"` from
+   * /api/quotes/[id]/sms, see src/lib/smsDeepLink.ts) and would report a
+   * text as sent when nothing was sent. StickyActionBar has that logic.
    */
   hideSendButton?: boolean;
 };
@@ -43,11 +50,11 @@ const ERROR_COPY: Record<string, string> = {
   already_accepted: "This quote has already been accepted.",
   pdf_generation_failed: "Could not generate the PDF.",
   pdf_upload_failed: "Could not save the PDF.",
-  email_not_configured: "Email isn't configured. Ask your admin to set RESEND_API_KEY.",
-  email_from_not_configured: "Email sender isn't configured. Set RESEND_FROM_EMAIL.",
-  sms_not_configured: "SMS isn't configured. Set TWILIO_ACCOUNT_SID.",
-  sms_token_not_configured: "SMS isn't configured. Set TWILIO_AUTH_TOKEN.",
-  sms_from_not_configured: "SMS isn't configured. Set TWILIO_FROM_NUMBER.",
+  email_not_configured: "Email sending isn't available right now — try again shortly.",
+  email_from_not_configured: "Email sending isn't available right now — try again shortly.",
+  sms_not_configured: "Text sending isn't available right now — send by email instead.",
+  sms_token_not_configured: "Text sending isn't available right now — send by email instead.",
+  sms_from_not_configured: "Text sending isn't available right now — send by email instead.",
   update_failed: "Message sent but the quote status couldn't update.",
   takeoff_blocked: "Fix the flagged takeoff lines before sending.",
   takeoff_unconfirmed: "Review and confirm the flagged quantities before sending.",

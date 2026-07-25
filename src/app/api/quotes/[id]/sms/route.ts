@@ -3,7 +3,8 @@ import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { generateQuotePdf } from "@/lib/pdf-generator";
-import { sendQuoteSms } from "@/lib/sms-quote";
+import { loadLogoForPdf } from "@/lib/pdf-logo";
+import { buildSmsBody, sendQuoteSms, smsConfigured } from "@/lib/sms-quote";
 import { uploadPdf } from "@/lib/quote-storage";
 import { generatePublicToken } from "@/lib/quote-tokens";
 import {
@@ -88,6 +89,8 @@ export async function POST(
   // Generate + upload the PDF up-front so the public /quote/[token] page
   // serves it instantly when the customer taps the SMS link. Mirrors the
   // email send route: durable artifacts first, irreversible action last.
+  const logo = await loadLogoForPdf(profile?.logo_url);
+
   let pdfBytes: Uint8Array;
   try {
     pdfBytes = await generateQuotePdf({
@@ -96,6 +99,7 @@ export async function POST(
       quote: quoteData,
       profile: profile ?? { business_name: null },
       acceptUrl,
+      logo,
     });
   } catch (e) {
     captureError(e, { route: "quotes/sms" });
@@ -140,14 +144,37 @@ export async function POST(
     );
   }
 
-  const smsResult = await sendQuoteSms({
+  const smsArgs = {
     to: validation.resolvedPhone,
     businessName: profile?.business_name || "Your business",
     clientName: quoteData.client.name,
     total: totalText,
     acceptUrl,
     quoteNumber: number,
-  });
+  };
+
+  // DEVICE PATH (the NZ default — see src/lib/smsDeepLink.ts for why
+  // Twilio cannot reach +64 mobiles). No platform sender configured, so
+  // hand the composed text back and let the client open the tradie's own
+  // Messages app.
+  //
+  // The quote is deliberately NOT marked sent here: the PDF and public
+  // link are now durable (saved above), but nothing has been sent — the
+  // tradie still has to hit send in Messages. They confirm that via
+  // POST /api/quotes/[id]/sms/sent, so "sent" never means "we opened an
+  // app and hoped".
+  if (!smsConfigured()) {
+    return NextResponse.json({
+      ok: true,
+      mode: "device",
+      to: validation.resolvedPhone,
+      body: buildSmsBody(smsArgs),
+      accept_url: acceptUrl,
+      client_name: quoteData.client.name,
+    });
+  }
+
+  const smsResult = await sendQuoteSms(smsArgs);
   if (!smsResult.ok) {
     return NextResponse.json(
       {
@@ -156,7 +183,7 @@ export async function POST(
           smsResult.error === "sms_not_configured" ||
           smsResult.error === "sms_token_not_configured" ||
           smsResult.error === "sms_from_not_configured"
-            ? "SMS isn't configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_FROM_NUMBER."
+            ? "Text sending isn't available right now — send by email instead."
             : "Could not send the SMS. PDF was saved but the message wasn't delivered.",
       },
       {

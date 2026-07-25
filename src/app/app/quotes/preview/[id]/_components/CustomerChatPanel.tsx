@@ -3,6 +3,7 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react/dist/ssr";
 import type { QuoteData } from "@/lib/quote-types";
+import { ChatModerationControls } from "./ChatModerationControls";
 
 /**
  * CustomerChatPanel — Wave 36 — read-only tradie view of the
@@ -63,27 +64,34 @@ function formatTime(iso: string): string {
 
 export function CustomerChatPanel({
   quoteData,
+  quoteId,
+  chatDisabled = false,
 }: {
   quoteData: QuoteData | null;
+  quoteId: string;
+  chatDisabled?: boolean;
 }) {
   const history = extractChatHistory(quoteData);
 
   if (history.length === 0) {
     return (
-      <div
-        data-testid="customer-chat-empty"
-        className="rounded-sm border border-ink-700 bg-ink-900/30 p-4 text-sm text-ink-300"
-      >
-        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-400">
-          {"// no customer chat yet"}
-        </p>
-        <p className="mt-1.5">
-          Once the customer opens this quote, they can tap the chat
-          bubble in the bottom-right corner and ask questions. T2Q
-          answers using the actual quote numbers, flags anything that
-          needs your input, and never agrees to a price change without
-          you. Their conversation will appear here.
-        </p>
+      <div className="space-y-3">
+        <ChatModerationControls quoteId={quoteId} chatDisabled={chatDisabled} />
+        <div
+          data-testid="customer-chat-empty"
+          className="rounded-sm border border-ink-700 bg-ink-900/30 p-4 text-sm text-ink-300"
+        >
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-400">
+            {"// no customer chat yet"}
+          </p>
+          <p className="mt-1.5">
+            Once the customer opens this quote, they can tap the chat
+            bubble in the bottom-right corner and ask questions. T2Q
+            answers using the actual quote numbers, flags anything that
+            needs your input, and never agrees to a price change without
+            you. Their conversation will appear here.
+          </p>
+        </div>
       </div>
     );
   }
@@ -98,6 +106,7 @@ export function CustomerChatPanel({
 
   return (
     <div className="space-y-4">
+      <ChatModerationControls quoteId={quoteId} chatDisabled={chatDisabled} />
       {/* Summary header */}
       <div className="flex items-center gap-2 rounded-sm border border-brand/30 bg-brand/5 px-3 py-2">
         <ChatCircle size={16} weight="bold" className="text-brand" />

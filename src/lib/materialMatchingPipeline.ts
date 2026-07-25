@@ -69,6 +69,19 @@ export async function enrichLineItemsWithCatalogue(
       continue;
     }
 
+    // A line already priced from the tradie's OWN library by the strong
+    // token match upstream (price_source="user_library", high confidence)
+    // is authoritative — this stage's normalized-name matcher must never
+    // downgrade it to missing_price just because ITS lookup missed.
+    if (
+      item.price_source === "user_library" &&
+      item.price_confidence === "high" &&
+      Number(item.unit_price) > 0
+    ) {
+      out.push(item);
+      continue;
+    }
+
     const result = await match({ description: item.description });
 
     if (result.status === "matched") {

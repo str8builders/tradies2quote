@@ -17,7 +17,11 @@ import { getSubscriptionStatus } from "@/lib/subscription";
 import { AppHeader } from "../_components/AppHeader";
 import { AdminChecklistPanel } from "../_components/agents/AdminChecklistPanel";
 import { SettingsForm, type SettingsInitial } from "./_components/SettingsForm";
+import { BusinessLogoField } from "./_components/BusinessLogoField";
+import { AiConsentSetting } from "./_components/AiConsentSetting";
 import { SubscriptionPanel } from "./_components/SubscriptionPanel";
+import { HideInNativeApp } from "@/app/_components/HideInNativeApp";
+import { isNativeShellRequest } from "@/lib/native-shell";
 import { reviewsEnabled, followupsEnabled } from "@/lib/engagement";
 import { EngagementSettings } from "./_components/EngagementSettings";
 import { paymentsEnabled, getConnectStatus, refreshConnectStatus } from "@/lib/payments";
@@ -65,7 +69,7 @@ export default async function SettingsPage({
     supabase
       .from("profiles")
       .select(
-        "business_name, email, phone, address, gst_number, country, currency, tax_label, tax_rate, default_labour_rate, default_markup_pct",
+        "business_name, email, phone, address, gst_number, payment_instructions, country, currency, tax_label, tax_rate, default_labour_rate, default_markup_pct, logo_url, ai_consent_at",
       )
       .eq("id", user.id)
       .maybeSingle(),
@@ -140,6 +144,7 @@ export default async function SettingsPage({
     phone: profile?.phone ?? "",
     address: profile?.address ?? "",
     gst_number: profile?.gst_number ?? "",
+    payment_instructions: profile?.payment_instructions ?? "",
     country: (profile?.country ?? NZ_DEFAULTS.country) || "NZ",
     currency: (profile?.currency ?? NZ_DEFAULTS.currency) || "NZD",
     tax_label: (profile?.tax_label ?? NZ_DEFAULTS.tax_label) || "GST",
@@ -251,6 +256,12 @@ export default async function SettingsPage({
             each item. Read-only. */}
         <AdminChecklistPanel profile={adminProfile} clients={adminClients} />
 
+        {/* Business logo — separate from the settings form (its own upload
+            action fires on pick). Renders on every quote/invoice PDF. */}
+        <div className="mb-8">
+          <BusinessLogoField logoUrl={profile?.logo_url ?? null} />
+        </div>
+
         <SettingsForm initial={initial} />
 
         {reviewsOn || followupsOn ? (
@@ -265,16 +276,31 @@ export default async function SettingsPage({
         ) : null}
 
         {/* Billing + subscription. Reads server-side so the panel
-            reflects the exact current state without a client round-trip. */}
-        <SubscriptionPanel
-          status={await getSubscriptionStatus({
-            userId: user.id,
-            // eslint-disable-next-line react-hooks/purity -- server component, one-shot per request
-            signedUpAt: new Date(user.created_at ?? Date.now()),
-            email: user.email,
-          })}
-          stripeConfigured={isStripeConfigured()}
-        />
+            reflects the exact current state without a client round-trip.
+            3.1.3(f) — SERVER-gated out of the iOS App Store shell: the
+            panel renders "$X/month" + a Stripe billing-portal button, so
+            its HTML must never be emitted to the binary at all (a client-
+            only hide leaves it in the SSR payload as a catchable flash).
+            <HideInNativeApp> stays as defence-in-depth for older shells. */}
+        {!(await isNativeShellRequest()) ? (
+          <HideInNativeApp>
+            <SubscriptionPanel
+              status={await getSubscriptionStatus({
+                userId: user.id,
+                // eslint-disable-next-line react-hooks/purity -- server component, one-shot per request
+                signedUpAt: new Date(user.created_at ?? Date.now()),
+                email: user.email,
+              })}
+              stripeConfigured={isStripeConfigured()}
+            />
+          </HideInNativeApp>
+        ) : null}
+
+        {/* AI-consent status + withdrawal (Guideline 5.1.2(i)). Only inside
+            the iOS shell, where the consent gate is enforced. */}
+        {(await isNativeShellRequest()) ? (
+          <AiConsentSetting consentedAt={profile?.ai_consent_at ?? null} />
+        ) : null}
 
         {/* Sign out lives here instead of the app header so the mobile
             top bar can stay compact. Signed-in email is shown for

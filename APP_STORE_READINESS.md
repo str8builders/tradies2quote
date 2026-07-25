@@ -1,6 +1,71 @@
 # Tradies2Quote — App Store readiness plan & checklist
 
-Last updated: 2026-07-10 (full audit + research pass; supersedes the 2026-06-05 notes)
+Last updated: 2026-07-18 (compliance-fix pass; supersedes the 2026-07-10 audit notes)
+
+## STATUS UPDATE 2026-07-18 — full audit-fix pass (43 findings closed)
+
+A strict guideline audit (10 dimensions) ran against the real code; every
+code-fixable finding is now closed and deployed:
+
+- **Reviewer access is code-guaranteed (2.1)**: `src/lib/reviewer.ts` comps
+  demo@tradies2quote.com to `paid` inside `getSubscriptionStatus` (no more
+  hand-inserted subscriptions row with a live expiry), and
+  `deleteAccountAction` runs the full 5.1.1(v) deletion UX for the demo
+  WITHOUT destroying the login — reviewers can verify deletion and still
+  sign in on the next round.
+- **3.1.3(f) is server-enforced**: the shell appends `T2QNativeShell` to the
+  WKWebView UA (capacitor.config.ts) and `src/lib/native-shell.ts` withholds
+  ALL money-shaped HTML server-side (settings SubscriptionPanel, /app/upgrade,
+  TrialBanner, homepage Pricing/FAQ). `<HideInNativeApp>` remains as
+  defence-in-depth only — it was previously the sole gate and left pricing in
+  the SSR payload (catchable hydration flash).
+- **Guideline 1.2 controls shipped for the customer AI chat**: server-side
+  content moderation on BOTH the customer's message and the model's reply
+  (blocklist + fast-tier classifier, src/lib/moderation.ts), a Report control
+  on both the customer chat UI and the tradie's chat panel (persisted to
+  `chat_reports` + surfaced in the monitor; <24 h review), and a per-quote
+  "Turn chat off" switch (`quotes.chat_disabled`, enforced 403 server-side).
+  Terms now carry a zero-tolerance clause; the chat UI discloses it is AI.
+- **Privacy policy rewritten to match reality (5.1.1(i))**: self-hosted VPS
+  (Contabo, France) instead of the stale Vercel/Supabase-US claims; photos +
+  images disclosed as sent to OpenAI/Anthropic vision; Open-Meteo (address/
+  coords) + Apple push added; device-SMS clarified (no SMS provider); named
+  natural-person data controller; date bumped.
+- **Unused permission strings removed**: NSFaceIDUsageDescription and
+  NSPhotoLibraryAddUsageDescription deleted from Info.plist (nothing
+  implements them); inert iPad orientation keys dropped (iPhone-only target);
+  PrivacyInfo.xcprivacy PreciseLocation flipped to Linked=true (job-site
+  assessments are stored per-account — the label must match).
+- **Placeholder surfaces removed (2.1)**: the owner-only "Personal Workspace"
+  gstack card grid (dead `claude://` buttons) is deleted from /app/agents;
+  the Weather tab now hides everywhere when the feature flag is parked
+  (flag honours the owner override).
+- Accept-form names are sanitised before becoming native push banners; the
+  seeded demo data now has a committed, idempotent top-up script
+  (`scripts/seed-demo-account.mjs`).
+
+Remaining are OWNER actions only: membership → APNs .p8 → Xcode archive
+(verify aps-environment=production in Organizer) → real 6.9" screenshots →
+age-rating questionnaire (declare the AI chat + UGC with the controls above)
+→ TestFlight pass → submit with APP_STORE_REVIEW_NOTES.md.
+
+## STATUS UPDATE 2026-07-17 — review-lens audit + fix pass (see APP_STORE_REVIEW_NOTES.md)
+
+Phase 2 is effectively DONE except APNs-key wiring (blocked on membership):
+shell + icons + splash ✅ · native share/save ✅ · mic/camera in webview ✅ ·
+offline screen ✅ · purpose strings ✅ (incl. location, added 2026-07-17) ·
+PrivacyInfo.xcprivacy ✅ (incl. PreciseLocation) · PushToggle native branch ✅ ·
+**in-app copy sweep ✅ (2026-07-17: /help billing FAQs shell-hidden, landing
+unreachable in shell via NativeAppRedirect, ALL user-visible "beta" copy
+removed app-wide, Text-send button config-gated)**. Face ID: NOT built
+(usage string only) — do not claim it in review notes. Additions this pass:
+TARGETED_DEVICE_FAMILY → 1 (iPhone-only), portrait-only orientations,
+armv7 → arm64, LaunchScreen dark bg, demo account made permanently
+subscribed (paywall can never fire mid-review), live checkout proven,
+dormant /api/payments/webhook endpoint disabled in Stripe until deposits
+ship. Remaining: membership → APNs .p8 → TestFlight → submit, with the
+paste-ready notes + metadata + privacy-label answers in
+**APP_STORE_REVIEW_NOTES.md**.
 
 ## The decision: hardened Capacitor shell, not a Swift rewrite (yet)
 
@@ -14,7 +79,7 @@ Research verdict (Apple guidelines current as of July 2026):
   path**, provided it is hardened against Guideline 4.2 (minimum functionality):
   web build **bundled locally** (never `server.url` to the live site), plus real
   native capabilities — APNs push, native mic/camera, native share sheet,
-  Face ID login, and a native offline screen (reviewers Airplane-Mode-test).
+  and a native offline screen (reviewers Airplane-Mode-test).
 - **Billing stays 100% on Stripe/web** under Guideline **3.1.3(f) "Free
   Stand-alone Apps"**: the iOS app is free, login-first, with **zero pricing,
   upgrade buttons, or billing links in the binary**. This is exactly how NZ
@@ -74,8 +139,11 @@ Research verdict (Apple guidelines current as of July 2026):
 - [ ] **Camera/photos**: existing `<input capture>` works in WKWebView — needs
       `NSCameraUsageDescription` + `NSPhotoLibraryUsageDescription`. HEIC
       conversion already handled in `src/lib/scanImage.ts`.
-- [ ] **Face ID login** (biometric unlock of the stored session) — reviewers
-      love it in screenshots; cite it in review notes.
+- [ ] **Face ID login** — NOT SHIPPED for v1 (2026-07-18: the unused
+      NSFaceIDUsageDescription string was removed from Info.plist — declaring
+      a capability with no code behind it is its own rejection risk). If built
+      later: add a Capacitor biometric plugin + LocalAuthentication flow FIRST,
+      then re-declare the string.
 - [ ] **Native offline screen** — reviewers Airplane-Mode-test; a browser error
       page = wrapper rejection. (The PWA deliberately has no offline mode;
       handle it at the shell level.)
@@ -98,9 +166,12 @@ Research verdict (Apple guidelines current as of July 2026):
       phone), audio recordings (voice quotes — processed, not retained beyond
       transcription), photos (plan scans), user content (quotes/invoices),
       identifiers. Mismatches are a top rejection cause.
-- [ ] Screenshots: **1320×2868** (6.9" iPhone) × up to 10 — include one showing
-      a native feature (Face ID prompt or the voice recorder). iPad screenshots
-      (2064×2752) only if iPad is enabled — consider iPhone-only for v1.
+- [ ] Screenshots: **1320×2868** (6.9" iPhone) × up to 10 — REAL on-device
+      captures of the built binary only (the 720×1560 web mockups in
+      public/screens/ are NOT valid: wrong size, simulated status bar, and
+      screen-1 is a loading splash). Show working screens: voice recorder
+      mid-capture, a generated quote, scan→takeoff, the native share sheet.
+      iPad screenshots not needed — iPhone-only target.
 - [ ] **Demo account with seeded data** in App Review notes (login-gated SaaS =
       #1 avoidable rejection): a test tradie with quotes, a client, materials.
       Review notes should name the native features explicitly.

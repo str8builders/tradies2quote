@@ -3,6 +3,12 @@ import path from "node:path";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
+  // Self-hosting (Docker): emit a standalone server bundle that ships only
+  // the file-traced runtime deps, so the production image doesn't need the
+  // full node_modules. Opt-in via BUILD_STANDALONE=1 (set by deploy/Dockerfile)
+  // because `next start` — which the VPS systemd service and Vercel-less local
+  // prod runs use — refuses to serve a standalone build.
+  ...(process.env.BUILD_STANDALONE === "1" ? { output: "standalone" as const } : {}),
   turbopack: {
     root: path.resolve(__dirname),
   },
@@ -58,6 +64,15 @@ const nextConfig: NextConfig = {
       "framer-motion",
       "lucide-react",
     ],
+    // Server Actions default to a 1 MB request-body cap. The avatar + business
+    // logo uploads go through Server Actions and their server-side size
+    // backstop is 8 MB, so without this the platform would 413 a large logo
+    // BEFORE the action's own check runs. Match the two so the action is the
+    // single enforcement point. (Client-side compression keeps real uploads
+    // far smaller; this only governs the fallback / pathological case.)
+    serverActions: {
+      bodySizeLimit: "8mb",
+    },
   },
 };
 

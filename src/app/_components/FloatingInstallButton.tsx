@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { DownloadSimple, X } from "@phosphor-icons/react";
+import { isNativeIOSApp } from "@/lib/native-app";
 import {
   isIOSUserAgent,
   isStandalone,
@@ -69,6 +70,8 @@ export function FloatingInstallButton() {
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
+    // Inside the iOS App Store shell the app IS installed — never offer.
+    if (isNativeIOSApp()) return;
     // Already installed — bail entirely.
     if (isStandalone(window)) return;
 

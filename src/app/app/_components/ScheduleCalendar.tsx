@@ -67,14 +67,29 @@ function longDate(dateKey: string): string {
   }).format(d);
 }
 
+export interface CalendarDayWeather {
+  status: "safe" | "caution" | "unsafe";
+  tempMaxC: number | null;
+  reason: string;
+}
+
+const WEATHER_DOT: Record<CalendarDayWeather["status"], string> = {
+  safe: "bg-emerald-400",
+  caution: "bg-amber-400",
+  unsafe: "bg-red-400",
+};
+
 export function ScheduleCalendar({
   jobs,
   notes,
   todayISO,
+  weather = {},
 }: {
   jobs: CalendarJob[];
   notes: CalendarNote[];
   todayISO: string;
+  /** Per-date work-suitability (YYYY-MM-DD keys) — forecast range only. */
+  weather?: Record<string, CalendarDayWeather>;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -130,6 +145,7 @@ export function ScheduleCalendar({
 
   const selectedJobs = jobsByDay.get(selected) ?? [];
   const selectedNotes = notesByDay.get(selected) ?? [];
+  const selWx = weather[selected] ?? null;
 
   function step(delta: number) {
     setView((v) => {
@@ -233,6 +249,7 @@ export function ScheduleCalendar({
           if (!c) return <div key={`b${i}`} aria-hidden="true" />;
           const hasJob = jobsByDay.has(c.dateKey);
           const hasNote = notesByDay.has(c.dateKey);
+          const wx = weather[c.dateKey];
           const isToday = c.dateKey === todayISO;
           const isSel = c.dateKey === selected;
           return (
@@ -240,7 +257,7 @@ export function ScheduleCalendar({
               key={c.dateKey}
               type="button"
               onClick={() => setSelected(c.dateKey)}
-              aria-label={`${c.day}${hasJob ? " — has jobs" : ""}${hasNote ? " — has notes" : ""}`}
+              aria-label={`${c.day}${hasJob ? " — has jobs" : ""}${hasNote ? " — has notes" : ""}${wx ? ` — weather ${wx.status}` : ""}`}
               aria-pressed={isSel}
               data-testid={`cal-day-${c.dateKey}`}
               className={[
@@ -253,7 +270,7 @@ export function ScheduleCalendar({
               ].join(" ")}
             >
               {c.day}
-              {hasJob || hasNote ? (
+              {hasJob || hasNote || wx ? (
                 <span className="absolute bottom-1 flex items-center gap-0.5">
                   {hasJob ? (
                     <span
@@ -267,6 +284,12 @@ export function ScheduleCalendar({
                       className={`h-1 w-1 rounded-full ${isSel ? "bg-ink-900/70" : "bg-hivis"}`}
                     />
                   ) : null}
+                  {wx ? (
+                    <span
+                      aria-hidden="true"
+                      className={`h-1 w-1 rounded-full ${isSel ? "bg-ink-900/50" : WEATHER_DOT[wx.status]}`}
+                    />
+                  ) : null}
                 </span>
               ) : null}
             </button>
@@ -278,6 +301,19 @@ export function ScheduleCalendar({
         <p className="text-xs font-semibold uppercase tracking-wide text-brand">
           {longDate(selected)}
         </p>
+        {selWx ? (
+          <p
+            className="mt-1 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-300"
+            data-testid="cal-selected-weather"
+          >
+            <span
+              aria-hidden="true"
+              className={`h-1.5 w-1.5 rounded-full ${WEATHER_DOT[selWx.status]}`}
+            />
+            {selWx.tempMaxC != null ? `${Math.round(selWx.tempMaxC)}° · ` : ""}
+            {selWx.reason}
+          </p>
+        ) : null}
 
         {selectedJobs.length > 0 ? (
           <ul className="mt-3 space-y-2">

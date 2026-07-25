@@ -55,29 +55,59 @@ describe("mobile shell contract — single owners", () => {
     expect(css).toMatch(/\.t2q-app-scroll\s*\{[^}]*overflow-x:\s*clip/);
   });
 
-  it("bottom nav owns the safe area: fixed, bottom 0, inset padding, own background", () => {
+  it("nav is a floating island: fixed, lifted by the safe-area inset, own background", () => {
+    // 2026-07-17 redesign: the nav floats 0.75rem above the home indicator;
+    // the safe-area inset rides in the BOTTOM OFFSET (not internal padding),
+    // and the bottom-edge paint owner is the root/canvas dark (asserted in
+    // the root-paint test below) — same colour everywhere, so the
+    // white-strip regression cannot recur.
     const nav = ruleBody(css, ".t2q-bottomnav-bar {");
     expect(nav).toMatch(/position:\s*fixed/);
-    expect(nav).toMatch(/left:\s*0/);
-    expect(nav).toMatch(/right:\s*0/);
-    expect(nav).toMatch(/bottom:\s*0/);
-    expect(nav).toMatch(/width:\s*100%/);
-    expect(nav).toMatch(/max-width:\s*100vw/);
-    expect(nav).toMatch(/padding:[^;]*env\(safe-area-inset-bottom/);
-    expect(nav).toMatch(/min-height:\s*calc\(4\.05rem \+ env\(safe-area-inset-bottom/);
+    expect(nav).toMatch(/left:\s*0\.75rem/);
+    expect(nav).toMatch(/right:\s*0\.75rem/);
+    expect(nav).toMatch(
+      /bottom:\s*calc\(env\(safe-area-inset-bottom[^)]*\)\s*\+\s*0\.75rem\)/,
+    );
+    expect(nav).toMatch(/margin-inline:\s*auto/);
+    expect(nav).toMatch(/max-width:\s*26rem/);
+    expect(nav).toMatch(/min-height:\s*4\.15rem/);
+    expect(nav).toMatch(/border-radius:/);
     expect(nav).toMatch(/background:/);
   });
 
-  it("scroll clearance stays in parity with the nav height (4.05rem + inset)", () => {
-    // .t2q-app-scroll's only shell job: pad content clear of the fixed nav.
+  it("scroll clearance stays in parity with the island geometry (5.8rem + inset)", () => {
+    // Island claims 0.75rem lift + 4.15rem bar = 4.9rem; clearance adds
+    // 0.9rem breathing → 5.8rem. Fixed sticky bars dock at 5.3rem (spot-check
+    // StickyActionBar/SupplierBrowser when changing this).
     expect(css).toMatch(
-      /\.t2q-app-scroll\s*\{[^}]*padding-bottom:\s*calc\(4\.05rem \+ env\(safe-area-inset-bottom/,
+      /\.t2q-app-scroll\s*\{[^}]*padding-bottom:\s*calc\(5\.8rem \+ env\(safe-area-inset-bottom/,
     );
   });
 
-  it("root fallback paint exists (cream, matches the splash — never white)", () => {
+  it("root fallback paint exists (ink, matches the splash — never white)", () => {
+    // The invariant is "root layer matches the splash/canvas colour so no
+    // strip can ever contrast at the screen edges" — ink since the dark
+    // app-shell flip (was cream #F5F4EE).
     const rootPaint = ruleBody(css, 'html:has([data-shell="app"])');
-    expect(rootPaint).toMatch(/background:\s*#F5F4EE/i);
+    expect(rootPaint).toMatch(/background:\s*#0A0A0A/i);
+  });
+
+  it("iOS zoom lock: form controls are >=16px on phones (kills focus-zoom)", () => {
+    // A control < 16px force-zooms the installed iOS shell on focus and never
+    // zooms back — the "app moves around inside the screen" bug. This rule
+    // lives INSIDE the single 639px block (a second block is banned above).
+    expect(css).toMatch(
+      /@media\s*\(max-width:\s*639px\)\s*\{[\s\S]*input,\s*textarea,\s*select\s*\{\s*font-size:\s*16px/,
+    );
+  });
+
+  it("iOS zoom lock: body sets touch-action manipulation (no double-tap zoom)", () => {
+    expect(ruleBody(css, "body {")).toMatch(/touch-action:\s*manipulation/);
+  });
+
+  it("iOS zoom lock: root viewport pins scale (maximumScale 1, userScalable false)", () => {
+    expect(rootLayout).toMatch(/maximumScale:\s*1\b/);
+    expect(rootLayout).toMatch(/userScalable:\s*false/);
   });
 
   it("overscroll is suppressed on BOTH html and body (no rubber-band / chain)", () => {

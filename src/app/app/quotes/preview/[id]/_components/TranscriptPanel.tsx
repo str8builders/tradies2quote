@@ -72,6 +72,8 @@ export function TranscriptPanel({ quoteId, transcript }: Props) {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ cleanedTranscript: editedText }),
+        // Plain DB save — a hung request shouldn't wedge the panel.
+        signal: AbortSignal.timeout(30_000),
       });
       if (!res.ok) {
         const detail = await res.json().catch(() => null);
@@ -97,6 +99,8 @@ export function TranscriptPanel({ quoteId, transcript }: Props) {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ cleanedTranscript: editedText }),
+          // LLM-backed — same stall guard as the core generate flow.
+          signal: AbortSignal.timeout(90_000),
         },
       );
       if (!res.ok) {

@@ -34,7 +34,7 @@ export function gateSummary(results: GateResult[]): string[] {
 /** Emit a single structured log line for one sheet. Never throws. */
 export function logPlanSheet(entry: PlanSheetLog): void {
   try {
-    // eslint-disable-next-line no-console
+     
     console.log(`[plan-reader] ${JSON.stringify(entry)}`);
   } catch {
     // Logging must never break the request.
@@ -73,7 +73,7 @@ export function summarizePlanRun(
     errored,
   };
   try {
-    // eslint-disable-next-line no-console
+     
     console.log(`[plan-reader:summary] ${JSON.stringify(summary)}`);
   } catch {
     // ignore

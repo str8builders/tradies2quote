@@ -37,6 +37,7 @@ import { applyGlossaryCorrections } from "./transcript/glossaryCorrect";
 import { normalizeSpokenMeasurements } from "./transcript/measureNormalize";
 import type { VocabSet, VocabTermType } from "./transcript/glossary";
 import { fetchWithTimeout, TIMEOUTS } from "@/lib/fetchTimeout";
+import { parseModelJsonObject } from "@/lib/modelJson";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -512,16 +513,14 @@ async function defaultAnthropicCall({
       "anthropic-version": "2023-06-01",
       "content-type": "application/json",
     },
+    // Sonnet 5 rejects non-default `temperature` and assistant prefills
+    // (both 400) — buildSummary's fence-tolerant parse replaces the old
+    // `{"role":"assistant","content":"{"}` JSON-forcing trick.
     body: JSON.stringify({
       model,
       max_tokens: maxTokens,
-      // Deterministic — same input must produce same JSON.
-      temperature: 0,
       system,
-      messages: [
-        { role: "user", content: user },
-        { role: "assistant", content: "{" },
-      ],
+      messages: [{ role: "user", content: user }],
     }),
   }, TIMEOUTS.llm);
   if (!res.ok) {
@@ -531,13 +530,12 @@ async function defaultAnthropicCall({
   const payload = (await res.json()) as {
     content?: Array<{ type: string; text?: string }>;
   };
-  const text = payload.content?.find((c) => c.type === "text")?.text ?? "";
-  return "{" + text;
+  return payload.content?.find((c) => c.type === "text")?.text ?? "";
 }
 
 export type BuildSummaryOptions = {
   apiKey?: string;
-  /** Defaults to claude-sonnet-4-20250514 (matches /api/quotes/generate). */
+  /** Defaults to claude-sonnet-5 (matches /api/quotes/generate). */
   model?: string;
   /** Test seam — pass a fake to avoid hitting Anthropic. */
   callAnthropic?: AnthropicCallable;
@@ -553,7 +551,7 @@ export async function buildSummary(
 ): Promise<TranscriptSummary | null> {
   const apiKey = options.apiKey ?? process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;
-  const model = options.model ?? "claude-sonnet-4-20250514";
+  const model = options.model ?? "claude-sonnet-5";
   const fn = options.callAnthropic ?? defaultAnthropicCall;
 
   let raw: string;
@@ -563,7 +561,8 @@ export async function buildSummary(
       system: SUMMARY_SYSTEM_PROMPT,
       user: cleanedTranscript,
       model,
-      maxTokens: 1024,
+      // Sonnet 5's tokenizer emits ~30% more tokens for the same content.
+      maxTokens: 1536,
     });
   } catch {
     return null;
@@ -571,7 +570,7 @@ export async function buildSummary(
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    parsed = parseModelJsonObject<unknown>(raw);
   } catch {
     return null;
   }

@@ -19,11 +19,14 @@ import { isOwnerEmail } from "@/lib/owner";
 import { STAGE_LABELS } from "@/lib/lifecycle/stages";
 import { AppHeader } from "./_components/AppHeader";
 import { DashboardSkeleton } from "./_components/DashboardSkeleton";
+import { StaggerIn } from "./_components/StaggerIn";
 import {
   QuotesListClient,
   type QuoteListRow,
 } from "./_components/QuotesListClient";
 import { ScheduleCalendar } from "./_components/ScheduleCalendar";
+import { WeekOutlook } from "./_components/WeekOutlook";
+import { getWeekOutlook } from "@/lib/weather-impact/outlook";
 import { SiteConditions } from "./_components/SiteConditions";
 
 export const metadata: Metadata = {
@@ -181,7 +184,7 @@ async function DashboardData({
       // → null is the common case.
       supabase
         .from("profiles")
-        .select("business_name")
+        .select("business_name, address")
         .eq("id", userId)
         .maybeSingle(),
       // Wave 41 — count of the tradie's own materials. Drives the
@@ -267,6 +270,19 @@ async function DashboardData({
   const nextScheduledJob =
     scheduledJobs.find((job) => job.date >= todayISO) ?? scheduledJobs[0] ?? null;
 
+  // Per-date weather for the calendar grid — same cached fetch the
+  // <WeekOutlook /> strip uses (unstable_cache dedupes), so this adds
+  // no extra upstream calls. Empty map when no address / no forecast.
+  const weekOutlookData = profile?.address
+    ? await getWeekOutlook(profile.address as string).catch(() => null)
+    : null;
+  const calendarWeather = Object.fromEntries(
+    (weekOutlookData?.days ?? []).map((d) => [
+      d.date,
+      { status: d.status, tempMaxC: d.tempMaxC, reason: d.reason },
+    ]),
+  );
+
   return (
     <>
       {/* Wave 36 — first-run nudge. Quote PDFs and the customer email's
@@ -278,6 +294,7 @@ async function DashboardData({
           quote benefits from the nudge. Quiet brand styling (not a
           full alert) since this is friction-removal, not an error. */}
       {businessNameMissing ? (
+        <StaggerIn index={0}>
         <Link
           href="/app/settings"
           data-testid="dashboard-business-name-banner"
@@ -310,6 +327,7 @@ async function DashboardData({
             aria-hidden="true"
           />
         </Link>
+        </StaggerIn>
       ) : null}
 
       {/* Wave 41 — empty-library nudge. Surfaces the bulk-seed page
@@ -318,6 +336,7 @@ async function DashboardData({
           early quote with AI-estimated prices (amber stripe on every
           material line) — a confidence killer for first impressions. */}
       {libraryEmpty ? (
+        <StaggerIn index={0}>
         <Link
           href="/app/materials/quick-start"
           data-testid="dashboard-quick-start-banner"
@@ -349,6 +368,7 @@ async function DashboardData({
             aria-hidden="true"
           />
         </Link>
+        </StaggerIn>
       ) : null}
 
       {/* Xero-style KPI strip — four headline numbers at the top of the
@@ -363,6 +383,7 @@ async function DashboardData({
           field; Willa drafts customer comms. KPIs, the lifecycle pipeline and
           the month calendar are demoted into the collapsible panel below so the
           home leads with what needs attention now. */}
+      <StaggerIn index={1}>
       <section data-testid="dashboard-today" aria-label="Today" className="mb-7">
         <div className="t2q-card-pro p-5 sm:p-6">
           <div className="flex items-start justify-between gap-4">
@@ -383,6 +404,13 @@ async function DashboardData({
 
           {/* Weather-aware planning block — flag-gated, renders nothing when off. */}
           <SiteConditions userId={userId} />
+
+          {/* Five-day work-suitability outlook for the tradie's own base —
+              renders nothing without a profile address or forecast. */}
+          <WeekOutlook
+            address={(profile?.address as string | null) ?? null}
+            todayISO={todayISO}
+          />
 
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             <WorkBoardMetric
@@ -407,8 +435,10 @@ async function DashboardData({
           </div>
         </div>
       </section>
+      </StaggerIn>
 
       {/* ── Demoted: pipeline, headline metrics & calendar (collapsed) ─────── */}
+      <StaggerIn index={2}>
       <details data-testid="dashboard-more" className="mb-7">
         <summary
           data-testid="dashboard-more-toggle"
@@ -529,18 +559,20 @@ async function DashboardData({
             jobs={scheduledJobs}
             notes={calendarNotes}
             todayISO={todayISO}
+            weather={calendarWeather}
           />
         </div>
       </details>
+      </StaggerIn>
 
-      <div className="flex items-center justify-between gap-3">
+      <StaggerIn index={3} className="flex items-center justify-between gap-3">
         <p
           data-testid="dashboard-recent-label"
           className="t2q-section-label-pro"
         >
           {`// ${recent.length} recent quote${recent.length === 1 ? "" : "s"}`}
         </p>
-      </div>
+      </StaggerIn>
 
       {/* Wave 13 — Agents card is now owner-only. Was visible to
           every tradie in Wave 10.4; now hidden from non-owners so
@@ -548,6 +580,7 @@ async function DashboardData({
           link is server-rendered behind `isOwner`, so it isn't even
           present in the HTML payload for non-owner accounts. */}
       {isOwner ? (
+        <StaggerIn index={4}>
         <Link
           href="/app/agents"
           data-testid="dashboard-agents-card"
@@ -583,12 +616,14 @@ async function DashboardData({
             aria-hidden="true"
           />
         </Link>
+        </StaggerIn>
       ) : null}
 
       {/* Owner-only Ops cockpit — live revenue, trials running out, and
           per-connector budget/health. Server-rendered behind `isOwner`
           so it never appears in a non-owner's HTML. */}
       {isOwner ? (
+        <StaggerIn index={5}>
         <Link
           href="/app/admin"
           data-testid="dashboard-ops-card"
@@ -619,8 +654,10 @@ async function DashboardData({
             aria-hidden="true"
           />
         </Link>
+        </StaggerIn>
       ) : null}
 
+      <StaggerIn index={4}>
       <section className="mt-5">
         {recent.length === 0 ? (
           <div
@@ -647,6 +684,7 @@ async function DashboardData({
           <QuotesListClient rows={recent} />
         )}
       </section>
+      </StaggerIn>
 
       {recent.length > 0 ? (
         <div className="mt-5 flex justify-end">

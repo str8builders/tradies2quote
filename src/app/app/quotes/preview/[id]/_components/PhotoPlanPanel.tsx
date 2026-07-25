@@ -138,6 +138,8 @@ export function PhotoPlanPanel({ onAddItems, onAddNotes, isAccepted }: Props) {
       const res = await fetch("/api/agents/photo-plan", {
         method: "POST",
         body: form,
+        // Vision LLM call — same stall guard as the core generate flow.
+        signal: AbortSignal.timeout(90_000),
       });
       const json = (await res.json()) as
         | { ok: true; result: PhotoPlanResult }

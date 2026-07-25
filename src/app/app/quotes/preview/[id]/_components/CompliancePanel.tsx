@@ -121,6 +121,8 @@ export function CompliancePanel({ quoteId, review, items }: Props) {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ wall }),
+        // LLM-backed — same stall guard as the core generate flow.
+        signal: AbortSignal.timeout(90_000),
       });
       if (!res.ok) {
         const detail = await res.json().catch(() => null);

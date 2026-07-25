@@ -4,6 +4,14 @@ import { Warning } from "@phosphor-icons/react/dist/ssr";
 
 type Props = {
   reason: "expired" | "not_found" | "unavailable";
+  /**
+   * Overrides the default `expired-<reason>` testid. Lets the two distinct
+   * not_found causes (a genuine RPC miss vs a token on a non-live/draft
+   * quote) carry different testids without changing the customer-facing
+   * copy — so they're never again conflated the way they were in the
+   * 2026-07-17 outage.
+   */
+  testId?: string;
 };
 
 const COPY = {
@@ -21,11 +29,11 @@ const COPY = {
   },
 } as const;
 
-export function ExpiredView({ reason }: Props) {
+export function ExpiredView({ reason, testId }: Props) {
   const { title, body } = COPY[reason];
   return (
     <section
-      data-testid={`expired-${reason}`}
+      data-testid={testId ?? `expired-${reason}`}
       className="t2q-card-pro p-6 sm:p-8 text-center"
     >
       <Warning

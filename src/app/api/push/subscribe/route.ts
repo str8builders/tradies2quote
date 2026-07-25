@@ -7,11 +7,19 @@ export const dynamic = "force-dynamic";
 type SubBody = {
   endpoint?: unknown;
   keys?: { p256dh?: unknown; auth?: unknown };
+  /** Wave 46 — iOS App Store shell registrations. */
+  platform?: unknown;
+  token?: unknown;
 };
 
 /**
- * Store a Web Push subscription for the signed-in tradie. Upserts on the
+ * Store a push subscription for the signed-in tradie. Upserts on the
  * unique `endpoint` so re-enabling on the same device doesn't duplicate.
+ *
+ * Two shapes:
+ *   * Web Push (default): { endpoint, keys: { p256dh, auth } }
+ *   * iOS shell (APNs):   { platform: "ios", token } — the device token
+ *     is stored in `endpoint` with the VAPID key columns null.
  */
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -28,6 +36,33 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
+
+  // iOS App Store shell — APNs device token registration.
+  if (body.platform === "ios") {
+    const token = typeof body.token === "string" ? body.token.trim() : "";
+    // APNs tokens are hex; length varies by device generation. Bound it
+    // so junk can't fill the column.
+    if (!/^[0-9a-f]{32,200}$/i.test(token)) {
+      return NextResponse.json({ error: "invalid_token" }, { status: 400 });
+    }
+    const { error } = await supabase.from("push_subscriptions").upsert(
+      {
+        user_id: user.id,
+        endpoint: token,
+        p256dh: null,
+        auth: null,
+        platform: "ios",
+        user_agent: request.headers.get("user-agent"),
+      },
+      { onConflict: "endpoint" },
+    );
+    if (error) {
+      console.error("apns subscribe failed", error);
+      return NextResponse.json({ error: "save_failed" }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true });
+  }
+
   const endpoint = typeof body.endpoint === "string" ? body.endpoint : "";
   const p256dh = typeof body.keys?.p256dh === "string" ? body.keys.p256dh : "";
   const auth = typeof body.keys?.auth === "string" ? body.keys.auth : "";
@@ -41,6 +76,7 @@ export async function POST(request: NextRequest) {
       endpoint,
       p256dh,
       auth,
+      platform: "web",
       user_agent: request.headers.get("user-agent"),
     },
     { onConflict: "endpoint" },

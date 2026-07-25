@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ThemeToggle } from "@/app/_components/landing/ThemeToggle";
+import { motion, useReducedMotion } from "framer-motion";
+import { isWeatherImpactEnabled } from "@/lib/weather-impact/feature-flag";
+import { SPRING_SNAPPY } from "./motion";
 
 /**
  * Wave 17 — perf — see MobileAppMenuClient.tsx for the rationale.
@@ -52,6 +54,14 @@ const TABS = [
   { href: "/app/clients", label: "Clients", ownerOnly: false },
 ] as const;
 
+/** Tabs whose feature is flag-parked vanish from the strip entirely — a
+ *  visible tab must never open a locked "owner testing" screen (2.1). */
+function isTabVisible(tab: (typeof TABS)[number], isOwner: boolean): boolean {
+  if (tab.ownerOnly && !isOwner) return false;
+  if (tab.href === "/app/weather") return isWeatherImpactEnabled(isOwner);
+  return true;
+}
+
 function isActiveTab(href: string, pathname: string) {
   if (href === "/app") return pathname === "/app";
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -64,7 +74,8 @@ export function AppHeaderClient({
   avatarUrl,
 }: Props) {
   const pathname = usePathname() ?? "";
-  const visibleTabs = TABS.filter((t) => isOwner || !t.ownerOnly);
+  const reduce = useReducedMotion();
+  const visibleTabs = TABS.filter((t) => isTabVisible(t, isOwner));
   const initial = (userEmail ?? "?").trim().charAt(0).toUpperCase() || "?";
 
   // Avatar dropdown state — desktop only. Close on outside-click and
@@ -158,15 +169,23 @@ export function AppHeaderClient({
                   aria-current={active ? "page" : undefined}
                   data-testid={`app-header-tab-${tab.label.toLowerCase()}`}
                 >
-                  {tab.label}
+                  {/* Wave 45 — active highlight + underline slide between
+                      tabs via shared layoutId (the static CSS rule keeps
+                      only the text colour). */}
+                  {active ? (
+                    <motion.span
+                      layoutId="t2q-header-tab-pill"
+                      aria-hidden="true"
+                      transition={reduce ? { duration: 0 } : SPRING_SNAPPY}
+                      className="absolute inset-0 rounded-[0.125rem] border border-[rgba(255,95,21,0.4)] bg-[rgba(255,95,21,0.1)]"
+                      style={{ boxShadow: "inset 0 -2px 0 0 #FF5F15" }}
+                    />
+                  ) : null}
+                  <span className="relative">{tab.label}</span>
                 </Link>
               );
             })}
           </nav>
-
-          <div className="hidden sm:flex sm:items-center sm:gap-2 sm:border-l sm:border-ink-700 sm:pl-3">
-            <ThemeToggle />
-          </div>
 
           {/* Avatar trigger. On desktop it pops a hub panel; on mobile
               it's a safety-net link to /app/settings (the mobile bottom

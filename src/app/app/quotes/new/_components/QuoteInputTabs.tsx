@@ -8,6 +8,7 @@ import {
   type ClarificationAnswer,
 } from "./ClarificationModal";
 import { ScanPanel } from "./ScanPanel";
+import { AiConsentModal } from "./AiConsentModal";
 import { TapeMeasureProgress } from "@/app/app/_components/TapeMeasureProgress";
 import { splitTranscript, hasHighlights } from "@/lib/highlightDimensions";
 
@@ -38,11 +39,19 @@ function formatTime(seconds: number): string {
   return `${m}:${s}`;
 }
 
-export function QuoteInputTabs() {
+export function QuoteInputTabs({
+  needsAiConsent = false,
+}: {
+  /** iOS shell + not-yet-consented → show the 5.1.2(i) consent modal first. */
+  needsAiConsent?: boolean;
+} = {}) {
   const [tab, setTab] = useState<Tab>("voice");
   const [transcript, setTranscript] = useState<string>("");
   const [typed, setTyped] = useState<string>("");
   const [scanned, setScanned] = useState<string>("");
+  // Local mirror so accepting the modal reveals the tabs instantly (the
+  // server routes enforce consent independently, so this is UX only).
+  const [consentBlocked, setConsentBlocked] = useState<boolean>(needsAiConsent);
 
   // The "Continue" row reads the active tab's text. Scan and voice both
   // produce a fully-formed transcript, so they continue immediately;
@@ -54,6 +63,10 @@ export function QuoteInputTabs() {
 
   return (
     <div>
+      <AiConsentModal
+        open={consentBlocked}
+        onGranted={() => setConsentBlocked(false)}
+      />
       <div
         role="tablist"
         aria-label="Input method"

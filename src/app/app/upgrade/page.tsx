@@ -9,6 +9,8 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { getSubscriptionStatus } from "@/lib/subscription";
 import { isStripeConfigured } from "@/lib/stripe-client";
+import { HideInNativeApp } from "@/app/_components/HideInNativeApp";
+import { isNativeShellRequest } from "@/lib/native-shell";
 import { AppHeader } from "../_components/AppHeader";
 import { CheckoutButton } from "./_components/CheckoutButton";
 
@@ -33,9 +35,9 @@ export const dynamic = "force-dynamic";
 export default async function UpgradePage({
   searchParams,
 }: {
-  searchParams: Promise<{ stripe?: string }>;
+  searchParams: Promise<{ stripe?: string; from?: string }>;
 }) {
-  const { stripe: stripeQuery } = await searchParams;
+  const { stripe: stripeQuery, from } = await searchParams;
 
   const supabase = await createClient();
   const {
@@ -59,9 +61,57 @@ export default async function UpgradePage({
   const cancelled = stripeQuery === "cancelled";
   const stripeReady = isStripeConfigured();
 
+  // 3.1.3(f) — inside the iOS App Store shell this whole page's
+  // pricing/checkout content is replaced by a neutral note (no amounts, no
+  // billing links — not even a pointer to the website, which the guideline
+  // also disallows). SERVER-gated: the priced HTML below is never emitted
+  // to the shell at all; the <HideInNativeApp> wrapper further down stays
+  // as defence-in-depth for pre-marker shells.
+  //
+  // ?from=new-quote means the quotes/new gate bounced a trial-expired user
+  // here — the copy must be HONEST about that state ("everything works as
+  // normal" while quote creation is blocked reads as a broken app) while
+  // still steering nowhere.
+  const nativeFallback =
+    from === "new-quote" ? (
+      <main className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
+        <div className="t2q-section-label-pro mb-3">{"// account"}</div>
+        <h1 className="font-display text-3xl uppercase tracking-tight sm:text-4xl">
+          New quotes are paused on your account.
+        </h1>
+        <p className="mt-3 text-sm text-ink-300 sm:text-base">
+          Your free trial has ended. You can still view, send and
+          download all your existing quotes and invoices — creating
+          new ones is paused for now.
+        </p>
+      </main>
+    ) : (
+      <main className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
+        <div className="t2q-section-label-pro mb-3">{"// account"}</div>
+        <h1 className="font-display text-3xl uppercase tracking-tight sm:text-4xl">
+          Plan management isn&apos;t available in the app.
+        </h1>
+        <p className="mt-3 text-sm text-ink-300 sm:text-base">
+          Your quotes, invoices and clients all keep working as
+          normal.
+        </p>
+      </main>
+    );
+
+  if (await isNativeShellRequest()) {
+    return (
+      <div className="min-h-screen text-white">
+        <AppHeader context="Upgrade" />
+        {nativeFallback}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen text-white">
       <AppHeader context="Upgrade" />
+
+      <HideInNativeApp fallback={nativeFallback}>
 
       <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
         <div className="mb-8">
@@ -158,6 +208,7 @@ export default async function UpgradePage({
           </p>
         </section>
       </main>
+      </HideInNativeApp>
     </div>
   );
 }

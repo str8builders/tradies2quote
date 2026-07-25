@@ -807,3 +807,38 @@ describe("public payload contract — internal fields hidden (Stage 4.3 regressi
     );
   });
 });
+
+describe("enrichLineItemsWithCatalogue — upstream user_library price is authoritative", () => {
+  it("never downgrades a high-confidence library-priced line to missing_price", async () => {
+    const matcher = vi.fn(async () => missingResult("no_match"));
+    const priced = baseItem({
+      description: "Joist hangers galvanised",
+      unit_price: 6.8,
+      line_total: 6.8,
+      price_source: "user_library",
+      price_confidence: "high",
+      is_missing_price: false,
+      library_id: "lib-row",
+    });
+    const [out] = await enrichLineItemsWithCatalogue([priced], {
+      enabled: true,
+      matcher,
+    });
+    // The stage must pass the line through untouched — and must not even
+    // spend a lookup on it.
+    expect(matcher).not.toHaveBeenCalled();
+    expect(out.unit_price).toBe(6.8);
+    expect(out.is_missing_price).toBe(false);
+    expect(out.price_source).toBe("user_library");
+  });
+
+  it("still enriches lines without an authoritative library price", async () => {
+    const matcher = vi.fn(async () => missingResult("no_match"));
+    const [out] = await enrichLineItemsWithCatalogue(
+      [baseItem({ description: "mystery widget", unit_price: 0 })],
+      { enabled: true, matcher },
+    );
+    expect(matcher).toHaveBeenCalledOnce();
+    expect(out.is_missing_price).toBe(true);
+  });
+});

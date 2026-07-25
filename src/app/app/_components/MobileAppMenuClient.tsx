@@ -4,7 +4,9 @@ import { useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
+import { SPRING_SNAPPY, SPRING_SOFT } from "./motion";
 import type { Icon } from "@phosphor-icons/react";
 import {
   House,
@@ -77,6 +79,7 @@ function isActive(href: string, pathname: string) {
 export function MobileAppMenuClient({ isOwner, userEmail, avatarUrl }: Props) {
   const pathname = usePathname() ?? "";
   const [sheetOpen, setSheetOpen] = useState(false);
+  const reduce = useReducedMotion();
   // Scoped scroll-lock: while the account sheet is open the document must
   // not scroll behind the backdrop (iOS ignores overflow:hidden for touch
   // scrolling). Fully reverted + scroll position restored on close — the
@@ -84,6 +87,19 @@ export function MobileAppMenuClient({ isOwner, userEmail, avatarUrl }: Props) {
   // docs/mobile-shell-contract.md; this is not the banned general lock).
   useBodyScrollLock(sheetOpen);
   const newQuoteActive = pathname === "/app/quotes/new";
+
+  // Wave 45 — the active-tab pill is a SEPARATE background element that
+  // slides between tabs via framer's shared `layoutId`. The tab itself
+  // never transforms (shell-contract ban on press movement); only this
+  // decorative span moves. Reduced motion → the pill just swaps, no slide.
+  const pill = (
+    <motion.span
+      layoutId="t2q-bottomnav-pill"
+      aria-hidden="true"
+      transition={reduce ? { duration: 0 } : SPRING_SNAPPY}
+      className="absolute inset-0 rounded-[0.85rem] border border-[#FFD4B8] bg-[var(--t2q-app-orange-soft,#FFF1EA)] shadow-[inset_0_-2px_0_#FF5F15]"
+    />
+  );
 
   const renderTab = ({ href, label, icon: IconCmp, testId }: (typeof TABS)[number]) => {
     const active = isActive(href, pathname) && !newQuoteActive;
@@ -94,15 +110,16 @@ export function MobileAppMenuClient({ isOwner, userEmail, avatarUrl }: Props) {
         prefetch={true}
         aria-current={active ? "page" : undefined}
         data-testid={`app-bottom-nav-${testId}`}
-        className="t2q-bottomnav-tab"
+        className="t2q-bottomnav-tab relative"
       >
+        {active ? pill : null}
         <IconCmp
-          className="t2q-bottomnav-icon"
+          className="t2q-bottomnav-icon relative"
           size={23}
           weight={active ? "fill" : "regular"}
           aria-hidden="true"
         />
-        <span>{label}</span>
+        <span className="relative">{label}</span>
       </Link>
     );
   };
@@ -141,41 +158,55 @@ export function MobileAppMenuClient({ isOwner, userEmail, avatarUrl }: Props) {
         className="t2q-bottomnav-bar sm:hidden"
       >
         {TABS.slice(0, 2).map(renderTab)}
+        {/* Central raised "+" disc (mockup parity) — icon-only; the
+            accessible name is the aria-label. Active state is its own
+            ring (no sliding pill on a circle). */}
         <Link
           href="/app/quotes/new"
           prefetch={true}
+          aria-label="New quote"
           aria-current={newQuoteActive ? "page" : undefined}
           data-testid="app-bottom-nav-new-quote"
-          className="t2q-bottomnav-tab t2q-bottomnav-tab-primary"
+          className="t2q-bottomnav-plus"
         >
-          <Plus
-            className="t2q-bottomnav-icon"
-            size={25}
-            weight={newQuoteActive ? "fill" : "bold"}
-            aria-hidden="true"
-          />
-          <span>New</span>
+          <Plus size={26} weight="bold" aria-hidden="true" />
         </Link>
         {TABS.slice(2).map(renderTab)}
       </nav>
 
-      {sheetOpen ? (
-        <div
-          data-testid="account-sheet"
-          className="fixed inset-0 z-50 flex items-end bg-black/60 backdrop-blur-sm sm:hidden"
-          onClick={() => setSheetOpen(false)}
-        >
-          <div onClick={(e) => e.stopPropagation()} className="w-full">
-            <AccountHub
-              mode="sheet"
-              isOwner={isOwner}
-              userEmail={userEmail}
-              avatarUrl={avatarUrl}
-              onClose={() => setSheetOpen(false)}
-            />
-          </div>
-        </div>
-      ) : null}
+      <AnimatePresence>
+        {sheetOpen ? (
+          <motion.div
+            data-testid="account-sheet"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: reduce ? 0.1 : 0.2 }}
+            className="fixed inset-0 z-50 flex items-end bg-black/60 backdrop-blur-sm sm:hidden"
+            onClick={() => setSheetOpen(false)}
+          >
+            {/* iOS-style sheet: rises on a soft spring, drops on exit.
+                Backdrop and panel animate independently so the blur
+                fades while the sheet is still travelling. */}
+            <motion.div
+              initial={reduce ? { y: 0 } : { y: "100%" }}
+              animate={{ y: 0 }}
+              exit={reduce ? { opacity: 0 } : { y: "100%" }}
+              transition={reduce ? { duration: 0.1 } : SPRING_SOFT}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full"
+            >
+              <AccountHub
+                mode="sheet"
+                isOwner={isOwner}
+                userEmail={userEmail}
+                avatarUrl={avatarUrl}
+                onClose={() => setSheetOpen(false)}
+              />
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </>
   );
 }

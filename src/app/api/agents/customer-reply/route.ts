@@ -10,6 +10,7 @@ import {
   logAgentRunFinish,
 } from "@/lib/agent-monitor/logger";
 import { isOwnerEmail } from "@/lib/owner";
+import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,6 +38,11 @@ export async function POST(req: NextRequest) {
   if (!isOwnerEmail(user.email)) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
+
+  // Defence-in-depth: owner-only already, but a leaked session/XSS
+  // shouldn't be able to burn unbounded LLM credit either.
+  const quota = consumeDailyQuota("customer-reply:" + user.id, 200);
+  if (!quota.ok) return tooManyRequestsResponse(quota.resetAt);
 
   let body: Partial<CustomerReplyInput>;
   try {

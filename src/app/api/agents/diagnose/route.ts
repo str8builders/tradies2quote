@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { isOwnerEmail } from "@/lib/owner";
 import { fetchWithTimeout, TIMEOUTS } from "@/lib/fetchTimeout";
+import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
 
 /**
  * Owner-only triage endpoint for failed (or any) agent run.
@@ -27,7 +28,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-sonnet-4-20250514";
+const MODEL = "claude-sonnet-5";
 
 const SYSTEM_PROMPT = `You are a senior on-call engineer triaging a failed agent run in a Next.js + Supabase quoting app for tradespeople (tradies2Quote).
 
@@ -62,6 +63,11 @@ export async function POST(request: NextRequest) {
   if (!isOwnerEmail(user.email)) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
+
+  // Defence-in-depth: owner-only already, but a leaked session/XSS
+  // shouldn't be able to burn unbounded LLM credit either.
+  const quota = consumeDailyQuota("diagnose:" + user.id, 200);
+  if (!quota.ok) return tooManyRequestsResponse(quota.resetAt);
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -152,7 +158,9 @@ export async function POST(request: NextRequest) {
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 600,
+      // Sonnet 5's tokenizer emits ~30% more tokens for the same content;
+      // 600 risked clipping the triage report.
+      max_tokens: 800,
       system: SYSTEM_PROMPT,
       messages: [
         {

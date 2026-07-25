@@ -167,6 +167,27 @@ export type Database = {
           },
         ]
       }
+      app_waitlist: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          source: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          source?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          source?: string
+        }
+        Relationships: []
+      }
       beta_feedback: {
         Row: {
           app_version: string | null
@@ -199,6 +220,47 @@ export type Database = {
           wrong_number?: string | null
         }
         Relationships: []
+      }
+      chat_reports: {
+        Row: {
+          created_at: string
+          id: string
+          message_index: number | null
+          message_preview: string | null
+          quote_id: string
+          reason: string | null
+          reporter: string
+          resolved_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message_index?: number | null
+          message_preview?: string | null
+          quote_id: string
+          reason?: string | null
+          reporter: string
+          resolved_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message_index?: number | null
+          message_preview?: string | null
+          quote_id?: string
+          reason?: string | null
+          reporter?: string
+          resolved_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_reports_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       calendar_notes: {
         Row: {
@@ -935,6 +997,8 @@ export type Database = {
         Row: {
           address: string | null
           avatar_url: string | null
+          ai_consent_at: string | null
+          ai_consent_version: string | null
           business_name: string | null
           country: string | null
           created_at: string
@@ -955,6 +1019,8 @@ export type Database = {
         Insert: {
           address?: string | null
           avatar_url?: string | null
+          ai_consent_at?: string | null
+          ai_consent_version?: string | null
           business_name?: string | null
           country?: string | null
           created_at?: string
@@ -975,6 +1041,8 @@ export type Database = {
         Update: {
           address?: string | null
           avatar_url?: string | null
+          ai_consent_at?: string | null
+          ai_consent_version?: string | null
           business_name?: string | null
           country?: string | null
           created_at?: string
@@ -1225,6 +1293,7 @@ export type Database = {
           accepted_user_agent: string | null
           ai_snapshot: Json | null
           archived_at: string | null
+          chat_disabled: boolean
           client_id: string | null
           completed_at: string | null
           created_at: string
@@ -1259,6 +1328,7 @@ export type Database = {
           accepted_user_agent?: string | null
           ai_snapshot?: Json | null
           archived_at?: string | null
+          chat_disabled?: boolean
           client_id?: string | null
           completed_at?: string | null
           created_at?: string
@@ -1293,6 +1363,7 @@ export type Database = {
           accepted_user_agent?: string | null
           ai_snapshot?: Json | null
           archived_at?: string | null
+          chat_disabled?: boolean
           client_id?: string | null
           completed_at?: string | null
           created_at?: string

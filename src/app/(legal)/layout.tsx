@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
 import { Footer } from "../_components/landing/Footer";
+import { isNativeShellRequest } from "@/lib/native-shell";
 import { SectionTabs } from "./_components/SectionTabs";
 
 /**
@@ -10,11 +11,12 @@ import { SectionTabs } from "./_components/SectionTabs";
  * landing footer underneath. Same brand, no marketing nav anchors —
  * those would break from a non-landing URL.
  */
-export default function LegalLayout({
+export default async function LegalLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const nativeShell = await isNativeShellRequest();
   return (
     <div className="min-h-screen flex flex-col bg-ink-900 text-white">
       <header
@@ -53,7 +55,7 @@ export default function LegalLayout({
 
       <main className="flex-1">{children}</main>
 
-      <Footer />
+      <Footer hidePricingLinks={nativeShell} />
     </div>
   );
 }

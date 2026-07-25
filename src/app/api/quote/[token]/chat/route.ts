@@ -5,6 +5,7 @@ import {
   runCustomerChat,
   type ChatMessage,
 } from "@/lib/agents/customer-chat";
+import { moderateChatText } from "@/lib/moderation";
 import type { PublicQuotePayload, QuoteData } from "@/lib/quote-types";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
 
@@ -154,11 +155,39 @@ export async function POST(
   // chat history. Admin client because the customer is anonymous.
   const { data: row, error: rowErr } = await admin
     .from("quotes")
-    .select("id, quote_data")
+    .select("id, quote_data, chat_disabled")
     .eq("id", quote.id)
     .single();
   if (rowErr || !row) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+
+  // Guideline 1.2 "block" control: the tradie can switch the chat off for
+  // this quote link (the customer is an anonymous token-holder, so per-quote
+  // disable IS the block mechanism). The public page also hides the chat UI
+  // when disabled; this server check is the enforcement.
+  if ((row as { chat_disabled?: boolean }).chat_disabled === true) {
+    return NextResponse.json(
+      {
+        error: "chat_disabled",
+        message: `Chat is turned off for this quote. Contact ${quote.business_email ?? "the tradie"} directly.`,
+      },
+      { status: 403 },
+    );
+  }
+
+  // Guideline 1.2 "filter" control, inbound: screen the customer's message
+  // BEFORE it reaches the model or is persisted for the tradie. Blocked
+  // content gets a polite in-chat response (not an error) and is dropped.
+  const inboundVerdict = await moderateChatText(message, "inbound");
+  if (!inboundVerdict.allowed) {
+    return NextResponse.json({
+      ok: true,
+      reply:
+        "Let's keep this chat about the quote. That message isn't something I can pass on — feel free to rephrase, or contact the tradie directly.",
+      noteToTradie: null,
+      moderated: true,
+    });
   }
   const quoteData = (row.quote_data ?? {}) as QuoteData & {
     chat_history?: ChatHistoryEntry[];
@@ -223,6 +252,21 @@ export async function POST(
     });
   }
 
+  // Guideline 1.2 "filter" control, outbound: screen the MODEL's reply
+  // before it is shown to the customer or persisted. A jailbroken /
+  // prompt-injected reply gets replaced with a safe fallback; the raw
+  // flagged text is never stored or displayed.
+  const outboundVerdict = await moderateChatText(agentResult.reply, "outbound");
+  const safeReply = outboundVerdict.allowed
+    ? agentResult.reply
+    : "I can't help with that here — the tradie will follow up with you directly about this quote.";
+  if (!outboundVerdict.allowed) {
+    captureError(
+      new Error(`customer-chat outbound reply flagged: ${outboundVerdict.reason}`),
+      { route: "quote/chat" },
+    );
+  }
+
   // Append the customer message + assistant reply (+ optional note)
   // and write back to quote_data. Single round-trip update.
   // Atomic append of the two new turns (customer + assistant) via RPC.
@@ -232,10 +276,10 @@ export async function POST(
     { role: "customer", content: message, timestamp: now },
     {
       role: "assistant",
-      content: agentResult.reply,
+      content: safeReply,
       timestamp: new Date().toISOString(),
       intent: agentResult.intent,
-      ...(agentResult.noteToTradie
+      ...(agentResult.noteToTradie && outboundVerdict.allowed
         ? { note_to_tradie: agentResult.noteToTradie }
         : {}),
     },
@@ -252,8 +296,8 @@ export async function POST(
 
   return NextResponse.json({
     ok: true,
-    reply: agentResult.reply,
-    noteToTradie: agentResult.noteToTradie ?? null,
+    reply: safeReply,
+    noteToTradie: outboundVerdict.allowed ? (agentResult.noteToTradie ?? null) : null,
     intent: agentResult.intent,
   });
 }

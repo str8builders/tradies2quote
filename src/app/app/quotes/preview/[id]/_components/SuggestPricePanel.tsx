@@ -51,6 +51,8 @@ export function SuggestPricePanel({ line, onUseOnce, onSavedAndApply }: Props) {
           quantity: line.quantity,
           unit: line.unit,
         }),
+        // LLM-backed — same stall guard as the core generate flow.
+        signal: AbortSignal.timeout(90_000),
       });
       if (!res.ok) {
         setPhase("error");

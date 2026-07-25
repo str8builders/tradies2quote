@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
+import { extractModelJsonObject } from "@/lib/modelJson";
 import { createClient } from "@/lib/supabase/server";
 import { isOwnerEmail } from "@/lib/owner";
 
@@ -26,8 +27,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-sonnet-4-20250514";
-const MAX_TOKENS = 512;
+const MODEL = "claude-sonnet-5";
+// Sonnet 5's tokenizer emits ~30% more tokens than Sonnet 4 for the same
+// content — 512 risked truncating mid-JSON, so give it headroom.
+const MAX_TOKENS = 1024;
 const FETCH_TIMEOUT_MS = 8_000;
 const MAX_HTML_CHARS = 60_000;
 
@@ -228,10 +231,10 @@ Rules:
         "anthropic-version": "2023-06-01",
         "content-type": "application/json",
       },
+      // Sonnet 5 rejects non-default `temperature` with a 400 — omit it.
       body: JSON.stringify({
         model: MODEL,
         max_tokens: MAX_TOKENS,
-        temperature: 0,
         system,
         messages: [{ role: "user", content: userMsg }],
       }),
@@ -268,10 +271,13 @@ Rules:
   const text =
     payload.content?.find((c) => c.type === "text")?.text?.trim() ?? "";
 
+  // extractModelJsonObject tolerates code fences and returns null when the
+  // model answered "null" (no product found) — both cases leave product null.
   let product: ExtractedProduct | null = null;
-  if (text && text.toLowerCase() !== "null") {
+  const jsonText = extractModelJsonObject(text);
+  if (jsonText) {
     try {
-      const parsed = JSON.parse(text) as unknown;
+      const parsed = JSON.parse(jsonText) as unknown;
       if (parsed && typeof parsed === "object") {
         const obj = parsed as Record<string, unknown>;
         const name =

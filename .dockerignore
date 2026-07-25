@@ -1,0 +1,12 @@
+# Build context trimming for deploy/Dockerfile
+node_modules
+.next
+.git
+.env*
+npm-debug.log*
+deploy/supabase-official
+deploy/*.log
+**/.DS_Store
+coverage
+*.md
+!package.json

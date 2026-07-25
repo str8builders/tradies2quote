@@ -3,6 +3,7 @@ import { cache } from "react";
 import { adminClient } from "@/lib/supabase/admin";
 import { isStripeConfigured } from "@/lib/stripe-client";
 import { isOwnerEmail } from "@/lib/owner";
+import { isCompedEmail } from "@/lib/reviewer";
 
 /**
  * The single source of truth for "what tier is this user on?"
@@ -99,6 +100,23 @@ export async function getSubscriptionStatus(args: {
       currentPeriodEnd: null,
       stripeCustomerId: null,
       stripeSubscriptionStatus: "owner_bypass",
+      betaFreeUntil: betaActive ? betaFreeUntil : null,
+    };
+  }
+
+  // App Store review accounts are comped IN CODE (not via a fragile
+  // hand-inserted subscriptions row with a live expiry) so the reviewer can
+  // always exercise the core voice-to-quote flow — see src/lib/reviewer.ts.
+  // Deliberately NOT isOwnerEmail: reviewers must never see owner-only
+  // surfaces (/app/agents, /app/debug).
+  if (isCompedEmail(email)) {
+    return {
+      state: "paid",
+      trialEndsAt: provisionalTrialEndsAt,
+      trialDaysLeft: null,
+      currentPeriodEnd: null,
+      stripeCustomerId: null,
+      stripeSubscriptionStatus: "review_comp",
       betaFreeUntil: betaActive ? betaFreeUntil : null,
     };
   }

@@ -1,6 +1,7 @@
 import webpush from "web-push";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { adminClient } from "@/lib/supabase/admin";
+import { sendApnsNotification } from "@/lib/apns";
 
 /**
  * Public VAPID key — safe to expose (it's sent to every browser that
@@ -55,14 +56,44 @@ export async function sendPushToUser(
     const admin = adminClient() as unknown as SupabaseClient;
     const { data: subs } = await admin
       .from("push_subscriptions")
-      .select("endpoint, p256dh, auth")
+      .select("endpoint, p256dh, auth, platform")
       .eq("user_id", userId);
     if (!subs || subs.length === 0) return;
 
     const body = JSON.stringify(payload);
     await Promise.all(
       subs.map(async (s) => {
-        const sub = s as { endpoint: string; p256dh: string; auth: string };
+        const sub = s as {
+          endpoint: string;
+          p256dh: string | null;
+          auth: string | null;
+          platform?: string | null;
+        };
+
+        // iOS App Store shell — endpoint holds the APNs device token
+        // (Wave 46). Sent via APNs HTTP/2; dead tokens are pruned the
+        // same way expired web endpoints are.
+        if (sub.platform === "ios") {
+          const result = await sendApnsNotification(sub.endpoint, {
+            title: payload.title,
+            body: payload.body,
+            url: payload.url,
+          });
+          if (
+            !result.ok &&
+            (result.status === 410 || result.reason === "BadDeviceToken")
+          ) {
+            await admin
+              .from("push_subscriptions")
+              .delete()
+              .eq("endpoint", sub.endpoint);
+          } else if (!result.ok && result.reason !== "not_configured") {
+            console.warn("apns send failed", result.status, result.reason);
+          }
+          return;
+        }
+
+        if (!sub.p256dh || !sub.auth) return; // malformed web row — skip
         try {
           await webpush.sendNotification(
             {

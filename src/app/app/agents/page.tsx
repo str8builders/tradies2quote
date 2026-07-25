@@ -2,19 +2,13 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import {
-  Brain,
   CheckCircle,
   ClipboardText,
   Files,
   GearSix,
   Lifebuoy,
-  MagnifyingGlass,
-  Megaphone,
   Microphone,
-  PencilLine,
-  Rocket,
   ShieldCheck,
-  Swap,
   UsersThree,
 } from "@phosphor-icons/react/dist/ssr";
 import { getCachedAuthUser } from "@/lib/supabase/auth";
@@ -268,88 +262,6 @@ export default async function AgentsPage() {
                 </li>
               ))}
             </ul>
-          </div>
-        </section>
-
-        {/* ── Personal Workspace ─────────────────────────────────────── */}
-        <section
-          aria-labelledby="personal-workspace-heading"
-          data-testid="personal-workspace"
-          className="mt-16 border-t border-ink-700/60 pt-12"
-        >
-          <div className="t2q-section-label-pro mb-3">{"// workspace · personal ai os"}</div>
-          <div className="flex flex-wrap items-center gap-3">
-            <h2
-              id="personal-workspace-heading"
-              className="font-display text-3xl uppercase tracking-tight sm:text-4xl"
-            >
-              Your <span className="text-brand">Agents.</span>
-            </h2>
-            <span className="inline-flex items-center rounded-sm border border-hivis/40 bg-hivis/10 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-hivis">
-              gstack
-            </span>
-          </div>
-          <p className="mt-3 max-w-2xl text-sm text-ink-300 sm:text-base">
-            Your personal T2Q team — not tied to any one project. Marketing,
-            content, research, new ventures. Point them at any job.
-          </p>
-
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            <AgentCard
-              icon={Megaphone}
-              title="Marketing Agent"
-              description="Generates social posts, captions, and ad copy for any brand or project. Drafts content calendars, writes hooks, adapts tone per platform (Instagram, LinkedIn, TikTok)."
-              status="gstack · /browse"
-              statusTone="preview"
-              cta={{ label: "Open in Claude", href: "claude://" }}
-            />
-            <AgentCard
-              icon={PencilLine}
-              title="Content Writer"
-              description="Long-form posts, email newsletters, landing page copy, scripts. Give it a topic and audience — it writes, you publish."
-              status="gstack · ready"
-              statusTone="ready"
-              cta={{ label: "Open in Claude", href: "claude://" }}
-            />
-            <AgentCard
-              icon={MagnifyingGlass}
-              title="Research Agent"
-              description="Scrapes any website, summarises competitors, pulls pricing data, builds briefing docs. Uses /scrape + /skillify to codify into a reusable 200ms skill."
-              status="gstack · /scrape"
-              statusTone="preview"
-              cta={{ label: "Open in Claude", href: "claude://" }}
-            />
-            <AgentCard
-              icon={Rocket}
-              title="New Project Launcher"
-              description="Got a new idea? Run /office-hours — CEO review, design review, engineering review, DX review. All in one command. Any industry, any size."
-              status="gstack · /autoplan"
-              statusTone="ready"
-              cta={{ label: "Open in Claude", href: "claude://" }}
-            />
-            <AgentCard
-              icon={Swap}
-              title="Context Switch"
-              description="Save your exact working state — git branch, open decisions, remaining tasks — then restore it later across any project. Never lose your place when switching jobs."
-              status="gstack · /context-save"
-              statusTone="linked"
-              cta={{ label: "Open in Claude", href: "claude://" }}
-            />
-            <AgentCard
-              icon={Brain}
-              title="Memory & Learn"
-              description="Teaches gstack your preferences, patterns, and shortcuts across sessions. The more you use it, the smarter it gets about how you like to work."
-              status="gstack · /learn"
-              statusTone="linked"
-              cta={{ label: "Open in Claude", href: "claude://" }}
-            />
-          </div>
-
-          <div className="mt-6 rounded-sm border border-ink-700/60 bg-ink-900/40 p-4">
-            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink-400">
-              All personal agents run via Claude Code + gstack on your Mac.
-              The buttons open Claude — paste the skill command to run.
-            </p>
           </div>
         </section>
 

@@ -115,8 +115,8 @@ export default function TermsPage() {
         <LegalSection id="trial" number="04" title="Free trial">
           <p>
             New accounts get a 7-day free trial. We do not ask for a
-            credit card up front during the beta. When the trial ends, you
-            choose whether to subscribe — there is no automatic charge
+            credit card up front to start your trial. When the trial ends,
+            you choose whether to subscribe — there is no automatic charge
             without your explicit consent.
           </p>
         </LegalSection>
@@ -125,7 +125,7 @@ export default function TermsPage() {
           <p>
             Paid plans are billed monthly in advance. The price shown on
             our pricing page is the price you pay, in New Zealand dollars
-            and excluding GST (GST is added at checkout where applicable).
+            and inclusive of GST.
           </p>
           <p>
             Subscriptions <strong>auto-renew</strong> at the start of each
@@ -197,6 +197,17 @@ export default function TermsPage() {
               written agreement.
             </li>
           </ul>
+          <p>
+            <strong>Zero tolerance for objectionable content and abuse.</strong>{" "}
+            Content you (or your clients, in the quote chat) submit must not
+            contain hate speech, harassment, threats, sexual content, or
+            other objectionable material. Chat messages are screened by an
+            automated content filter, every chat carries a{" "}
+            <strong>Report</strong> control (and tradies can turn a
+            quote&apos;s chat off entirely), and we review reports within 24
+            hours. We may remove content, disable a chat, or suspend or
+            terminate an account that breaches this clause, without notice.
+          </p>
         </LegalSection>
 
         <LegalSection id="your-content" number="08" title="Your content">
@@ -220,9 +231,13 @@ export default function TermsPage() {
         >
           <p>
             {LEGAL.productName} uses third-party AI models (currently
-            OpenAI Whisper for transcription and Anthropic Claude for
-            quote generation) to turn your voice memo into a structured
-            quote. AI can and does make mistakes.
+            OpenAI and Anthropic Claude) throughout the product: voice
+            memos are transcribed and turned into structured quotes, plan
+            and site photos are read for dimensions and materials, and
+            the chat on your client&apos;s quote page is answered by an
+            AI assistant acting on your behalf (it cannot change pricing,
+            and its replies pass through an automated content filter).
+            AI can and does make mistakes.
           </p>
           <p>
             <strong>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import {
   ChatCircleText,
@@ -9,6 +9,7 @@ import {
   Warning,
 } from "@phosphor-icons/react";
 import type { QuoteStatus } from "@/lib/quote-types";
+import { buildSmsHref, deviceCanSendSms } from "@/lib/smsDeepLink";
 
 /**
  * Wave 19.10 — sticky bottom action bar.
@@ -47,6 +48,13 @@ type Props = {
    * firing /api/quotes/{id}/send. Returns true on success.
    */
   onSaveBeforeSend: () => Promise<boolean>;
+  /**
+   * Server-decided: a PLATFORM sender (Twilio) is configured. Note this
+   * no longer gates the button — with no platform sender the send falls
+   * back to the device's own Messages app (the NZ path), which is the
+   * common case. Kept so the component can tell the two apart.
+   */
+  smsEnabled?: boolean;
 };
 
 type SendState = "idle" | "saving" | "generating" | "sending" | "sent" | "error";
@@ -62,15 +70,18 @@ const ERROR_COPY: Record<string, string> = {
   already_accepted: "This quote has already been accepted.",
   pdf_generation_failed: "Could not generate the PDF.",
   pdf_upload_failed: "Could not save the PDF.",
-  email_not_configured: "Email isn't configured. Ask your admin to set RESEND_API_KEY.",
-  email_from_not_configured: "Email sender isn't configured. Set RESEND_FROM_EMAIL.",
-  sms_not_configured: "SMS isn't configured. Set TWILIO_ACCOUNT_SID.",
-  sms_token_not_configured: "SMS isn't configured. Set TWILIO_AUTH_TOKEN.",
-  sms_from_not_configured: "SMS isn't configured. Set TWILIO_FROM_NUMBER.",
+  email_not_configured: "Email sending isn't available right now — try again shortly.",
+  email_from_not_configured: "Email sending isn't available right now — try again shortly.",
+  sms_not_configured: "Text sending isn't available right now — send by email instead.",
+  sms_token_not_configured: "Text sending isn't available right now — send by email instead.",
+  sms_from_not_configured: "Text sending isn't available right now — send by email instead.",
   update_failed: "Message sent but the quote status couldn't update.",
   takeoff_blocked: "Fix the flagged takeoff lines before sending.",
   takeoff_unconfirmed: "Review and confirm the flagged quantities before sending.",
 };
+
+/** Capability checks never change mid-session — nothing to subscribe to. */
+const emptySubscribe = () => () => {};
 
 const STATUS_PILL: Record<QuoteStatus, { label: string; cls: string }> = {
   draft: { label: "Draft", cls: "border-hivis/40 bg-hivis/10 text-hivis" },
@@ -90,6 +101,7 @@ export function StickyActionBar({
   isPending,
   onSave,
   onSaveBeforeSend,
+  smsEnabled = true,
 }: Props) {
   const router = useRouter();
   const [sendState, setSendState] = useState<SendState>("idle");
@@ -98,6 +110,15 @@ export function StickyActionBar({
   // Wave 45 — takeoff safety gate (mirrors SendQuoteButton).
   const [confirmReasons, setConfirmReasons] = useState<string[] | null>(null);
   const [blockReasons, setBlockReasons] = useState<string[] | null>(null);
+  // Device-SMS handoff: the composed text waiting for the tradie to open
+  // Messages (see src/lib/smsDeepLink.ts). `opened` flips once they've
+  // tapped through, which flips the quote to sent.
+  const [smsHandoff, setSmsHandoff] = useState<{
+    to: string;
+    body: string;
+    clientName: string;
+    opened: boolean;
+  } | null>(null);
 
   const isAccepted = status === "accepted";
   const isSentOrViewed = status === "sent" || status === "viewed";
@@ -105,6 +126,18 @@ export function StickyActionBar({
     sendState === "saving" ||
     sendState === "generating" ||
     sendState === "sending";
+
+  // Whether to offer Text at all. The device check reads `navigator` /
+  // the Capacitor bridge, so it's client-only: the server snapshot is
+  // `false` and the client snapshot resolves on the first client render —
+  // same split <HideInNativeApp> uses, so SSR and hydration agree without
+  // setting state in an effect.
+  const canTextDevice = useSyncExternalStore(
+    emptySubscribe,
+    deviceCanSendSms,
+    () => false,
+  );
+  const canText = smsEnabled || canTextDevice;
 
   async function sendVia(channel: "email" | "sms", acknowledged = false) {
     setActiveChannel(channel);
@@ -158,12 +191,53 @@ export function StickyActionBar({
         return;
       }
       setConfirmReasons(null);
+
+      // Device-SMS path: nothing has been sent yet — the server minted the
+      // PDF + public link and handed back the text. Surface the handoff
+      // panel instead of claiming "sent".
+      const payload = (await res.json().catch(() => ({}))) as {
+        mode?: string;
+        to?: string;
+        body?: string;
+        client_name?: string;
+      };
+      if (payload.mode === "device" && payload.to && payload.body) {
+        setSmsHandoff({
+          to: payload.to,
+          body: payload.body,
+          clientName: payload.client_name ?? "your client",
+          opened: false,
+        });
+        setSendState("idle");
+        return;
+      }
+
       setSendState("sent");
       router.refresh();
     } catch {
       setErrorMessage("Network error. Please try again.");
       setSendState("error");
     }
+  }
+
+  /**
+   * Flip the quote to `sent` the instant the tradie hands the link to
+   * Messages. This is THE fix for the "Quote not found" bug: a token on a
+   * still-`draft` quote renders not-found to the client, so status must move
+   * the moment the link leaves the tradie's hands — not on a later "Mark as
+   * sent" tap they usually never return to make.
+   *
+   * Fire-and-forget + keepalive, and NEVER awaited before the sms: href
+   * navigates — awaiting first makes iOS WKWebView swallow the Messages open.
+   * A rare no-send is recoverable (decline from the LifecycleCard).
+   */
+  function markSentOnHandoff() {
+    void fetch(`/api/quotes/${quoteId}/sms/sent`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ trigger: "opened_messages" }),
+      keepalive: true,
+    }).catch(() => {});
   }
 
   const handleSend = () => sendVia("email");
@@ -270,12 +344,95 @@ export function StickyActionBar({
         </div>
       )}
 
+      {/* Device-SMS handoff. Two steps on purpose: the sms: scheme needs a
+          real tap to open reliably in WKWebView (an async fetch loses the
+          original gesture), and it lets the tradie read the text before it
+          hits their Messages app. Tapping "Open Messages" flips the quote to
+          `sent` (the link is now live for the client), then the second step
+          is just an acknowledgement — no separate status action. */}
+      {smsHandoff && (
+        <div
+          data-testid="sms-handoff"
+          className="fixed inset-x-0 bottom-[calc(5.3rem_+_env(safe-area-inset-bottom))] z-50 px-3 sm:static sm:px-0 sm:pb-4"
+        >
+          <div className="mx-auto max-w-3xl rounded-xl border border-brand/40 bg-ink-950/95 p-3.5 shadow-[0_-6px_24px_-10px_rgba(0,0,0,0.7)] backdrop-blur-md sm:p-4">
+            <p className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-brand">
+              <ChatCircleText size={14} weight="bold" />
+              {smsHandoff.opened
+                ? "// marked sent"
+                : `// text ready for ${smsHandoff.clientName}`}
+            </p>
+
+            {!smsHandoff.opened && (
+              <p className="mt-2 rounded-sm border border-ink-700 bg-ink-900 p-2.5 text-xs leading-relaxed text-ink-200">
+                {smsHandoff.body}
+              </p>
+            )}
+
+            <p className="mt-2 text-xs text-ink-400">
+              {smsHandoff.opened
+                ? "The quote is now marked sent and the link is live for your client. Didn't actually send it? You can decline the quote below."
+                : "Opens your Messages app with this ready to go — it sends from your own number, so your client can just reply."}
+            </p>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {!smsHandoff.opened ? (
+                <a
+                  href={buildSmsHref(smsHandoff.to, smsHandoff.body)}
+                  data-testid="sms-handoff-open"
+                  onClick={() => {
+                    // Flip to `sent` at hand-off (non-awaited — the tap must
+                    // reach the sms: href), then move to the acknowledgement
+                    // step.
+                    markSentOnHandoff();
+                    setSmsHandoff((h) => (h ? { ...h, opened: true } : h));
+                  }}
+                  className="t2q-btn-primary-pro min-h-[44px] !px-4 !text-[11px]"
+                >
+                  <ChatCircleText size={16} weight="bold" />
+                  Open Messages
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  data-testid="sms-handoff-done"
+                  onClick={() => {
+                    // Re-ensure the flip: if the fire-and-forget POST on
+                    // "Open Messages" was dropped, this guarantees the quote
+                    // is sent (the route is idempotent, so a second call is a
+                    // no-op). Closes the "dropped request -> stuck draft ->
+                    // dead link" gap without a duplicate audit row.
+                    markSentOnHandoff();
+                    setSmsHandoff(null);
+                    setSendState("sent");
+                    router.refresh();
+                  }}
+                  className="t2q-btn-primary-pro min-h-[44px] !px-4 !text-[11px]"
+                >
+                  Done
+                </button>
+              )}
+              {!smsHandoff.opened && (
+                <button
+                  type="button"
+                  data-testid="sms-handoff-cancel"
+                  onClick={() => setSmsHandoff(null)}
+                  className="min-h-[44px] px-2 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-300 hover:text-ink-100"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div
         data-testid="sticky-action-bar"
         className={[
-          // Mobile bottom nav owns the home-indicator inset, so this bar
-          // sits directly above it.
-          "fixed left-0 right-0 bottom-[calc(4.05rem_+_env(safe-area-inset-bottom))] z-40 border-t border-[#E3E2DA] bg-white shadow-[0_-6px_20px_-12px_rgba(10,10,10,0.18)]",
+          // Docks directly above the floating island nav: island claims
+          // 4.9rem + inset, +0.4rem gap = 5.3rem (see globals.css contract).
+          "fixed left-0 right-0 bottom-[calc(5.3rem_+_env(safe-area-inset-bottom))] z-40 border-t border-ink-800 bg-ink-950/90 shadow-[0_-6px_20px_-12px_rgba(0,0,0,0.6)] backdrop-blur-md",
           // min height 56 per the spec — leaves room for 44-px buttons.
           "min-h-[56px]",
           // On sm+ become a normal inline strip, no fixed positioning.
@@ -339,36 +496,44 @@ export function StickyActionBar({
                         : "Email"}
                   </span>
                 </button>
-                <button
-                  type="button"
-                  data-testid="sticky-send-sms-button"
-                  onClick={handleSendSms}
-                  disabled={sendBusy || isPending}
-                  aria-label={
-                    sendBusy && activeChannel === "sms"
-                      ? "Sending text"
-                      : isSentOrViewed
-                        ? "Resend text"
-                        : "Send text"
-                  }
-                  title={
-                    sendBusy && activeChannel === "sms"
-                      ? "Sending text…"
-                      : isSentOrViewed
-                        ? "Resend text"
-                        : "Send text"
-                  }
-                  className="t2q-btn-ghost-pro min-h-[44px] flex-1 !px-2 sm:flex-none sm:!px-7 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <ChatCircleText size={16} weight="bold" className="shrink-0" />
-                  <span>
-                    {sendBusy && activeChannel === "sms"
-                      ? "Sending"
-                      : isSentOrViewed
-                        ? "Resend"
-                        : "Text"}
-                  </span>
-                </button>
+                {/* Text renders when SOMETHING can actually send: either a
+                    platform sender (Twilio, server-decided) or this device's
+                    own Messages app. On desktop — no Messages app, no Twilio
+                    — it stays hidden rather than opening a dead sms: scheme.
+                    A visible button whose only outcome is an error is a
+                    Guideline 2.1 rejection waiting to happen. */}
+                {canText && (
+                  <button
+                    type="button"
+                    data-testid="sticky-send-sms-button"
+                    onClick={handleSendSms}
+                    disabled={sendBusy || isPending}
+                    aria-label={
+                      sendBusy && activeChannel === "sms"
+                        ? "Sending text"
+                        : isSentOrViewed
+                          ? "Resend text"
+                          : "Send text"
+                    }
+                    title={
+                      sendBusy && activeChannel === "sms"
+                        ? "Sending text…"
+                        : isSentOrViewed
+                          ? "Resend text"
+                          : "Send text"
+                    }
+                    className="t2q-btn-ghost-pro min-h-[44px] flex-1 !px-2 sm:flex-none sm:!px-7 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ChatCircleText size={16} weight="bold" className="shrink-0" />
+                    <span>
+                      {sendBusy && activeChannel === "sms"
+                        ? "Sending"
+                        : isSentOrViewed
+                          ? "Resend"
+                          : "Text"}
+                    </span>
+                  </button>
+                )}
               </>
             )}
           </div>

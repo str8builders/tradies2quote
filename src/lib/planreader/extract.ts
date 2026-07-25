@@ -27,7 +27,7 @@ import type {
 } from "./schema";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const EXTRACT_MODEL = "claude-opus-4-7";
+const EXTRACT_MODEL = "claude-opus-4-8";
 const MAX_TOKENS = 2048;
 
 const EXTRACT_SYSTEM = `You are a construction-drawing OCR + dimension reader. You are shown ONE plan sheet. Read ONLY what is actually printed — never guess, never infer a measurement that is not written.

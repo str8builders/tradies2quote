@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { isNativeIOSApp } from "@/lib/native-app";
 import {
   X,
   DeviceMobile,
@@ -73,6 +74,8 @@ export default function InstallNudge() {
       window.matchMedia?.("(display-mode: standalone)").matches ||
       nav.standalone === true;
 
+    // Inside the iOS App Store shell the app IS installed — never nudge.
+    if (isNativeIOSApp()) return;
     if (isStandalone) return;
     if (!isIos && !isAndroid) return;
 

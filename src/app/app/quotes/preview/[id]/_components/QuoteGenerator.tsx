@@ -5,10 +5,36 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TapeMeasureProgress } from "@/app/app/_components/TapeMeasureProgress";
 
+/**
+ * Elapsed-time-aware status copy. Generation has no real progress signal,
+ * so honesty = tell the tradie what stage we're LIKELY in for the time
+ * that has actually passed. Simple text quotes land in ~15–40s; the
+ * measurement/takeoff path (decks, framing with dimensions) runs the
+ * full calculators and can take 1–2 minutes — the old static
+ * "usually 5–15 seconds" read as a hang the moment a real job ran long.
+ */
+const STAGES: ReadonlyArray<{ fromS: number; text: string }> = [
+  { fromS: 0, text: "Reading your description…" },
+  { fromS: 8, text: "Itemising materials, labour and GST…" },
+  { fromS: 25, text: "Calculating quantities from your measurements…" },
+  { fromS: 55, text: "Pricing lines from your materials library…" },
+  {
+    fromS: 90,
+    text: "Still working — big takeoffs get double-checked, this can run a couple of minutes.",
+  },
+];
+
+function fmtElapsed(s: number): string {
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${String(r).padStart(2, "0")}`;
+}
+
 export function QuoteGenerator({ id }: { id: string }) {
   const router = useRouter();
   const [error, setError] = useState<string>("");
   const [pending, setPending] = useState<boolean>(true);
+  const [elapsedS, setElapsedS] = useState<number>(0);
   const startedRef = useRef<boolean>(false);
 
   useEffect(() => {
@@ -18,6 +44,14 @@ export function QuoteGenerator({ id }: { id: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 1 Hz elapsed clock — drives the stage copy and the visible timer so
+  // the wait always shows movement even while the tape needle holds.
+  useEffect(() => {
+    if (!pending) return;
+    const t = setInterval(() => setElapsedS((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [pending]);
+
   async function generate() {
     setError("");
     setPending(true);
@@ -26,9 +60,9 @@ export function QuoteGenerator({ id }: { id: string }) {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ id }),
-        // Generation's server budget is 60s (maxDuration) — 90s only
-        // catches a stalled connection; the error UI offers retry.
-        signal: AbortSignal.timeout(90_000),
+        // Generation's server budget is 140s (TIMEOUTS.generation) — 170s
+        // only catches a stalled connection; the error UI offers retry.
+        signal: AbortSignal.timeout(170_000),
       });
       if (res.status === 409) {
         router.refresh();
@@ -55,13 +89,13 @@ export function QuoteGenerator({ id }: { id: string }) {
       {pending ? (
         <>
           {/* Live measuring-tape gauge — the SAME loader as the splash,
-              scan and import screens. Driven live: the needle eases out
-              toward ~92% over the typical generation time and HOLDS there
-              until the result lands and the page refreshes, so it reads as
-              "almost there", never a fake or frozen bar. */}
+              scan and import screens. estimateMs is calibrated to the SLOW
+              (takeoff) path so the needle keeps visibly creeping for the
+              whole realistic wait instead of racing to 92% in 14s and then
+              freezing for a minute (the old behaviour read as a hang). */}
           <TapeMeasureProgress
             label="// generating quote"
-            estimateMs={14000}
+            estimateMs={75000}
           />
           <h2 className="mt-8 font-display text-2xl uppercase tracking-tight sm:text-3xl">
             Generating your <span className="text-brand">quote</span>…
@@ -70,10 +104,10 @@ export function QuoteGenerator({ id }: { id: string }) {
             aria-live="polite"
             className="mt-3 max-w-sm text-sm text-ink-300 sm:text-base"
           >
-            Itemising materials, labour, and tax based on your description.
+            {STAGES.filter((st) => elapsedS >= st.fromS).at(-1)!.text}
           </p>
           <p className="mt-6 font-mono text-xs uppercase tracking-[0.2em] text-ink-500">
-            {"// usually 5–15 seconds"}
+            {`// ${fmtElapsed(elapsedS)} elapsed · simple jobs ~30s · measured jobs up to ~2 min`}
           </p>
         </>
       ) : (

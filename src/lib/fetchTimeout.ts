@@ -33,6 +33,14 @@ function safeHost(url: string): string {
 export const TIMEOUTS = {
   /** LLM text/vision generation (Anthropic/OpenAI chat). */
   llm: 50_000,
+  /**
+   * Full quote generation — the takeoff/calculator prompt plus a many-line
+   * quote is the app's biggest single completion, and on Sonnet 5 it can
+   * legitimately run past the 50s `llm` ceiling (two live 504s at exactly
+   * 50s proved it). Self-hosted, so no platform kill to duck under — the
+   * matching client abort in QuoteGenerator.tsx is 170s.
+   */
+  generation: 140_000,
   /** Audio transcription — large uploads are slower end-to-end. */
   transcribe: 55_000,
   /** Vision extraction on supplier documents (maxDuration 90 routes). */

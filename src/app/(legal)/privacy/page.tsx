@@ -92,9 +92,12 @@ export default function PrivacyPage() {
           </p>
           <p>
             <strong>2. Job and quote content</strong> — the audio you record,
-            the cleaned-up transcript of that audio, the line items and
-            prices that go into each quote, and the client contact details
-            you save against a job. This is the working data of the product.
+            the cleaned-up transcript of that audio, plan and site photos
+            you scan, the line items and prices that go into each quote,
+            the client contact details you save against a job, messages
+            your clients send in the quote chat, and — if you use the
+            weather feature — the job-site address or location you check.
+            This is the working data of the product.
           </p>
           <p>
             <strong>3. Technical information</strong> — IP address, browser
@@ -140,15 +143,38 @@ export default function PrivacyPage() {
         <LegalSection
           id="voice-recordings"
           number="04"
-          title="Voice recordings"
+          title="Voice, photos & AI processing"
         >
           <p>
-            When you record a voice memo, the audio is uploaded to our
-            servers and forwarded to <strong>OpenAI</strong> for
-            transcription using the Whisper API. The transcript is then
-            sent to <strong>Anthropic</strong> (Claude) to be turned into a
-            structured quote.
+            {LEGAL.productName} is built on AI, and using its AI features
+            sends the content you submit to our AI providers:
           </p>
+          <ul>
+            <li>
+              <strong>Voice memos</strong> — the audio is uploaded to our
+              server and forwarded to <strong>OpenAI</strong> for
+              transcription (Whisper API). The transcript is then sent to{" "}
+              <strong>Anthropic</strong> (Claude) to be turned into a
+              structured quote.
+            </li>
+            <li>
+              <strong>Photos and images</strong> — plan scans, site
+              drawings, and supplier documents you photograph or upload
+              are sent to <strong>Anthropic</strong> and/or{" "}
+              <strong>OpenAI</strong> for vision analysis (reading
+              dimensions, extracting line items). Site photos can show
+              private property — only upload what you&apos;re comfortable
+              processing this way.
+            </li>
+            <li>
+              <strong>Customer quote chat</strong> — when your client uses
+              the chat on their quote page, their messages are processed
+              by <strong>Anthropic</strong> to generate the reply. The
+              chat is clearly labelled as AI, the conversation is visible
+              to you, and both sides of it are screened by an automated
+              content filter.
+            </li>
+          </ul>
           <p>
             Both OpenAI and Anthropic have committed, under their API
             terms, that they do not use API inputs to train their models.
@@ -162,6 +188,9 @@ export default function PrivacyPage() {
             OpenAI, and discarded once the text transcript has been
             extracted. The transcript itself lives inside your quote and
             is deleted when you delete the quote or close your account.
+            Plan and site images you attach are stored with your account
+            so your quotes keep their source documents; delete the quote
+            (or your account) and they go with it.
           </p>
         </LegalSection>
 
@@ -177,34 +206,58 @@ export default function PrivacyPage() {
           </p>
           <ul>
             <li>
-              <strong>Supabase</strong> — database, authentication, and
-              file storage. Stores your account, your quotes, and your
-              audio files.
+              <strong>Contabo GmbH</strong> — infrastructure. The
+              application and its database run on a virtual private
+              server we operate ourselves, hosted in Contabo&apos;s data
+              centre in France. Your account data, quotes, clients, and
+              uploaded images live on that server (we run the database
+              and file storage software ourselves — no third-party
+              database service holds your data).
             </li>
             <li>
-              <strong>Vercel</strong> — application hosting and edge
-              network. Handles every request you make to the site.
+              <strong>OpenAI</strong> — voice transcription (Whisper) and
+              vision analysis of photos/plan images you submit.
             </li>
             <li>
-              <strong>OpenAI</strong> — voice transcription via the
-              Whisper API. Receives your audio recordings only.
+              <strong>Anthropic</strong> — quote generation, plan-drawing
+              analysis, and the customer quote chat via the Claude API.
+              Receives transcripts, quote content, images you scan, and
+              your customers&apos; chat messages.
             </li>
             <li>
-              <strong>Anthropic</strong> — quote generation via the Claude
-              API. Receives the cleaned transcript and your quote prompt
-              only.
+              <strong>Open-Meteo</strong> — job-site weather. Receives
+              the job-site address (to geocode it) and/or coordinates —
+              including your device location if you tap &ldquo;use my
+              location&rdquo; — and returns the forecast. No account
+              identifiers are sent with it.
             </li>
             <li>
-              <strong>Stripe</strong> — payment processing (when paid plans
-              launch). Handles billing details. We never see your card
-              number.
+              <strong>Stripe</strong> — payment processing for paid plans
+              (billed on our website) and, where a tradie enables it,
+              client deposit payments. Handles billing details. We never
+              see your card number.
             </li>
             <li>
-              <strong>Resend</strong> — transactional email delivery
-              (when email features launch). Sends sign-in links and quote
-              notifications.
+              <strong>Resend</strong> — transactional email delivery.
+              Sends sign-in links, quote and invoice emails to your
+              clients, and account notifications.
+            </li>
+            <li>
+              <strong>Apple</strong> — push notifications on iOS. If you
+              turn notifications on in the iOS app, a device push token is
+              stored and notifications are delivered through the Apple
+              Push Notification service.
             </li>
           </ul>
+          <p>
+            Text-message quote links are sent from <strong>your own
+            phone&apos;s Messages app</strong> — no SMS provider receives
+            your client&apos;s number or the message from us.
+          </p>
+          <p>
+            Error monitoring runs on our own server; crash and error
+            reports are not sent to any third-party analytics service.
+          </p>
           <p>
             Each of these providers is bound by their own privacy policy
             and by contractual data-processing terms with us.
@@ -217,13 +270,20 @@ export default function PrivacyPage() {
           title="Where data is stored"
         >
           <p>
-            Your account data and quote content are stored on Supabase
-            infrastructure. Our application is hosted on Vercel&apos;s
-            global edge network. Both providers operate data centres in
-            multiple regions, including the United States.
+            Your account data and quote content are stored on a server we
+            operate, hosted by Contabo GmbH in <strong>France</strong>
+            (European Union). Backups live on the same infrastructure.
           </p>
           <p>
-            That means your personal information may be transferred to and
+            When you use the AI features, the content being processed
+            (audio, transcripts, images, chat messages) is sent to OpenAI
+            and Anthropic, which process it in the{" "}
+            <strong>United States</strong>. Weather lookups go to
+            Open-Meteo in the EU; emails are delivered via Resend in the
+            US.
+          </p>
+          <p>
+            That means your personal information is transferred to and
             processed in countries outside New Zealand and the United
             Kingdom. We rely on the contractual safeguards our providers
             offer (including standard contractual clauses where required)
@@ -279,9 +339,13 @@ export default function PrivacyPage() {
               is wrong or out of date.
             </li>
             <li>
-              <strong>Delete</strong> — ask us to remove your personal
-              information. Email us from the address on your account and
-              we will close it and delete your data within 20 working days.
+              <strong>Delete</strong> — remove your personal information.
+              You can delete your account and its data yourself, right now,
+              in the app (Settings &rarr; Delete account) — this removes your
+              data immediately. If you&apos;d rather we did it, email us from
+              the address on your account and we&apos;ll action it within 20
+              working days. Either way, copies in routine backups are
+              overwritten within 30 days.
             </li>
             <li>
               <strong>Export</strong> — get a copy of your quotes and
@@ -334,10 +398,10 @@ export default function PrivacyPage() {
 
         <LegalSection id="security" number="11" title="Security">
           <p>
-            Data is encrypted in transit using TLS 1.2 or higher. Data at
-            rest is encrypted by our hosting providers (Supabase, Vercel).
-            Passwords are hashed using industry-standard algorithms — we
-            never store them in plain text.
+            Data is encrypted in transit using TLS 1.2 or higher. It is
+            stored on access-controlled infrastructure that only we
+            administer. Passwords are hashed using industry-standard
+            algorithms — we never store them in plain text.
           </p>
           <p>
             Your account data is isolated at the database level using

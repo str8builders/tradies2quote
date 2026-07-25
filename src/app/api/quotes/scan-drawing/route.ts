@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
+import { aiConsentGate } from "@/lib/ai-consent";
 import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
 import { resolveDocumentType } from "@/lib/scanClassify";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
@@ -29,7 +30,7 @@ const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 // docs.anthropic.com is `claude-opus-4-7`. If we 502 again, the
 // improved error logging below will surface the actual Anthropic
 // response status + body so we can diagnose properly.
-export const MODEL = "claude-opus-4-7";
+export const MODEL = "claude-opus-4-8";
 // Bumped from 2048 → 4096. A detailed hand-drawn plan (multiple
 // dimension labels, step heights, post depths, fastener notes) can
 // easily generate a long structured response: 6 sections of prose
@@ -402,6 +403,11 @@ export async function POST(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  // Guideline 5.1.2(i) — no plan/site image goes to Anthropic vision without
+  // recorded consent (iOS shell only; web unaffected).
+  const consentGate = await aiConsentGate(supabase, user.id);
+  if (consentGate) return consentGate;
 
   // Per-user daily cap — cheap circuit-breaker on drawing-scan (vision) spend.
   const quota = consumeDailyQuota(`scan-drawing:${user.id}`, 60);

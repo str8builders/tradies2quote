@@ -7,6 +7,7 @@ import {
 } from "pdf-lib";
 import { formatCurrency, formatIssueDate } from "./quote-defaults";
 import type { QuoteData, QuoteLineItem, QuoteProfile } from "./quote-types";
+import { drawPdfLogo, type PdfLogo } from "./pdf-logo";
 
 /**
  * Invoice PDF generator. Sibling to `pdf-generator.ts` (quotes) — same
@@ -23,7 +24,8 @@ import type { QuoteData, QuoteLineItem, QuoteProfile } from "./quote-types";
 type GenerateArgs = {
   invoiceNumber: string;
   createdAt: string;
-  dueDate: string;
+  /** null = due on receipt (tradie never set a date). */
+  dueDate: string | null;
   snapshot: QuoteData;
   profile: Partial<QuoteProfile> & {
     business_name: string | null;
@@ -36,6 +38,8 @@ type GenerateArgs = {
    *  footer (e.g. "Pay to: KIWIBANK 38-9023-... Ref: INV-0042"). When
    *  unset the footer just shows the due date again. */
   paymentInstructions?: string | null;
+  /** Optional business logo drawn top-left of the letterhead. */
+  logo?: PdfLogo | null;
 };
 
 const ORANGE = rgb(1.0, 0.373, 0.082); // #FF5F15
@@ -92,6 +96,7 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
     snapshot,
     profile,
     paymentInstructions,
+    logo,
   } = args;
 
   const pdf = await PDFDocument.create();
@@ -144,6 +149,8 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
   }
 
   // ===== Header =====
+  // Optional logo top-left; pushes the business name down by whatever it used.
+  y -= await drawPdfLogo(pdf, page, logo, MARGIN_X, y);
   const businessName = profile.business_name || "Your business";
   drawText(businessName.toUpperCase(), MARGIN_X, y, { font: bold, size: 18 });
   y -= 24;
@@ -182,7 +189,7 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
     color: MUTED,
   });
   // Due date is the headline for an invoice — emphasised in bold INK.
-  const dueLabel = `Due ${formatIssueDate(dueDate)}`;
+  const dueLabel = dueDate ? `Due ${formatIssueDate(dueDate)}` : "Due on receipt";
   page.drawText(dueLabel, {
     x: PAGE_W - MARGIN_X - bold.widthOfTextAtSize(dueLabel, 10),
     y: TOP - 60,
@@ -401,7 +408,9 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
     });
   } else {
     drawText(
-      `Please pay by ${formatIssueDate(dueDate)}. Use ${invoiceNumber} as the reference.`,
+      dueDate
+        ? `Please pay by ${formatIssueDate(dueDate)}. Use ${invoiceNumber} as the reference.`
+        : `Payment is due on receipt. Use ${invoiceNumber} as the reference.`,
       MARGIN_X,
       y,
       {

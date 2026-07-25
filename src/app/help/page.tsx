@@ -5,6 +5,8 @@ import {
   EnvelopeSimple,
   ArrowRight,
 } from "@phosphor-icons/react/dist/ssr";
+import { HideInNativeApp } from "@/app/_components/HideInNativeApp";
+import { isNativeShellRequest } from "@/lib/native-shell";
 
 /**
  * Public Help / FAQ page — answers the questions tradies actually
@@ -24,8 +26,13 @@ export const metadata: Metadata = {
 
 const SUPPORT_EMAIL = "support@tradies2quote.com";
 
-const FAQS: ReadonlyArray<{ q: string; a: React.ReactNode }> = [
+// `billing: true` entries carry pricing / subscription mechanics. They are
+// wrapped in <HideInNativeApp> below — Guideline 3.1.3(f) forbids ANY
+// pricing or purchase-steering copy inside the iOS binary, and /help is
+// reachable in the shell from the account menu.
+const FAQS: ReadonlyArray<{ q: string; a: React.ReactNode; billing?: boolean }> = [
   {
+    billing: true,
     q: "How does the 7-day free trial work?",
     a: (
       <>
@@ -38,6 +45,7 @@ const FAQS: ReadonlyArray<{ q: string; a: React.ReactNode }> = [
     ),
   },
   {
+    billing: true,
     q: "What happens after the trial?",
     a: (
       <>
@@ -67,7 +75,7 @@ const FAQS: ReadonlyArray<{ q: string; a: React.ReactNode }> = [
     q: "Why are all the prices blank in my new quotes?",
     a: (
       <>
-        This is on purpose during the beta. Tradies2Quote does <strong>not</strong>{" "}
+        This is deliberate. Tradies2Quote does <strong>not</strong>{" "}
         guess prices for you — AI-generated unit prices have been turned off so
         we never send a customer a number the AI made up. Every material starts
         with a <em>&ldquo;Needs price&rdquo;</em> badge and you fill in your real
@@ -214,7 +222,14 @@ const FAQS: ReadonlyArray<{ q: string; a: React.ReactNode }> = [
   },
 ];
 
-export default function HelpPage() {
+export default async function HelpPage() {
+  // 3.1.3(f) — /help is reachable in the iOS shell from the account menu, and
+  // the `billing: true` FAQs carry pricing/subscription mechanics. Withhold
+  // them SERVER-side so their answers never reach the binary's HTML; the
+  // <HideInNativeApp> wrapper below stays as defence-in-depth for pre-marker
+  // shells (which the server can't detect).
+  const nativeShell = await isNativeShellRequest();
+  const faqs = nativeShell ? FAQS.filter((f) => !f.billing) : FAQS;
   return (
     <div
       data-theme="light"
@@ -235,31 +250,39 @@ export default function HelpPage() {
 
         {/* FAQs — native <details> for zero-JS expand/collapse */}
         <div className="mt-10 space-y-3">
-          {FAQS.map((faq, i) => (
-            <details
-              key={i}
-              className="group overflow-hidden rounded-2xl border bg-white shadow-[0_1px_2px_rgba(10,10,10,0.04)] transition-shadow open:shadow-[0_4px_14px_rgba(10,10,10,0.06)]"
-              style={{ borderColor: "#E8E6DD" }}
-            >
-              <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-5 py-4 [&::-webkit-details-marker]:hidden">
-                <h2 className="text-base font-semibold text-ink-900 sm:text-lg">
-                  {faq.q}
-                </h2>
-                <CaretDown
-                  size={18}
-                  weight="bold"
-                  className="mt-1 shrink-0 text-ink-400 transition-transform group-open:rotate-180"
-                  aria-hidden="true"
-                />
-              </summary>
-              <div
-                className="border-t px-5 py-4 text-sm leading-relaxed text-ink-700 sm:text-base"
-                style={{ borderColor: "#F0EFE9" }}
+          {faqs.map((faq, i) => {
+            const item = (
+              <details
+                key={i}
+                className="group overflow-hidden rounded-2xl border bg-white shadow-[0_1px_2px_rgba(10,10,10,0.04)] transition-shadow open:shadow-[0_4px_14px_rgba(10,10,10,0.06)]"
+                style={{ borderColor: "#E8E6DD" }}
               >
-                {faq.a}
-              </div>
-            </details>
-          ))}
+                <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-5 py-4 [&::-webkit-details-marker]:hidden">
+                  <h2 className="text-base font-semibold text-ink-900 sm:text-lg">
+                    {faq.q}
+                  </h2>
+                  <CaretDown
+                    size={18}
+                    weight="bold"
+                    className="mt-1 shrink-0 text-ink-400 transition-transform group-open:rotate-180"
+                    aria-hidden="true"
+                  />
+                </summary>
+                <div
+                  className="border-t px-5 py-4 text-sm leading-relaxed text-ink-700 sm:text-base"
+                  style={{ borderColor: "#F0EFE9" }}
+                >
+                  {faq.a}
+                </div>
+              </details>
+            );
+            // 3.1.3(f) — billing/pricing FAQs never render in the iOS shell.
+            return faq.billing ? (
+              <HideInNativeApp key={i}>{item}</HideInNativeApp>
+            ) : (
+              item
+            );
+          })}
         </div>
 
         {/* Contact card */}

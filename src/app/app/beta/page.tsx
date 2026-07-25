@@ -6,14 +6,17 @@ import { createClient } from "@/lib/supabase/server";
 import { AppHeader } from "../_components/AppHeader";
 import { BetaFeedbackForm } from "./_components/BetaFeedbackForm";
 
-export const metadata: Metadata = { title: "Beta — before you send" };
+export const metadata: Metadata = { title: "Before you send" };
 export const dynamic = "force-dynamic";
 
 /**
- * Small in-app beta guidance page — the target of the dismissible beta
- * notice's "Read before sending quotes" link. Login-gated by proxy.ts;
- * getUser + redirect here as defense-in-depth. Visible to all beta users
- * (owner + mates) — not owner-only.
+ * Small in-app pre-send guidance page — the target of the dismissible
+ * "Heads up" notice's link. Login-gated by proxy.ts; getUser + redirect
+ * here as defense-in-depth. Visible to all tradies — not owner-only.
+ *
+ * NOTE: copy deliberately avoids the word "beta" anywhere user-visible —
+ * Apple rejects apps that present as beta/trial builds (2.3.10 / 2.1).
+ * The /app/beta route path is invisible in the native shell (no URL bar).
  */
 const CHECKS = [
   "Materials & quantities are right — especially from a drawing or supplier scan.",
@@ -32,16 +35,16 @@ export default async function BetaHelpPage() {
 
   return (
     <div className="min-h-screen text-white">
-      <AppHeader context="Beta" />
+      <AppHeader context="Guide" />
       <main className="mx-auto max-w-2xl px-4 py-10 sm:px-6 sm:py-14">
-        <div className="t2q-section-label-pro mb-3">{"// beta"}</div>
+        <div className="t2q-section-label-pro mb-3">{"// pre-send checklist"}</div>
         <h1 className="font-display text-3xl uppercase tracking-tight sm:text-4xl">
           Before you send.
         </h1>
         <p className="mt-3 text-sm text-ink-300 sm:text-base">
-          You&apos;re one of the first tradies on Tradies2Quote. It&apos;s
-          solid — but you&apos;re the final check on every quote. The app flags
-          and blocks the risky stuff; you make the call.
+          T2Q does the heavy lifting — but you&apos;re the final check on
+          every quote. The app flags and blocks the risky stuff; you make
+          the call.
         </p>
 
         <section

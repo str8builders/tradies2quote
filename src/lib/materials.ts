@@ -48,6 +48,19 @@ export function matchToLibrary(
   description: string,
   library: LibraryMaterial[],
 ): LibraryMaterial | null {
+  return matchToLibraryScored(description, library)?.item ?? null;
+}
+
+/**
+ * Like matchToLibrary, but also reports HOW specific the winning match
+ * was (the number of library-name tokens that all appeared in the
+ * description). A specificity of 1 is a single generic token ("screws")
+ * — fine for linking, too weak to auto-apply the library PRICE.
+ */
+export function matchToLibraryScored(
+  description: string,
+  library: LibraryMaterial[],
+): { item: LibraryMaterial; specificity: number } | null {
   if (!description || library.length === 0) return null;
   const descTokens = normaliseTokens(description);
   if (descTokens.size === 0) return null;
@@ -71,7 +84,7 @@ export function matchToLibrary(
     }
   }
 
-  return best;
+  return best ? { item: best, specificity: bestSpecificity } : null;
 }
 
 export function formatLibraryForPrompt(

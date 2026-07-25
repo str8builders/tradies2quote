@@ -20,7 +20,8 @@ import { captureError } from "@/lib/observability";
  *     enforcement of the same list via mime check. The storage bucket
  *     itself ALSO enforces the same mime allow-list, so a bad upload
  *     is rejected twice — once by us, once by Postgres-side storage.
- *   - 2 MB size cap, server-checked + bucket-enforced.
+ *   - Generous size backstop, server-checked. The client compresses every
+ *     pick first (prepareAvatarImage), so the cap only catches a prep failure.
  *   - Path always prefixed with the authenticated user's uid; the
  *     storage RLS policies ("Avatars: insert own" etc.) reject anything
  *     outside `{auth.uid()}/...`, so the user cannot write to anyone
@@ -32,7 +33,11 @@ import { captureError } from "@/lib/observability";
  */
 
 const BUCKET = "profile-avatars";
-const MAX_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB
+// Backstop only. The client compresses every pick to ~512 px before upload
+// (see prepareAvatarImage), so a real photo lands in the tens of KB; this
+// generous ceiling only catches a client-prep failure. (The old 2 MB cap was
+// the "FILE IS OVER 2 MB" complaint — raised so normal phone photos pass.)
+const MAX_SIZE_BYTES = 8 * 1024 * 1024; // 8 MB
 const ALLOWED_MIME: ReadonlyArray<string> = [
   "image/jpeg",
   "image/png",
@@ -87,7 +92,7 @@ async function uploadFileForUser(
     return { ok: false, error: "Empty file." };
   }
   if (file.size > MAX_SIZE_BYTES) {
-    return { ok: false, error: "File is over 2 MB." };
+    return { ok: false, error: "Image is too large — try a smaller one." };
   }
   const resolved = resolveImage(file);
   if ("error" in resolved) {

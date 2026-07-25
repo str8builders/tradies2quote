@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import Script from "next/script";
 import {
   Archivo_Black,
   IBM_Plex_Sans,
@@ -9,7 +8,6 @@ import {
   Plus_Jakarta_Sans,
 } from "next/font/google";
 import "./globals.css";
-import { ThemeBoot } from "./_components/ThemeBoot";
 import { FloatingInstallButton } from "./_components/FloatingInstallButton";
 import { SignupBeacon } from "./_components/SignupBeacon";
 import { CookieConsent } from "./_components/CookieConsent";
@@ -159,7 +157,14 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 5,
+  // Locked to 1 (+ userScalable:false): in the installed iOS shell, focusing
+  // a form field force-zooms the page and it never zooms back — the "app
+  // moves around inside the screen" report. This disables pinch/double-tap
+  // zoom and the focus-zoom. Text size is unaffected (the 16px input rule in
+  // globals.css removes the focus-zoom TRIGGER; this removes the ability to
+  // stay zoomed). viewportFit/themeColor unchanged → shell-contract test green.
+  maximumScale: 1,
+  userScalable: false,
   // Wave 14.1 — `cover` lets the browser render the page under the
   // iPhone notch / Android camera cutout. Combined with each
   // top-of-page header's `pt-[env(safe-area-inset-top)]`, the page
@@ -167,23 +172,6 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   themeColor: "#0A0A0A",
 };
-
-/**
- * Pre-hydration theme script.
- *
- * Runs synchronously, before React hydrates, before the first paint.
- * Reads `localStorage["t2q-theme"]` + `(prefers-color-scheme: dark)` and
- * writes the resolved value to `<html data-theme="…">`, which the
- * `[data-theme="light"]` CSS overrides in `globals.css` respond to.
- *
- * Without this, the server emits `<html>` with no `data-theme`, so the
- * first paint is always the dark default; the `<ThemeToggle />` then runs
- * its mount effect and flips the value, producing a single-frame flash.
- *
- * Wrapped in try/catch so a strict CSP / private-mode localStorage block
- * never throws — `<ThemeBoot />` then re-applies on mount as a backstop.
- */
-const THEME_INIT_SCRIPT = `(function(){try{var m=localStorage.getItem("t2q-theme");if(m!=="light"&&m!=="dark"&&m!=="auto"){m="auto";}var e=m==="auto"?(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;document.documentElement.dataset.theme=e;}catch(_){}})();`;
 
 export default function RootLayout({
   children,
@@ -193,23 +181,16 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      // Wave 18.1 — perf — the pre-hydration `THEME_INIT_SCRIPT` below
-      // intentionally writes `data-theme="..."` to <html> before React
-      // hydrates, so React's hydration check always flagged a mismatch
-      // here in dev. Suppress only on the <html> element so other
-      // mismatches still surface.
-      suppressHydrationWarning
+      // Dark-only (owner decision, 2026-07-13): the light theme is parked.
+      // `data-theme` is pinned server-side, the pre-hydration theme script,
+      // <ThemeBoot /> syncer and header <ThemeToggle /> are unmounted. The
+      // `[data-theme="light"]` CSS in globals.css and the toggle components
+      // stay on disk so re-enabling is just re-mounting them (the /help
+      // page still uses a locally-scoped data-theme="light" by design).
+      data-theme="dark"
       className={`${archivoblack.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable} ${fraunces.variable} ${inter.variable} ${plusJakartaSans.variable} h-full`}
     >
-      <head>
-        <Script
-          id="t2q-theme-init"
-          strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
-        />
-      </head>
       <body className="min-h-full flex flex-col bg-ink-900 text-white antialiased">
-        <ThemeBoot />
         {children}
         {/* Wave 12.3 — floating Install-App CTA. Renders nothing when
             the app is already installed or the browser can't install,

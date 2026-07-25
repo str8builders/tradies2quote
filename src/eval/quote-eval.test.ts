@@ -17,6 +17,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { buildQuotePrompt } from "@/lib/quote-prompt";
+import { parseModelJsonObject } from "@/lib/modelJson";
 import type {
   LibraryMaterial,
   QuoteData,
@@ -33,7 +34,7 @@ import {
 const ENABLED = process.env.RUN_QUOTE_EVAL === "1";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-sonnet-4-20250514";
+const MODEL = "claude-sonnet-5";
 
 /** Pull ANTHROPIC_API_KEY from the shell env, falling back to `.env.local`. */
 function resolveApiKey(): string | null {
@@ -65,17 +66,17 @@ async function generateQuote(
       "anthropic-version": "2023-06-01",
       "content-type": "application/json",
     },
+    // Mirrors /api/quotes/generate: Sonnet 5 rejects non-default
+    // `temperature` and assistant prefills, so neither is sent.
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 8192,
-      temperature: 0,
       system,
       messages: [
         {
           role: "user",
           content: `Job description from voice memo or typed input:\n\n${description}`,
         },
-        { role: "assistant", content: "{" },
       ],
     }),
   });
@@ -88,7 +89,7 @@ async function generateQuote(
     content?: Array<{ type: string; text?: string }>;
   };
   const text = payload.content?.find((c) => c.type === "text")?.text ?? "";
-  return JSON.parse("{" + text) as QuoteData;
+  return parseModelJsonObject<QuoteData>(text);
 }
 
 /** Per-case score tally for the final summary line. */
