@@ -44,5 +44,13 @@ export default async function CalculatorLaunch({
 
   if (!offer) return null;
 
-  return <OpenCalculator route={route} className={className} />;
+  // The "see what's inside" link goes to /calculator, which redirects the App
+  // Store shell straight back to /app — so the shell never gets the link.
+  return (
+    <OpenCalculator
+      route={route}
+      detailsLink={!nativeShell}
+      className={className}
+    />
+  );
 }

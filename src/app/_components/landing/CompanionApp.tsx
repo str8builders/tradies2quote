@@ -14,8 +14,8 @@ import {
  * out on site crosses into a Tradies2Quote draft priced at the tradie's own
  * markup and GST, because both apps read the same profile row.
  *
- * Every figure here is counted from the app's own source (92 calculator slugs
- * in T2QCAL/Models/Tools*.swift; 72 documents in Models/Resources.swift) and
+ * Every figure here is counted from the app's own source (94 calculator slugs
+ * in T2QCAL/Models/Tools*.swift; 74 documents in Models/Resources.swift) and
  * every screenshot is a capture of the running app. Nothing is claimed about
  * downloads, users or time saved — the app isn't on the App Store yet and the
  * section says so.
@@ -25,7 +25,7 @@ const PROOF = [
   {
     slug: "calculators",
     icon: Ruler,
-    stat: "92",
+    stat: "94",
     title: "calculators",
     body: "Rafters, stairs, spacings, slabs, cladding, tube — each with a live measured drawing you can check against the job.",
   },
@@ -39,7 +39,7 @@ const PROOF = [
   {
     slug: "library",
     icon: BookOpenText,
-    stat: "72",
+    stat: "74",
     title: "manuals on the phone",
     body: "GIB, MiTek, James Hardie, Pryda, Concrete NZ. Sixty-two pull down over wifi and read in a subfloor with no signal; the Building Code clauses are listed alongside them.",
   },
@@ -119,8 +119,8 @@ export function CompanionApp() {
           <div className="relative grid grid-cols-2 gap-4 sm:gap-6">
             <PhoneShot
               src="/screens/t2qcal-tools.jpg"
-              alt="T2QCAL calculator list showing a search across 92 construction calculators, with roof and rafter tools listed below"
-              caption="92 calculators"
+              alt="T2QCAL calculator list showing a search across 94 construction calculators, with roof and rafter tools listed below"
+              caption="94 calculators"
               className="mt-8"
             />
             <PhoneShot

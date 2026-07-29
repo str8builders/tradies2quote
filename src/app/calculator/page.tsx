@@ -20,12 +20,12 @@ import { isNativeShellRequest } from "@/lib/native-shell";
 export const metadata: Metadata = {
   title: "T2QCAL — the calculator that quotes",
   description:
-    "A construction calculator for iPhone that signs in with your Tradies2Quote account. 92 calculators with live measured drawings, 72 trade manuals that read offline, and quantities that cross straight into a draft quote at your own markup and GST.",
+    "A construction calculator for iPhone that signs in with your Tradies2Quote account. 94 calculators with live measured drawings, 74 trade manuals that read offline, and quantities that cross straight into a draft quote at your own markup and GST.",
   alternates: { canonical: "/calculator" },
   openGraph: {
     title: "T2QCAL — the calculator that quotes",
     description:
-      "92 construction calculators, 72 trade manuals offline, and quantities that go straight into a Tradies2Quote draft. One account, both apps.",
+      "94 construction calculators, 74 trade manuals offline, and quantities that go straight into a Tradies2Quote draft. One account, both apps.",
     url: "/calculator",
   },
 };
@@ -55,14 +55,15 @@ const TRADES = [
   { name: "Printable templates", count: 8 },
   { name: "General geometry", count: 8 },
   { name: "Stairs & balustrades", count: 6 },
+  { name: "Drainage & spouting", count: 2 },
 ];
 
 // Counted from T2QCAL/Models/Resources.swift, by publisher, exactly as the
-// app attributes them. Sums to 72.
+// app attributes them. Sums to 74.
 const PUBLISHERS = [
   { name: "MiTek NZ", count: 25 },
   { name: "James Hardie NZ", count: 14 },
-  { name: "MBIE Building Performance", count: 8 },
+  { name: "MBIE Building Performance", count: 10 },
   { name: "Winstone Wallboards (GIB)", count: 6 },
   { name: "Pryda NZ", count: 5 },
   { name: "CHH Woodproducts", count: 3 },
@@ -155,7 +156,7 @@ export default async function CalculatorPage() {
                 <span className="text-brand">that quotes.</span>
               </h1>
               <p className="mt-6 max-w-lg text-lg leading-relaxed text-ink-200">
-                Ninety-two construction calculators for iPhone, each drawing the
+                Ninety-four construction calculators for iPhone, each drawing the
                 job as you type it. It signs in with your Tradies2Quote account,
                 so a quantity worked out standing in the trench goes onto your
                 quote list before you&apos;ve got back to the ute.
@@ -263,12 +264,12 @@ export default async function CalculatorPage() {
           </div>
         </section>
 
-        {/* ── 92 calculators ──────────────────────────────────────────── */}
+        {/* ── 94 calculators ──────────────────────────────────────────── */}
         <section className="border-b border-ink-600 bg-ink-900 py-16 md:py-24">
           <div className="mx-auto max-w-5xl px-5">
             <Header
               label="// the tools"
-              lead="92 calculators."
+              lead="94 calculators."
               accent="Every one draws."
             />
             <p className="mt-5 max-w-2xl text-lg leading-relaxed text-ink-200">
@@ -295,7 +296,7 @@ export default async function CalculatorPage() {
             </ul>
 
             <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-400">
-              Metric and imperial throughout · 90 of the 92 produce something you
+              Metric and imperial throughout · 92 of the 94 produce something you
               can put on a quote
             </p>
           </div>
@@ -307,7 +308,7 @@ export default async function CalculatorPage() {
             <div>
               <Header
                 label="// the shelf"
-                lead="72 manuals."
+                lead="74 manuals."
                 accent="No signal needed."
               />
               <p className="mt-5 text-lg leading-relaxed text-ink-200">
@@ -340,7 +341,7 @@ export default async function CalculatorPage() {
                 <Card
                   icon={WifiSlash}
                   title="62 download directly"
-                  body="The other 10 sit behind a bot check or a free registration, so the app opens the publisher's page rather than quietly saving an error page."
+                  body="The other 12 sit behind a bot check or a free registration, so the app opens the publisher's page rather than quietly saving an error page."
                 />
                 <Card
                   icon={BookOpenText}
@@ -374,7 +375,7 @@ export default async function CalculatorPage() {
                 accent="and the clause behind it."
               />
               <p className="mt-5 text-lg leading-relaxed text-ink-200">
-                74 of the 92 calculators carry a link to the rule that governs
+                76 of the 94 calculators carry a link to the rule that governs
                 them, and it opens the manual{" "}
                 <em>at the right search term</em> — not the front cover, and not
                 a search box on a website.
