@@ -7,13 +7,21 @@
  * for the rationale on each tuning knob.
  */
 import * as Sentry from "@sentry/nextjs";
+import {
+  isSentryEnabled,
+  sentrySendDefaultPii,
+  sentryTracesSampleRate,
+} from "@/lib/observability/sentryTarget";
+
+const DSN = process.env.NEXT_PUBLIC_SENTRY_DSN;
 
 Sentry.init({
-  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-  enabled: process.env.NODE_ENV === "production",
-  tracesSampleRate: 0.1,
+  dsn: DSN,
+  enabled: isSentryEnabled(DSN),
+  tracesSampleRate: sentryTracesSampleRate(DSN),
   // Server-side (edge/proxy) — keep customer PII out of 3rd-party error logs.
-  sendDefaultPii: false,
+  // A local sink never leaves the machine, so it gets full request context.
+  sendDefaultPii: sentrySendDefaultPii(DSN),
   environment:
     process.env.VERCEL_ENV ??
     process.env.NODE_ENV ??

@@ -14,13 +14,19 @@
  */
 import * as Sentry from "@sentry/nextjs";
 import { reportClientError } from "@/lib/observability/clientReport";
+import {
+  isSentryEnabled,
+  sentryTracesSampleRate,
+} from "@/lib/observability/sentryTarget";
+
+const DSN = process.env.NEXT_PUBLIC_SENTRY_DSN;
 
 Sentry.init({
-  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-  enabled:
-    process.env.NODE_ENV === "production" &&
-    Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN),
-  tracesSampleRate: 0.1,
+  dsn: DSN,
+  // Production as before; also on in dev when the DSN is a local sink
+  // (STR8SENTRY), where capturing dev errors is the entire point.
+  enabled: isSentryEnabled(DSN),
+  tracesSampleRate: sentryTracesSampleRate(DSN),
   replaysSessionSampleRate: 0,
   replaysOnErrorSampleRate: 1.0,
   integrations: [
