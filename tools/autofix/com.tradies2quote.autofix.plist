@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The overnight fix proposer: runs at 7:00am NZ, fifteen minutes
+	     after the error-digest email, so a morning with a new error is
+	     also a morning with a tested proposed fix. If the Mac was asleep
+	     at 7:00, launchd runs it once on wake instead. -->
+	<key>Label</key>
+	<string>com.tradies2quote.autofix</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/usr/bin/python3</string>
+		<string>/Users/admin/Desktop/tradies2quote/tools/autofix/autofix.py</string>
+	</array>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>7</integer>
+		<key>Minute</key>
+		<integer>0</integer>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>/Users/admin/.t2q-autofix/logs/launchd.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/admin/.t2q-autofix/logs/launchd.log</string>
+</dict>
+</plist>
