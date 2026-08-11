@@ -240,7 +240,9 @@ def cycle(state: dict, failures: int) -> int:
             state.get("outage") and now - state.get("last_outage_post", 0) >= OUTAGE_REMINDER_S
         ):
             if not state.get("outage"):
-                state["outage"] = now
+                # The clock starts at the first missed poll, not the fourth —
+                # "down for 3 min" is the truth the first alert should tell.
+                state["outage"] = now - (OUTAGE_AFTER_FAILURES - 1) * POLL_SECONDS
             state["last_outage_post"] = now
             minutes = int((now - state["outage"]) / 60)
             post_bridge_notice(
