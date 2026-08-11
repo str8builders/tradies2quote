@@ -11,7 +11,7 @@
 	<key>ProgramArguments</key>
 	<array>
 		<string>/usr/bin/python3</string>
-		<string>/Users/admin/Desktop/tradies2quote/tools/autofix/autofix.py</string>
+		<string>/Users/admin/.t2q-autofix/bin/autofix.py</string>
 	</array>
 	<key>StartCalendarInterval</key>
 	<dict>

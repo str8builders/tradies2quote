@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Production errors → STR8SENTRY, continuously. KeepAlive so it
+	     survives crashes and reboots; the bridge itself tolerates the
+	     VPS or the sink app being down and just keeps retrying. -->
+	<key>Label</key>
+	<string>com.tradies2quote.sentry-bridge</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/usr/bin/python3</string>
+		<string>/Users/admin/.t2q-autofix/bin/bridge.py</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+	<key>ThrottleInterval</key>
+	<integer>30</integer>
+	<key>StandardOutPath</key>
+	<string>/Users/admin/.t2q-autofix/logs/bridge-launchd.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/admin/.t2q-autofix/logs/bridge-launchd.log</string>
+</dict>
+</plist>

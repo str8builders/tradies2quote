@@ -34,3 +34,21 @@ owner wakes to a "proposed fixes" email listing tested diffs.
 
 State, logs and reports live in `~/.t2q-autofix/`. Kill switch:
 `launchctl bootout gui/501/com.tradies2quote.autofix`.
+
+## The bridge (production → STR8SENTRY, live)
+
+`bridge.py` polls the production monitor every 45s and forwards each event into
+STR8SENTRY's ingest (`localhost:8969`, project "20") with the monitor's own
+fingerprint and event id — same grouping, idempotent replays. A brand-new
+production problem also starts an autofix session immediately (same caps and
+envelope as the 7:00am run; backfilled history never triggers). If the VPS
+stops answering for ~3 minutes, the bridge posts "production monitor
+unreachable" into STR8SENTRY so the server dying finally raises a Mac
+notification — recovery is posted the same way.
+
+**macOS trap, learned the hard way:** launchd agents cannot read `~/Desktop`
+(TCC privacy). Both plists therefore run copies in `~/.t2q-autofix/bin/` —
+re-copy after editing these files. The fixer's own git/build work still needs
+Desktop access, so under launchd it requires python3 granted Full Disk Access
+(System Settings → Privacy & Security); a bridge started from a terminal
+session has access and needs nothing.
