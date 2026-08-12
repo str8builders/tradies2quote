@@ -79,6 +79,21 @@ const MACHINE: ReadonlySet<LineProvenance> = new Set([
   "ai_unconfirmed",
 ]);
 
+/**
+ * Exact tool-output licences for the two material families protected by the
+ * leak guard. A generic `t2qcal_` field or a similar-looking description is
+ * not evidence: only outputs shipped and audited by T2QCAL are accepted.
+ */
+export function t2qcalLicensedFamily(
+  item: Pick<QuoteLineItem, "t2qcal_source_key">,
+): "deck" | "insulation" | null {
+  switch (item.t2qcal_source_key) {
+    case "deck-boards.lineal-order": return "deck";
+    case "insulation-batts.packs-order": return "insulation";
+    default: return null;
+  }
+}
+
 export interface StrippedLine {
   description: string;
   reason: "invalid_values" | "unlicensed_deck" | "unlicensed_insulation";
@@ -148,11 +163,13 @@ export function guardQuoteForReview(
     // any family always stay.)
     if (MACHINE.has(provenance) && raw.type === "material") {
       const family = materialFamilyForDescription(raw.description ?? "");
-      if (family === "deck" && !licensed.has("deck")) {
+      const toolFamily = t2qcalLicensedFamily(raw);
+      if (family === "deck" && !licensed.has("deck") && toolFamily !== "deck") {
         stripped.push({ description: raw.description, reason: "unlicensed_deck" });
         continue;
       }
-      if (family === "insulation" && !licensed.has("insulation")) {
+      if (family === "insulation" && !licensed.has("insulation")
+          && toolFamily !== "insulation") {
         stripped.push({
           description: raw.description,
           reason: "unlicensed_insulation",

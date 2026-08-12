@@ -30,6 +30,7 @@ import type {
   QuoteLineItem,
   QuoteStatus,
 } from "@/lib/quote-types";
+import { applyLineEdit } from "@/lib/t2qcalLineEdit";
 import {
   confirmAndRecalc,
   type DimensionEdit,
@@ -198,7 +199,7 @@ export function QuoteEditor({
     setItems((prev) =>
       prev.map((it, i) => {
         if (i !== idx) return it;
-        const next = { ...it, ...patch };
+        const next = applyLineEdit(it, patch);
         next.line_total = round2(
           (Number(next.quantity) || 0) * (Number(next.unit_price) || 0),
         );

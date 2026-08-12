@@ -3,6 +3,7 @@ import { computeQuoteTotals, moneyEquals, round2 } from "./quote-defaults";
 import {
   classifyLineProvenance,
   licensedFamiliesForDescription,
+  t2qcalLicensedFamily,
 } from "./reviewGuard";
 import { materialFamilyForDescription } from "./takeoff/license";
 
@@ -192,7 +193,8 @@ export function assessQuoteContradictions(
       if (prov !== "calculated" && prov !== "ai_unconfirmed") return false;
       return (
         materialFamilyForDescription(it.description ?? "") === family &&
-        !licensed.has(family)
+        !licensed.has(family) &&
+        t2qcalLicensedFamily(it) !== family
       );
     });
   const deckLeaks = unlicensed("deck");

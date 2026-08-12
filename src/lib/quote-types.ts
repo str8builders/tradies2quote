@@ -127,6 +127,21 @@ export type QuoteLineItem = {
    */
   quantity_source?: "ai" | "calculator" | "supplier" | "user";
   quantity_confirmed?: boolean;
+  /** T2QCAL — stable calculator output key; internal review evidence only. */
+  t2qcal_source_key?: string;
+  /** T2QCAL — canonical product/package basis used for the quantity. */
+  t2qcal_basis_fingerprint?: string;
+  /** T2QCAL — plain-language assumptions/checks shown in Review Quote only. */
+  t2qcal_assumptions?: string[];
+  t2qcal_checks?: string[];
+  /** T2QCAL — honest source note, separate from compliance `reason`. */
+  t2qcal_provenance_note?: string;
+  /** T2QCAL — calculator inputs at the moment the result was produced. */
+  t2qcal_calculator_snapshot?: {
+    toolSlug: string;
+    toolName: string;
+    inputs: Array<{ key: string; label: string; value: number; unit: string }>;
+  };
 };
 
 /**

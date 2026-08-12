@@ -37,9 +37,17 @@ type StagedComplianceKeys =
   | "required_confirmations"
   | "citations";
 
+type T2QCALInternalKeys =
+  | "t2qcal_source_key"
+  | "t2qcal_basis_fingerprint"
+  | "t2qcal_assumptions"
+  | "t2qcal_checks"
+  | "t2qcal_provenance_note"
+  | "t2qcal_calculator_snapshot";
+
 describe("PublicLineItem strips Stage-5 compliance fields (test 11)", () => {
   it("type-level: none of the compliance keys are in keyof PublicLineItem", () => {
-    type Leak = StagedComplianceKeys & keyof PublicLineItem;
+    type Leak = (StagedComplianceKeys | T2QCALInternalKeys) & keyof PublicLineItem;
     // If any compliance key sneaks onto PublicLineItem, `Leak` widens
     // beyond `never` and the type-level assertion below fails to compile.
     expectTypeOf<Leak>().toEqualTypeOf<never>();
@@ -84,6 +92,16 @@ describe("PublicLineItem strips Stage-5 compliance fields (test 11)", () => {
       compliance_notes: ["Insulation not required by default for internal walls."],
       required_confirmations: ["Confirm acoustic separation requirement."],
       citations,
+      t2qcal_source_key: "insulation-batts.packs-order",
+      t2qcal_basis_fingerprint: "v1|insulation-pack|l0=1160|l1=580|v0=10",
+      t2qcal_assumptions: ["10 batts per pack"],
+      t2qcal_checks: ["Quantity is rounded up to whole packs"],
+      t2qcal_provenance_note: "Deterministic T2QCAL result",
+      t2qcal_calculator_snapshot: {
+        toolSlug: "insulation-batts",
+        toolName: "Insulation batts",
+        inputs: [{ key: "pack", label: "Batts per pack", value: 10, unit: "" }],
+      },
     };
 
     // The public projection that the Supabase RPC would perform — we
@@ -122,6 +140,12 @@ describe("PublicLineItem strips Stage-5 compliance fields (test 11)", () => {
       "price_match_key",
       "price_source",
       "price_confidence",
+      "t2qcal_source_key",
+      "t2qcal_basis_fingerprint",
+      "t2qcal_assumptions",
+      "t2qcal_checks",
+      "t2qcal_provenance_note",
+      "t2qcal_calculator_snapshot",
     ] as const) {
       expect(publicKeys).not.toContain(key);
     }

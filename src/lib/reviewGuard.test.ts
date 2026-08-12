@@ -15,6 +15,7 @@ import {
   classifyLineProvenance,
   guardQuoteForReview,
   licensedFamiliesForDescription,
+  t2qcalLicensedFamily,
 } from "./reviewGuard";
 import {
   assessQuoteContradictions,
@@ -82,6 +83,15 @@ describe("licensedFamiliesForDescription", () => {
   });
 });
 
+describe("T2QCAL exact source licences", () => {
+  it("licenses only the exact audited source-key family", () => {
+    expect(t2qcalLicensedFamily({ t2qcal_source_key: "deck-boards.lineal-order" })).toBe("deck");
+    expect(t2qcalLicensedFamily({ t2qcal_source_key: "insulation-batts.packs-order" })).toBe("insulation");
+    expect(t2qcalLicensedFamily({ t2qcal_source_key: "deck-boards.spoof" })).toBeNull();
+    expect(t2qcalLicensedFamily({ t2qcal_source_key: "insulation-batts.packs-order-extra" })).toBeNull();
+  });
+});
+
 describe("guardQuoteForReview — strip rules", () => {
   it("strips structurally invalid lines and reports them", () => {
     const data = qd([li(), li({ description: "Garbage", quantity: Number.NaN })]);
@@ -107,6 +117,27 @@ describe("guardQuoteForReview — strip rules", () => {
     const res = guardQuoteForReview(data, { description: "build a deck 4m x 6m" });
     expect(res.stripped).toEqual([]);
     expect(res.data.line_items.length).toBe(1);
+  });
+
+  it("keeps an exact typed T2QCAL deck line even under a generic multi-tool job name", () => {
+    const data = qd([li({
+      description: "Deck board layout — Decking lineal length to order",
+      quantity_source: "calculator",
+      t2qcal_source_key: "deck-boards.lineal-order",
+    })]);
+    const res = guardQuoteForReview(data, { description: "Smith job" });
+    expect(res.stripped).toEqual([]);
+    expect(res.data.line_items).toHaveLength(1);
+  });
+
+  it("does not let a deck key license an insulation line", () => {
+    const data = qd([li({
+      description: "Pink Batts R2.2",
+      quantity_source: "calculator",
+      t2qcal_source_key: "deck-boards.lineal-order",
+    })]);
+    expect(guardQuoteForReview(data, { description: "Smith job" }).stripped[0].reason)
+      .toBe("unlicensed_insulation");
   });
 
   it("NEVER strips a user-confirmed deck line, licensed or not (rule 3)", () => {
@@ -167,6 +198,15 @@ describe("Quote QA contradictions — send gate", () => {
     const items = [li({ description: "Deck joists H3.2", quantity_source: "calculator" })];
     const reasons = assessQuoteContradictions(qd(items), "build a deck 4x6m");
     expect(reasons).toEqual([]);
+  });
+
+  it("exact T2QCAL deck evidence passes the independent send-time contradiction guard", () => {
+    const items = [li({
+      description: "Deck board layout — Decking lineal length to order",
+      quantity_source: "calculator",
+      t2qcal_source_key: "deck-boards.lineal-order",
+    })];
+    expect(assessQuoteContradictions(qd(items), "Smith job")).toEqual([]);
   });
 
   it("user-confirmed deck line never blocks (rule 3)", () => {
