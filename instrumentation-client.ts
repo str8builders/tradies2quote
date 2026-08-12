@@ -15,6 +15,7 @@
 import * as Sentry from "@sentry/nextjs";
 import { reportClientError } from "@/lib/observability/clientReport";
 import {
+  isLocalSentrySink,
   isSentryEnabled,
   sentryTracesSampleRate,
 } from "@/lib/observability/sentryTarget";
@@ -41,6 +42,23 @@ Sentry.init({
     process.env.NODE_ENV ??
     "development",
 });
+
+// Sessions carry no identity unless a user is set, so the local monitor could
+// count visits but not people. A random per-browser id fixes that. Local sink
+// only — this must never attach an identifier to events leaving the machine.
+if (isLocalSentrySink(DSN)) {
+  try {
+    const KEY = "s8.visitor";
+    let visitor = window.localStorage.getItem(KEY);
+    if (!visitor) {
+      visitor = crypto.randomUUID().replace(/-/g, "");
+      window.localStorage.setItem(KEY, visitor);
+    }
+    Sentry.setUser({ id: visitor });
+  } catch {
+    // Private mode / blocked storage: counting degrades, nothing breaks.
+  }
+}
 
 // Next 16 client navigation instrumentation — lets Sentry tie errors to the
 // route transition the user was on. Required hook export for the App Router.
