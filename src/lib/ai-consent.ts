@@ -30,10 +30,11 @@ export async function hasAiConsent(
 ): Promise<boolean> {
   const { data } = await supabase
     .from("profiles")
-    .select("ai_consent_at")
+    .select("ai_consent_at,ai_consent_version")
     .eq("id", userId)
     .maybeSingle();
-  return Boolean((data as { ai_consent_at?: string | null } | null)?.ai_consent_at);
+  const profile = data as { ai_consent_at?: string | null; ai_consent_version?: string | null } | null;
+  return Boolean(profile?.ai_consent_at && profile.ai_consent_version === AI_CONSENT_VERSION);
 }
 
 /**

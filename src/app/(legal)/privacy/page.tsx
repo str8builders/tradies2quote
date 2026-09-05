@@ -24,7 +24,7 @@ const SECTIONS = [
   { id: "contact", label: "Contact" },
 ];
 
-const PRIVACY_LAST_UPDATED_DISPLAY = "23 August 2026";
+const PRIVACY_LAST_UPDATED_DISPLAY = "6 September 2026";
 
 export default function PrivacyPage() {
   return (
@@ -82,6 +82,11 @@ export default function PrivacyPage() {
             us. This policy explains what we collect, why we collect it, who
             we share it with, and the rights you have over it.
           </p>
+          <p>
+            This policy also covers T2QCAL, our separate construction calculator
+            app. T2QCAL uses the same Tradies2Quote account when you choose to
+            sign in.
+          </p>
         </LegalSection>
 
         <LegalSection id="what-we-collect" number="02" title="What we collect">
@@ -111,6 +116,16 @@ export default function PrivacyPage() {
             We do <strong>not</strong> collect payment card details
             ourselves. If and when we charge for paid plans, payment is
             handled by Stripe — your card never touches our servers.
+          </p>
+          <p>
+            <strong>T2QCAL on-device work</strong> — calculator inputs, drawings,
+            saved jobs and room measurements are stored on your device. Saving a
+            calculation locally does not send it to Tradies2Quote. When you
+            choose to send selected work to your account, its job details,
+            quantities, prices and calculation evidence are sent to our service.
+            Optional voice and plan-reading features send the recording or image
+            you select for processing, after AI consent. The provider disclosures
+            below apply to those features too.
           </p>
         </LegalSection>
 

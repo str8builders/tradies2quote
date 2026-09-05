@@ -12,12 +12,12 @@ vi.mock("next/headers", () => ({
 import { AI_CONSENT_VERSION, aiConsentGate, hasAiConsent } from "./ai-consent";
 
 /** Minimal supabase stub: profiles.select().eq().maybeSingle() → the row. */
-function fakeSupabase(aiConsentAt: string | null): SupabaseClient {
+function fakeSupabase(aiConsentAt: string | null, version: string | null = AI_CONSENT_VERSION): SupabaseClient {
   return {
     from: () => ({
       select: () => ({
         eq: () => ({
-          maybeSingle: async () => ({ data: { ai_consent_at: aiConsentAt }, error: null }),
+          maybeSingle: async () => ({ data: { ai_consent_at: aiConsentAt, ai_consent_version: version }, error: null }),
         }),
       }),
     }),
@@ -33,6 +33,10 @@ describe("hasAiConsent", () => {
   });
   it("false when null", async () => {
     expect(await hasAiConsent(fakeSupabase(null), "u")).toBe(false);
+  });
+  it("requires renewed consent when the disclosed processor version changed", async () => {
+    expect(await hasAiConsent(fakeSupabase("2026-07-18T00:00:00Z", "2026-07-v1"), "u")).toBe(false);
+    expect(await hasAiConsent(fakeSupabase("2026-07-18T00:00:00Z", null), "u")).toBe(false);
   });
 });
 
