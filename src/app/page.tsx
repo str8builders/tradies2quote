@@ -1,6 +1,5 @@
 import { Header } from "./_components/landing/Header";
 import { Hero } from "./_components/landing/Hero";
-import { Pain } from "./_components/landing/Pain";
 import { DemoReel } from "./_components/landing/DemoReel";
 import { QuoteWorkflow } from "./_components/landing/QuoteWorkflow";
 import { HowItWorks } from "./_components/landing/HowItWorks";
@@ -12,8 +11,6 @@ import { FAQ } from "./_components/landing/FAQ";
 import { FinalCta } from "./_components/landing/FinalCta";
 import { Footer } from "./_components/landing/Footer";
 import { ScrollProgress } from "./_components/landing/ScrollProgress";
-import { CursorSpotlight } from "./_components/landing/CursorSpotlight";
-import TapeDivider from "./_components/landing/TapeDivider";
 import InstallNudge from "./_components/landing/InstallNudge";
 import { Reveal } from "./_components/landing/Reveal";
 import { HideInNativeApp } from "./_components/HideInNativeApp";
@@ -21,20 +18,7 @@ import { NativeAppRedirect } from "./_components/landing/NativeAppRedirect";
 import { isNativeShellRequest } from "@/lib/native-shell";
 import { softwareApplicationLd } from "./_components/landing/structured-data";
 
-/**
- * Wave 10.5 — `<StatStrip />` and `<LiveTicker />` were removed from the
- * landing because they showed invented platform numbers (12,847 quotes,
- * $4.2M invoiced, 1,243 tradies, fake "Riki T. sent quote $3,420"
- * notifications).
- *
- * Wave 19.2 — `<Testimonials />` removed for the same reason: the three
- * quotes ("Riki T. · Builder · Auckland", "Macca · Plumber · Brisbane",
- * "James W. · Sparkie · Manchester") were placeholder copy attributed
- * to non-existent customers. The component is kept on disk so it can
- * be re-mounted once real beta-tradie quotes (with consent) are ready
- * to swap in. The page reads honestly: Hero → Pain → product → pricing
- * → FAQ → CTA, no fabricated social proof.
- */
+/** Marketing redesign; native-shell gates remain server-side. */
 export default async function HomePage() {
   // 3.1.3(f) — the pricing + FAQ sections carry tier prices, so their HTML
   // must never reach the iOS App Store shell (a client-only hide leaves it
@@ -42,33 +26,27 @@ export default async function HomePage() {
   // <HideInNativeApp> wrapper below stays as defence-in-depth.
   const nativeShell = await isNativeShellRequest();
   return (
-    <div className="min-h-screen bg-ink-900 text-white relative">
+    <div className="studio-site min-h-screen text-white relative">
       {/* 3.1.3(f) + 4.2 — the marketing landing never renders inside the
           iOS App Store shell; native visits bounce straight to /app. */}
       <NativeAppRedirect />
-      <CursorSpotlight />
       <ScrollProgress />
       <Header hidePricingLinks={nativeShell} />
-      <main className="relative z-[2]">
+      <a href="#main-content" className="studio-skip-link">
+        Skip to content
+      </a>
+      <main id="main-content" className="relative z-[2]">
         <Hero />
-        {/* Scroll-reveal motion on every below-the-fold section (Reveal.tsx).
-            Hero stays unwrapped — it's the LCP and must paint instantly. */}
         <Reveal>
-          <Pain />
+          <HowItWorks />
         </Reveal>
-        {/* Remotion-powered 15s product reel (voice → quote → paid).
-            Sits right after Pain so the fix plays immediately after
-            the problem; the deeper AppShowcase tour follows below. */}
+        {/* Remotion walkthrough: capture, draft, review, ready to send. */}
         <Reveal>
           <DemoReel />
         </Reveal>
         <Reveal>
           <QuoteWorkflow />
         </Reveal>
-        <Reveal>
-          <HowItWorks />
-        </Reveal>
-        <TapeDivider label="ONE TOOL · DOES ONE THING · DOES IT WELL" />
         <Reveal>
           <Features />
         </Reveal>
@@ -116,12 +94,14 @@ export default async function HomePage() {
           authenticated surface where it makes more sense. */}
       <InstallNudge />
 
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(softwareApplicationLd),
-        }}
-      />
+      {!nativeShell && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(softwareApplicationLd),
+          }}
+        />
+      )}
     </div>
   );
 }

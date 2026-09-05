@@ -1,519 +1,414 @@
 "use client";
-
-import React from "react";
 import {
   AbsoluteFill,
-  Sequence,
   interpolate,
   spring,
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
 
-/**
- * QuoteDemo — the Remotion composition behind the landing page's
- * <DemoReel /> section. A 15-second self-playing product reel:
- *
- *   Scene 1 (0.0–3.5s)   "// voice in"  — mic waveform + the tradie's
- *                         words typing out.
- *   Scene 2 (3.5–10.5s)  "// quote builds itself" — line items spring
- *                         in one at a time while the total counts up.
- *   Scene 3 (10.5–12.5s) "// send"      — GST line lands, the send
- *                         button fills and fires.
- *   Scene 4 (12.5–15s)   "// paid"      — hi-vis PAID stamp slams in.
- *
- * Marketing surface only — same rules as AppShowcase: no imports from
- * src/lib/quote*, no Supabase, demo numbers only (they intentionally
- * match the Hero phone mockup's Bathroom Reno figures so the two
- * surfaces tell one story). All styling is inline with brand hex
- * values (not Tailwind classes) so the composition stays portable if
- * it's ever rendered to MP4 with the Remotion CLI, where the site's
- * stylesheet doesn't exist. Fonts fall back gracefully in that case.
- */
-
 export const QUOTE_DEMO_FPS = 30;
-export const QUOTE_DEMO_DURATION = 450; // 15s
+export const QUOTE_DEMO_DURATION = 600;
 export const QUOTE_DEMO_WIDTH = 1280;
 export const QUOTE_DEMO_HEIGHT = 720;
+const orange = "#FF5F15";
+const font = 'var(--font-plus-jakarta), "Arial", sans-serif';
+const mono = "var(--font-ibm-plex-mono), monospace";
+const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
+const chapters = [
+  "Capture the job",
+  "Build your draft",
+  "Check the details",
+  "Ready to send",
+];
+const descriptions = [
+  "Your words are the starting point.",
+  "Materials. Labour. A clear breakdown.",
+  "Your experience has the final say.",
+  "Your name. Your quote. Your call.",
+];
+const transcript =
+  "New timber deck, 24 square metres. Include decking, fixings, site preparation and installation.";
+const rows = [
+  { title: "Decking & fixings", type: "MATERIALS", amount: "$2,640.00" },
+  { title: "Preparation & installation", type: "LABOUR", amount: "$1,560.00" },
+];
 
-const BRAND = "#FF5F15";
-const HIVIS = "#FFEA00";
-const INK_950 = "#0A0A0A";
-const INK_900 = "#111111";
-const INK_800 = "#1A1A1A";
-const INK_600 = "#262626";
-const INK_400 = "#737373";
-const INK_200 = "#D4D4D4";
-
-const FONT_DISPLAY =
-  'var(--font-archivo-black, "Archivo Black"), "Archivo Black", system-ui, sans-serif';
-const FONT_MONO =
-  'var(--font-ibm-plex-mono, "IBM Plex Mono"), "IBM Plex Mono", ui-monospace, monospace';
-const FONT_SANS =
-  'var(--font-ibm-plex-sans, "IBM Plex Sans"), "IBM Plex Sans", system-ui, sans-serif';
-
-const TRANSCRIPT =
-  "Bathroom reno for Sarah — new vanity, retile the floor, rainfall shower. Two days labour plus the plumber...";
-
-const LINE_ITEMS = [
-  { d: "Vanity unit 900mm + soft-close", v: 980 },
-  { d: "Floor tiles 600×600 porcelain · 6m²", v: 540 },
-  { d: "Rainfall shower head + arm", v: 380 },
-  { d: "Plumbing rough-in & connect", v: 620 },
-  { d: "Tiling install · 2 days", v: 1180 },
-  { d: "Demo, prep & site clean", v: 491.3 },
-] as const;
-
-const SUBTOTAL = 4191.3;
-const TOTAL = 4820; // = SUBTOTAL + 15% GST ($628.70)
-
-const nzd = (n: number) =>
-  n.toLocaleString("en-NZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-/** Section label in the site's `// comment` voice. */
-function Label({ children, color = BRAND }: { children: string; color?: string }) {
-  return (
-    <div
-      style={{
-        fontFamily: FONT_MONO,
-        fontSize: 18,
-        letterSpacing: "0.25em",
-        textTransform: "uppercase",
-        color,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-/** Scene 1 — voice waveform + typing transcript. */
-function VoiceScene() {
+/** A fictional worked example, showing review before sending; no live activity. */
+export function QuoteDemo() {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-
-  const enter = spring({ frame, fps, config: { damping: 14, stiffness: 120 } });
-  const charsShown = Math.floor(
-    interpolate(frame, [12, 95], [0, TRANSCRIPT.length], {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-    }),
-  );
-  // Whole scene (incl. its Label) fades before scene 2 starts.
-  const sceneOut = interpolate(frame, [92, 104], [1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
+  const chapter = Math.min(3, Math.floor(frame / 150));
+  const local = frame % 150;
+  const enter = spring({
+    frame: local,
+    fps,
+    config: { damping: 22, stiffness: 110 },
   });
-
+  const turn = interpolate(frame, [150, 195], [10, 0], clamp);
+  const ready = chapter === 3;
   return (
     <AbsoluteFill
       style={{
-        justifyContent: "center",
-        alignItems: "center",
-        gap: 42,
-        padding: 80,
-        opacity: sceneOut,
+        background: "#101212",
+        fontFamily: font,
+        color: "#f4f4f1",
+        overflow: "hidden",
       }}
     >
-      <div style={{ transform: `scale(${enter})` }}>
-        <Label>{"// voice in"}</Label>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: `radial-gradient(ellipse at ${70 + Math.sin(frame / 130) * 8}% 75%,#FF5F151a,transparent 60%)`,
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          backgroundImage:
+            "linear-gradient(#ffffff07 1px,transparent 1px),linear-gradient(90deg,#ffffff07 1px,transparent 1px)",
+          backgroundSize: "64px 64px",
+          opacity: 0.7,
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          left: 55,
+          top: 42,
+          right: 55,
+          display: "flex",
+          justifyContent: "space-between",
+          fontFamily: mono,
+          fontSize: 15,
+          letterSpacing: 2,
+          color: "#9d9f9b",
+        }}
+      >
+        <span>
+          TRADIES<span style={{ color: orange }}>2</span>QUOTE / PRODUCT
+          WALKTHROUGH
+        </span>
+        <span>EXAMPLE DATA</span>
       </div>
-
-      {/* Waveform — 28 bars driven by out-of-phase sine waves. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 7, height: 110 }}>
-        {Array.from({ length: 28 }).map((_, i) => {
-          const talking = frame > 8 && frame < 96;
-          const h = talking
-            ? 14 +
-              Math.abs(Math.sin(frame / 3.1 + i * 0.9)) * 52 +
-              Math.abs(Math.sin(frame / 7.7 + i * 1.7)) * 34
-            : 8;
-          return (
+      <div style={{ position: "absolute", top: 140, left: 70, width: 475 }}>
+        <div
+          style={{
+            fontFamily: mono,
+            fontSize: 18,
+            color: orange,
+            letterSpacing: 3,
+            marginBottom: 28,
+          }}
+        >
+          0{chapter + 1} / {chapter === 0 ? "VOICE IN" : "QUOTE OUT"}
+        </div>
+        <div
+          style={{
+            fontSize: 66,
+            fontWeight: 800,
+            lineHeight: 1.08,
+            letterSpacing: -4,
+            transform: `translateY(${(1 - enter) * 12}px)`,
+            opacity: 0.5 + enter * 0.5,
+          }}
+        >
+          {chapters[chapter]}
+          <span style={{ color: orange }}>.</span>
+        </div>
+        <div
+          style={{
+            fontSize: 25,
+            lineHeight: 1.6,
+            color: "#aaa",
+            marginTop: 26,
+            maxWidth: 395,
+          }}
+        >
+          {descriptions[chapter]}
+        </div>
+        <div style={{ display: "flex", gap: 10, marginTop: 58 }}>
+          {chapters.map((_, i) => (
             <div
               key={i}
               style={{
-                width: 9,
-                height: h,
-                borderRadius: 4,
-                background: i % 5 === 2 ? HIVIS : BRAND,
-                opacity: enter,
+                width: 65,
+                height: 4,
+                borderRadius: 10,
+                background: i <= chapter ? orange : "#ffffff19",
               }}
             />
-          );
-        })}
-      </div>
-
-      <div
-        style={{
-          fontFamily: FONT_SANS,
-          fontSize: 27,
-          lineHeight: 1.5,
-          color: INK_200,
-          maxWidth: 860,
-          textAlign: "center",
-          minHeight: 120,
-        }}
-      >
-        “{TRANSCRIPT.slice(0, charsShown)}
-        <span style={{ color: BRAND, opacity: frame % 16 < 8 ? 1 : 0 }}>▎</span>
-      </div>
-    </AbsoluteFill>
-  );
-}
-
-/** Scenes 2+3 — the quote assembles itself, then sends. */
-function QuoteBuildScene() {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-
-  const cardIn = spring({ frame, fps, config: { damping: 15, stiffness: 90 } });
-
-  // Each line item springs in 22 frames after the previous one.
-  const itemAt = (i: number) => 14 + i * 22;
-  const lastItemLanded = itemAt(LINE_ITEMS.length - 1) + 12;
-
-  // Running total: sums the portion of each item already revealed.
-  let running = 0;
-  LINE_ITEMS.forEach((it, i) => {
-    running += interpolate(frame, [itemAt(i), itemAt(i) + 14], [0, it.v], {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-    });
-  });
-  const showGst = frame > lastItemLanded + 6;
-  const displayTotal = showGst
-    ? interpolate(frame, [lastItemLanded + 6, lastItemLanded + 26], [SUBTOTAL, TOTAL], {
-        extrapolateLeft: "clamp",
-        extrapolateRight: "clamp",
-      })
-    : running;
-
-  // Send button: fills, then "fires" with a flash.
-  const sendStart = lastItemLanded + 34;
-  const sendFill = interpolate(frame, [sendStart, sendStart + 24], [0, 100], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const fired = frame > sendStart + 26;
-  const firedPulse = spring({
-    frame: Math.max(0, frame - (sendStart + 26)),
-    fps,
-    config: { damping: 9, stiffness: 190 },
-  });
-
-  return (
-    <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", padding: 60 }}>
-      <div
-        style={{
-          width: 780,
-          background: "#FFFFFF",
-          border: `3px solid ${INK_950}`,
-          boxShadow: `14px 14px 0 ${BRAND}`,
-          opacity: cardIn,
-          transform: `translateY(${(1 - cardIn) * 90}px)`,
-        }}
-      >
-        {/* Card header */}
+          ))}
+        </div>
         <div
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "20px 28px",
-            borderBottom: `2px solid ${INK_950}`,
-            background: "#F5F5F5",
+            fontFamily: mono,
+            fontSize: 14,
+            color: "#818783",
+            marginTop: 22,
           }}
         >
-          <div>
-            <Label>{"// quote builds itself"}</Label>
-            <div
-              style={{
-                fontFamily: FONT_DISPLAY,
-                fontSize: 30,
-                textTransform: "uppercase",
-                letterSpacing: "-0.03em",
-                color: INK_950,
-                marginTop: 6,
-              }}
-            >
-              Bathroom Reno — Sarah K
-            </div>
-          </div>
+          CAPTURE → DRAFT → REVIEW → SEND
+        </div>
+      </div>
+      <div
+        style={{
+          position: "absolute",
+          top: 113,
+          right: 65,
+          width: 555,
+          perspective: 1000,
+        }}
+      >
+        {chapter === 0 ? (
           <div
             style={{
-              fontFamily: FONT_MONO,
-              fontSize: 15,
-              padding: "6px 12px",
-              background: BRAND,
-              color: "#fff",
-              letterSpacing: "0.15em",
+              marginTop: 42,
+              padding: 38,
+              background: "#1d201f",
+              border: "1px solid #ffffff29",
+              borderRadius: 24,
+              boxShadow: "0 32px 90px #0008",
+              transform: `rotateY(-7deg) translateY(${Math.sin(frame / 35) * 6}px)`,
             }}
           >
-            Q-202607-3B
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                fontSize: 18,
+              }}
+            >
+              <span style={{ color: orange }}>YOUR SITE NOTE</span>
+              <span style={{ color: "#aaa", fontFamily: mono }}>
+                00:{String(Math.floor(local / 30)).padStart(2, "0")}
+              </span>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                height: 110,
+                gap: 6,
+                marginBlock: 30,
+              }}
+            >
+              {Array.from({ length: 32 }, (_, i) => (
+                <div
+                  key={i}
+                  style={{
+                    width: 6,
+                    borderRadius: 4,
+                    height: 12 + Math.abs(Math.sin(frame / 8 + i * 0.9)) * 70,
+                    background: i % 7 === 0 ? "#FFEA00" : orange,
+                  }}
+                />
+              ))}
+            </div>
+            <p
+              style={{
+                fontSize: 25,
+                lineHeight: 1.6,
+                color: "#e2e5df",
+                minHeight: 150,
+              }}
+            >
+              “
+              {transcript.slice(
+                0,
+                Math.floor(
+                  interpolate(local, [4, 120], [0, transcript.length], clamp),
+                ),
+              )}
+              ”
+            </p>
+            <div
+              style={{
+                fontSize: 16,
+                color: "#939d96",
+                borderTop: "1px solid #ffffff19",
+                paddingTop: 22,
+                marginTop: 20,
+              }}
+            >
+              Describe the job in your own words.
+            </div>
           </div>
-        </div>
-
-        {/* Line items */}
-        <div style={{ padding: "10px 28px" }}>
-          {LINE_ITEMS.map((it, i) => {
-            const s = spring({
-              frame: Math.max(0, frame - itemAt(i)),
-              fps,
-              config: { damping: 13, stiffness: 150 },
-            });
-            return (
-              <div
-                key={it.d}
+        ) : (
+          <div
+            style={{
+              padding: 32,
+              background: "linear-gradient(130deg,#292c29,#1b1e1c)",
+              border: "1px solid #ffffff2b",
+              borderRadius: 22,
+              boxShadow: "0 32px 90px #0008",
+              transform: `rotateY(${-turn}deg) rotateZ(${Math.sin(frame / 160) * 0.7}deg)`,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                borderBottom: "1px solid #ffffff20",
+                paddingBottom: 20,
+              }}
+            >
+              <strong style={{ fontSize: 18 }}>YOUR BUSINESS</strong>
+              <span
                 style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "11px 0",
-                  borderBottom: i < LINE_ITEMS.length - 1 ? "1px solid #E5E5E5" : "none",
-                  opacity: s,
-                  transform: `translateX(${(1 - s) * -46}px)`,
+                  fontSize: 13,
+                  color: ready ? "#FFEA00" : "#d7d7c7",
+                  padding: "7px 12px",
+                  borderRadius: 7,
+                  background: "#ffffff0b",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <span
+                {ready ? "REVIEWED" : "DRAFT QUOTE"}
+              </span>
+            </div>
+            <div
+              style={{
+                fontSize: 29,
+                fontWeight: 700,
+                marginTop: 22,
+                letterSpacing: -1,
+              }}
+            >
+              New timber deck
+            </div>
+            <div style={{ fontSize: 15, color: "#9fa59f", marginTop: 8 }}>
+              24 m² · Example quote
+            </div>
+            <div style={{ marginTop: 15 }}>
+              {rows.map((r, i) => {
+                const entry =
+                  chapter > 1
+                    ? 1
+                    : spring({
+                        frame: local - 20 - i * 28,
+                        fps,
+                        config: { damping: 20 },
+                      });
+                return (
+                  <div
+                    key={r.type}
                     style={{
-                      fontFamily: FONT_MONO,
-                      color: BRAND,
-                      fontSize: 19,
-                      fontWeight: 700,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "18px 0",
+                      borderBottom: "1px solid #ffffff13",
+                      opacity: entry,
+                      transform: `translateY(${(1 - entry) * 12}px)`,
                     }}
                   >
-                    ✓
-                  </span>
-                  <span style={{ fontFamily: FONT_SANS, fontSize: 21, color: INK_950 }}>
-                    {it.d}
-                  </span>
-                </div>
-                <span style={{ fontFamily: FONT_MONO, fontSize: 20, color: INK_950 }}>
-                  ${nzd(it.v)}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Totals + send */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "18px 28px",
-            borderTop: `2px solid ${INK_950}`,
-            background: INK_950,
-          }}
-        >
-          <div>
-            <div
-              style={{
-                fontFamily: FONT_MONO,
-                fontSize: 14,
-                letterSpacing: "0.2em",
-                color: showGst ? HIVIS : INK_400,
-                textTransform: "uppercase",
-                minHeight: 18,
-              }}
-            >
-              {showGst ? "GST 15% in · NZD" : "adding it up..."}
+                    <span style={{ fontSize: 18 }}>
+                      {r.title}
+                      <small
+                        style={{
+                          display: "block",
+                          fontFamily: mono,
+                          fontSize: 11,
+                          color: "#8e9890",
+                          marginTop: 7,
+                        }}
+                      >
+                        {r.type}
+                      </small>
+                    </span>
+                    <span style={{ fontSize: 19 }}>{r.amount}</span>
+                  </div>
+                );
+              })}
             </div>
             <div
               style={{
-                fontFamily: FONT_DISPLAY,
-                fontSize: 52,
-                color: BRAND,
-                letterSpacing: "-0.03em",
-                fontVariantNumeric: "tabular-nums",
+                display: "flex",
+                justifyContent: "space-between",
+                marginTop: 20,
+                fontSize: 16,
+                color: "#adb6ad",
               }}
             >
-              ${nzd(displayTotal)}
+              <span>Subtotal</span>
+              <span>$4,200.00</span>
             </div>
-          </div>
-
-          <div
-            style={{
-              position: "relative",
-              overflow: "hidden",
-              border: `2px solid ${fired ? HIVIS : BRAND}`,
-              padding: "16px 30px",
-              fontFamily: FONT_DISPLAY,
-              fontSize: 22,
-              textTransform: "uppercase",
-              letterSpacing: "-0.02em",
-              color: "#fff",
-              transform: fired ? `scale(${1 + (1 - firedPulse) * 0.12})` : undefined,
-            }}
-          >
             <div
               style={{
-                position: "absolute",
-                inset: 0,
-                background: fired ? HIVIS : BRAND,
-                width: `${sendFill}%`,
+                display: "flex",
+                justifyContent: "space-between",
+                marginTop: 12,
+                fontSize: 16,
+                color: "#adb6ad",
               }}
-            />
-            <span style={{ position: "relative", color: fired ? INK_950 : "#fff" }}>
-              {fired ? "Sent ✓" : "Send to client"}
-            </span>
+            >
+              <span>GST (15%)</span>
+              <span>$630.00</span>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginTop: 20,
+                paddingTop: 20,
+                borderTop: "1px solid #ffffff25",
+              }}
+            >
+              <span style={{ fontSize: 18 }}>Total NZD</span>
+              <strong
+                style={{ fontSize: 36, color: orange, letterSpacing: -1 }}
+              >
+                $4,830.00
+              </strong>
+            </div>
+            <div
+              style={{
+                padding: "17px 20px",
+                background: ready ? orange : "#ffffff09",
+                border: "1px solid #ffffff16",
+                borderRadius: 9,
+                marginTop: 24,
+                fontSize: 18,
+                fontWeight: 600,
+                color: ready ? "#111" : "#eee",
+                display: "flex",
+                justifyContent: "space-between",
+              }}
+            >
+              <span>
+                {ready
+                  ? "Ready when you are"
+                  : chapter === 2
+                    ? "Check scope, rates & terms"
+                    : "Editable first draft"}
+              </span>
+              <span>{ready ? "→" : "✓"}</span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
-    </AbsoluteFill>
-  );
-}
-
-/** Scene 4 — PAID stamp slams onto the frozen quote card. */
-function PaidScene() {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-
-  const slam = spring({ frame: Math.max(0, frame - 6), fps, config: { damping: 10, stiffness: 210 } });
-  const sub = spring({ frame: Math.max(0, frame - 22), fps, config: { damping: 13, stiffness: 130 } });
-
-  return (
-    <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", gap: 30 }}>
-      <div
-        style={{
-          transform: `scale(${0.4 + slam * 0.6}) rotate(${-45 + slam * 33}deg)`,
-          opacity: Math.min(1, slam * 2),
-          background: HIVIS,
-          color: INK_950,
-          border: `4px solid ${INK_950}`,
-          boxShadow: `16px 16px 0 ${BRAND}`,
-          padding: "34px 74px",
-          textAlign: "center",
-        }}
-      >
-        <div
-          style={{
-            fontFamily: FONT_MONO,
-            fontSize: 17,
-            letterSpacing: "0.25em",
-            textTransform: "uppercase",
-            opacity: 0.7,
-          }}
-        >
-          Status
-        </div>
-        <div
-          style={{
-            fontFamily: FONT_DISPLAY,
-            fontSize: 130,
-            lineHeight: 0.95,
-            textTransform: "uppercase",
-            letterSpacing: "-0.04em",
-          }}
-        >
-          PAID
-        </div>
-        <div
-          style={{
-            fontFamily: FONT_MONO,
-            fontSize: 17,
-            letterSpacing: "0.2em",
-            textTransform: "uppercase",
-            opacity: 0.7,
-            marginTop: 8,
-          }}
-        >
-          $4,820.00 · 3 days
-        </div>
-      </div>
-
-      <div
-        style={{
-          opacity: sub,
-          transform: `translateY(${(1 - sub) * 30}px)`,
-          fontFamily: FONT_DISPLAY,
-          fontSize: 34,
-          textTransform: "uppercase",
-          letterSpacing: "-0.02em",
-          color: "#fff",
-          textAlign: "center",
-        }}
-      >
-        Talked. Quoted. <span style={{ color: BRAND }}>Paid.</span>
-      </div>
-    </AbsoluteFill>
-  );
-}
-
-/** Root composition. */
-export function QuoteDemo() {
-  const frame = useCurrentFrame();
-
-  // Fade out only at the tail so the loop restart reads as a cut, not
-  // a flash. Deliberately NO fade-in at frame 0: a paused player (e.g.
-  // reduced-motion users, or before the IntersectionObserver starts
-  // playback) sits on frame 0, which must show real content — an
-  // opacity-0 first frame renders as a solid black box.
-  const loopFade = interpolate(
-    frame,
-    [QUOTE_DEMO_DURATION - 10, QUOTE_DEMO_DURATION],
-    [1, 0],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-  );
-
-  return (
-    <AbsoluteFill style={{ background: INK_900 }}>
-      {/* Backdrop: faint blueprint grid + brand glow, echoing the site. */}
-      <AbsoluteFill
-        style={{
-          backgroundImage: `linear-gradient(${INK_800} 1px, transparent 1px), linear-gradient(90deg, ${INK_800} 1px, transparent 1px)`,
-          backgroundSize: "44px 44px",
-          opacity: 0.55,
-        }}
-      />
-      <AbsoluteFill
-        style={{
-          background: `radial-gradient(600px 400px at 78% 18%, ${BRAND}26, transparent 70%), radial-gradient(520px 380px at 18% 85%, ${HIVIS}14, transparent 70%)`,
-        }}
-      />
-
-      <AbsoluteFill style={{ opacity: loopFade }}>
-        <Sequence durationInFrames={105}>
-          <VoiceScene />
-        </Sequence>
-        <Sequence from={105} durationInFrames={270}>
-          <QuoteBuildScene />
-        </Sequence>
-        <Sequence from={375}>
-          <PaidScene />
-        </Sequence>
-      </AbsoluteFill>
-
-      {/* Progress tick along the bottom — measuring-tape nod. */}
       <div
         style={{
           position: "absolute",
-          left: 0,
-          bottom: 0,
-          height: 6,
-          width: `${(frame / QUOTE_DEMO_DURATION) * 100}%`,
-          background: BRAND,
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          right: 20,
-          bottom: 16,
-          fontFamily: FONT_MONO,
+          left: 55,
+          right: 55,
+          bottom: 39,
+          fontFamily: mono,
           fontSize: 13,
-          letterSpacing: "0.2em",
-          textTransform: "uppercase",
-          color: INK_400,
+          color: "#969d98",
+          display: "flex",
+          justifyContent: "space-between",
         }}
       >
-        demo data · 15 sec
+        <span>YOU REVIEW EVERY QUOTE BEFORE IT GOES OUT.</span>
+        <span>20 SECOND PRODUCT TOUR</span>
       </div>
     </AbsoluteFill>
   );
 }
-
-/** Divider between scene borders (kept for future scenes). */
-export const QUOTE_DEMO_BORDER = INK_600;

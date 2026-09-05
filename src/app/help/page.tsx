@@ -14,7 +14,7 @@ import { isNativeShellRequest } from "@/lib/native-shell";
  * linkable from outside the app, from emails, from a "Need help?"
  * footer link, and reachable when someone is locked out.
  *
- * Wrapped in `data-theme="light"` so it picks up the same Xero-style
+ * Wrapped in `data-theme="dark"` so it picks up the same Xero-style
  * cream/white tokens as the in-app surface, even though it's outside
  * the `[data-shell="app"]` boundary.
  */
@@ -232,18 +232,17 @@ export default async function HelpPage() {
   const faqs = nativeShell ? FAQS.filter((f) => !f.billing) : FAQS;
   return (
     <div
-      data-theme="light"
-      className="min-h-[100dvh] text-ink-900"
-      style={{ background: "#F5F4EE" }}
+      data-theme="dark"
+      className="studio-public studio-help min-h-[100dvh] text-white"
     >
       <div className="mx-auto max-w-2xl px-5 pt-12 pb-20 sm:px-8 sm:pt-16">
         <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-brand">
           {"// help & faq"}
         </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
           Need a hand?
         </h1>
-        <p className="mt-3 text-base leading-relaxed text-ink-500 sm:text-lg">
+        <p className="mt-3 text-base leading-relaxed text-ink-300 sm:text-lg">
           Quick answers to the things tradies ask most in the first week.
           Can&apos;t find what you need? Email me direct.
         </p>
@@ -254,11 +253,11 @@ export default async function HelpPage() {
             const item = (
               <details
                 key={i}
-                className="group overflow-hidden rounded-2xl border bg-white shadow-[0_1px_2px_rgba(10,10,10,0.04)] transition-shadow open:shadow-[0_4px_14px_rgba(10,10,10,0.06)]"
-                style={{ borderColor: "#E8E6DD" }}
+                className="group overflow-hidden rounded-2xl border bg-ink-800/70 shadow-[0_1px_2px_rgba(10,10,10,0.04)] transition-shadow open:shadow-[0_4px_14px_rgba(10,10,10,0.06)]"
+                style={{ borderColor: "rgba(255,255,255,.12)" }}
               >
                 <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-5 py-4 [&::-webkit-details-marker]:hidden">
-                  <h2 className="text-base font-semibold text-ink-900 sm:text-lg">
+                  <h2 className="text-base font-semibold text-white sm:text-lg">
                     {faq.q}
                   </h2>
                   <CaretDown
@@ -269,8 +268,8 @@ export default async function HelpPage() {
                   />
                 </summary>
                 <div
-                  className="border-t px-5 py-4 text-sm leading-relaxed text-ink-700 sm:text-base"
-                  style={{ borderColor: "#F0EFE9" }}
+                  className="border-t px-5 py-4 text-sm leading-relaxed text-ink-200 sm:text-base"
+                  style={{ borderColor: "rgba(255,255,255,.08)" }}
                 >
                   {faq.a}
                 </div>
@@ -287,8 +286,8 @@ export default async function HelpPage() {
 
         {/* Contact card */}
         <section
-          className="mt-10 rounded-2xl border bg-white p-6 shadow-[0_1px_2px_rgba(10,10,10,0.04)] sm:p-8"
-          style={{ borderColor: "#E8E6DD" }}
+          className="mt-10 rounded-2xl border bg-ink-800/70 p-6 shadow-[0_1px_2px_rgba(10,10,10,0.04)] sm:p-8"
+          style={{ borderColor: "rgba(255,255,255,.12)" }}
         >
           <div className="flex items-start gap-4">
             <span
@@ -298,10 +297,10 @@ export default async function HelpPage() {
               <EnvelopeSimple size={22} weight="bold" />
             </span>
             <div className="min-w-0 flex-1">
-              <h2 className="text-lg font-semibold text-ink-900 sm:text-xl">
+              <h2 className="text-lg font-semibold text-white sm:text-xl">
                 Still stuck? Email me direct.
               </h2>
-              <p className="mt-1 text-sm text-ink-500 sm:text-base">
+              <p className="mt-1 text-sm text-ink-300 sm:text-base">
                 I&apos;m Challis — qualified builder, the bloke who built this
                 app. I read every email myself. Same-day during launch week,
                 weekends included.
@@ -313,7 +312,7 @@ export default async function HelpPage() {
                 <EnvelopeSimple size={16} weight="bold" />
                 {SUPPORT_EMAIL}
               </a>
-              <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.22em] text-ink-500">
+              <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.22em] text-ink-300">
                 Write &quot;URGENT&quot; in the subject if a bug is stopping
                 you finishing a quote today.
               </p>
@@ -332,7 +331,7 @@ export default async function HelpPage() {
           </Link>
           <Link
             href="/"
-            className="text-ink-500 hover:text-ink-900"
+            className="text-ink-300 hover:text-white"
           >
             Tradies2Quote home →
           </Link>

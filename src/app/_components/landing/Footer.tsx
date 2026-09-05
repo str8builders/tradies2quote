@@ -12,7 +12,7 @@ export function Footer({
   return (
     <footer
       data-testid="site-footer"
-      className="relative bg-ink-950 pt-20 pb-10"
+      className="studio-footer relative pt-16 pb-16"
     >
       <div className="max-w-7xl mx-auto px-6 md:px-12">
         <div className="grid md:grid-cols-5 gap-10 pt-8 border-t border-ink-700">
@@ -32,22 +32,22 @@ export function Footer({
             </div>
             <ul className="space-y-2 text-ink-200 text-sm">
               <li>
-                <a
-                  href="#how"
+                <Link
+                  href="/#how"
                   data-testid="footer-link-how"
                   className="hover:text-white"
                 >
                   How it works
-                </a>
+                </Link>
               </li>
               <li>
-                <a
-                  href="#features"
+                <Link
+                  href="/#features"
                   data-testid="footer-link-features"
                   className="hover:text-white"
                 >
                   Features
-                </a>
+                </Link>
               </li>
               {/* Both withheld inside the iOS App Store shell: pricing for
                   3.1.3(f), the calculator app because it is a native iOS app
@@ -64,13 +64,13 @@ export function Footer({
                     </Link>
                   </li>
                   <li>
-                    <a
-                      href="#pricing"
+                    <Link
+                      href="/#pricing"
                       data-testid="footer-link-pricing"
                       className="hover:text-white"
                     >
                       Pricing
-                    </a>
+                    </Link>
                   </li>
                 </>
               )}
@@ -158,7 +158,7 @@ export function Footer({
         <div className="mt-12 pt-6 border-t border-ink-800 grid gap-3 text-xs font-mono uppercase tracking-[0.16em] text-ink-300">
           <div className="flex flex-col md:flex-row gap-3 justify-between">
             <span>© {new Date().getFullYear()} tradies2Quote · Built in NZ</span>
-            <span>Voice in. Quote out. Under 60 sec.</span>
+            <span>Voice in. Quote out. Your final say.</span>
           </div>
           <div
             data-testid="footer-operator"

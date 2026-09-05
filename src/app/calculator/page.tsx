@@ -103,7 +103,7 @@ export default async function CalculatorPage() {
   if (nativeShell) redirect("/app");
 
   return (
-    <div className="min-h-screen bg-ink-900 text-white">
+    <div className="studio-public studio-calculator-page min-h-screen text-white">
       <NativeAppRedirect />
 
       {/* Slim brand bar — same shell as /install */}

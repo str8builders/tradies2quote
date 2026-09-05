@@ -1,34 +1,14 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
-
-/**
- * Shared split-screen frame for /login and /signup.
- *
- * Layout:
- *
- *   lg:  [ visual / marketing panel ]  [ form panel ]
- *   sm:                                 form panel only (visual hidden)
- *
- * Server-component-friendly: takes the panel content as render props
- * (`visual` and `form`). The "← Back" link in the top-left of the form
- * panel goes to `backHref` (defaults to `/`). Reuses the landing
- * `<Logo>` SVG for the brand mark.
- *
- * The auth pages handle their own server actions via children — this
- * shell never touches form state, error handling, or actions.
- */
+import { Logo } from "../landing/Logo";
 type Props = {
-  /** Left/visual panel (hidden on mobile). */
   visual: ReactNode;
-  /** Right/form panel (always visible). */
   form: ReactNode;
-  /** Where the back link points. Defaults to `/`. */
   backHref?: string;
-  /** Reverse panels — visual on RIGHT instead of LEFT. */
   reverse?: boolean;
 };
-
+/** Shared presentation only: server actions and form state stay with each page. */
 export function AuthSplitShell({
   visual,
   form,
@@ -38,81 +18,31 @@ export function AuthSplitShell({
   return (
     <div
       data-testid="auth-split-shell"
-      className="min-h-screen grid lg:grid-cols-2 bg-ink-900 text-white"
+      className={`studio-auth-shell ${reverse ? "studio-auth-reverse" : ""}`}
     >
-      {/* Wave 12.3 — marketing panel is no longer aria-hidden. It now
-          contains a real scrollable story ("how it works", "what you
-          get", "built for", "safety promise") that fades+slides in as
-          the user scrolls. aria-label is descriptive so screen readers
-          announce the panel without reading the entire scroll story. */}
-      <aside
-        aria-label="What Tradies2Quote does"
-        className={[
-          "hidden lg:flex relative bg-ink-950 overflow-hidden lg:max-h-screen",
-          reverse ? "lg:order-2 border-l border-ink-700" : "border-r border-ink-700",
-        ].join(" ")}
-      >
-        <div className="pointer-events-none absolute inset-0 t2q-grid-bg opacity-40" />
-        <div className="pointer-events-none absolute -top-40 -right-32 w-[480px] h-[480px] rounded-full bg-brand/30 blur-3xl animate-blob" />
-        <div className="pointer-events-none absolute -bottom-40 -left-32 w-[420px] h-[420px] rounded-full bg-hivis/15 blur-3xl animate-blob-slow" />
-        <div className="relative flex w-full flex-col p-10 lg:p-12 xl:p-16 overflow-y-auto">
-          {visual}
-        </div>
+      <aside aria-label="What Tradies2Quote does" className="studio-auth-aside">
+        <Link href="/" aria-label="Tradies2Quote home">
+          <Logo size={34} />
+        </Link>
+        {visual}
       </aside>
-
-      {/* Wave 14.1 — adds safe-area top padding on top of the
-          existing py-8 so the Back link + logo stay clear of the
-          iPhone notch / Android cutout under viewport-fit=cover. */}
-      <div className="relative flex flex-col px-6 pt-[calc(env(safe-area-inset-top)+2rem)] pb-8 sm:px-10 sm:pt-[calc(env(safe-area-inset-top)+3rem)] sm:pb-12 lg:p-14">
-        <div className="flex items-center justify-between gap-3">
-          <Link
-            href={backHref}
-            data-testid="auth-back"
-            className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.25em] text-ink-300 hover:text-white"
-          >
-            <ArrowLeft size={14} weight="bold" /> Back
+      <div className="studio-auth-form-side">
+        <div className="studio-auth-top">
+          <Link href={backHref} data-testid="auth-back">
+            <ArrowLeft size={17} /> Back to website
           </Link>
           <Link
             href="/"
-            aria-label="tradies2Quote home"
-            className="lg:hidden inline-flex items-center justify-center rounded-md bg-[#0A0A0A] px-2 py-1.5"
+            aria-label="Tradies2Quote home"
+            className="studio-auth-mobile-logo"
           >
-            {/* The brand mark's T and Q glyphs are near-white. On the
-                cream light-mode auth shell that left only the orange
-                "2" visible — the T and Q vanished into the background.
-                The dark pill restores contrast; it must use a literal
-                #0A0A0A, NOT bg-ink-950 (the light theme remaps
-                .bg-ink-950 to cream, which is what broke this before). */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo-mark.png?v=21"
-              alt="Tradies2Quote"
-              width={1084}
-              height={512}
-              className="block h-7 w-auto"
-            />
+            <Logo size={28} withWordmark={false} />
           </Link>
         </div>
-
-        <div className="mt-8 lg:mt-12 flex-1 flex flex-col">
-          <Link
-            href="/"
-            aria-label="tradies2Quote home"
-            className="mb-10 hidden w-fit items-center rounded-lg bg-[#0A0A0A] px-3 py-2 lg:inline-flex"
-          >
-            {/* Dark plate so the near-white T/Q glyphs stay legible on the
-                cream light-theme form side (see mobile logo note above). */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo-horizontal.png?v=21"
-              alt="Tradies2Quote"
-              width={1084}
-              height={512}
-              className="block h-10 w-auto"
-            />
-          </Link>
-          <div className="w-full max-w-md mx-auto lg:mx-0">{form}</div>
-        </div>
+        <div className="studio-auth-form">{form}</div>
+        <p className="studio-auth-foot">
+          Built by a builder in New Zealand. Made for the trades.
+        </p>
       </div>
     </div>
   );

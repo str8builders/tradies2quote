@@ -30,7 +30,7 @@ export const metadata: Metadata = {
 export default async function InstallPage() {
   const nativeShell = await isNativeShellRequest();
   return (
-    <div className="min-h-screen bg-ink-900 text-white">
+    <div className="studio-public studio-install-page min-h-screen text-white">
       {/* Slim brand bar */}
       <header className="border-b border-ink-600">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-5 py-4">

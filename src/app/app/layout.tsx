@@ -61,7 +61,7 @@ export default function AppLayout({
     <div
       data-shell="app"
       data-theme="dark"
-      className="t2q-app-canvas min-h-dvh w-full max-w-full overflow-x-clip lg:grid lg:grid-cols-[24px_1fr_24px]"
+      className="studio-app t2q-app-canvas min-h-dvh w-full max-w-full overflow-x-clip lg:grid lg:grid-cols-[24px_1fr_24px]"
     >
       {/*
         Status-bar safe-area guard. Kept transparent so the installed

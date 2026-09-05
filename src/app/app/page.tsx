@@ -90,8 +90,7 @@ export default async function DashboardPage() {
               Welcome, <span className="text-brand">{username}.</span>
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-300 sm:text-base">
-              Track quotes, jobs, materials, and client follow-ups from one
-              tidy workspace.
+              Your jobs, your quotes, your next move. All in one place.
             </p>
           </div>
           <div

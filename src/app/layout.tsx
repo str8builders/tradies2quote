@@ -8,6 +8,8 @@ import {
   Plus_Jakarta_Sans,
 } from "next/font/google";
 import "./globals.css";
+import "./redesign.css";
+import { LiveWallpaper } from "./_components/LiveWallpaper";
 import { FloatingInstallButton } from "./_components/FloatingInstallButton";
 import { SignupBeacon } from "./_components/SignupBeacon";
 import { CookieConsent } from "./_components/CookieConsent";
@@ -68,11 +70,11 @@ const siteUrl =
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Tradies2Quote — Voice in. Quote out. Under 60 seconds.",
+    default: "Tradies2Quote — AI quotes & invoices for NZ tradies",
     template: "Tradies2Quote | %s",
   },
   description:
-    "Voice-first AI quoting app for tradies. Record a 60-second voice memo on the job, get a professional, branded quote PDF emailed to your client before you've left the driveway. Built for builders, plumbers, electricians, sparkies, painters and every tradie who hates writing quotes.",
+    "Turn site notes into professional quotes and invoices. Voice, text or scan, with your rates, branding and GST. Built in New Zealand for the trades.",
   applicationName: "tradies2Quote",
   keywords: [
     "quoting app for tradies",
@@ -93,15 +95,15 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "tradies2Quote",
-    title: "tradies2Quote — Voice in. Quote out. Under 60 seconds.",
+    title: "Tradies2Quote — AI quotes & invoices for NZ tradies",
     description:
-      "Turn a 60-second voice memo into a professional, branded quote PDF — emailed to your client before you've left the driveway.",
+      "Turn site notes into a professional quote. Review your scope, rates and GST before you send. Built for NZ tradies.",
     url: "/",
     locale: "en_NZ",
   },
   twitter: {
     card: "summary_large_image",
-    title: "tradies2Quote — Voice in. Quote out. Under 60 seconds.",
+    title: "Tradies2Quote — AI quotes & invoices for NZ tradies",
     description:
       "Voice-first AI quoting for tradies. NZ, AU, UK, US, CA.",
   },
@@ -191,7 +193,8 @@ export default function RootLayout({
       className={`${archivoblack.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable} ${fraunces.variable} ${inter.variable} ${plusJakartaSans.variable} h-full`}
     >
       <body className="min-h-full flex flex-col bg-ink-900 text-white antialiased">
-        {children}
+        <LiveWallpaper />
+        <div className="studio-content">{children}</div>
         {/* Wave 12.3 — floating Install-App CTA. Renders nothing when
             the app is already installed or the browser can't install,
             so safe to mount globally. */}

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { List, X } from "@phosphor-icons/react";
 import { Logo } from "./Logo";
 import InstallPWAButton from "./InstallPWAButton";
@@ -48,6 +48,19 @@ export function Header({
     : LINKS;
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setOpen(false); toggleRef.current?.focus(); }
+    };
+    const desktop = window.matchMedia("(min-width: 1024px)");
+    const onDesktop = () => { if (desktop.matches) setOpen(false); };
+    desktop.addEventListener("change", onDesktop);
+    window.addEventListener("keydown", onKey);
+    return () => { window.removeEventListener("keydown", onKey); desktop.removeEventListener("change", onDesktop); };
+  }, [open]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -118,10 +131,14 @@ export function Header({
         <div className="flex items-center gap-2 lg:hidden">
           <InstallPWAButton variant="icon" />
           <button
-            className="text-white"
+            ref={toggleRef}
+            type="button"
+            className="text-white min-h-11 min-w-11 grid place-items-center"
+            aria-expanded={open}
+            aria-controls="mobile-site-navigation"
             data-testid="nav-mobile-toggle"
             onClick={() => setOpen((o) => !o)}
-            aria-label="menu"
+            aria-label={open ? "Close navigation" : "Open navigation"}
           >
             {open ? (
               <X size={24} weight="bold" />
@@ -133,7 +150,7 @@ export function Header({
       </div>
 
       {open && (
-        <div className="lg:hidden border-t border-ink-600 bg-ink-950">
+        <div id="mobile-site-navigation" className="lg:hidden border-t border-ink-600 bg-ink-950">
           <div className="flex flex-col px-6 py-4 gap-3">
             {links.map((l) => (
               <a

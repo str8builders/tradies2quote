@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
 import { Footer } from "../_components/landing/Footer";
 import { isNativeShellRequest } from "@/lib/native-shell";
+import { Logo } from "../_components/landing/Logo";
 import { SectionTabs } from "./_components/SectionTabs";
 
 /**
@@ -18,7 +19,7 @@ export default async function LegalLayout({
 }) {
   const nativeShell = await isNativeShellRequest();
   return (
-    <div className="min-h-screen flex flex-col bg-ink-900 text-white">
+    <div className="studio-public studio-legal min-h-screen flex flex-col text-white">
       <header
         data-testid="legal-header"
         className="sticky top-0 z-50 border-b border-ink-600 bg-ink-950 pt-[env(safe-area-inset-top)]"
@@ -30,14 +31,7 @@ export default async function LegalLayout({
             className="group inline-flex items-center"
             aria-label="tradies2Quote home"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo-horizontal.png?v=21"
-              alt="Tradies2Quote"
-              width={1084}
-              height={512}
-              className="block h-10 w-auto sm:h-11"
-            />
+            <Logo size={32} />
           </Link>
           <Link
             href="/"

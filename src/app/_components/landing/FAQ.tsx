@@ -1,114 +1,67 @@
-"use client";
-
-import { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { CaretDown } from "@phosphor-icons/react";
-
-/**
- * Common questions accordion. Native `<details>` was working but the
- * snap-open/snap-close felt cheap next to the rest of the page. This
- * version uses framer-motion's AnimatePresence to interpolate height +
- * opacity for a smooth open/close, with a chevron that rotates.
- *
- * Ported from the Emergent landing-export bundle to TSX. Single-open
- * behaviour: clicking an already-open item closes it. Keyboard activated
- * via the surrounding `<button>` so screen readers still announce the
- * expanded state via `aria-expanded`.
- */
-
+import Link from "next/link";
+import { Plus, ArrowUpRight } from "@phosphor-icons/react/dist/ssr";
 const FAQS = [
   {
     slug: "tech-skill",
-    q: "Do I need any tech skill to use T2Q?",
-    a: "Nope. Open the app, hit the big orange button, talk for 60 seconds, hit send. That's it.",
-  },
-  {
-    slug: "regions",
-    q: "What if I'm in NZ / AU / UK / US / CA?",
-    a: "NZ today — that's where we've launched, with GST 15% baked in and NZ supplier integrations on the way (ITM, Mitre 10, Bunnings). AU, UK, US and CA are queued; drop your country at signup and we'll email you the day it switches on in your region.",
+    q: "Do I need to be good with technology?",
+    a: "You can start with a voice note or a typed description of the job. Tradies2Quote creates a draft for you to check, edit and send. You don't need to set up a spreadsheet or design a quote template.",
   },
   {
     slug: "edit-quote",
-    q: "Can I edit a quote after it's generated?",
-    a: "Yeah. Tweak any line item, change the price, add a note. The PDF re-renders in a click.",
+    q: "Can I change the quote before it goes out?",
+    a: "Yes. Review and edit the line items, quantities, prices and terms. Nothing is sent to your client until you choose to send it.",
   },
   {
-    slug: "data-safety",
-    q: "Is my data safe?",
-    a: "Your client list is yours. We never sell it, never share it, and you can export the whole lot to a CSV any time. Encrypted in transit and at rest, hosted on Supabase.",
+    slug: "regions",
+    q: "Is it available where I work?",
+    a: "We're starting in New Zealand, with NZD and 15% GST. Australia, the UK, the US and Canada are planned. The current launch is for NZ tradies.",
+  },
+  {
+    slug: "trial",
+    q: "How does the free trial work?",
+    a: "You get 7 days to try Tradies2Quote without a credit card up front. Solo is $49 NZD a month including GST after the trial. You can cancel anytime.",
+  },
+  {
+    slug: "phone",
+    q: "Can I use it on my phone?",
+    a: "Yes. Tradies2Quote runs in your phone's browser and can be added to your home screen. You can also sign in from a computer. T2QCAL is a separate iPhone companion currently in beta.",
   },
   {
     slug: "replaces-jms",
-    q: "Will it replace my job-management software?",
-    a: "No, and that's the point. We do quoting fast. Pair us with whatever you already use for invoicing or scheduling.",
+    q: "Does it replace my entire business system?",
+    a: "Tradies2Quote focuses on quotes, invoices, clients and your material rates, with lightweight scheduling. Keep using the tools you need for accounting and wider job management.",
   },
 ];
-
 export function FAQ() {
-  const [open, setOpen] = useState<string | null>(null);
-
   return (
-    <section
-      id="faq"
-      data-testid="section-faq"
-      className="relative border-b border-ink-600 bg-ink-900 py-24 md:py-32"
-    >
-      <div className="max-w-4xl mx-auto px-6 md:px-12">
-        <div className="text-center mb-12">
-          <div className="t2q-section-label mb-4 inline-block">{"// straight talk"}</div>
-          <h2 className="font-display text-4xl sm:text-5xl lg:text-6xl tracking-tighter uppercase">
-            Common <span className="text-brand">questions.</span>
+    <section id="faq" data-testid="section-faq" className="studio-section">
+      <div className="studio-container studio-faq-grid">
+        <div>
+          <div className="studio-eyebrow">07 / GOOD QUESTIONS</div>
+          <h2>
+            No jargon.
+            <br />
+            <em>Straight answers.</em>
           </h2>
+          <p>Need a hand with something else?</p>
+          <Link href="/support" className="studio-text-link">
+            Talk to us <ArrowUpRight size={19} />
+          </Link>
         </div>
-        <div className="space-y-3">
-          {FAQS.map((item) => {
-            const isOpen = open === item.slug;
-            return (
-              <div
-                key={item.slug}
-                data-testid={`faq-item-${item.slug}`}
-                className={`rounded-lg border bg-ink-800/90 px-5 shadow-[0_16px_42px_-34px_rgba(0,0,0,0.85)] transition-colors ${
-                  isOpen ? "border-brand" : "border-white/10"
-                }`}
-              >
-                <button
-                  type="button"
-                  data-testid={`faq-toggle-${item.slug}`}
-                  onClick={() => setOpen(isOpen ? null : item.slug)}
-                  aria-expanded={isOpen}
-                  className="w-full flex items-center justify-between gap-4 text-left font-display text-lg sm:text-xl uppercase tracking-tight py-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand rounded-sm"
-                >
-                  <span>{item.q}</span>
-                  <CaretDown
-                    size={20}
-                    weight="bold"
-                    className={`shrink-0 text-brand transition-transform duration-200 ${
-                      isOpen ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
-                <AnimatePresence initial={false}>
-                  {isOpen && (
-                    <motion.div
-                      key="content"
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                      className="overflow-hidden"
-                    >
-                      <p
-                        data-testid={`faq-answer-${item.slug}`}
-                        className="text-ink-100 text-base leading-relaxed pb-5"
-                      >
-                        {item.a}
-                      </p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            );
-          })}
+        <div className="studio-faq-list">
+          {FAQS.map(({ slug, q, a }) => (
+            <details
+              key={slug}
+              data-testid={`faq-item-${slug}`}
+              name="site-faq"
+            >
+              <summary data-testid={`faq-toggle-${slug}`}>
+                {q}
+                <Plus size={20} weight="bold" />
+              </summary>
+              <p>{a}</p>
+            </details>
+          ))}
         </div>
       </div>
     </section>
