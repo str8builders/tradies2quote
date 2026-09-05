@@ -28,10 +28,20 @@ describe("applyLineEdit", () => {
 
   it("clears material price identity and package basis when the selling unit changes", () => {
     const next = applyLineEdit(line, { unit: "ft" });
+    expect(next.is_calculated_takeoff).toBe(false);
+    expect(next.formula).toBeUndefined();
+    expect(next.t2qcal_calculator_snapshot).toBeUndefined();
     expect(next.unit_price).toBe(0);
     expect(next.library_id).toBeNull();
     expect(next.price_match_key).toBeUndefined();
     expect(next.t2qcal_basis_fingerprint).toBeUndefined();
+  });
+
+  it("retires the material basis and calculation proof when its description changes", () => {
+    const next = applyLineEdit(line, { description: "Different decking profile" });
+    expect(next.t2qcal_basis_fingerprint).toBeUndefined();
+    expect(next.quantity_source).toBe("user");
+    expect(next.formula).toBeUndefined();
   });
 
   it("does not retire evidence for an unrelated price edit", () => {

@@ -15,7 +15,7 @@ export function applyLineEdit(
     && patch.description !== item.description;
   const unitChanged = patch.unit !== undefined && patch.unit !== item.unit;
 
-  if (quantityChanged || descriptionChanged) {
+  if (quantityChanged || descriptionChanged || unitChanged) {
     next.quantity_source = "user";
     next.quantity_confirmed = true;
     next.is_calculated_takeoff = false;
@@ -34,9 +34,7 @@ export function applyLineEdit(
     next.price_confidence = undefined;
     next.unit_price = 0;
     next.is_missing_price = true;
-    next.t2qcal_basis_fingerprint = unitChanged
-      ? undefined
-      : next.t2qcal_basis_fingerprint;
+    next.t2qcal_basis_fingerprint = undefined;
   }
 
   return next;

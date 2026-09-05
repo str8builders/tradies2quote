@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchWithTimeout } from "@/lib/fetchTimeout";
+
 import { useState } from "react";
 import { Check, Sparkle, Warning } from "@phosphor-icons/react/dist/ssr";
 import type { SuggestPriceResult } from "@/lib/agents/suggestPrice";
@@ -43,7 +45,7 @@ export function SuggestPricePanel({ line, onUseOnce, onSavedAndApply }: Props) {
     setPhase("loading");
     setError("");
     try {
-      const res = await fetch("/api/materials/suggest-price", {
+      const res = await fetchWithTimeout("/api/materials/suggest-price", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({

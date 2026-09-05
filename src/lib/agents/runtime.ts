@@ -187,15 +187,11 @@ function usageFrom(payload: AnthropicResponsePayload): AgentUsage {
 export async function runStructuredAgent<T>(
   opts: StructuredAgentOptions<T>,
 ): Promise<StructuredAgentResult<T>> {
-  if (isLocalTextAiProvider()) {
-    if (
-      Array.isArray(opts.user) &&
-      opts.user.some((block) => block.type === "image")
-    ) {
-      throw new Error(
-        "The local text AI provider does not support image input. Configure an external vision provider for this agent.",
-      );
-    }
+  const hasImages = Array.isArray(opts.user) && opts.user.some(block => block.type === "image");
+  if (isLocalTextAiProvider() && hasImages && !(opts.apiKey ?? process.env.ANTHROPIC_API_KEY)) {
+    throw new Error("The local text AI provider does not support image input. Configure Anthropic vision for this agent.");
+  }
+  if (isLocalTextAiProvider() && !hasImages) {
 
     const localUser =
       typeof opts.user === "string"

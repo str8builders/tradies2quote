@@ -22,17 +22,35 @@ export function runGenericCalculator(ext: ExtractedExtraction): ScopeResult {
   const area =
     dims.area_m2 !== null && dims.area_m2 !== undefined
       ? dims.area_m2
-      : round2(len * wid);
+      : len * wid;
   const volume = dims.volume_m3 ?? 0;
   const perimeter = dims.perimeter_m ?? 0;
   const wastePct = ext.waste_percent ?? 10;
+  const coverage = ext.coverage_mm ?? 0;
+  const stock = ext.stock_length_m ?? 0;
+  const invalid = [...Object.values(dims), ext.coverage_mm, ext.stock_length_m, ext.waste_percent]
+    .some(value => value != null && (!Number.isFinite(value) || value < 0))
+    || (ext.coverage_mm != null && coverage <= 0) || (ext.stock_length_m != null && stock <= 0)
+    || wastePct > 100;
+  if (invalid) return {
+    scope: "generic", status: "blocked", lines: [], assumptions: [], clarifications: [], explanation: "",
+    summary: {primary_metric: "quantity", primary_value: 0, unit: "ea", inputs: {}},
+    warnings: ["Enter finite positive geometry and material coverage/stock dimensions; waste must be between 0% and 100%."],
+  };
 
   // Pick the most-likely "primary unit" from what we extracted.
   let quantity = 0;
   let unit = "ea";
   let formula = "";
   let confidence = 0.4;
-  if (volume > 0) {
+  if (volume <= 0 && area > 0 && coverage > 0) {
+    const lineal = area / (coverage / 1000) * (1 + wastePct / 100);
+    quantity = stock > 0 ? Math.ceil(lineal / stock - 1e-10) : round2(lineal);
+    unit = stock > 0 ? "length" : "m";
+    formula = `area=${area}m² ÷ coverage=${coverage}/1000m × (1+${wastePct}/100)`
+      + (stock > 0 ? ` ÷ stock=${stock}m, rounded up = ${quantity}` : ` = ${quantity}m`);
+    confidence = 0.7;
+  } else if (volume > 0) {
     quantity = round2(volume * (1 + wastePct / 100));
     unit = "m³";
     formula = `volume=${volume}m³ × (1+${wastePct}/100) = ${quantity}`;
@@ -44,9 +62,10 @@ export function runGenericCalculator(ext: ExtractedExtraction): ScopeResult {
     confidence = 0.6;
   } else if (perimeter > 0 || len > 0) {
     const lm = perimeter || len;
-    quantity = round2(lm * (1 + wastePct / 100));
-    unit = "m";
-    formula = `length=${lm}m × (1+${wastePct}/100) = ${quantity}`;
+    const order = lm * (1 + wastePct / 100);
+    quantity = stock > 0 ? Math.ceil(order / stock - 1e-10) : round2(order);
+    unit = stock > 0 ? "length" : "m";
+    formula = `length=${lm}m × (1+${wastePct}/100)` + (stock > 0 ? ` ÷ stock=${stock}m, rounded up = ${quantity}` : ` = ${quantity}`);
     confidence = 0.6;
   } else {
     quantity = 0;
@@ -59,6 +78,7 @@ export function runGenericCalculator(ext: ExtractedExtraction): ScopeResult {
     assumptions.push("Used default 10% waste.");
   }
 
+  if (stock > 0 && unit === "length") assumptions.push("Stock count is a lineal allowance; confirm member cut lengths, joins and offcut reuse before ordering.");
   const lines: TakeoffLine[] = [
     {
       id: "generic-quantity",
@@ -79,6 +99,7 @@ export function runGenericCalculator(ext: ExtractedExtraction): ScopeResult {
           perimeter_m: perimeter,
           volume_m3: volume,
           waste_percent: wastePct,
+          coverage_mm: coverage || null, stock_length_m: stock || null,
         },
         assumed: assumptions,
       },
@@ -110,6 +131,7 @@ export function runGenericCalculator(ext: ExtractedExtraction): ScopeResult {
         perimeter_m: perimeter,
         volume_m3: volume,
         waste_percent: wastePct,
+        coverage_mm: coverage || null, stock_length_m: stock || null,
       },
     },
     lines,

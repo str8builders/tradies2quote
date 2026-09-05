@@ -20,7 +20,7 @@ export async function GET() {
     {
       ok: true,
       commit: build.commitSha ? build.commitSha.slice(0, 10) : null,
-      env: build.vercelEnv ?? "development",
+      env: build.vercelEnv ?? build.nodeEnv,
       time: new Date().toISOString(),
     },
     {

@@ -7,6 +7,7 @@ const ORIGINAL = {
   apiKey: process.env.LOCAL_LLM_API_KEY,
   model: process.env.LOCAL_LLM_MODEL,
   timeoutMs: process.env.LOCAL_LLM_TIMEOUT_MS,
+  visionKey: process.env.ANTHROPIC_API_KEY,
   maxTokens: process.env.LOCAL_LLM_MAX_TOKENS,
 };
 
@@ -20,6 +21,7 @@ afterEach(() => {
   restore("LOCAL_LLM_API_KEY", ORIGINAL.apiKey);
   restore("LOCAL_LLM_MODEL", ORIGINAL.model);
   restore("LOCAL_LLM_TIMEOUT_MS", ORIGINAL.timeoutMs);
+  restore("ANTHROPIC_API_KEY", ORIGINAL.visionKey);
   restore("LOCAL_LLM_MAX_TOKENS", ORIGINAL.maxTokens);
 });
 
@@ -85,6 +87,7 @@ describe("runStructuredAgent local provider", () => {
 
   it("rejects image blocks before any local request", async () => {
     enableLocalProvider();
+    delete process.env.ANTHROPIC_API_KEY;
     let fetchCalled = false;
     const fetchImpl: typeof fetch = async () => {
       fetchCalled = true;
@@ -115,5 +118,27 @@ describe("runStructuredAgent local provider", () => {
       }),
     ).rejects.toThrow(/does not support image input/i);
     expect(fetchCalled).toBe(false);
+  });
+
+  it("routes images to configured vision while local text AI stays enabled", async () => {
+    enableLocalProvider();
+    process.env.ANTHROPIC_API_KEY = "vision-fixture-key";
+    let destination = "";
+    let body: Record<string, unknown> = {};
+    const fetchImpl: typeof fetch = async (input, init) => {
+      destination = String(input);
+      body = JSON.parse(String(init?.body));
+      expect(new Headers(init?.headers).get("x-api-key")).toBe("vision-fixture-key");
+      return Response.json({ content: [{ type: "tool_use", name: "emit_result", input: { width: 1234 } }] });
+    };
+    const result = await runStructuredAgent({
+      agentName: "Vision routing fixture", system: "Read dimensions.",
+      user: [{ type: "image", source: { type: "base64", media_type: "image/png", data: "AA==" } }],
+      tool: { name: "emit_result", description: "Dimensions", schema: { type: "object", properties: {} } },
+      parse: input => ({ ok: true as const, value: input }), fetchImpl,
+    });
+    expect(destination).toBe("https://api.anthropic.com/v1/messages");
+    expect(body).toHaveProperty("messages.0.content.0.type", "image");
+    expect(result.value).toEqual({ width: 1234 });
   });
 });

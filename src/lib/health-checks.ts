@@ -322,7 +322,7 @@ export interface BuildIdentity {
 
 export function getBuildIdentity(): BuildIdentity {
   return {
-    commitSha: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
+    commitSha: process.env.APP_COMMIT_SHA ?? process.env.VERCEL_GIT_COMMIT_SHA ?? null,
     commitMessage: process.env.VERCEL_GIT_COMMIT_MESSAGE ?? null,
     branch: process.env.VERCEL_GIT_COMMIT_REF ?? null,
     vercelEnv: process.env.VERCEL_ENV ?? null,

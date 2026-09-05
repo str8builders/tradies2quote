@@ -187,7 +187,7 @@ export async function POST(
     const status =
       result.error === "expired"
         ? 410
-        : result.error === "already_accepted"
+        : ["already_accepted", "declined", "not_available", "quote_changed"].includes(result.error)
           ? 409
           : 404;
     return NextResponse.json({ error: result.error }, { status });

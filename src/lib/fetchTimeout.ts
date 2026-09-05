@@ -63,9 +63,10 @@ export async function fetchWithTimeout(
 
   // Honour an existing caller signal alongside ours.
   const outer = init.signal;
+  const abortFromCaller = () => ctrl.abort(outer?.reason);
   if (outer) {
     if (outer.aborted) ctrl.abort(outer.reason);
-    else outer.addEventListener("abort", () => ctrl.abort(outer.reason), { once: true });
+    else outer.addEventListener("abort", abortFromCaller, { once: true });
   }
 
   try {
@@ -79,5 +80,6 @@ export async function fetchWithTimeout(
     throw err;
   } finally {
     clearTimeout(timer);
+    outer?.removeEventListener("abort", abortFromCaller);
   }
 }

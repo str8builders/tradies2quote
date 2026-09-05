@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchWithTimeout } from "@/lib/fetchTimeout";
+
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -117,7 +119,7 @@ export function CompliancePanel({ quoteId, review, items }: Props) {
     setSubmitError(null);
     try {
       const wall = answersToWallContext(answers);
-      const res = await fetch(`/api/quotes/${quoteId}/compliance/clarify`, {
+      const res = await fetchWithTimeout(`/api/quotes/${quoteId}/compliance/clarify`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ wall }),

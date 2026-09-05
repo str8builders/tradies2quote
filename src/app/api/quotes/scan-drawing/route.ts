@@ -60,7 +60,7 @@ const JOB_TYPE_GUIDANCE: Record<string, string> = {
   Framing:
     "This is TIMBER WALL/FLOOR/ROOF FRAMING. Focus on: top and bottom plates (90x45 H1.2 typical), studs and stud spacing (usually 600mm centres), noggins/dwangs (1 row per 1.35m of stud height), lintels over openings, trimmers, framing nails, framing brackets, GIB bracing.",
   Concrete:
-    "This is CONCRETE WORK (slab/pad/footing). Focus on: plan dimensions, depth/thickness, reinforcing (D12 rebar, SE62/SE82 mesh), polythene DPM, formwork timber, bag counts (20kg bag covers ~0.01m³ — i.e. 100 bags per m³), or call it ready-mix m³ if a truck is implied.",
+    "This is CONCRETE WORK (slab/pad/footing). Focus on: plan dimensions, depth/thickness, reinforcing (D12 rebar, SE62/SE82 mesh), polythene DPM, formwork timber, bag counts (use the stated manufacturer yield; do not invent a yield from bag weight), or call it ready-mix m³ if a truck is implied.",
   Roofing:
     "This is ROOFING. Focus on: roof plan area, pitch, purlin size and spacing, long-run iron sheet lengths and overlaps, ridge, barge, flashings, building paper, roof screws (Tek screws), gutters and downpipes if shown.",
   Other:
@@ -94,7 +94,7 @@ export function buildSystemPrompt(
 
 CONTEXT (the DRAWING is the source of truth — the hint below is NOT authoritative):
 - ${hintLine}
-- The tradie buys timber in ${timberLength}m lengths. When you note board / stud / plate / decking lengths, work in whole ${timberLength}m lengths and assume a 10% waste factor.
+- The tradie buys timber in ${timberLength}m stock lengths. Preserve the exact measured member lengths and counts from the drawing. Stock conversion and waste are calculated downstream; do not round measurements into stock lengths or add a waste allowance during extraction.
 
 Your job: FIRST work out what the drawing actually shows, THEN read every annotation and produce a structured takeoff that a quoting AI can turn into materials and labour.
 

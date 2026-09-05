@@ -102,9 +102,31 @@ function safeCeil(n: number): number {
   return Math.ceil(Math.round(n * 1e6) / 1e6);
 }
 
+/** Reject invalid dimensions before any count is produced. An invalid divisor
+ * must never masquerade as zero material required. */
+function invalidTakeoff(input: Record<string, unknown>, required: string[], positive: string[]): MaterialTakeoffResult | null {
+  const warnings: string[] = [];
+  for (const key of required) {
+    if (input[key] === undefined || input[key] === null) warnings.push(`${key} is required.`);
+  }
+  for (const [key, value] of Object.entries(input)) {
+    if (value === undefined || value === null || typeof value === "boolean") continue;
+    const number = Number(value);
+    if (!Number.isFinite(number) || number < 0 || number > 1e9) warnings.push(`${key} must be a finite non-negative number within range.`);
+    else if (positive.includes(key) && number === 0) warnings.push(`${key} must be greater than 0.`);
+    else if (key.startsWith("numberOf") && !Number.isInteger(number)) warnings.push(`${key} must be a whole number.`);
+  }
+  return warnings.length ? {
+    summary: { wallAreaM2: 0, openingAreaM2: 0, netWallAreaM2: 0, wastePercent: 0 },
+    materials: [], warnings,
+  } : null;
+}
+
 export function calculateMaterialTakeoff(
   input: MaterialTakeoffInput,
 ): MaterialTakeoffResult {
+  const invalid = invalidTakeoff(input, ["wallLengthM"], ["wallLengthM", "wallHeightM", "studSpacingMm", "timberStockLengthM", "gibSheetWidthM", "gibSheetHeightM", "insulationPackCoverageM2", "doorWidthM", "doorHeightM", "windowWidthM", "windowHeightM"]);
+  if (invalid) return invalid;
   const wallLengthM = Number(input.wallLengthM);
   const wallHeightM = input.wallHeightM ?? DEFAULTS.wallHeightM;
   const studSpacingMm = input.studSpacingMm ?? DEFAULTS.studSpacingMm;
@@ -148,7 +170,8 @@ export function calculateMaterialTakeoff(
   const safeWallLength = Math.max(wallLengthM, 0);
   const safeWallHeight = Math.max(wallHeightM, 0);
 
-  const wallAreaM2 = round2(safeWallLength * safeWallHeight);
+  const rawWallAreaM2 = safeWallLength * safeWallHeight;
+  const wallAreaM2 = round2(rawWallAreaM2);
   const doorAreaM2 = numberOfDoors * doorWidthM * doorHeightM;
   const windowAreaM2 = numberOfWindows * windowWidthM * windowHeightM;
   const openingAreaM2 = round2(doorAreaM2 + windowAreaM2);
@@ -177,10 +200,10 @@ export function calculateMaterialTakeoff(
       ? Math.ceil(safeWallLength / timberStockLengthM)
       : 0;
 
-  const gibAreaM2 = netWallAreaM2 * gibSides;
+  const gibAreaM2 = Math.max(rawWallAreaM2 - doorAreaM2 - windowAreaM2, 0) * gibSides;
   const gibAreaWithWaste = gibAreaM2 * wasteMultiplier;
   const gibSheets =
-    sheetAreaM2 > 0 ? Math.ceil(gibAreaWithWaste / sheetAreaM2) : 0;
+    sheetAreaM2 > 0 ? safeCeil(gibAreaWithWaste / sheetAreaM2) : 0;
   const gibScrews = Math.ceil(gibSheets * 40 * 1.1);
   const adhesiveTubes = Math.ceil(gibSheets / 4);
 
@@ -538,6 +561,8 @@ function applySubfloorRatioGuard(
 export function calculateDeckTakeoff(
   input: DeckTakeoffInput,
 ): MaterialTakeoffResult {
+  const invalid = invalidTakeoff(input, ["deckLengthM", "deckWidthM"], ["deckLengthM", "deckWidthM", "joistSpacingMm", "bearerSpacingM", "pileSpacingM", "boardWidthMm", "timberStockLengthM"]);
+  if (invalid) return invalid;
   const deckLengthM = sanitiseMeters(Number(input.deckLengthM));
   const deckWidthM = sanitiseMeters(Number(input.deckWidthM));
   const joistSpacingMm =
@@ -754,6 +779,8 @@ export const CLADDING_DEFAULTS = {
 export function calculateCladdingTakeoff(
   input: CladdingTakeoffInput,
 ): MaterialTakeoffResult {
+  const invalid = invalidTakeoff(input, ["wallLengthM"], ["wallLengthM", "wallHeightM", "claddingCoverageMm", "battenSpacingMm", "timberStockLengthM"]);
+  if (invalid) return invalid;
   const wallLengthM = sanitiseMeters(Number(input.wallLengthM));
   const wallHeightM = sanitiseMeters(
     input.wallHeightM ?? CLADDING_DEFAULTS.wallHeightM,
@@ -929,6 +956,8 @@ export const SUBFLOOR_DEFAULTS = {
 export function calculateSubfloorTakeoff(
   input: SubfloorTakeoffInput,
 ): MaterialTakeoffResult {
+  const invalid = invalidTakeoff(input, ["floorLengthM", "floorWidthM"], ["floorLengthM", "floorWidthM", "joistSpacingMm", "bearerSpacingM", "pileSpacingM", "timberStockLengthM", "plywoodSheetWidthM", "plywoodSheetHeightM"]);
+  if (invalid) return invalid;
   const floorLengthM = sanitiseMeters(Number(input.floorLengthM));
   const floorWidthM = sanitiseMeters(Number(input.floorWidthM));
   const joistSpacingMm =

@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchWithTimeout } from "@/lib/fetchTimeout";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -68,7 +70,7 @@ export function TranscriptPanel({ quoteId, transcript }: Props) {
     setError(null);
     setPending("save");
     try {
-      const res = await fetch(`/api/quotes/${quoteId}/transcript`, {
+      const res = await fetchWithTimeout(`/api/quotes/${quoteId}/transcript`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ cleanedTranscript: editedText }),
@@ -93,7 +95,7 @@ export function TranscriptPanel({ quoteId, transcript }: Props) {
     setError(null);
     setPending("regen");
     try {
-      const res = await fetch(
+      const res = await fetchWithTimeout(
         `/api/quotes/${quoteId}/transcript/regenerate`,
         {
           method: "POST",

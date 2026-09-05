@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchWithTimeout } from "@/lib/fetchTimeout";
+
 import { useEffect, useRef, useState } from "react";
 import {
   Camera,
@@ -135,7 +137,7 @@ export function PhotoPlanPanel({ onAddItems, onAddNotes, isAccepted }: Props) {
       const form = new FormData();
       form.set("image", upload);
       if (hint.trim().length > 0) form.set("hint", hint.trim());
-      const res = await fetch("/api/agents/photo-plan", {
+      const res = await fetchWithTimeout("/api/agents/photo-plan", {
         method: "POST",
         body: form,
         // Vision LLM call — same stall guard as the core generate flow.
