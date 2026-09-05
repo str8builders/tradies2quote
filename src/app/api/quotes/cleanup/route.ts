@@ -37,9 +37,8 @@ import {
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// The LLM summary inside cleanTranscript can run tens of seconds; the
-// platform default function timeout would kill it mid-call (502).
-export const maxDuration = 60;
+// The CPU-only local model can take several minutes for a summary.
+export const maxDuration = 1800;
 
 type CleanupRequest = {
   transcript?: unknown;
@@ -112,12 +111,11 @@ export async function POST(request: NextRequest) {
     includeRecentQuotes: true,
   });
 
-  // Cleanup never throws — it has built-in fallbacks for the LLM
-  // summary call. If the Anthropic key is missing it just returns
+  // Cleanup never throws — it has built-in fallbacks for the local-model
+  // summary call. If local text AI is unavailable it just returns
   // null for `summary` and the questions list is whatever the
   // deterministic regex + glossary pass produced.
   const cleaned = await cleanTranscript(transcript, {
-    apiKey: process.env.ANTHROPIC_API_KEY,
     vocab,
   });
 

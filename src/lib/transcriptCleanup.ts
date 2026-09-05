@@ -36,7 +36,7 @@
 import { applyGlossaryCorrections } from "./transcript/glossaryCorrect";
 import { normalizeSpokenMeasurements } from "./transcript/measureNormalize";
 import type { VocabSet, VocabTermType } from "./transcript/glossary";
-import { fetchWithTimeout, TIMEOUTS } from "@/lib/fetchTimeout";
+import { fetchWithTimeout } from "@/lib/fetchTimeout";
 import { parseModelJsonObject } from "@/lib/modelJson";
 
 // ---------------------------------------------------------------------------
@@ -492,7 +492,7 @@ export type AnthropicCallable = (
   },
 ) => Promise<string>;
 
-/** Default Anthropic call (used in production). */
+/** Default local OpenAI-compatible call (used in production). */
 async function defaultAnthropicCall({
   apiKey,
   system,
@@ -506,52 +506,111 @@ async function defaultAnthropicCall({
   model: string;
   maxTokens: number;
 }): Promise<string> {
-  const res = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
+  const baseUrl = process.env.LOCAL_LLM_BASE_URL?.trim().replace(/\/+$/, "");
+  if (!baseUrl) throw new Error("LOCAL_LLM_BASE_URL is not configured.");
+  const parsedUrl = new URL(baseUrl);
+  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+    throw new Error("LOCAL_LLM_BASE_URL must use HTTP or HTTPS.");
+  }
+  const timeoutValue = Number(process.env.LOCAL_LLM_TIMEOUT_MS);
+  const timeoutMs =
+    Number.isInteger(timeoutValue) && timeoutValue > 0
+      ? timeoutValue
+      : 30 * 60 * 1000;
+  const maxTokensCeilingValue = Number(process.env.LOCAL_LLM_MAX_TOKENS);
+  const maxTokensCeiling =
+    Number.isInteger(maxTokensCeilingValue) && maxTokensCeilingValue > 0
+      ? maxTokensCeilingValue
+      : 2048;
+  const summarySchema = {
+    type: "object",
+    additionalProperties: false,
+    required: [
+      "job_type",
+      "site_or_client",
+      "dimensions",
+      "surface_context",
+      "exposure_context",
+      "material_assumptions",
+      "missing_information",
+      "compliance_risks",
+      "confidence",
+    ],
+    properties: {
+      job_type: { type: ["string", "null"] },
+      site_or_client: { type: ["string", "null"] },
+      dimensions: { type: ["string", "null"] },
+      surface_context: { type: ["string", "null"] },
+      exposure_context: { type: ["string", "null"] },
+      material_assumptions: { type: "array", items: { type: "string" } },
+      missing_information: { type: "array", items: { type: "string" } },
+      compliance_risks: { type: "array", items: { type: "string" } },
+      confidence: { type: "number", minimum: 0, maximum: 1 },
     },
-    // Sonnet 5 rejects non-default `temperature` and assistant prefills
-    // (both 400) — buildSummary's fence-tolerant parse replaces the old
-    // `{"role":"assistant","content":"{"}` JSON-forcing trick.
-    body: JSON.stringify({
-      model,
-      max_tokens: maxTokens,
-      system,
-      messages: [{ role: "user", content: user }],
-    }),
-  }, TIMEOUTS.llm);
+  };
+  const res = await fetchWithTimeout(
+    `${baseUrl}/chat/completions`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: Math.min(maxTokens, maxTokensCeiling),
+        temperature: 0,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "transcript_summary",
+            strict: true,
+            schema: summarySchema,
+          },
+        },
+      }),
+    },
+    timeoutMs,
+  );
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    throw new Error(`Anthropic ${res.status}: ${detail.slice(0, 200)}`);
+    throw new Error(`Local LLM ${res.status}: ${detail.slice(0, 200)}`);
   }
   const payload = (await res.json()) as {
-    content?: Array<{ type: string; text?: string }>;
+    choices?: Array<{ message?: { content?: string | null } }>;
   };
-  return payload.content?.find((c) => c.type === "text")?.text ?? "";
+  return payload.choices?.[0]?.message?.content ?? "";
 }
 
 export type BuildSummaryOptions = {
   apiKey?: string;
-  /** Defaults to claude-sonnet-5 (matches /api/quotes/generate). */
+  /** Defaults to LOCAL_LLM_MODEL. */
   model?: string;
-  /** Test seam — pass a fake to avoid hitting Anthropic. */
+  /** Legacy-named test seam — pass a fake to avoid hitting the model. */
   callAnthropic?: AnthropicCallable;
 };
 
 /**
  * Build the structured summary from the cleaned transcript using the
- * Anthropic API. Returns null on any failure — caller must handle.
+ * configured text model. Returns null on any failure — caller must handle.
  */
 export async function buildSummary(
   cleanedTranscript: string,
   options: BuildSummaryOptions = {},
 ): Promise<TranscriptSummary | null> {
-  const apiKey = options.apiKey ?? process.env.ANTHROPIC_API_KEY;
+  const apiKey = options.apiKey ?? process.env.LOCAL_LLM_API_KEY;
   if (!apiKey) return null;
-  const model = options.model ?? "claude-sonnet-5";
+  if (
+    !options.callAnthropic &&
+    process.env.TEXT_AI_PROVIDER?.trim().toLowerCase() !== "local"
+  ) {
+    return null;
+  }
+  const model = options.model ?? process.env.LOCAL_LLM_MODEL ?? "qwen3.5-9b-uncensored";
   const fn = options.callAnthropic ?? defaultAnthropicCall;
 
   let raw: string;
@@ -561,8 +620,8 @@ export async function buildSummary(
       system: SUMMARY_SYSTEM_PROMPT,
       user: cleanedTranscript,
       model,
-      // Sonnet 5's tokenizer emits ~30% more tokens for the same content.
-      maxTokens: 1536,
+      // The summary shape is compact; this keeps local CPU inference bounded.
+      maxTokens: 768,
     });
   } catch {
     return null;
@@ -644,7 +703,7 @@ export async function cleanTranscript(
     summary = await buildSummary(det.cleanedTranscript, options);
     if (!summary) {
       fallback = "summary_failed";
-      fallbackReason = "Anthropic returned null or unparsable JSON";
+      fallbackReason = "Local text model returned null or unparsable JSON";
     }
   } catch (err) {
     fallback = "summary_failed";

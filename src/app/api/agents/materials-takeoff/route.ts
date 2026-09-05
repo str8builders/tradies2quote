@@ -15,7 +15,7 @@ import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 // LLM call can take 20-40s; avoid a 502 on the default function timeout.
-export const maxDuration = 60;
+export const maxDuration = 1800;
 
 /**
  * POST /api/agents/materials-takeoff

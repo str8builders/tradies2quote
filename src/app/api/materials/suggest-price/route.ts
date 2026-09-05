@@ -12,12 +12,13 @@ import { tradieBrainEnabledFromEnv } from "@/lib/tradieBrain";
 import { getRelevantMemories } from "@/lib/tradieBrain/retrieve";
 import { formatMemoriesForPrompt } from "@/lib/tradieBrain/format";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
+import { isLocalTextAiProvider } from "@/lib/llm/local-chat";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 // One short LLM call at most (and often none — the deterministic paths skip
 // it). Keep headroom but well under the generate route's budget.
-export const maxDuration = 30;
+export const maxDuration = 1800;
 
 /**
  * Owner-only + flag-gated "Suggest a Price" agent endpoint (beta).
@@ -156,7 +157,9 @@ export async function POST(request: NextRequest) {
     library,
     history,
     memoryContext,
-    apiKey: process.env.ANTHROPIC_API_KEY ?? "",
+    apiKey: isLocalTextAiProvider()
+      ? (process.env.LOCAL_LLM_API_KEY ?? "")
+      : (process.env.ANTHROPIC_API_KEY ?? ""),
   });
 
   console.log("[suggest-price] result", {

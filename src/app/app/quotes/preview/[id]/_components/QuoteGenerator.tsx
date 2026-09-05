@@ -8,19 +8,18 @@ import { TapeMeasureProgress } from "@/app/app/_components/TapeMeasureProgress";
 /**
  * Elapsed-time-aware status copy. Generation has no real progress signal,
  * so honesty = tell the tradie what stage we're LIKELY in for the time
- * that has actually passed. Simple text quotes land in ~15–40s; the
- * measurement/takeoff path (decks, framing with dimensions) runs the
- * full calculators and can take 1–2 minutes — the old static
- * "usually 5–15 seconds" read as a hang the moment a real job ran long.
+ * that has actually passed. This deployment uses a private, CPU-only local
+ * model. It is slower than a hosted AI API, so substantial quotes can take
+ * several minutes while keeping the job text on this server.
  */
 const STAGES: ReadonlyArray<{ fromS: number; text: string }> = [
   { fromS: 0, text: "Reading your description…" },
-  { fromS: 8, text: "Itemising materials, labour and GST…" },
-  { fromS: 25, text: "Calculating quantities from your measurements…" },
-  { fromS: 55, text: "Pricing lines from your materials library…" },
+  { fromS: 20, text: "Itemising materials, labour and GST…" },
+  { fromS: 60, text: "Calculating quantities from your measurements…" },
+  { fromS: 120, text: "Pricing lines from your materials library…" },
   {
-    fromS: 90,
-    text: "Still working — big takeoffs get double-checked, this can run a couple of minutes.",
+    fromS: 180,
+    text: "Still working on the private local AI — larger quotes can take 5–15 minutes.",
   },
 ];
 
@@ -60,9 +59,10 @@ export function QuoteGenerator({ id }: { id: string }) {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ id }),
-        // Generation's server budget is 140s (TIMEOUTS.generation) — 170s
-        // only catches a stalled connection; the error UI offers retry.
-        signal: AbortSignal.timeout(170_000),
+        // The private Qwen model is CPU-only and serialises requests through
+        // one slot. Keep the connection open long enough for a queued,
+        // substantial quote while still bounding a genuinely stalled call.
+        signal: AbortSignal.timeout(30 * 60 * 1000),
       });
       if (res.status === 409) {
         router.refresh();
@@ -95,7 +95,7 @@ export function QuoteGenerator({ id }: { id: string }) {
               freezing for a minute (the old behaviour read as a hang). */}
           <TapeMeasureProgress
             label="// generating quote"
-            estimateMs={75000}
+            estimateMs={10 * 60 * 1000}
           />
           <h2 className="mt-8 font-display text-2xl uppercase tracking-tight sm:text-3xl">
             Generating your <span className="text-brand">quote</span>…
@@ -107,7 +107,7 @@ export function QuoteGenerator({ id }: { id: string }) {
             {STAGES.filter((st) => elapsedS >= st.fromS).at(-1)!.text}
           </p>
           <p className="mt-6 font-mono text-xs uppercase tracking-[0.2em] text-ink-500">
-            {`// ${fmtElapsed(elapsedS)} elapsed · simple jobs ~30s · measured jobs up to ~2 min`}
+            {`// ${fmtElapsed(elapsedS)} elapsed · private local AI · larger jobs may take 5–15 min`}
           </p>
         </>
       ) : (
@@ -160,4 +160,3 @@ export function QuoteGenerator({ id }: { id: string }) {
     </section>
   );
 }
-

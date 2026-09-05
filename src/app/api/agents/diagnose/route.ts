@@ -3,8 +3,12 @@ import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { isOwnerEmail } from "@/lib/owner";
-import { fetchWithTimeout, TIMEOUTS } from "@/lib/fetchTimeout";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
+import {
+  isLocalTextAiProvider,
+  resolveLocalLlmConfig,
+  runLocalChatCompletion,
+} from "@/lib/llm/local-chat";
 
 /**
  * Owner-only triage endpoint for failed (or any) agent run.
@@ -16,7 +20,7 @@ import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
  * Flow:
  *   1. Auth gate — only the project owner can call this.
  *   2. Read the run row + the last 20 events for that run.
- *   3. Ship the lot to Claude with a triage prompt.
+ *   3. Send the lot to the configured local text model with a triage prompt.
  *   4. Return the model's markdown analysis — probable cause, suggested
  *      fix, what to check, retry suitability.
  *
@@ -25,10 +29,7 @@ import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
-
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-sonnet-5";
+export const maxDuration = 1800;
 
 const SYSTEM_PROMPT = `You are a senior on-call engineer triaging a failed agent run in a Next.js + Supabase quoting app for tradespeople (tradies2Quote).
 
@@ -69,12 +70,14 @@ export async function POST(request: NextRequest) {
   const quota = consumeDailyQuota("diagnose:" + user.id, 200);
   if (!quota.ok) return tooManyRequestsResponse(quota.resetAt);
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  try {
+    if (!isLocalTextAiProvider()) throw new Error("local provider not selected");
+    resolveLocalLlmConfig();
+  } catch {
     return NextResponse.json(
       {
         error: "ai_not_configured",
-        message: "Diagnose needs ANTHROPIC_API_KEY in the environment.",
+        message: "Local AI diagnosis is not configured.",
       },
       { status: 503 },
     );
@@ -131,7 +134,7 @@ export async function POST(request: NextRequest) {
   }
   const events = eventsRes.data ?? [];
 
-  // Build the user-facing payload Claude reads. Plain JSON so the model
+  // Build the user-facing payload the model reads. Plain JSON so the model
   // can pattern-match on field names without us pre-summarizing.
   const payload = {
     run: {
@@ -149,69 +152,32 @@ export async function POST(request: NextRequest) {
     events,
   };
 
-  const claudeRes = await fetchWithTimeout(ANTHROPIC_URL, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      // Sonnet 5's tokenizer emits ~30% more tokens for the same content;
-      // 600 risked clipping the triage report.
-      max_tokens: 800,
-      system: SYSTEM_PROMPT,
-      messages: [
-        {
-          role: "user",
-          content: `Here is the run + recent events as JSON:\n\n\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\`\n\nProduce the triage report.`,
-        },
-      ],
-    }),
-  }, TIMEOUTS.llm);
-
-  if (!claudeRes.ok) {
-    const detail = await claudeRes.text().catch(() => "");
-    console.error("Claude diagnose call failed", claudeRes.status, detail);
-    captureError(new Error(`Claude diagnose ${claudeRes.status}: ${detail.slice(0, 120)}`), { route: "/api/agents/diagnose" });
-    return NextResponse.json(
-      {
-        error: `ai_error_${claudeRes.status}`,
-        message: "Claude couldn't analyze the run. Try again in a moment.",
-      },
-      { status: 502 },
-    );
-  }
-
-  let data: { content?: Array<{ type: string; text?: string }> };
+  let modelResult: Awaited<ReturnType<typeof runLocalChatCompletion>>;
   try {
-    data = (await claudeRes.json()) as {
-      content?: Array<{ type: string; text?: string }>;
-    };
-  } catch {
-    // A non-JSON 200 (CDN/proxy error page) would otherwise throw → raw 500.
+    modelResult = await runLocalChatCompletion({
+      system: SYSTEM_PROMPT,
+      user: `Here is the run + recent events as JSON:\n\n\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\`\n\nProduce the triage report.`,
+      maxTokens: 800,
+      temperature: 0,
+    });
+  } catch (error) {
+    console.error("Local Qwen diagnose call failed", error);
+    captureError(error, { route: "/api/agents/diagnose" });
     return NextResponse.json(
       {
-        error: "ai_parse_error",
-        message: "Claude returned an unexpected response. Try again.",
+        error: "ai_error",
+        message: "The local AI couldn't analyze the run. Try again in a moment.",
       },
       { status: 502 },
     );
   }
-  // Claude returns content as an array of blocks; only the text ones matter.
-  const diagnosis =
-    data.content
-      ?.filter((c) => c.type === "text" && typeof c.text === "string")
-      .map((c) => c.text)
-      .join("\n\n")
-      .trim() ?? "";
+  const diagnosis = modelResult.text.trim();
 
   if (!diagnosis) {
     return NextResponse.json(
       {
         error: "empty_response",
-        message: "Claude returned no analysis.",
+        message: "The local AI returned no analysis.",
       },
       { status: 502 },
     );

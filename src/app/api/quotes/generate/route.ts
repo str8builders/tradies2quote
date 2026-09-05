@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
 import { parseModelJsonObject } from "@/lib/modelJson";
-import { FetchTimeoutError, fetchWithTimeout, TIMEOUTS } from "@/lib/fetchTimeout";
+import { FetchTimeoutError } from "@/lib/fetchTimeout";
 import { createClient } from "@/lib/supabase/server";
 import { aiConsentGate } from "@/lib/ai-consent";
 import { DEFAULT_NZ_CONTRACT_TERMS } from "@/lib/default-contract";
@@ -46,6 +46,11 @@ import type {
 } from "@/lib/quote-types";
 import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
+import {
+  isLocalTextAiProvider,
+  resolveLocalLlmConfig,
+  runLocalChatCompletion,
+} from "@/lib/llm/local-chat";
 
 const TAKEOFF_MATERIAL_PATTERNS: RegExp[] = [
   // Wall framing
@@ -114,68 +119,14 @@ function looksLikeTakeoffMaterial(description: string): boolean {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// This route makes 2+ sequential LLM calls (quote generation, then
-// transcript cleanup, plus optional matcher/compliance passes). Give it
-// headroom so a slow-but-succeeding generation isn't killed by Vercel's
-// default function timeout and surfaced to the client as a gateway 502.
-// Self-hosted (systemd) so nothing enforces this locally, but keep it
-// truthful for any platform that does: it must exceed TIMEOUTS.generation.
-export const maxDuration = 180;
+// The self-hosted Qwen model is CPU-only and this route also performs a
+// transcript-summary call after the main quote. Keep the platform declaration
+// honest even though the current systemd deployment does not enforce it.
+export const maxDuration = 1800;
 
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-sonnet-5";
-// Bumped 8192 → 16384 defensively after the scan-drawing route's
-// 2048 cap surfaced as the misleading "Drawing was too detailed"
-// error. The same `stop_reason === "max_tokens"` branch below would
-// surface as "This job was too long to quote in one go" — also
-// misleading, because the issue is the cap, not the job. A long
-// quote with 40+ line items, labour breakdowns, notes and
-// compliance review can plausibly push past 8192. Sonnet 4 supports
-// up to 64k output tokens; 16384 keeps headroom for several years
-// of quote-complexity growth. max_tokens is a CAP not a minimum —
-// the model returns what it needs so this doesn't cost more on
-// normal quotes.
-const MAX_TOKENS = 16384;
-
-// Anthropic intermittently returns 429 (rate limit), 500, 503 and 529
-// (overloaded). Without a retry these surfaced to the client as a 502 and
-// the user saw generation "go backwards" before a manual retry succeeded.
-// Retry transient failures server-side with exponential backoff so a blip
-// is invisible. Non-retryable statuses (e.g. 400/401) return immediately.
-const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 529]);
-
-async function fetchWithRetry(
-  url: string,
-  init: RequestInit,
-  { attempts = 3, baseDelayMs = 500 }: { attempts?: number; baseDelayMs?: number } = {},
-): Promise<Response> {
-  for (let i = 0; i < attempts; i++) {
-    const isLast = i === attempts - 1;
-    try {
-      // Bound each attempt so a hung upstream socket can't eat the whole
-      // function budget — a timed-out attempt falls into the retry path.
-      const res = await fetchWithTimeout(url, init, TIMEOUTS.generation);
-      if (res.ok || !RETRYABLE_STATUSES.has(res.status) || isLast) {
-        return res;
-      }
-      console.warn(
-        `Claude API ${res.status}; retrying (${i + 1}/${attempts - 1})`,
-      );
-    } catch (e) {
-      // A timed-out attempt already spent the request budget — retrying
-      // would just leave the client hanging past its own abort. Fail fast.
-      if (e instanceof FetchTimeoutError) throw e;
-      if (isLast) throw e;
-      console.warn(
-        `Claude API network error; retrying (${i + 1}/${attempts - 1})`,
-        e,
-      );
-    }
-    await new Promise((r) => setTimeout(r, baseDelayMs * 2 ** i));
-  }
-  // Unreachable: the loop always returns or throws on the last attempt.
-  throw new Error("fetchWithRetry exhausted all attempts");
-}
+// The live llama.cpp service is capped at 2,048 generated tokens. Asking for
+// more cannot increase the output and makes truncation expectations misleading.
+const MAX_TOKENS = 2048;
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -186,7 +137,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Guideline 5.1.2(i) — no transcript/prompt goes to Anthropic without
+  // Guideline 5.1.2(i) — no transcript/prompt goes to AI without
   // recorded consent (iOS shell only; web unaffected).
   const consentGate = await aiConsentGate(supabase, user.id);
   if (consentGate) return consentGate;
@@ -216,10 +167,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  try {
+    if (!isLocalTextAiProvider()) throw new Error("local provider not selected");
+    resolveLocalLlmConfig();
+  } catch {
     return NextResponse.json(
-      { error: "Quote generation is not configured. Set ANTHROPIC_API_KEY." },
+      { error: "Local quote generation is not configured." },
       { status: 503 },
     );
   }
@@ -416,32 +369,21 @@ export async function POST(request: NextRequest) {
     `<job_transcript>\n${transcript}\n</job_transcript>`,
   ].join("\n\n");
 
-  let claudeRes: Response;
+  let modelResult: Awaited<ReturnType<typeof runLocalChatCompletion>>;
   try {
-    claudeRes = await fetchWithRetry(ANTHROPIC_URL, {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
+    modelResult = await runLocalChatCompletion({
+      system: systemPrompt,
+      user: userMessage,
+      maxTokens: MAX_TOKENS,
+      temperature: 0,
+      responseSchema: {
+        name: "tradies2quote_quote",
+        description: "A structured quote matching the format in the system prompt.",
+        schema: { type: "object" },
       },
-      // Sonnet 5 rejects non-default `temperature` and assistant
-      // prefills (both 400) — the old `{"role":"assistant","content":"{"}`
-      // JSON-forcing trick is gone; parseModelJsonObject handles fences.
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: MAX_TOKENS,
-        system: systemPrompt,
-        messages: [
-          {
-            role: "user",
-            content: userMessage,
-          },
-        ],
-      }),
     });
   } catch (e) {
-    console.error("Claude API unreachable", e);
+    console.error("Local Qwen unreachable", e);
     captureError(e, { route: "/api/quotes/generate" });
     const timedOut = e instanceof FetchTimeoutError;
     return NextResponse.json(
@@ -454,40 +396,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!claudeRes.ok) {
-    const detail = await claudeRes.text().catch(() => "");
-    console.error("Claude API error", claudeRes.status, detail);
-    return NextResponse.json(
-      { error: "Quote generation failed. Please try again." },
-      { status: 502 },
-    );
-  }
-
-  let claudePayload: {
-    content?: Array<{ type: string; text?: string }>;
-    stop_reason?: string;
-  };
-  try {
-    claudePayload = await claudeRes.json();
-  } catch {
-    // 200 OK but a non-JSON body — treat as an upstream failure, not a 500.
-    console.error("Claude returned a non-JSON 200 body");
-    return NextResponse.json(
-      { error: "Quote generation failed. Please try again." },
-      { status: 502 },
-    );
-  }
-  const text = claudePayload.content?.find((c) => c.type === "text")?.text ?? "";
+  const text = modelResult.text;
   if (!text) {
     return NextResponse.json(
       { error: "Empty response from quote model. Please try again." },
       { status: 502 },
     );
   }
-  // A truncated response (`max_tokens`) can never parse as complete
+  // A truncated response (`length`) can never parse as complete
   // JSON, so a retry just reproduces the failure — surface a distinct,
   // actionable message instead of the generic "malformed" one.
-  if (claudePayload.stop_reason === "max_tokens") {
+  if (modelResult.finishReason === "length") {
     return NextResponse.json(
       {
         error:
@@ -502,10 +421,10 @@ export async function POST(request: NextRequest) {
   } catch (e) {
     captureError(e, { route: "quotes/generate" });
     console.error(
-      "Failed to parse Claude JSON",
+      "Failed to parse local Qwen JSON",
       e,
-      "stop_reason:",
-      claudePayload.stop_reason,
+      "finish_reason:",
+      modelResult.finishReason,
       "raw (first 800):",
       text.slice(0, 800),
     );
@@ -1001,7 +920,6 @@ export async function POST(request: NextRequest) {
     includeRecentQuotes: true,
   });
   const cleaned = await cleanTranscript(transcript, {
-    apiKey,
     vocab,
   });
   parsed.transcript = {

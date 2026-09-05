@@ -70,13 +70,36 @@ async function checkSupabase(): Promise<HealthCheck> {
   }
 }
 
-function checkAnthropic(): HealthCheck {
-  const r = envStatus("ANTHROPIC_API_KEY");
+function localTextReady(): boolean {
+  return (
+    process.env.TEXT_AI_PROVIDER?.trim().toLowerCase() === "local" &&
+    envSet("LOCAL_LLM_BASE_URL") &&
+    envSet("LOCAL_LLM_MODEL") &&
+    envSet("LOCAL_LLM_API_KEY")
+  );
+}
+
+function checkLocalTextAi(): HealthCheck {
+  const ready = localTextReady();
   return {
-    id: "anthropic",
-    name: "AI quote generator (Anthropic)",
-    status: r.status,
-    detail: r.detail,
+    id: "local-text-ai",
+    name: "AI text + quote generator (local Qwen)",
+    status: ready ? "ok" : "missing",
+    detail: ready
+      ? "Private local text model configured"
+      : "Local text model configuration is incomplete",
+  };
+}
+
+function checkVisionAi(): HealthCheck {
+  const ready = envSet("ANTHROPIC_API_KEY") || envSet("OPENAI_API_KEY");
+  return {
+    id: "vision-ai",
+    name: "Image / plan reading (optional external AI)",
+    status: ready ? "ok" : "missing",
+    detail: ready
+      ? "An external vision provider is configured"
+      : "Not configured — the local Qwen model is text-only",
   };
 }
 
@@ -194,7 +217,8 @@ export async function getAllHealthChecks(): Promise<HealthCheck[]> {
   const [supabase] = await Promise.all([checkSupabase()]);
   return [
     supabase,
-    checkAnthropic(),
+    checkLocalTextAi(),
+    checkVisionAi(),
     checkTranscription(),
     checkResend(),
     checkTwilio(),
@@ -258,10 +282,10 @@ export function getAgentReadiness(): AgentReadiness[] {
     {
       id: "ai-quote",
       name: "AI Quote Builder (existing route)",
-      status: envSet("ANTHROPIC_API_KEY") ? "ready" : "needs-setup",
-      detail: envSet("ANTHROPIC_API_KEY")
-        ? "Anthropic key configured. The existing /api/quotes/generate route is the agent."
-        : "ANTHROPIC_API_KEY not set — AI quote generation will fail.",
+      status: localTextReady() ? "ready" : "needs-setup",
+      detail: localTextReady()
+        ? "Private local Qwen configured. /api/quotes/generate uses the local model."
+        : "Local text AI configuration is incomplete — quote generation will fail.",
     },
     {
       id: "voice-transcribe",

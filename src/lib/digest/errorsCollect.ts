@@ -1,6 +1,10 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { fetchWithTimeout, TIMEOUTS } from "@/lib/fetchTimeout";
+import {
+  isLocalTextAiProvider,
+  resolveLocalLlmConfig,
+  runLocalChatCompletion,
+} from "@/lib/llm/local-chat";
 import {
   type Diagnosis,
   type DigestGroup,
@@ -124,8 +128,12 @@ export async function collectErrorDigest(
  * say so instead of diagnosing the same incident three times.
  */
 async function defaultDiagnose(groups: DigestGroup[]): Promise<Diagnosis[]> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return [];
+  try {
+    if (!isLocalTextAiProvider()) return [];
+    resolveLocalLlmConfig();
+  } catch {
+    return [];
+  }
 
   const system = [
     "You are a senior engineer triaging the internal error monitor of Tradies2Quote,",
@@ -161,31 +169,28 @@ async function defaultDiagnose(groups: DigestGroup[]): Promise<Diagnosis[]> {
     2,
   );
 
-  const res = await fetchWithTimeout(
-    "https://api.anthropic.com/v1/messages",
-    {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
+  const result = await runLocalChatCompletion({
+    system,
+    user,
+    maxTokens: 1200,
+    temperature: 0,
+    responseSchema: {
+      name: "error_diagnoses",
+      schema: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["fingerprint", "likely_cause", "severity", "next_step"],
+          properties: {
+            fingerprint: { type: "string" },
+            likely_cause: { type: "string" },
+            severity: { type: "string", enum: ["high", "medium", "low"] },
+            next_step: { type: "string" },
+          },
+        },
       },
-      body: JSON.stringify({
-        model: "claude-opus-5",
-        max_tokens: 2000,
-        system,
-        messages: [{ role: "user", content: user }],
-      }),
     },
-    TIMEOUTS.llm,
-  );
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new Error(`Anthropic ${res.status}: ${detail.slice(0, 200)}`);
-  }
-  const payload = (await res.json()) as {
-    content?: Array<{ type: string; text?: string }>;
-  };
-  const raw = payload.content?.find((c) => c.type === "text")?.text ?? "";
-  return parseDiagnoses(raw);
+  });
+  return parseDiagnoses(result.text);
 }

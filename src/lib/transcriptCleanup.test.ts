@@ -232,10 +232,10 @@ describe("applyDeterministicCorrections — corrections sorted by position", () 
 });
 
 // ===========================================================================
-// buildSummary — Anthropic call with mocked transport
+// buildSummary — configured text model with mocked transport
 // ===========================================================================
 
-describe("buildSummary — Anthropic via mock transport", () => {
+describe("buildSummary — text model via mock transport", () => {
   const validResponse = `{
     "job_type": "Internal partition framing",
     "site_or_client": null,
@@ -291,8 +291,8 @@ describe("buildSummary — Anthropic via mock transport", () => {
       callAnthropic: async () => validResponse,
       // apiKey intentionally omitted, env var unset in test
     });
-    // env may have ANTHROPIC_API_KEY set in dev — only assert when unset.
-    if (!process.env.ANTHROPIC_API_KEY) {
+    // env may have a local key set in dev — only assert when unset.
+    if (!process.env.LOCAL_LLM_API_KEY) {
       expect(out).toBeNull();
     }
   });
@@ -338,7 +338,7 @@ describe("cleanTranscript — orchestrator", () => {
     expect(r.confidence).toBeLessThan(0.9);
   });
 
-  it("happy path with mocked Anthropic returns full shape", async () => {
+  it("happy path with mocked text model returns full shape", async () => {
     const callAnthropic = vi.fn().mockResolvedValue(`{"job_type":"Wall","confidence":0.9}`);
     const r = await cleanTranscript("h32 framing 90 by 45", {
       apiKey: "fake",

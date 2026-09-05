@@ -18,6 +18,7 @@ import type { Json } from "@/lib/supabase/database.types";
 import { adminClient } from "@/lib/supabase/admin";
 import { runPat } from "@/lib/agents/pat";
 import { runWilla } from "@/lib/agents/willa";
+import { isLocalTextAiProvider } from "@/lib/llm/local-chat";
 import { fetchForecastForWindow } from "./provider";
 import { geocodeAddress } from "./geocode";
 import { pickJobAddress } from "./jobAddress";
@@ -177,7 +178,11 @@ export async function assessJob(input: AssessJobInput): Promise<AssessJobResult>
 
   // 8. Pat + Willa — only if the engine flagged them and a key exists.
   const runAgents = input.runAgents ?? true;
-  const apiKey = input.apiKey ?? process.env.ANTHROPIC_API_KEY;
+  const apiKey =
+    input.apiKey ??
+    (isLocalTextAiProvider()
+      ? process.env.LOCAL_LLM_API_KEY
+      : process.env.ANTHROPIC_API_KEY);
   let pat: PatOutput | null = null;
   let willa: WillaOutput | null = null;
 

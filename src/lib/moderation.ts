@@ -1,5 +1,6 @@
 import "server-only";
 import { runStructuredAgent, type ParseResult } from "@/lib/agents/runtime";
+import { isLocalTextAiProvider } from "@/lib/llm/local-chat";
 
 /**
  * Content moderation for the public customer chat (Guideline 1.2).
@@ -96,6 +97,14 @@ export async function moderateChatText(
 ): Promise<ModerationVerdict> {
   if (matchesBlocklist(text)) {
     return { allowed: false, reason: "blocklist" };
+  }
+  // The deployed Qwen model is uncensored and CPU-only. Asking it to moderate
+  // would add two long, serial calls to every public chat turn without a
+  // trustworthy safety benefit. Keep the high-precision blocklist and the
+  // route's strict rate limit; a future external classifier can use the path
+  // below when the text provider is not local.
+  if (isLocalTextAiProvider()) {
+    return { allowed: true, reason: "local_blocklist_only" };
   }
   try {
     const result = await runStructuredAgent<{ flagged: boolean; category?: string }>({

@@ -24,6 +24,8 @@ import {
   newRunId,
 } from "@/lib/agent-monitor/logger";
 import { fetchWithTimeout, TIMEOUTS } from "@/lib/fetchTimeout";
+import { isLocalTextAiProvider } from "@/lib/llm/local-chat";
+import { runOpenAIStructuredAgent } from "./openai-runtime";
 
 export type ModelTier = "fast" | "default" | "deep";
 
@@ -185,6 +187,58 @@ function usageFrom(payload: AnthropicResponsePayload): AgentUsage {
 export async function runStructuredAgent<T>(
   opts: StructuredAgentOptions<T>,
 ): Promise<StructuredAgentResult<T>> {
+  if (isLocalTextAiProvider()) {
+    if (
+      Array.isArray(opts.user) &&
+      opts.user.some((block) => block.type === "image")
+    ) {
+      throw new Error(
+        "The local text AI provider does not support image input. Configure an external vision provider for this agent.",
+      );
+    }
+
+    const localUser =
+      typeof opts.user === "string"
+        ? opts.user
+        : opts.user
+            .filter(
+              (block): block is Extract<AgentContentBlock, { type: "text" }> =>
+                block.type === "text",
+            )
+            .map((block) => block.text)
+            .join("\n\n");
+    const localResult = await runOpenAIStructuredAgent<T>({
+      agentName: opts.agentName,
+      system: opts.system,
+      user: localUser,
+      tool: opts.tool,
+      parse: opts.parse,
+      maxTokens: opts.maxTokens,
+      temperature: 0,
+      runId: opts.runId,
+      quoteId: opts.quoteId,
+      userId: opts.userId,
+      apiKey: opts.apiKey,
+      provider: "local",
+      fetchImpl: opts.fetchImpl,
+    });
+
+    return {
+      value: localResult.value,
+      model: localResult.model,
+      attempts: localResult.attempts,
+      usage: {
+        // Some injected test adapters and older compatible runtimes do not
+        // report token usage. Observability must not turn a valid model result
+        // into a runtime failure.
+        inputTokens: localResult.usage?.inputTokens ?? 0,
+        outputTokens: localResult.usage?.outputTokens ?? 0,
+        cacheReadTokens: 0,
+        cacheCreationTokens: 0,
+      },
+    };
+  }
+
   const apiKey = opts.apiKey ?? process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not configured.");
 

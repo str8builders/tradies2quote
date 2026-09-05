@@ -24,6 +24,8 @@ const SECTIONS = [
   { id: "contact", label: "Contact" },
 ];
 
+const PRIVACY_LAST_UPDATED_DISPLAY = "23 August 2026";
+
 export default function PrivacyPage() {
   return (
     <article className="bg-ink-900">
@@ -33,7 +35,7 @@ export default function PrivacyPage() {
           Privacy <span className="text-brand">Policy</span>
         </h1>
         <p className="mt-3 font-mono text-xs uppercase tracking-[0.2em] text-ink-400">
-          Last updated {LEGAL.lastUpdatedDisplay}
+          Last updated {PRIVACY_LAST_UPDATED_DISPLAY}
         </p>
 
         <div className="mt-10 rounded-md border border-ink-600 bg-ink-800 p-6">
@@ -146,51 +148,50 @@ export default function PrivacyPage() {
           title="Voice, photos & AI processing"
         >
           <p>
-            {LEGAL.productName} is built on AI, and using its AI features
-            sends the content you submit to our AI providers:
+            {LEGAL.productName} uses a locally hosted AI model for text. Voice
+            transcription and image-reading need separate external providers
+            and are unavailable unless we explicitly configure and disclose
+            them. Content is processed as follows:
           </p>
           <ul>
             <li>
-              <strong>Voice memos</strong> — the audio is uploaded to our
-              server and forwarded to <strong>OpenAI</strong> for
-              transcription (Whisper API). The transcript is then sent to{" "}
-              <strong>Anthropic</strong> (Claude) to be turned into a
-              structured quote.
+              <strong>Typed descriptions and transcripts</strong> — the text
+              is processed by our self-hosted Qwen model on the same private
+              server as the application. It is not sent to OpenAI or
+              Anthropic for quote generation.
             </li>
             <li>
-              <strong>Photos and images</strong> — plan scans, site
-              drawings, and supplier documents you photograph or upload
-              are sent to <strong>Anthropic</strong> and/or{" "}
-              <strong>OpenAI</strong> for vision analysis (reading
-              dimensions, extracting line items). Site photos can show
-              private property — only upload what you&apos;re comfortable
-              processing this way.
+              <strong>Voice memos</strong> — voice transcription is disabled
+              on the local-model deployment. If an external transcription
+              provider is enabled later, we will disclose it before use; the
+              resulting text can then be processed locally by Qwen.
+            </li>
+            <li>
+              <strong>Photos and images</strong> — the installed Qwen model is
+              text-only, so plan scans, site drawings and photographed
+              documents are not sent to it. Image-reading remains unavailable
+              unless a compatible, disclosed vision provider is configured.
             </li>
             <li>
               <strong>Customer quote chat</strong> — when your client uses
               the chat on their quote page, their messages are processed
-              by <strong>Anthropic</strong> to generate the reply. The
-              chat is clearly labelled as AI, the conversation is visible
-              to you, and both sides of it are screened by an automated
-              content filter.
+              by the self-hosted Qwen model to generate the reply. The chat is
+              clearly labelled as AI, the conversation is visible to you, and
+              both sides of it are screened by an automated content filter.
             </li>
           </ul>
           <p>
-            Both OpenAI and Anthropic have committed, under their API
-            terms, that they do not use API inputs to train their models.
-            They process your data only to return the response, and they
-            store it for a short period (typically up to 30 days) for abuse
-            monitoring before deletion.
+            Text sent to the local Qwen model stays on infrastructure we
+            operate and is not used to train the model. If an optional external
+            AI provider is enabled, its identity, purpose and applicable data
+            handling terms will be disclosed before that feature is used.
           </p>
           <p>
-            We do not store the raw audio on our own servers. The
-            recording is streamed through our backend, transcribed by
-            OpenAI, and discarded once the text transcript has been
-            extracted. The transcript itself lives inside your quote and
-            is deleted when you delete the quote or close your account.
-            Plan and site images you attach are stored with your account
-            so your quotes keep their source documents; delete the quote
-            (or your account) and they go with it.
+            The text description or transcript lives inside your quote and is
+            deleted when you delete the quote or close your account. Plan and
+            site images you attach are stored with your account so your quotes
+            keep their source documents; delete the quote (or your account) and
+            they go with it.
           </p>
         </LegalSection>
 
@@ -215,14 +216,15 @@ export default function PrivacyPage() {
               database service holds your data).
             </li>
             <li>
-              <strong>OpenAI</strong> — voice transcription (Whisper) and
-              vision analysis of photos/plan images you submit.
+              <strong>Local Qwen model</strong> — quote generation, transcript
+              cleanup and customer quote chat. It runs on the private server
+              described above; text is not sent to a third-party AI API.
             </li>
             <li>
-              <strong>Anthropic</strong> — quote generation, plan-drawing
-              analysis, and the customer quote chat via the Claude API.
-              Receives transcripts, quote content, images you scan, and
-              your customers&apos; chat messages.
+              <strong>OpenAI and Anthropic</strong> — optional external AI
+              providers for voice transcription or image analysis. They are
+              not configured for the local text deployment; we will update the
+              disclosure before enabling either service.
             </li>
             <li>
               <strong>Open-Meteo</strong> — job-site weather. Receives
@@ -275,12 +277,11 @@ export default function PrivacyPage() {
             (European Union). Backups live on the same infrastructure.
           </p>
           <p>
-            When you use the AI features, the content being processed
-            (audio, transcripts, images, chat messages) is sent to OpenAI
-            and Anthropic, which process it in the{" "}
-            <strong>United States</strong>. Weather lookups go to
-            Open-Meteo in the EU; emails are delivered via Resend in the
-            US.
+            Typed descriptions, transcripts and AI chat messages are processed
+            by the local Qwen model on the same server infrastructure as the
+            application. They are not transferred to OpenAI or Anthropic.
+            Weather lookups go to Open-Meteo in the EU; emails are delivered
+            via Resend in the US.
           </p>
           <p>
             That means your personal information is transferred to and
