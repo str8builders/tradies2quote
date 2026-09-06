@@ -52,6 +52,7 @@ import { blockedLineGuide } from "@/lib/takeoff/blockedLineGuide";
 import { PhotoPlanPanel } from "./PhotoPlanPanel";
 import { SendQuoteButton } from "./SendQuoteButton";
 import { MaterialsListButton } from "./MaterialsListButton";
+import { hasT2QCALWorking, T2QCALWorking } from "./T2QCALWorking";
 import { MobileCollapsibleCard } from "./MobileCollapsibleCard";
 import { CsiGroupedView } from "./CsiGroupedView";
 import { StickyActionBar } from "./StickyActionBar";
@@ -1458,12 +1459,13 @@ function ItemsSection({
               <div className="mt-1 text-right font-mono text-xs uppercase tracking-[0.2em] text-ink-300">
                 Line total: <span className="text-white">{formatCurrency(it.line_total, currency)}</span>
               </div>
-              {(it.formula || libMaterial) && (
+              {(it.formula || libMaterial || hasT2QCALWorking(it)) && (
                 <ShowWorking
                   formula={it.formula}
                   libraryName={libMaterial?.name ?? null}
                   unit={it.unit}
                   result={it.quantity}
+                  nativeLine={it}
                 />
               )}
             </li>
@@ -1480,22 +1482,24 @@ function ShowWorking({
   libraryName,
   unit,
   result,
+  nativeLine,
 }: {
   formula: string | null | undefined;
   libraryName: string | null;
   unit: string;
   result: number;
+  nativeLine?: QuoteLineItem;
 }) {
   const explained = explainFormula(formula);
   const hasMath = explained.length > 0;
   // Skip the entire toggle if we have neither a formula nor a library
   // match — the parent already gates on that, but it's defensive here.
-  if (!hasMath && !libraryName) return null;
+  if (!hasMath && !libraryName && !hasT2QCALWorking(nativeLine)) return null;
   return (
     <details className="t2q-show-working mt-1.5 rounded-sm border border-ink-700 bg-ink-950/70 [&[open]>summary>span:last-child]:rotate-180">
       <summary
         data-testid="show-working-toggle"
-        className="flex cursor-pointer select-none items-center justify-between gap-2 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-300 hover:text-white"
+        className="flex min-h-[44px] cursor-pointer select-none items-center justify-between gap-2 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-300 hover:text-white"
       >
         <span>{"// show working"}</span>
         <span aria-hidden="true" className="transition-transform">
@@ -1516,6 +1520,7 @@ function ShowWorking({
             </div>
           </div>
         )}
+        {nativeLine && <T2QCALWorking line={nativeLine} />}
         {libraryName && (
           <div data-testid="working-library">
             <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-500">

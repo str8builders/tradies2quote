@@ -140,7 +140,7 @@ export type QuoteLineItem = {
   t2qcal_calculator_snapshot?: {
     toolSlug: string;
     toolName: string;
-    inputs: Array<{ key: string; label: string; value: number; unit: string }>;
+    inputs: Array<{ key: string; label: string; value: number; unit: string; displayLabel?: string | null }>;
   };
 };
 
