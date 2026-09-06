@@ -59,6 +59,8 @@ const nextConfig: NextConfig = {
   // framer-motion (only used on splash + auth panel) and lucide-react.
   // Verified against Next 16 release notes — supported under Turbopack.
   experimental: {
+    // Optional for disposable or disk-constrained builds; runtime output is identical.
+    turbopackFileSystemCacheForBuild: process.env.T2Q_NO_BUILD_CACHE !== "1",
     optimizePackageImports: [
       "@phosphor-icons/react",
       "framer-motion",

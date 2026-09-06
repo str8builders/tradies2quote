@@ -44,9 +44,9 @@ export async function onRequestError(
   try {
     // Node runtime only — the internal sink hashes fingerprints with
     // node:crypto, which the Edge runtime (proxy only) can't load.
-    if (process.env.NEXT_RUNTIME !== "nodejs") throw new Error("edge");
-    const { captureError } = await import("@/lib/observability");
-    captureError(err, {
+    if (process.env.NEXT_RUNTIME === "nodejs") {
+      const { captureError } = await import("@/lib/observability");
+      captureError(err, {
       route: request.path,
       surface:
         context.routerKind === "App Router" &&
@@ -58,7 +58,8 @@ export async function onRequestError(
         routeType: context.routeType,
         method: request.method,
       },
-    });
+      });
+    }
   } catch {
     /* reporting must never affect the request */
   }
