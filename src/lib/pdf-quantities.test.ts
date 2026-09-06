@@ -38,12 +38,15 @@ describe("quote and invoice quantity columns", () => {
     expect((await PDFDocument.load(bytes)).getPageCount()).toBeGreaterThan(1);
     for (const call of calls) {
       expect(call.x + call.width).toBeLessThanOrEqual(547.29);
-      expect(call.y).toBeGreaterThanOrEqual(32);
+      expect(call.y).toBeGreaterThanOrEqual(call.text.includes("Page ") ? 32 : 80);
       if (call.x === 282 && call.text !== "QTY") expect(call.x + call.width).toBeLessThanOrEqual(376.01);
       if (call.x === 386 && call.text !== "UNIT PRICE") expect(call.x + call.width).toBeLessThanOrEqual(462.01);
     }
     expect(calls.some(c => c.text === "0.237504 m3")).toBe(true);
     expect(calls.some(c => c.text === "$0.123456789012345")).toBe(true);
+    if (kind === "invoice") {
+      expect(calls.find(c => c.text === "PAYMENT")?.page).toBe(calls.find(c => c.text === "AMOUNT DUE")?.page);
+    }
     const pagesWithItems = new Set(calls.filter(c => c.x === 282 && c.text !== "QTY").map(c => c.page));
     for (const page of pagesWithItems) expect(calls.some(c => c.page === page && c.text === "QTY")).toBe(true);
     if (process.env.AUDIT_PDF_DIR && !longDescription) writeFileSync(`${process.env.AUDIT_PDF_DIR}/${kind}-quantity-example.pdf`, bytes);

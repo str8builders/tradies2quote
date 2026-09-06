@@ -121,6 +121,10 @@ export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> 
     const lines = wrapText(sanitise(text), font, size, maxWidth);
     let cursor = yPos;
     for (const line of lines) {
+      if (cursor - lineHeight < BOTTOM_MIN) {
+        page = pdf.addPage([PAGE_W, PAGE_H]);
+        cursor = TOP;
+      }
       page.drawText(line, { x, y: cursor, size, font, color });
       cursor -= lineHeight;
     }
@@ -140,16 +144,14 @@ export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> 
   // Optional logo top-left; pushes the business name down by whatever it used.
   y -= await drawPdfLogo(pdf, page, logo, MARGIN_X, y);
   const businessName = profile.business_name || "Your business";
-  drawText(businessName.toUpperCase(), MARGIN_X, y, { font: bold, size: 18 });
-  y -= 24;
+  y = drawText(businessName.toUpperCase(), MARGIN_X, y, { font: bold, size: 18, maxWidth: 280 }) - 4;
 
   const headerLines: string[] = [];
   if (profile.email) headerLines.push(profile.email);
   if (profile.phone) headerLines.push(profile.phone);
   if (profile.address) headerLines.push(profile.address);
   for (const line of headerLines) {
-    drawText(line, MARGIN_X, y, { color: MUTED, size: 9 });
-    y -= 12;
+    y = drawText(line, MARGIN_X, y, { color: MUTED, size: 9, maxWidth: 280, lineHeight: 12 }) - 2;
   }
 
   // QUOTE label top right
@@ -342,7 +344,8 @@ export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> 
   drawSection("Other", other);
 
   // ===== Totals =====
-  ensureSpace(110);
+  const totalsHeight = 128 + (other.length > 0 ? 14 : 0);
+  ensureSpace(totalsHeight + (quote.terms || acceptUrl ? 60 : 0));
   drawRule(y);
   y -= 14;
 
@@ -354,7 +357,7 @@ export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> 
     const color = emphasis ? ORANGE : INK;
 
     page.drawText(labelText, {
-      x: COL_PRICE_X - 60,
+      x: COL_QTY_X - 50,
       y,
       font,
       size,
@@ -411,7 +414,7 @@ export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> 
 
   // ===== Accept link footer =====
   if (acceptUrl) {
-    ensureSpace(36);
+    ensureSpace(60);
     y -= 18;
     drawRule(y);
     y -= 14;

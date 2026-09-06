@@ -146,6 +146,10 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
     const lines = wrapText(sanitise(text), font, size, maxWidth);
     let cursor = yPos;
     for (const line of lines) {
+      if (cursor - lineHeight < BOTTOM_MIN) {
+        page = pdf.addPage([PAGE_W, PAGE_H]);
+        cursor = TOP;
+      }
       page.drawText(line, { x, y: cursor, size, font, color });
       cursor -= lineHeight;
     }
@@ -165,8 +169,7 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
   // Optional logo top-left; pushes the business name down by whatever it used.
   y -= await drawPdfLogo(pdf, page, logo, MARGIN_X, y);
   const businessName = profile.business_name || "Your business";
-  drawText(businessName.toUpperCase(), MARGIN_X, y, { font: bold, size: 18 });
-  y -= 24;
+  y = drawText(businessName.toUpperCase(), MARGIN_X, y, { font: bold, size: 18, maxWidth: 280 }) - 4;
 
   const headerLines: string[] = [];
   if (profile.email) headerLines.push(profile.email);
@@ -174,8 +177,7 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
   if (profile.address) headerLines.push(profile.address);
   if (profile.gst_number) headerLines.push(`GST: ${profile.gst_number}`);
   for (const line of headerLines) {
-    drawText(line, MARGIN_X, y, { color: MUTED, size: 9 });
-    y -= 12;
+    y = drawText(line, MARGIN_X, y, { color: MUTED, size: 9, maxWidth: 280, lineHeight: 12 }) - 2;
   }
 
   // INVOICE label top right
@@ -368,7 +370,12 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
   drawSection("Other", other);
 
   // ===== Totals =====
-  ensureSpace(110);
+  const paymentText = paymentInstructions || (dueDate
+    ? `Please pay by ${formatIssueDate(dueDate)}. Use ${invoiceNumber} as the reference.`
+    : `Payment is due on receipt. Use ${invoiceNumber} as the reference.`);
+  const paymentHeight = 46 + 13 * wrapText(sanitise(paymentText), helv, 10, PAGE_W - 2 * MARGIN_X).length;
+  // Keep the amount due and ordinary payment instructions on the same page.
+  ensureSpace(Math.min(TOP - BOTTOM_MIN, 86 + Math.max(60, paymentHeight)));
   drawRule(y);
   y -= 14;
 
@@ -380,7 +387,7 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
     const color = emphasis ? ORANGE : INK;
 
     page.drawText(labelText, {
-      x: COL_PRICE_X - 60,
+      x: COL_QTY_X - 50,
       y,
       font,
       size,
@@ -410,27 +417,9 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
   y -= 14;
   drawText("PAYMENT", MARGIN_X, y, { font: bold, size: 9, color: MUTED });
   y -= 14;
-  if (paymentInstructions) {
-    y = drawText(paymentInstructions, MARGIN_X, y, {
-      size: 10,
-      color: INK,
-      maxWidth: PAGE_W - 2 * MARGIN_X,
-      lineHeight: 13,
-    });
-  } else {
-    drawText(
-      dueDate
-        ? `Please pay by ${formatIssueDate(dueDate)}. Use ${invoiceNumber} as the reference.`
-        : `Payment is due on receipt. Use ${invoiceNumber} as the reference.`,
-      MARGIN_X,
-      y,
-      {
-        size: 10,
-        color: INK,
-        maxWidth: PAGE_W - 2 * MARGIN_X,
-      },
-    );
-  }
+  y = drawText(paymentText, MARGIN_X, y, {
+    size: 10, color: INK, maxWidth: PAGE_W - 2 * MARGIN_X, lineHeight: 13,
+  });
 
   // Invoice number footer on each page
   const pages = pdf.getPages();
