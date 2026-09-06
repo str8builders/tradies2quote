@@ -7,6 +7,7 @@ import {
   splitDisplaySubtotals,
 } from "@/lib/quote-defaults";
 import type { PublicQuotePayload, PublicLineItem } from "@/lib/quote-types";
+import { formatQuantity, formatUnitPrice } from "@/lib/quantity-display";
 
 type Props = {
   token: string;
@@ -148,7 +149,7 @@ function Section({
             <div className="min-w-0 flex-1">
               <p className="text-sm text-white">{it.description}</p>
               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-400">
-                {it.quantity} {it.unit} · {formatCurrency(it.unit_price, currency)}
+                {formatQuantity(it.quantity, it.unit_price)} {it.unit} · {formatUnitPrice(it.unit_price, currency)}
               </p>
             </div>
             <p className="shrink-0 font-mono text-sm tabular-nums text-white">

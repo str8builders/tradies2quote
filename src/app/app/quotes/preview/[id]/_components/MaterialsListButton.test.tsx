@@ -52,4 +52,9 @@ describe("buildMaterialsListText", () => {
     expect(text).toContain("• 2.5 m3 — Sand");
     expect(text).toContain("• 4 each — Posts");
   });
+
+  it("does not round a small nonzero material order to zero", () => {
+    const text = buildMaterialsListText([li("material", "Grout", 0.0002375, "m3")]);
+    expect(text).toContain("• 0.000238 m3 — Grout");
+  });
 });

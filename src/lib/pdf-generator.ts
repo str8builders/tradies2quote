@@ -1,4 +1,5 @@
 import "server-only";
+import { formatQuantity, formatUnitPrice } from "./quantity-display";
 import {
   PDFDocument,
   StandardFonts,
@@ -55,7 +56,19 @@ function sanitise(s: string | null | undefined): string {
 }
 
 function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
-  const words = text.split(/\s+/);
+  const words = text.split(/\s+/).flatMap(word => {
+    const parts: string[] = [];
+    let part = "";
+    for (const character of word) {
+      if (part && font.widthOfTextAtSize(part + character, size) > maxWidth) {
+        parts.push(part);
+        part = "";
+      }
+      part += character;
+    }
+    if (part) parts.push(part);
+    return parts;
+  });
   const lines: string[] = [];
   let line = "";
   for (const w of words) {
@@ -217,8 +230,8 @@ export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> 
 
   // ===== Line items =====
   const COL_DESC_X = MARGIN_X;
-  const COL_QTY_X = 340;
-  const COL_PRICE_X = 410;
+  const COL_QTY_X = 282;
+  const COL_PRICE_X = 386;
   const COL_TOTAL_X = PAGE_W - MARGIN_X;
 
   function drawHeaderRow(yPos: number) {
@@ -268,57 +281,55 @@ export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> 
     y -= 12;
 
     for (const it of items) {
-      const desc = sanitise(it.description || "");
-      const lines = wrapText(desc, helv, 10, 280);
-      const rowHeight = Math.max(14, lines.length * 13);
-      ensureSpace(rowHeight + 2);
-
-      let lineY = y;
-      for (const line of lines) {
-        page.drawText(line, {
-          x: COL_DESC_X,
-          y: lineY,
-          font: helv,
-          size: 10,
-          color: INK,
-        });
-        lineY -= 13;
+      const columns = [
+        { text: sanitise(it.description || ""), x: COL_DESC_X, width: 222, right: false },
+        { text: sanitise(`${formatQuantity(it.quantity, it.unit_price)} ${it.unit ?? ""}`.trim()), x: COL_QTY_X, width: 94, right: false },
+        { text: sanitise(formatUnitPrice(Number(it.unit_price) || 0, quote.currency)), x: COL_PRICE_X, width: 76, right: false },
+        { text: sanitise(formatCurrency(Number(it.line_total) || 0, quote.currency)), x: COL_TOTAL_X, width: 75, right: true },
+      ].map((column, i) => {
+        // Keep each numeric token intact. Long rates wrap the unit/currency,
+        // and scale down to seven points before moving to a full-width detail.
+        const longest = Math.max(1, ...column.text.split(/\s+/).map(w => helv.widthOfTextAtSize(w, 10)));
+        const size = i === 0 ? 10 : Math.min(10, 10 * column.width / longest);
+        return { ...column, size, lines: wrapText(column.text, helv, size, column.width) };
+      });
+      const details = columns.slice(1).flatMap((column, i) => column.size < 7
+        ? wrapText(`${["Quantity", "Unit price", "Line total"][i]}: ${column.text}`, helv, 9, PAGE_W - 2 * MARGIN_X)
+        : []);
+      const visible = columns.map(column => column.size < 7
+        ? { ...column, size: 9, lines: ["See below"] } : column);
+      const bodyLines = Math.max(1, ...visible.map(column => column.lines.length));
+      const rowHeight = bodyLines * 13 + details.length * 12 + 6;
+      const continueTable = () => {
+        page = pdf.addPage([PAGE_W, PAGE_H]);
+        y = TOP;
+        drawHeaderRow(y);
+        y -= 4;
+        drawRule(y);
+        y -= 12;
+      };
+      // Keep normal rows together; very long descriptions continue onto as
+      // many pages as needed without losing the quantity on the first part.
+      if (rowHeight <= TOP - BOTTOM_MIN - 16 && y - rowHeight < BOTTOM_MIN) continueTable();
+      let offset = 0;
+      while (offset < bodyLines) {
+        if (y - 13 < BOTTOM_MIN) continueTable();
+        const count = Math.min(bodyLines - offset, Math.floor((y - BOTTOM_MIN) / 13));
+        for (const column of visible) {
+          column.lines.slice(offset, offset + count).forEach((text, index) => page.drawText(text, {
+            x: column.right ? column.x - helv.widthOfTextAtSize(text, column.size) : column.x,
+            y: y - index * 13, font: helv, size: column.size, color: INK,
+          }));
+        }
+        y -= count * 13;
+        offset += count;
       }
-
-      const qtyText = `${it.quantity} ${it.unit ?? ""}`.trim();
-      page.drawText(sanitise(qtyText), {
-        x: COL_QTY_X,
-        y,
-        font: helv,
-        size: 10,
-        color: INK,
-      });
-
-      const priceText = formatCurrency(
-        Number(it.unit_price) || 0,
-        quote.currency,
-      );
-      page.drawText(sanitise(priceText), {
-        x: COL_PRICE_X,
-        y,
-        font: helv,
-        size: 10,
-        color: INK,
-      });
-
-      const totalText = formatCurrency(
-        Number(it.line_total) || 0,
-        quote.currency,
-      );
-      page.drawText(sanitise(totalText), {
-        x: COL_TOTAL_X - helv.widthOfTextAtSize(sanitise(totalText), 10),
-        y,
-        font: helv,
-        size: 10,
-        color: INK,
-      });
-
-      y = Math.min(y, lineY) - 6;
+      for (const text of details) {
+        if (y - 12 < BOTTOM_MIN) continueTable();
+        page.drawText(text, { x: COL_DESC_X, y, font: helv, size: 9, color: MUTED });
+        y -= 12;
+      }
+      y -= 6;
     }
     y -= 6;
   }

@@ -4,18 +4,13 @@ import { useState } from "react";
 import { CheckCircle, ClipboardText } from "@phosphor-icons/react";
 import { isNativeIOSApp } from "@/lib/native-app";
 import type { QuoteLineItem } from "@/lib/quote-types";
+import { formatQuantity } from "@/lib/quantity-display";
 
 type Props = {
   items: QuoteLineItem[];
   /** One-line job description for the list header, when present. */
   jobSummary?: string | null;
 };
-
-/** "225.72" → "225.72", "13" → "13" — no trailing ".00" noise on whole counts. */
-function formatQty(q: unknown): string {
-  const n = Number(q) || 0;
-  return Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100);
-}
 
 /**
  * Build the plain-text materials list — quantities only, deliberately NO
@@ -28,7 +23,7 @@ export function buildMaterialsListText(
 ): string {
   const materials = items.filter((it) => it.type !== "labour");
   const lines = materials.map(
-    (it) => `• ${formatQty(it.quantity)} ${it.unit} — ${it.description}`,
+    (it) => `• ${formatQuantity(it.quantity, it.unit_price)} ${it.unit} — ${it.description}`,
   );
   return [
     "Materials list",

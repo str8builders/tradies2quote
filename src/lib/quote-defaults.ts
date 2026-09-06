@@ -42,13 +42,13 @@ const CURRENCY_LOCALE: Record<string, string> = {
   CAD: "en-CA",
 };
 
-export function formatCurrency(amount: number, currency: string): string {
+export function formatCurrency(amount: number, currency: string, maximumFractionDigits = 2): string {
   const locale = CURRENCY_LOCALE[currency] ?? "en-NZ";
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    maximumFractionDigits,
   }).format(Number.isFinite(amount) ? amount : 0);
 }
 
