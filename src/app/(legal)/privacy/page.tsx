@@ -127,6 +127,13 @@ export default function PrivacyPage() {
             you select for processing, after AI consent. The provider disclosures
             below apply to those features too.
           </p>
+          <p>
+            PDFs imported into T2QCAL remain on your device, separate from the
+            public reference-manual cache. Signed-in imports are shown only for
+            the account that added them; signed-out imports stay in the device
+            library. Older imports without an owner require a recovery choice.
+            Importing a PDF does not upload it for AI processing.
+          </p>
         </LegalSection>
 
         <LegalSection id="how-we-use" number="03" title="How we use it">
