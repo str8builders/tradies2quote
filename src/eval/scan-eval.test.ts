@@ -27,7 +27,7 @@ import {
   buildSystemPrompt,
   sanitisePlan,
   type ScannedPlan,
-} from "@/app/api/quotes/scan-drawing/route";
+} from "@/lib/scan-drawing";
 import { SCAN_CASES, type ScanCase } from "./scan-cases";
 
 const ENABLED = process.env.RUN_SCAN_EVAL === "1";

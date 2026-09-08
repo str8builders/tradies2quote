@@ -17,7 +17,7 @@
  * tradie drew.
  */
 
-import type { ScannedPlan } from "@/app/api/quotes/scan-drawing/route";
+import type { ScannedPlan } from "@/lib/scan-drawing";
 
 type JobType = "Deck" | "Fence" | "Framing" | "Concrete" | "Roofing" | "Other";
 

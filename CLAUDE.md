@@ -26,7 +26,7 @@ Before adding APIs you haven't used in this codebase yet (route handlers, server
 - **Styling:** Tailwind CSS v4 + Phosphor icons (no emojis in UI)
 - **Auth/DB/Storage:** Supabase via `@supabase/ssr` — project id `guiovuqccbzlbacaxepd`
 - **AI:** OpenAI Whisper (transcription) and Anthropic Claude `claude-sonnet-4` (quote generation, planned). Prefer `fetch` over SDKs where the API surface is small.
-- **Hosting:** self-hosted VPS (84.247.170.160) — `tradies2quote.com` DNS points there; Caddy → systemd `tradies2quote.service` (`next start` on 127.0.0.1:3001) + self-hosted Supabase docker stack (`tradies-supabase-*`, kong on :8100). The old Vercel project `tradies-nz` is legacy/rollback only.
+- **Hosting:** Sydney VPS, SSH alias `str8-sydney` (46.250.240.146 at the 6 September 2026 audit). Caddy → `t2q.service` → Next.js on 127.0.0.1:3001; app `/srv/t2q/app`, external environment `/srv/t2q/app.env`, database container `supabase-db`. Verify the live layout before release. See `deploy/README.md`; older VPS/Vercel layouts are historical.
 - **Planned later:** Stripe (subscriptions), Resend (email), react-pdf or pdf-lib (PDF generation)
 
 Avoid adding dependencies unless absolutely necessary.
@@ -77,30 +77,27 @@ Semantic tokens (`bg-background`, `text-ink`, `bg-surface`) were never defined i
 | `npm run build` | production build — run at the end of every chunk, expect zero errors |
 | `npm run lint` | ESLint with the Next preset |
 | `npm test` | vitest unit tests (also run in CI on every push) |
-## Deploy model (VPS — since 2026-07)
+## Deploy model (Sydney VPS)
 
-Production runs on the owner's VPS (84.247.170.160, ssh alias `nursemate-vps` /
-user `deploy`), NOT Vercel. GitHub pushes deploy nothing. The zero-downtime
-update path (ask the owner before any production deploy):
+Use the current [deployment runbook](deploy/README.md). Do not use the historical
+`nursemate-vps`, `/home/deploy/tradies2quote`, fresh-database or Vercel cutover
+instructions for the existing production site.
 
-1. `cp -r ~/tradies2quote ~/tradies2quote-release && rm -rf ~/tradies2quote-release/{.next,node_modules}` on the VPS (preserves `.env.local`).
-2. rsync the local working tree → `~/tradies2quote-release/`, excluding
-   `.git node_modules .next .env* .claude .vercel coverage tsconfig.tsbuildinfo`.
-3. `npm ci && npm run build` in the release dir (live app keeps serving).
-4. Apply any new `supabase/migrations/*.sql` (see `deploy/apply-migrations.sh`).
-5. `sudo systemctl stop tradies2quote && mv ~/tradies2quote ~/tradies2quote.previous-$(date +%Y%m%d%H%M%S) && mv ~/tradies2quote-release ~/tradies2quote && sudo systemctl start tradies2quote`.
-6. Verify `https://tradies2quote.com/api/health` + key routes return 200.
+Ask the owner before a production deploy when the current task has not already
+authorised it. The owner's 8 September 2026 request explicitly authorised the
+current audit repairs and deployment; do not ask for duplicate approval.
+Actual server access and release acceptance checks are still required.
 
-Rollback: stop the service, `mv` the `previous-*` dir back, start.
-Runtime env/secrets live ONLY in `/home/deploy/tradies2quote/.env.local` on the
-VPS (never in git, excluded from rsync). Cron jobs run as systemd timers
-(`tradies2quote-cron@<name>.timer` → curl the `/api/cron/*` route with
-`CRON_SECRET`); daily DB+storage backups via `tradies2quote-backup.timer` to
-`/var/backups/tradies2quote` (14-day retention).
+Stage/build a separate release while the existing app serves. Preserve
+`/srv/t2q/app.env`, verify a restricted database backup, apply only the reviewed
+repair transaction and check native-to-web owner isolation before activation.
+Retain the previous app directory for rollback. A database rollback after commit
+requires a reviewed corrective migration or backup restore; app rollback alone
+does not revert database changes.
 
-Legacy: the Vercel project `tradies-nz` still exists for rollback history; the
-old `vercel deploy --prod` path and the `str8685` deploy-mirror notes are
-retired. `knockoff.app` is a separate Vercel project and is unaffected.
+`npm run release:test` checks the read-only configuration preflight and migration
+dry-run. `release:check` inventories settings without printing secrets or calling
+providers. Passing it is not proof of live transactions or App Store readiness.
 
 ## Scope boundaries
 

@@ -36,17 +36,17 @@ export function CompanionApp() {
           </h2>
           <p>
             T2QCAL brings construction calculations and measured drawings to
-            your iPhone. Send selected quantities into a Tradies2Quote draft,
+            your phone, tablet or computer. Install it separately from Tradies2Quote. Send selected quantities into a Tradies2Quote draft,
             using your own rates, markup and GST.
           </p>
           <div className="studio-calculator-stats">
             <div data-testid="companion-proof-calculators">
-              <strong>94</strong>
-              <span>trade calculators</span>
+              <strong>02</strong>
+              <span>installable web apps</span>
             </div>
             <div data-testid="companion-proof-library">
-              <strong>74</strong>
-              <span>manuals &amp; resources</span>
+              <strong>Live</strong>
+              <span>calculator drawings</span>
             </div>
             <div data-testid="companion-proof-account">
               <strong>01</strong>
@@ -58,13 +58,13 @@ export function CompanionApp() {
             your quotes.
           </p>
           <Link
-            href="/calculator"
+            href="/t2qcal"
             className="studio-button studio-button-secondary"
           >
             Explore T2QCAL <ArrowUpRight size={20} />
           </Link>
           <span className="studio-availability">
-            iPhone companion in beta · Register your interest
+            Open in your browser · Add each app to your Home Screen
           </span>
         </div>
       </div>

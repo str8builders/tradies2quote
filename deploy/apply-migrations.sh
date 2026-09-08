@@ -36,15 +36,25 @@ psql_file() {
   fi
 }
 
-echo ">> Ensuring tracking table exists..."
-psql_run -q <<'SQL'
+if [ "${DRY_RUN:-0}" = "1" ]; then
+  # Even creating the tracker is a write. A dry run must work with a read-only
+  # database role and leave a previously untracked database untouched.
+  tracker=$(psql_run -qAt -c "select to_regclass('public._applied_migrations') is not null;")
+  if [ "$tracker" = "t" ]; then
+    applied=$(psql_run -qAt -c "select name from public._applied_migrations;")
+  else
+    applied=""
+  fi
+else
+  echo ">> Ensuring tracking table exists..."
+  psql_run -q <<'SQL'
 create table if not exists public._applied_migrations (
   name text primary key,
   applied_at timestamptz not null default now()
 );
 SQL
-
-applied=$(psql_run -qAt -c "select name from public._applied_migrations;")
+  applied=$(psql_run -qAt -c "select name from public._applied_migrations;")
+fi
 
 pending=()
 for f in "$MIGRATIONS_DIR"/*.sql; do

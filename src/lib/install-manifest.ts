@@ -3,8 +3,8 @@ import type { MetadataRoute } from "next";
 /**
  * Web App Manifest for tradies2Quote.
  *
- * Next 16 App Router serves this at `/manifest.webmanifest` automatically and
- * injects the `<link rel="manifest" />` into every page in the layout tree.
+ * Served by the explicit /manifest.webmanifest route. Layout metadata chooses
+ * the manifest so the separate T2QCAL app can override its install identity.
  *
  * Theme + background colours mirror the design tokens declared in
  * `src/app/globals.css`:
@@ -26,6 +26,7 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: "/app",
     name: "tradies2Quote",
     short_name: "T2Q",
     description:

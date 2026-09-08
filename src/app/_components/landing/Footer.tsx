@@ -56,7 +56,7 @@ export function Footer({
                 <>
                   <li>
                     <Link
-                      href="/calculator"
+                      href="/t2qcal"
                       data-testid="footer-link-calculator"
                       className="hover:text-white"
                     >

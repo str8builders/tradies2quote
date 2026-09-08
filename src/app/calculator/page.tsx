@@ -87,7 +87,7 @@ const HONEST = [
   },
   {
     q: "Android?",
-    a: "Not yet — it's a native iPhone app. Tradies2Quote itself runs on Android through the browser.",
+    a: "Yes. Open the T2QCAL web app on Android, iPhone, tablet or desktop. You can add it to your Home Screen separately from Tradies2Quote. The native iPhone companion is still awaiting App Store distribution.",
   },
   {
     q: "Does it store the manuals?",
@@ -167,11 +167,11 @@ export default async function CalculatorPage() {
                 signal.
               </p>
               <a
-                href="#waitlist"
+                href="/t2qcal"
                 className="t2q-btn-primary mt-8 inline-flex"
                 data-testid="calculator-hero-cta"
               >
-                Tell me when it lands <ArrowRight size={18} weight="bold" />
+                Open T2QCAL web app <ArrowRight size={18} weight="bold" />
               </a>
             </div>
 
@@ -424,10 +424,10 @@ export default async function CalculatorPage() {
                 <span className="text-brand">Not on the App Store yet.</span>
               </h2>
               <p className="mt-5 leading-relaxed text-ink-200">
-                T2QCAL runs on real phones today, but it&apos;s in beta and
-                there&apos;s no public download link to give you — putting one on
-                the App Store is the next step. Leave your email and you&apos;ll
-                get one message when it&apos;s installable. Not a newsletter.
+                Use the T2QCAL web app now and add it to your Home Screen.
+                The native iPhone app, including its offline manual shelf and
+                device features, is awaiting App Store distribution. Leave your
+                email for a message when the native app becomes available.
               </p>
 
               <div className="mt-8">

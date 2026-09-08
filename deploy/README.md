@@ -1,185 +1,106 @@
-# tradies2quote — VPS self-hosting runbook
+# Tradies2Quote — existing Sydney production release
 
-Move the app off Vercel and the database off Supabase Cloud onto **one VPS**,
-running the Next.js app + a **self-hosted Supabase stack** behind Caddy (auto-HTTPS).
+This replaces the historical fresh-VPS/Vercel migration instructions. The user
+approved the audit repairs and deployment on **8 September 2026**. Server access was restored on 8 September. A restricted database backup was
+verified, the three core repair migrations and private T2QCAL saved-working
+table were applied, and disposable native handoff/owner-isolation tests passed.
+The two-web-app release is being built and checked before activation. External
+AI, quote-email, billing, SMS, scheduler and push configuration remains incomplete.
 
-```
-Internet ──▶ Caddy (:443)
-              ├── tradies2quote.com      ──▶ app        (Next.js standalone :3000)
-              └── api.tradies2quote.com  ──▶ kong :8000 ──▶ Supabase (Auth/PostgREST/Storage/Realtime) ──▶ Postgres
-```
+## Known deployment (last inspected 8 September 2026)
 
-Everything in this `deploy/` folder is the app + proxy layer. The Supabase
-services come from the **official** `supabase/docker` stack (you never
-hand-write those — they change often and are easy to get subtly wrong).
-
----
-
-## What you need before starting (the 2 blockers)
-
-1. **A VPS** — Ubuntu 22.04/24.04, ≥ 4 GB RAM (Supabase's ~10 containers + the
-   app need headroom; 8 GB comfortable), Docker + Docker Compose installed,
-   ports 80/443 open. Give Claude SSH access (key-based) **or** run the steps
-   yourself with Claude guiding.
-2. **Secrets** — the values currently in your Vercel project
-   (Settings → Environment Variables): OpenAI, Anthropic, Stripe, Resend,
-   Twilio, VAPID. Copy them into `deploy/.env.vps`.
-
-> **No data migration needed** (decided 2026-07-12): the cloud Supabase data
-> was test-only, so the VPS starts with a **fresh, empty database** — schema
-> comes from the repo's migrations (Step 7). The paused cloud project
-> `guiovuqccbzlbacaxepd` can stay paused; Step 8 is skipped.
-
----
-
-## Step 1 — DNS
-
-Point these A records at your VPS public IP:
-
-| Record | Purpose |
+| Component | Existing destination |
 |---|---|
-| `tradies2quote.com` | the app |
-| `www.tradies2quote.com` | redirects to apex |
-| `api.tradies2quote.com` | self-hosted Supabase API |
+| Server | SSH alias `str8-sydney`, then 46.250.240.146 |
+| App / environment | `/srv/t2q/app` / `/srv/t2q/app.env` |
+| Process | `t2q.service`, Next.js at 127.0.0.1:3001 behind Caddy |
+| Website | https://tradies2quote.com |
+| Supabase API | https://api.tradies2quote.com |
+| Postgres | Docker container `supabase-db`, database `postgres` |
+| Separate native app | T2QCAL, `com.t2qcal.app`; shares accounts and quote drafts |
 
-Caddy provisions TLS automatically on first hit once DNS resolves.
+Recheck the live service, its working directory/launch command and current app
+revision before using these paths. Preserve changes made since the audit. Do not
+print the external environment, container environment, credentials or customer
+records to logs. The old host `84.247.170.160`, `nursemate-vps`, old Docker app
+compose file and an empty-database rebuild are not this release procedure.
 
-## Step 2 — Get the code onto the VPS
+## Release gates
 
-```bash
-git clone https://github.com/str8builders/tradies2quote.git
-cd tradies2quote
+1. **Access and recovery:** confirm server access, service identity, available disk,
+   current application revision and an existing rollback directory. Back up the
+   existing database with a restricted custom-format dump and verify its archive
+   listing before schema changes. Preserve private storage and the external env.
+2. **Configuration:** run the command below using the existing app environment and
+   the actual GoTrue container name. It prints setting names/statuses only. A local
+   text model does not provide the Anthropic plan routes or OpenAI photo/voice
+   routes. Resend quote email and Supabase signup/reset SMTP are separate services.
+   Provide real account configuration and exercise the enabled features; do not
+   treat placeholders, test Stripe keys or disabled client flags as a full release.
+3. **Database:** apply only the reviewed three `20260906_restore_*` migrations in
+   the audit's `repair.sql` transaction. Recheck duplicate/JSON preconditions since
+   the original rehearsal. This repair retains customer records. Unexpected data
+   or locks must abort. The normal migration runner must not replay the historical
+   migration directory against this reconstructed database.
+4. **Application:** stage the reviewed source into a new release directory, excluding
+   `.git`, dependencies, generated builds and all `.env*` files. Run `npm ci`, the
+   tests, lint and production build there. Use the real public Supabase/app values
+   at build time because Next.js embeds `NEXT_PUBLIC_*` values. Keep production
+   serving throughout the build. Retain build logs and source checksums.
+5. **Acceptance:** run the disposable native quote fixture through authentication,
+   owner insert/read, other-account denial, retry/conflict handling and the signed-in
+   website preview. Test representative text/voice/photo/plan inputs, quote edits,
+   quantity totals, private evidence, PDF output, and test-mode provider/webhook
+   flows. Customer messages or live payments require their own intended recipients
+   and transactions; deployment authorisation is not permission to send them.
+6. **Activation:** after gates pass, stop `t2q.service` briefly, retain the old app
+   directory, move the staged release to the configured app location, and restart.
+   Use the verified service account/ownership and existing systemd environment.
+   This directory swap involves a brief interruption; do not describe it as zero
+   downtime. Confirm the expected revision from `/api/health`, auth, protected
+   routes, quote creation/reopen, public quote view and PDF output. The health
+   endpoint alone only proves that the Next.js process answers.
+
+Read-only local checks (Node 22+):
+
+```sh
+npm run release:test
 ```
 
-## Step 3 — Stand up the official Supabase stack
+Read-only server configuration inventory (replace `ACTUAL_GOTRUE_CONTAINER` with
+its inspected name; do not assume it shares the database container's name):
 
-```bash
-# Official self-hosted Supabase (canonical, maintained).
-git clone --depth 1 https://github.com/supabase/supabase deploy/supabase-official
-cd deploy/supabase-official/docker
-cp .env.example .env
+```sh
+node --env-file=/srv/t2q/app.env deploy/check-release.mjs --auth-container ACTUAL_GOTRUE_CONTAINER
 ```
 
-Now edit that `.env` and set, at minimum:
+The preflight makes no network requests, sends nothing, and writes no settings.
+It checks static configuration, not provider account entitlements or delivery.
+Exit 0 means **configuration present**, 1 means **blocked configuration**, and 2
+means the inventory itself could not run. The returned `notVerified` list remains
+outstanding even when all configuration checks pass. Its scope is the complete
+client feature set requested for this audit, including plan reading and deposits.
+Enable those flags only after their respective acceptance checks pass.
 
-- `POSTGRES_PASSWORD` — strong password.
-- `JWT_SECRET`, `ANON_KEY`, `SERVICE_ROLE_KEY` — generate as a matched set with
-  the Supabase JWT generator (https://supabase.com/docs/guides/self-hosting/docker#generate-api-keys).
-- `SITE_URL=https://tradies2quote.com`, `API_EXTERNAL_URL=https://api.tradies2quote.com`,
-  `SUPABASE_PUBLIC_URL=https://api.tradies2quote.com`.
-- SMTP settings if you want Supabase to send its own auth emails (optional —
-  the app also sends via Resend).
+The legacy migration runner's `DRY_RUN=1` now performs SELECTs only, including
+when the tracking table does not yet exist. Do not interpret its pending list as
+approval to execute all historical migrations on Sydney.
 
-Start it:
+## Recovery
 
-```bash
-docker compose up -d
-docker network ls        # note the network name, usually `supabase_default`
-cd ../../..              # back to repo root
-```
+Before activation, record the exact previous app path and source revision. If app
+acceptance fails, stop the service, retain the failed release for diagnosis,
+restore the previous app directory to its configured location and start it again.
+Verify health and representative authenticated reads. Keep the database backup
+private and preserve storage files. A post-commit database reversal is a separate
+operation: assess compatibility and use a reviewed corrective migration or a
+coordinated backup restore, accounting for writes made since that backup.
 
-## Step 4 — Configure the app env
+## Native distribution
 
-```bash
-cp deploy/.env.vps.example deploy/.env.vps
-```
-
-Fill `deploy/.env.vps`:
-
-- **Supabase (section A):** set `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` = the
-  `ANON_KEY` and `SUPABASE_SERVICE_ROLE*` = the `SERVICE_ROLE_KEY` you generated
-  in Step 3. Set `SUPABASE_NETWORK` to the network name from `docker network ls`.
-- **Third-party keys (section C):** paste from Vercel.
-- Generate the ones marked: `CRON_SECRET` (`openssl rand -hex 32`) and, if you
-  don't already have them, VAPID keys (`npx web-push generate-vapid-keys`).
-
-> The `NEXT_PUBLIC_*` values are **baked into the build**, so they're passed as
-> build args automatically by the compose file — just make sure they're correct
-> in `.env.vps` before building.
-
-## Step 5 — Set the domains in the proxy
-
-Edit `deploy/Caddyfile` — replace `tradies2quote.com` / `api.tradies2quote.com`
-if your domains differ.
-
-## Step 6 — Build & run the app + proxy
-
-```bash
-docker compose -f deploy/docker-compose.yml --env-file deploy/.env.vps up -d --build
-docker compose -f deploy/docker-compose.yml logs -f app     # watch it boot
-curl -fsS https://tradies2quote.com/api/health              # should return JSON
-```
-
-## Step 7 — Create / update the schema on the self-hosted DB
-
-Use the tracked migration runner (idempotent — applies only files it hasn't
-applied before, in name order, and records them in
-`public._applied_migrations`):
-
-```bash
-DRY_RUN=1 ./deploy/apply-migrations.sh   # list what would run
-./deploy/apply-migrations.sh             # apply pending migrations
-```
-
-**Run this on every deploy that adds files to `supabase/migrations/`** —
-the rsync deploy ships app code only, so a forgotten migration means the app
-hits a schema that doesn't match.
-
-One-time baseline for a database that already has the schema (created before
-the runner existed): insert the already-applied filenames into
-`public._applied_migrations` first, so the runner doesn't re-apply them.
-
-## Step 8 — Copy the data from Cloud Supabase  ⟵ SKIPPED (test data only)
-
-**Not needed for this migration** — the cloud data was test-only, so we start
-fresh. Kept below in case you ever want it. It requires `guiovuqccbzlbacaxepd`
-to be restored (currently paused/billing-blocked):
-
-```bash
-# Dry run first — dumps only, writes nothing:
-SOURCE_DB_URL='postgresql://postgres:PASS@db.guiovuqccbzlbacaxepd.supabase.co:5432/postgres' \
-  ./deploy/migrate-supabase.sh
-
-# Inspect deploy/_dump/*.sql, then apply:
-SOURCE_DB_URL='...' TARGET_DB_URL='postgresql://postgres:PASS@VPS_IP:5432/postgres' \
-  APPLY=1 ./deploy/migrate-supabase.sh
-```
-
-Then copy the **storage files** for the `signatures` bucket (the script moves
-only the DB rows) — see the note the script prints on completion.
-
-## Step 9 — Point Stripe / webhooks at the new host
-
-- Update Stripe webhook endpoints to `https://tradies2quote.com/api/payments/webhook`
-  (and the subscriptions webhook), then refresh `STRIPE_*_WEBHOOK_SECRET`.
-- Update any Resend/Twilio callback URLs similarly.
-- Re-issue OAuth redirect URLs in Supabase Auth config to the new `api.*` host.
-
-## Step 10 — Cut over & verify
-
-Smoke-test end-to-end before flipping DNS TTL down:
-
-- [ ] Landing page loads over HTTPS
-- [ ] **Sign up + log in** (auth against self-hosted GoTrue)
-- [ ] Create a quote (OpenAI/Anthropic calls succeed)
-- [ ] Public `/quote/[token]` accept + **signature upload** (storage works)
-- [ ] Stripe checkout + webhook received
-- [ ] `/api/health` green
-
----
-
-## Rollback
-
-Vercel stays live and untouched until you flip DNS. If anything fails, point
-DNS back to Vercel. (No cloud data is at risk — the migration doesn't touch
-the old Supabase project at all.)
-
-## Notes / gotchas
-
-- **RAM:** the Supabase stack is heavy. If the VPS is < 4 GB, expect OOM. Add
-  swap or size up.
-- **Backups:** set up `pg_dump` cron on the VPS Postgres — you're now your own
-  DBA. Supabase Cloud's automatic backups won't cover you anymore.
-- **Sentry** is optional and stays a no-op unless you set `NEXT_PUBLIC_SENTRY_DSN`.
-- The app reads either `SUPABASE_SERVICE_ROLE` or `SUPABASE_SERVICE_ROLE_KEY` —
-  `.env.vps` sets both to the same value.
+T2QCAL remains the existing SwiftUI app. The web source package does not publish
+it to the App Store. Integrate the reviewed native patch, complete a current Xcode
+build and simulator/device checks, configure the correct Apple team and bundle,
+then validate a signed archive/TestFlight build and App Store metadata/privacy.
+Camera, microphone, RoomPlan/LiDAR, AR accuracy and account/private-document flows
+need real-device verification before client release.

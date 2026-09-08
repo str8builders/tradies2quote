@@ -1,0 +1,15 @@
+"use client";
+import {useCallback,useEffect,useState} from "react";
+import Link from "next/link";
+import type {SavedCalculation} from "./calculators/CalculationSeed";
+export function SavedWorking(){
+  const [records,setRecords]=useState<SavedCalculation[]>([]),[next,setNext]=useState<number|null>(null),[error,setError]=useState(""),[busy,setBusy]=useState(true);
+  const load=useCallback(async(offset=0,signal?:AbortSignal)=>{try{const response=await fetch(`/api/t2qcal/calculations?offset=${offset}`,{cache:"no-store",signal:signal?AbortSignal.any([signal,AbortSignal.timeout(20000)]):AbortSignal.timeout(20000)});const data=await response.json();if(!response.ok){if(response.status===401){setRecords([]);setNext(null);}throw new Error(data.error??"Could not load saved working.");}setError("");setRecords(old=>offset?[...old,...data.records.filter((r:SavedCalculation)=>!old.some(o=>o.id===r.id))]:data.records);setNext(data.nextOffset);}catch(e){if(!signal?.aborted)setError(e instanceof Error?e.message:"Could not load saved working.");}finally{if(!signal?.aborted)setBusy(false);}},[]);
+  // Fetch the external account store after hydration; updates follow the response.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(()=>{const abort=new AbortController();void load(0,abort.signal);const focus=()=>{setRecords([]);setNext(null);setBusy(true);void load(0,abort.signal);};window.addEventListener("focus",focus);return()=>{abort.abort();window.removeEventListener("focus",focus);};},[load]);
+  async function remove(record:SavedCalculation){if(!window.confirm(`Delete “${record.name}” from your saved working?`))return;setBusy(true);setError("");try{const response=await fetch(`/api/t2qcal/calculations/${record.id}`,{method:"DELETE",signal:AbortSignal.timeout(20000)});if(!response.ok)throw new Error("The calculation was not removed. Please try again.");await load();}catch(e){setError(e instanceof Error?e.message:"The calculation was not removed.");}finally{setBusy(false);}}
+  return <main className="directory-page"><section className="page-intro"><h1>Saved working</h1><p>Reopen your measurements, update them or save a new copy.</p></section>{error&&<p role="alert">{error} <button onClick={()=>load()}>Try again</button></p>}{busy&&<p role="status">Loading…</p>}{!busy&&!error&&!records.length&&<div className="empty-state"><h2>No saved calculations yet</h2><Link href="/t2qcal/calculators">Choose a calculator</Link></div>}
+    <div className="tool-grid">{records.map(record=><article className="save-working" key={record.id}><h2><Link href={`/t2qcal/calculator/${record.snapshot.slug}?saved=${record.id}`}>{record.name}</Link></h2><p>{record.snapshot.unit==="metric"?"Metric":"Imperial"} · {new Date(record.updated_at).toLocaleDateString()}</p><div className="save-actions"><Link href={`/t2qcal/calculator/${record.snapshot.slug}?saved=${record.id}`}>Open calculation</Link><button disabled={busy} onClick={()=>remove(record)}>Delete</button></div></article>)}</div>{next!==null&&<button className="directory-button" disabled={busy} onClick={()=>load(next)}>Load more</button>}
+  </main>;
+}

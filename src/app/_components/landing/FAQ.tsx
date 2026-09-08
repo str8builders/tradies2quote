@@ -24,7 +24,7 @@ const FAQS = [
   {
     slug: "phone",
     q: "Can I use it on my phone?",
-    a: "Yes. Tradies2Quote runs in your phone's browser and can be added to your home screen. You can also sign in from a computer. T2QCAL is a separate iPhone companion currently in beta.",
+    a: "Yes. Tradies2Quote runs in your phone's browser and can be added to your home screen. You can also sign in from a computer. T2QCAL is a separate web app for construction calculators. Open each app from this website and add each to your home screen; both use your Tradies2Quote account.",
   },
   {
     slug: "replaces-jms",

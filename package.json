@@ -13,7 +13,9 @@
     "eval:plans": "RUN_PLAN_EVAL=1 vitest run src/eval/plan-reader-eval.test.ts",
     "eval:csi": "RUN_CSI_EVAL=1 vitest run src/eval/csi-mapper-eval.test.ts",
     "eval:quote-agent": "RUN_QUOTE_AGENT_EVAL=1 vitest run src/eval/quote-agent-eval.test.ts",
-    "eval:corrections": "RUN_CORRECTIONS_EVAL=1 vitest run src/eval/corrections-eval.test.ts"
+    "eval:corrections": "RUN_CORRECTIONS_EVAL=1 vitest run src/eval/corrections-eval.test.ts",
+    "release:check": "node deploy/check-release.mjs",
+    "release:test": "node --test deploy/test-release.mjs"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.1",

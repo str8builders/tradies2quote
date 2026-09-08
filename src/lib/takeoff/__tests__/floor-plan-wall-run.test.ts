@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sanitisePlan } from "@/app/api/quotes/scan-drawing/route";
+import { sanitisePlan } from "@/lib/scan-drawing";
 import {
   extractStructuredPlanMarker,
   parseTakeoffDescription,

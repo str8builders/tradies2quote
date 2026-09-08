@@ -21,7 +21,7 @@ import {
   isSupportedScanInput,
   scanUploadSizeError,
 } from "@/lib/imageUpload";
-import type { ScannedPlan } from "@/app/api/quotes/scan-drawing/route";
+import type { ScannedPlan } from "@/lib/scan-drawing";
 
 type ScanState =
   | "idle"

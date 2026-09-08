@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   geometryPreamble,
   sanitisePlan,
-} from "@/app/api/quotes/scan-drawing/route";
+} from "@/lib/scan-drawing";
 import { extractFromText } from "../extraction";
 
 // ─────────────────────────────────────────────────────────────────────────

@@ -8,6 +8,7 @@ import {
   Plus_Jakarta_Sans,
 } from "next/font/google";
 import "./globals.css";
+import { TradiesOnly } from "./_components/TradiesOnly";
 import "./redesign.css";
 import { LiveWallpaper } from "./_components/LiveWallpaper";
 import { FloatingInstallButton } from "./_components/FloatingInstallButton";
@@ -118,7 +119,9 @@ export const metadata: Metadata = {
     },
   },
   category: "business",
-  // PWA — `app/manifest.ts` is auto-served at `/manifest.webmanifest` and the
+  // Explicit metadata lets /t2qcal select its separate install manifest.
+  manifest: "/manifest.webmanifest",
+  // The
   // Favicons are owned by Next.js's file convention — see
   // `src/app/icon.svg`, `src/app/icon.ico`, `src/app/apple-icon.png`.
   // Next emits `<link rel="icon" href="/icon?<hash>">` etc. with a
@@ -126,7 +129,7 @@ export const metadata: Metadata = {
   // favicon cache ignores ?v= query strings on the original URL). The
   // manual `metadata.icons` block that used to live here pointed at
   // /favicon.ico?v=NN and got bypassed by Chrome's sticky cache.
-  // <link rel="manifest"> is auto-injected by Next 16; iOS-specific
+  // The manifest link follows layout metadata; iOS-specific
   // meta tags (apple-mobile-web-app-*) follow below. Favicon links are
   // emitted from the file-convention files in src/app/, not from here.
   appleWebApp: {
@@ -193,12 +196,12 @@ export default function RootLayout({
       className={`${archivoblack.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable} ${fraunces.variable} ${inter.variable} ${plusJakartaSans.variable} h-full`}
     >
       <body className="min-h-full flex flex-col bg-ink-900 text-white antialiased">
-        <LiveWallpaper />
+        <TradiesOnly><LiveWallpaper /></TradiesOnly>
         <div className="studio-content">{children}</div>
         {/* Wave 12.3 — floating Install-App CTA. Renders nothing when
             the app is already installed or the browser can't install,
             so safe to mount globally. */}
-        <FloatingInstallButton />
+        <TradiesOnly><FloatingInstallButton /></TradiesOnly>
         {/* Analytics (track.js) is no longer loaded unconditionally here —
             <CookieConsent /> injects it only after the visitor opts in,
             so the non-essential tracker never runs pre-consent. */}
