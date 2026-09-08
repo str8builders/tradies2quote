@@ -1,5 +1,5 @@
 /* T2QCAL's public calculator cache. Never cache accounts, APIs or saved URLs. */
-const CACHE = "t2qcal-web-20260909-native-2";
+const CACHE = "t2qcal-web-20260909-native-3";
 const HOME = "/t2qcal/calculators";
 const OFFLINE = "/t2qcal/offline.html";
 const publicPage = url => !url.search && (url.pathname === "/t2qcal" || [HOME,"/t2qcal/device","/t2qcal/install","/t2qcal/jobs","/t2qcal/measure","/t2qcal/resources"].includes(url.pathname) || /^\/t2qcal\/calculator\/[a-z0-9-]+$/.test(url.pathname));
@@ -19,7 +19,7 @@ async function warmPage(path) {
 }
 self.addEventListener("install",event=>event.waitUntil((async()=>{
   const cache=await caches.open(CACHE);
-  await cache.addAll([OFFLINE,"/t2qcal/native-icon.png","/t2qcal/native-mark.png"]);
+  await cache.addAll([OFFLINE,"/t2qcal/native-icon.png","/t2qcal/native-mark.png","/t2qcal/fonts/ArchivoBlack-Regular.woff2","/t2qcal/fonts/IBMPlexSans.woff2","/t2qcal/fonts/IBMPlexMono-Regular.woff2"]);
   await Promise.all([warmPage(HOME),warmPage("/t2qcal/device"),warmPage("/t2qcal/install"),warmPage("/t2qcal/jobs"),warmPage("/t2qcal/measure"),warmPage("/t2qcal/resources")]);
   await self.skipWaiting();
 })()));

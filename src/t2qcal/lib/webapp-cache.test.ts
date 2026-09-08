@@ -16,3 +16,10 @@ it("never serves public cache for a private saved calculation",async()=>{const w
 it("leaves account APIs and the quoting app untouched",()=>{const w=worker();expect(w.navigate("/api/t2qcal/calculations","cors")).toBeUndefined();expect(w.navigate("/app")).toBeUndefined();expect(w.navigate("/login")).toBeUndefined();});
 it("shows an honest fallback for an unopened calculator",async()=>{const w=worker();expect(await(await w.navigate("/t2qcal/calculator/concrete-slab")!).text()).toBe("offline fallback");});
 it("does not use HTML caching for RSC requests",()=>{const w=worker();expect(w.navigate("/t2qcal/calculators?_rsc=abc","cors")).toBeUndefined();});
+it("preloads the native identity and fonts before claiming offline support",async()=>{
+ let install:((event:{waitUntil:(p:Promise<void>)=>void})=>void)|undefined;
+ const addAll=vi.fn(async(_paths:string[])=>{});
+ runInNewContext(source,{self:{location:{origin:"https://example.com"},addEventListener:(name:string,handler:typeof install)=>{if(name==="install")install=handler;},skipWaiting:async()=>{}},URL,Response,fetch:async()=>new Response("",{headers:{"content-type":"text/plain"}}),caches:{open:async()=>({addAll})}});
+ let completion:Promise<void>|undefined;install!({waitUntil:p=>{completion=p;}});await completion;
+ expect(addAll.mock.calls[0][0]).toEqual(expect.arrayContaining(["/t2qcal/native-icon.png","/t2qcal/native-mark.png","/t2qcal/fonts/ArchivoBlack-Regular.woff2","/t2qcal/fonts/IBMPlexSans.woff2","/t2qcal/fonts/IBMPlexMono-Regular.woff2"]));
+});
