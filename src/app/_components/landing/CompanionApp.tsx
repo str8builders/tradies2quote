@@ -25,7 +25,7 @@ export function CompanionApp() {
             <p className="mt-3 text-sm text-ink-400">Calculators open without signing in. Use Install T2QCAL to add this web app.</p>
           </article>
         </div>
-        <p className="mt-6 max-w-3xl text-sm leading-relaxed text-ink-400">On iPhone, open your chosen web app in Safari, tap Share, then Add to Home Screen. Repeat for the other app if you want both. The native T2QCAL iPhone app is being prepared for the App Store; its download will be added here when available.</p>
+        <p className="mt-6 max-w-3xl text-sm leading-relaxed text-ink-400">On iPhone, open your chosen web app in Safari, tap Share, then Add to Home Screen. Repeat for the other app if you want both. T2QCAL is available as an installable web app now. The native iPhone version is retained for a future App Store release.</p>
       </div>
     </section>
   );

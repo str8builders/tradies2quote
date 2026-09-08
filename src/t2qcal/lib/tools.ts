@@ -1,3 +1,4 @@
+import nativeCatalog from "./native-catalog.json";
 export type ToolCategory = {
   id: string;
   name: string;
@@ -136,7 +137,7 @@ const toolCatalog: ToolEntry[] = [
 
 // Every route is backed by either a dedicated interactive module or the shared
 // verified formula/technical-drawing engine.
-export const tools: ToolEntry[] = toolCatalog.map((tool) => ({ ...tool, available: true }));
+export const tools: ToolEntry[] = nativeCatalog.tools.map((tool) => ({ ...toolCatalog.find(t=>t.slug===tool.slug), name:tool.name,slug:tool.slug,category:tool.category,summary:tool.summary,popular:tool.popular,units:toolCatalog.find(t=>t.slug===tool.slug)?.units??"both",available:true }));
 
 export const availableTools = tools.filter((tool) => tool.available);
 export const popularTools = tools.filter((tool) => tool.popular && tool.available);

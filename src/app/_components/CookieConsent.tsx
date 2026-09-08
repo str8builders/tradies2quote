@@ -94,7 +94,7 @@ export function CookieConsent() {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="font-display text-sm uppercase tracking-tight text-white">
-                  Cookies on Tradies2Quote
+                  Cookies on {pathname.startsWith("/t2qcal") ? "T2QCAL" : "Tradies2Quote"}
                 </p>
                 <p className="mt-1 text-xs leading-relaxed text-ink-300 sm:text-sm">
                   We use essential cookies to keep you signed in. With your

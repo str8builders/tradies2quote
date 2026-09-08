@@ -1,55 +1,16 @@
 "use client";
-
-import { useEffect, useMemo, useRef, useState } from "react";
-import { categories, tools } from "@/t2qcal/lib/tools";
-import { ToolCard } from "./ToolCard";
-
-export function DirectoryExplorer() {
-  const search = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    const handle = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); search.current?.focus(); }
-    };
-    window.addEventListener("keydown", handle);
-    return () => window.removeEventListener("keydown", handle);
-  }, []);
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("all");
-  const [readyOnly, setReadyOnly] = useState(false);
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return tools.filter((tool) => {
-      const matchesQuery = !q || `${tool.name} ${tool.summary}`.toLowerCase().includes(q);
-      return matchesQuery && (category === "all" || tool.category === category) && (!readyOnly || tool.available);
-    });
-  }, [query, category, readyOnly]);
-
-  return (
-    <>
-      <section className="directory-controls" aria-label="Calculator filters" id="directory">
-        <label className="search-control">
-          <span>Search</span>
-          <input ref={search} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try “rafter”, “spacing” or “tile”…" type="search" />
-          <kbd>⌘ K</kbd>
-        </label>
-        <label className="select-control">
-          <span>Trade</span>
-          <select value={category} onChange={(event) => setCategory(event.target.value)}>
-            <option value="all">Every category</option>
-            {categories.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
-          </select>
-        </label>
-        <label className="check-control">
-          <input type="checkbox" checked={readyOnly} onChange={(event) => setReadyOnly(event.target.checked)} />
-          <span>Interactive now</span>
-        </label>
-      </section>
-      <div className="directory-result-line"><strong>{filtered.length}</strong> tools in this view</div>
-      <section className="tool-grid directory-grid" aria-live="polite">
-        {filtered.map((tool) => <ToolCard key={tool.slug} tool={tool} />)}
-      </section>
-      {filtered.length === 0 && <div className="empty-state"><strong>No tool matches that search.</strong><p>Try a material, job or measurement instead.</p></div>}
-    </>
-  );
+import {useEffect,useRef,useState} from "react";
+import {House,Steps,Ruler,Cube,Wrench,CircleDashed,GridFour,ArrowsLeftRight,Triangle,Package,CaretRight,MagnifyingGlass} from "@phosphor-icons/react";
+import catalog from "@/t2qcal/lib/native-catalog.json";
+import {getTool} from "@/t2qcal/lib/tools";
+const icons={roof:House,stairs:Steps,spacing:Ruler,concrete:Cube,metal:Wrench,templates:CircleDashed,deck:GridFour,convert:ArrowsLeftRight,geometry:Triangle,materials:Package};
+function Glyph({category}:{category:string}){const Icon=icons[category as keyof typeof icons]??Ruler;return <span className="native-glyph"><Icon size={18} weight="fill"/></span>;}
+export function DirectoryExplorer(){
+ const [query,setQuery]=useState("");const [searching,setSearching]=useState(false);const search=useRef<HTMLInputElement>(null);
+ useEffect(()=>{const timer=window.setTimeout(()=>{if(new URLSearchParams(location.search).has("search")){setSearching(true);window.setTimeout(()=>search.current?.focus(),0);}},0);const key=(e:KeyboardEvent)=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();setSearching(true);window.setTimeout(()=>search.current?.focus(),0);}};window.addEventListener("keydown",key);return()=>{window.clearTimeout(timer);window.removeEventListener("keydown",key);};},[]);
+ const shown=catalog.tools.filter(t=>`${t.name} ${t.summary}`.toLowerCase().includes(query.trim().toLowerCase()));
+ return <main className="native-page"><section className="native-hero"><div className="native-eyebrow">{"// FOR THE TOOLS"}</div><h1>MEASURE ONCE.<br/><em>DRAWN RIGHT.</em></h1><p>{catalog.tools.length} construction calculators with live measured drawings, running set-out lists and 3D assemblies.</p></section><label className="native-search" style={searching?undefined:{display:"none"}}><MagnifyingGlass size={19}/><input ref={search} type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder={`Search ${catalog.tools.length} calculators`} aria-label="Search calculators"/></label>
+ {!query&&<section><h2 className="native-section-label">{"// POPULAR"}</h2><div className="native-popular">{catalog.tools.filter(t=>t.popular&&getTool(t.slug)).map(t=><a key={t.slug} href={`/t2qcal/calculator/${t.slug}`}><Glyph category={t.category}/>{t.name}</a>)}</div></section>}
+ {catalog.categories.map(category=>{const rows=shown.filter(t=>t.category===category.id);return rows.length>0&&<section key={category.id}><h2 className="native-section-label"><Glyph category={category.id}/>{category.name}</h2><div className="native-group">{rows.map(t=>getTool(t.slug)?<a className="native-row" key={t.slug} href={`/t2qcal/calculator/${t.slug}`}><Glyph category={t.category}/><span><strong>{t.name}</strong><small>{t.summary}</small></span><CaretRight size={15}/></a>:<div className="native-row" key={t.slug}><Glyph category={t.category}/><span><strong>{t.name}</strong><small>Native calculator · web conversion in progress</small></span></div>)}</div></section>;})}
+ {shown.length===0&&<p className="native-footnote">No calculators match this search.</p>}</main>;
 }

@@ -31,7 +31,8 @@ export function calculateStairs(totalRise: number, preferredRise: number, treadR
   const stringer = treads * bridge;
   const stockGuide = risers * bridge;
   const openingRun = actualRise > 0 ? (headroom + floorThickness) * treadRun / actualRise : 0;
-  return { risers, actualRise, treads, totalRun, angle, stringer, stockGuide, openingRun };
+  const notchDepth = actualRise * treadRun / bridge;
+  return { risers, actualRise, treads, totalRun, angle, bridge, notchDepth, stringer, stockGuide, openingRun };
 }
 
 /** Cleared inputs collapse the divisor, so counts are capped before any array is built. */

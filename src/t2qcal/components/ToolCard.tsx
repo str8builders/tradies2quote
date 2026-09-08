@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getCategory, type ToolEntry } from "@/t2qcal/lib/tools";
 
 export function ToolCard({ tool, compact = false }: { tool: ToolEntry; compact?: boolean }) {
@@ -18,5 +17,5 @@ export function ToolCard({ tool, compact = false }: { tool: ToolEntry; compact?:
   );
 
   if (!tool.available) return <div className={`tool-card tool-card-muted ${compact ? "compact" : ""}`}>{content}</div>;
-  return <Link className={`tool-card ${compact ? "compact" : ""}`} href={`/t2qcal/calculator/${tool.slug}`}>{content}</Link>;
+  return <a className={`tool-card ${compact ? "compact" : ""}`} href={`/t2qcal/calculator/${tool.slug}`}>{content}</a>;
 }

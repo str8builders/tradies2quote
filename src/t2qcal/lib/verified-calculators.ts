@@ -1,3 +1,4 @@
+import {nativeExtraDefinition} from "./native-extra-calculators";
 import {balancedSpacing} from "./balanced-spacing";
 import { layoutDefinition } from "./layout-calculators";
 import { calculatorInputErrors } from "./calculator-inputs";
@@ -397,6 +398,7 @@ const geometrySlugs = new Set(["square-up", "golden-ratio", "pyramid", "gothic-a
 const materialSlugs = new Set(["floor-area", "tile-quantity", "weatherboard", "circular-paving", "timber-volume", "board-foot"]);
 
 function rawDefinition(slug: string): VerifiedDefinition {
+  const nativeExtra=nativeExtraDefinition(slug);if(nativeExtra)return nativeExtra;
   const layout = layoutDefinition(slug);
   if (layout) return layout;
   if (spacingSlugs.has(slug)) {

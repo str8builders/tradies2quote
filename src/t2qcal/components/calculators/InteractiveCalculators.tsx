@@ -100,11 +100,11 @@ function StairCalculator({ tool }: { tool: ToolEntry }) {
   const [totalRise,setTotalRise]=useCalculationValue<number>("totalRise",2800); const [idealRise,setIdealRise]=useCalculationValue<number>("idealRise",175);
   const [run,setRun]=useCalculationValue<number>("run",250); const [width,setWidth]=useCalculationValue<number>("width",1000); const [floorThickness,setFloorThickness]=useCalculationValue<number>("floorThickness",260);
   const [headroom,setHeadroom]=useCalculationValue<number>("headroom",unit === "metric" ? 2000 : 2000/25.4);
-  const { risers, actualRise, treads, totalRun, angle, stringer, stockGuide, openingRun } = calculateStairs(totalRise, idealRise, run, floorThickness, headroom);
+  const { risers, actualRise, treads, totalRun, angle, stringer, stockGuide, openingRun, bridge } = calculateStairs(totalRise, idealRise, run, floorThickness, headroom);
   function changeUnit(next: UnitSystem) { if (next === unit) return; const c = next === "imperial" ? toImperial : toMetric; [setTotalRise,setIdealRise,setRun,setWidth,setFloorThickness,setHeadroom].forEach((setter) => setter((v) => c(v))); setUnit(next); }
   const draw = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
     setupCanvas(ctx, w, h);
-    const pad = 72, base = h - 76, top = 74, usableW = w - pad * 2, usableH = base - top;
+    const pad = Math.min(72, Math.max(48, w * .11)), base = h - 76, top = 112, usableW = w - pad * 2, usableH = base - top;
     const scale = Math.min(usableW / Math.max(totalRun,1e-9), usableH / Math.max(totalRise,1e-9));
     const sx = run * scale, sy = actualRise * scale;
     const topX = pad + treads * sx, topY = base - risers * sy;
@@ -126,16 +126,28 @@ function StairCalculator({ tool }: { tool: ToolEntry }) {
       shape(ctx, [{ x: topX, y: topY }, { x: w - 8, y: topY }, { x: w - 8, y: topY + thkPx }, { x: topX, y: topY + thkPx }], wood(ctx), "#000", 1);
       note(ctx, `\u2195 ${nfmt(floorThickness)}`, w - 14, topY + thkPx + 14, "#000", "right", 11);
     }
+    // Clearance is vertical above the pitch line at the floor-opening edge.
+    const edgeX = topX - openingRun * scale;
+    const undersideY = topY + floorThickness * scale;
+    if (edgeX >= pad && edgeX <= topX) {
+      if (floorThickness > 0) shape(ctx, [{x:pad,y:topY},{x:edgeX,y:topY},{x:edgeX,y:undersideY},{x:pad,y:undersideY}], wood(ctx), "#000", 1);
+      line(ctx, pad, undersideY, edgeX, undersideY, "#086b33", 2);
+      dimension(ctx, edgeX, undersideY, edgeX, undersideY + headroom * scale, `Headroom ${nfmt(headroom)} ${unitLabel}`, "#086b33", -16);
+      dimension(ctx, edgeX, topY, topX, topY, `Opening ${nfmt(openingRun)} ${unitLabel}`, "#086b33", -22);
+    } else {
+      note(ctx, "Opening extends beyond this stair flight", pad, h - 12, "#086b33", "left", 11);
+    }
     dimension(ctx, pad, base, topX, base, `Total Run ${nfmt(totalRun)}`, "#000", 42);
     dimension(ctx, topX, base, topX, topY, `Total Rise ${nfmt(totalRise)}`, "#000", 44);
     angleLabel(ctx, `${nfmt(angle, 2)}°`, pad - 12, base - 20, "right");
     infoLines(ctx, [
       `${risers} Rises @ ${nfmt(actualRise, 2)} - ${treads} Runs @ ${nfmt(run, 2)}`,
-      `Stringer Line ${nfmt(stringer)} - Stair Width ${nfmt(width)} ${unitLabel}`,
-      `Floor Opening ${nfmt(openingRun)} ${unitLabel}`,
+      `Pitch line ${nfmt(stringer)} ${unitLabel}`,
+      `Stair width ${nfmt(width)} ${unitLabel}`,
     ], pad, 30, "left");
+    return { unitsPerPixel: 1 / scale, unit: unitLabel };
   };
-  const marks = Array.from({length:treads},(_,i)=>`${nfmt((i+1)*run)} ${unitLabel}  ·  rise ${nfmt((i+1)*actualRise)} ${unitLabel}`);
+  const marks = Array.from({length:treads},(_,i)=>`Tread ${i+1} · nose ${nfmt(i*run,2)} ${unitLabel} · height ${nfmt((i+1)*actualRise,2)} ${unitLabel} · along pitch ${nfmt(i*bridge,2)} ${unitLabel}`);
   return <CalculatorFrame values={{totalRise,idealRise,run,width,floorThickness,headroom}} tool={tool} unit={unit} onUnitChange={changeUnit}>
     <div className="calculator-workbench">
       <section className="input-panel"><SectionHead index="01" title="Stair inputs" note="All rises are balanced evenly into the total rise." /><div className="field-grid">
@@ -146,12 +158,12 @@ function StairCalculator({ tool }: { tool: ToolEntry }) {
         <NumberField label="Required vertical headroom" value={headroom} onChange={setHeadroom} unit={unitLabel} min={0} />
         <NumberField label="Upper floor thickness" value={floorThickness} onChange={setFloorThickness} unit={unitLabel} min={0} />
       </div></section>
-      <section className="diagram-panel"><div className="diagram-toolbar"><span>Stringer set-out</span><span>{risers} rises · {treads} treads</span></div><TechnicalCanvas draw={draw} label="Straight stair side profile with equal rises and tread runs" model={{kind:"stairs",values:{risers,totalRun,totalRise,width,run,rise:actualRise,floorThickness,headroom,openingRun},unit:unitLabel,title:"Straight stairs"}} /></section>
+      <section className="diagram-panel"><div className="diagram-toolbar"><span>Stringer set-out</span><span>{risers} rises · {treads} treads</span></div><TechnicalCanvas measurable draw={draw} label="Straight stair side profile with equal rises and tread runs" model={{kind:"stairs",values:{risers,totalRun,totalRise,width,run,rise:actualRise,floorThickness,headroom,openingRun},unit:unitLabel,title:"Straight stairs"}} /></section>
     </div>
     <section className="results-section"><SectionHead index="02" title="Stair geometry" /><ResultGrid results={[
       {label:"Actual rise",value:`${nfmt(actualRise,2)} ${unitLabel}`,primary:true},{label:"Number of rises",value:String(risers)},{label:"Number of treads",value:String(treads)},{label:"Total run",value:`${nfmt(totalRun)} ${unitLabel}`},{label:"Stair angle",value:`${nfmt(angle,2)}°`},{label:"Stringer line",value:`${nfmt(stringer)} ${unitLabel}`},{label:"Clear width",value:`${nfmt(width)} ${unitLabel}`},{label:"Stringer stock guide",value:`${nfmt(stockGuide)} ${unitLabel}`},{label:"Opening for entered headroom",value:`${nfmt(openingRun)} ${unitLabel}`},
     ]} /></section>
-    <section className="markout-section"><SectionHead index="03" title="Running stringer marks" note="Horizontal run · vertical rise from the first nosing datum." /><DimensionLine values={marks} /></section>
+    <section className="markout-section"><SectionHead index="03" title="Running stringer marks" note="Nose run and pitch distance from the first nosing; height above the lower finished floor." /><DimensionLine values={marks} /></section>
   </CalculatorFrame>;
 }
 

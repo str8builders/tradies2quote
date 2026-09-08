@@ -26,7 +26,6 @@ export function VerifiedCalculator({ tool }: { tool: ToolEntry }) {
   const [unit, setUnit] = useState<VerifiedUnit>(saved?.snapshot.unit ?? (tool.units === "imperial" ? "imperial" : "metric"));
   const [values, setValues] = useState<Record<string, number>>(() => saved ? saved.snapshot.values as Record<string,number> : initialCalculatorValues(definition.fields, tool.units === "imperial" ? "imperial" : "metric"));
   const [sheet, setSheet] = useState(0);
-  const [zoom, setZoom] = useState(1);
   const output = useMemo(() => {
     try { return definition.compute(values, unit); }
     catch { return { errors: ["Calculation could not be completed"], results: [{ label: "Check inputs", value: "Enter valid positive dimensions", primary: true }] }; }
@@ -82,16 +81,9 @@ export function VerifiedCalculator({ tool }: { tool: ToolEntry }) {
       </section>
       <section className="diagram-panel detailed-diagram-panel">
         <div className="diagram-toolbar">
-          <div className="sheet-tabs" role="tablist" aria-label="Drawing sheets">
-            {sheets.map((item, index) => <button key={item.label} role="tab" aria-selected={sheet === index} className={sheet === index ? "active" : ""} onClick={() => setSheet(index)}>{item.label}</button>)}
-          </div>
-          <div className="zoom-tools" aria-label="Diagram zoom">
-            <button onClick={() => setZoom((current) => Math.max(.75, +(current - .15).toFixed(2)))} aria-label="Zoom out">−</button>
-            <button onClick={() => setZoom(1)}>{Math.round(zoom * 100)}%</button>
-            <button onClick={() => setZoom((current) => Math.min(1.8, +(current + .15).toFixed(2)))} aria-label="Zoom in">+</button>
-          </div>
+          <label className="native-drawing-picker">Drawing<select aria-label="Drawing view" value={sheet} onChange={e=>setSheet(Number(e.target.value))}>{sheets.map((item,index)=><option key={item.label} value={index}>{item.label}</option>)}</select></label>
         </div>
-        {output.errors?.length ? <div className="verification-note" role="alert">Correct the highlighted inputs to generate this drawing.</div> : <TechnicalCanvas draw={draw} label={`${definition.title} ${activeSheet.label} technical diagram`} height={500} zoom={zoom} />}
+        {output.errors?.length ? <div className="verification-note" role="alert">Correct the highlighted inputs to generate this drawing.</div> : <TechnicalCanvas draw={draw} label={`${definition.title} ${activeSheet.label} technical diagram`} height={350} />}
         <div className="drawing-legend"><span><i className="legend-cut" />Geometry &amp; dimensions</span><span><i className="legend-setout" />Running set-out</span><span><i className="legend-adjust" />Adjusted value</span><span><i className="legend-angle" />Angle</span><span>Measured dimensions govern</span></div>
       </section>
     </div>

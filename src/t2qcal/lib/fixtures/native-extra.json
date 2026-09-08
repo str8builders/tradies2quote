@@ -1,0 +1,290 @@
+[
+  {
+    "expected" : {
+      "fall" : 200,
+      "finishDepth" : 800,
+      "intervals" : 4
+    },
+    "slug" : "pipe-fall",
+    "unit" : "metric",
+    "values" : {
+      "grade" : 60,
+      "marks" : 3,
+      "run" : 12000,
+      "startInvert" : 600
+    }
+  },
+  {
+    "expected" : {
+      "fall" : 208.33333333333334,
+      "finishDepth" : 808.33333333333337,
+      "intervals" : 5
+    },
+    "slug" : "pipe-fall",
+    "unit" : "metric",
+    "values" : {
+      "grade" : 60,
+      "marks" : 3,
+      "run" : 12500,
+      "startInvert" : 600
+    }
+  },
+  {
+    "expected" : {
+      "fall" : 500,
+      "finishDepth" : 1100,
+      "intervals" : 10
+    },
+    "slug" : "pipe-fall",
+    "unit" : "metric",
+    "values" : {
+      "grade" : 60,
+      "marks" : 3,
+      "run" : 30000,
+      "startInvert" : 600
+    }
+  },
+  {
+    "expected" : {
+      "flow" : 2.5,
+      "outlets" : 1,
+      "spacing" : 12000
+    },
+    "slug" : "spouting-downpipes",
+    "unit" : "metric",
+    "values" : {
+      "capacity" : 2.5,
+      "catchment" : 5000,
+      "eave" : 12000,
+      "intensity" : 150
+    }
+  },
+  {
+    "expected" : {
+      "flow" : 2.5,
+      "outlets" : 2,
+      "spacing" : 6000
+    },
+    "slug" : "spouting-downpipes",
+    "unit" : "metric",
+    "values" : {
+      "capacity" : 1.5,
+      "catchment" : 5000,
+      "eave" : 12000,
+      "intensity" : 150
+    }
+  },
+  {
+    "expected" : {
+      "flow" : 2.5,
+      "outlets" : 5,
+      "spacing" : 2400
+    },
+    "slug" : "spouting-downpipes",
+    "unit" : "metric",
+    "values" : {
+      "capacity" : 0.5,
+      "catchment" : 5000,
+      "eave" : 12000,
+      "intensity" : 150
+    }
+  },
+  {
+    "expected" : {
+      "apothem" : 991.44486137381034,
+      "area" : 46944.376984524795,
+      "inner" : 208.3913854051448,
+      "outer" : 261.05238444010314
+    },
+    "slug" : "paving-ring",
+    "unit" : "metric",
+    "values" : {
+      "count" : 24,
+      "diameter" : 2000,
+      "joint" : 0,
+      "paverThickness" : 50,
+      "unitDepth" : 200,
+      "waste" : 10
+    }
+  },
+  {
+    "expected" : {
+      "apothem" : 991.63953528604407,
+      "area" : 46349.451330880969,
+      "inner" : 205.41675713692567,
+      "outer" : 258.077756171884
+    },
+    "slug" : "paving-ring",
+    "unit" : "metric",
+    "values" : {
+      "count" : 24,
+      "diameter" : 2000,
+      "joint" : 3,
+      "paverThickness" : 50,
+      "unitDepth" : 200,
+      "waste" : 10
+    }
+  },
+  {
+    "expected" : {
+      "apothem" : 992.08509919668586,
+      "area" : 44960.834626737087,
+      "inner" : 198.47367361620624,
+      "outer" : 251.13467265116458
+    },
+    "slug" : "paving-ring",
+    "unit" : "metric",
+    "values" : {
+      "count" : 24,
+      "diameter" : 2000,
+      "joint" : 10,
+      "paverThickness" : 50,
+      "unitDepth" : 200,
+      "waste" : 10
+    }
+  },
+  {
+    "expected" : {
+      "fall" : 7.8740157480314963,
+      "finishDepth" : 31.496062992125985,
+      "intervals" : 4
+    },
+    "slug" : "pipe-fall",
+    "unit" : "imperial",
+    "values" : {
+      "grade" : 60,
+      "marks" : 3,
+      "run" : 472.44094488188978,
+      "startInvert" : 23.622047244094489
+    }
+  },
+  {
+    "expected" : {
+      "fall" : 8.2020997375328086,
+      "finishDepth" : 31.824146981627297,
+      "intervals" : 5
+    },
+    "slug" : "pipe-fall",
+    "unit" : "imperial",
+    "values" : {
+      "grade" : 60,
+      "marks" : 3,
+      "run" : 492.12598425196848,
+      "startInvert" : 23.622047244094489
+    }
+  },
+  {
+    "expected" : {
+      "fall" : 19.685039370078741,
+      "finishDepth" : 43.30708661417323,
+      "intervals" : 10
+    },
+    "slug" : "pipe-fall",
+    "unit" : "imperial",
+    "values" : {
+      "grade" : 60,
+      "marks" : 3,
+      "run" : 1181.1023622047244,
+      "startInvert" : 23.622047244094489
+    }
+  },
+  {
+    "expected" : {
+      "flow" : 2.5,
+      "outlets" : 1,
+      "spacing" : 472.44094488188978
+    },
+    "slug" : "spouting-downpipes",
+    "unit" : "imperial",
+    "values" : {
+      "capacity" : 2.5,
+      "catchment" : 196.85039370078741,
+      "eave" : 472.44094488188978,
+      "intensity" : 150
+    }
+  },
+  {
+    "expected" : {
+      "flow" : 2.5,
+      "outlets" : 2,
+      "spacing" : 236.22047244094489
+    },
+    "slug" : "spouting-downpipes",
+    "unit" : "imperial",
+    "values" : {
+      "capacity" : 1.5,
+      "catchment" : 196.85039370078741,
+      "eave" : 472.44094488188978,
+      "intensity" : 150
+    }
+  },
+  {
+    "expected" : {
+      "flow" : 2.5,
+      "outlets" : 5,
+      "spacing" : 94.488188976377955
+    },
+    "slug" : "spouting-downpipes",
+    "unit" : "imperial",
+    "values" : {
+      "capacity" : 0.5,
+      "catchment" : 196.85039370078741,
+      "eave" : 472.44094488188978,
+      "intensity" : 150
+    }
+  },
+  {
+    "expected" : {
+      "apothem" : 39.033262258811433,
+      "area" : 72.763929853873137,
+      "inner" : 8.2043852521710559,
+      "outer" : 10.277652930712723
+    },
+    "slug" : "paving-ring",
+    "unit" : "imperial",
+    "values" : {
+      "count" : 24,
+      "diameter" : 78.740157480314963,
+      "joint" : 0,
+      "paverThickness" : 1.9685039370078741,
+      "unitDepth" : 7.8740157480314963,
+      "waste" : 10
+    }
+  },
+  {
+    "expected" : {
+      "apothem" : 39.040926586064728,
+      "area" : 71.841793246451985,
+      "inner" : 8.087273903028569,
+      "outer" : 10.160541581570236
+    },
+    "slug" : "paving-ring",
+    "unit" : "imperial",
+    "values" : {
+      "count" : 24,
+      "diameter" : 78.740157480314963,
+      "joint" : 0.11811023622047244,
+      "paverThickness" : 1.9685039370078741,
+      "unitDepth" : 7.8740157480314963,
+      "waste" : 10
+    }
+  },
+  {
+    "expected" : {
+      "apothem" : 39.058468472310466,
+      "area" : 69.689433050308565,
+      "inner" : 7.8139241581183558,
+      "outer" : 9.8871918366600227
+    },
+    "slug" : "paving-ring",
+    "unit" : "imperial",
+    "values" : {
+      "count" : 24,
+      "diameter" : 78.740157480314963,
+      "joint" : 0.39370078740157477,
+      "paverThickness" : 1.9685039370078741,
+      "unitDepth" : 7.8740157480314963,
+      "waste" : 10
+    }
+  }
+]

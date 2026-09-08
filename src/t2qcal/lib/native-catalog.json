@@ -1,0 +1,6587 @@
+{
+  "categories" : [
+    {
+      "icon" : "house.fill",
+      "id" : "roof",
+      "name" : "Roof & rafters"
+    },
+    {
+      "icon" : "stairs",
+      "id" : "stairs",
+      "name" : "Stairs & balustrades"
+    },
+    {
+      "icon" : "ruler.fill",
+      "id" : "spacing",
+      "name" : "Centers & spacing"
+    },
+    {
+      "icon" : "cube.fill",
+      "id" : "concrete",
+      "name" : "Concrete & masonry"
+    },
+    {
+      "icon" : "wrench.and.screwdriver.fill",
+      "id" : "metal",
+      "name" : "Metal & tubing"
+    },
+    {
+      "icon" : "circle.dashed",
+      "id" : "templates",
+      "name" : "Printable templates"
+    },
+    {
+      "icon" : "square.grid.3x2.fill",
+      "id" : "deck",
+      "name" : "Decks & fencing"
+    },
+    {
+      "icon" : "arrow.left.arrow.right.circle.fill",
+      "id" : "convert",
+      "name" : "Convert & measure"
+    },
+    {
+      "icon" : "triangle.fill",
+      "id" : "geometry",
+      "name" : "General geometry"
+    },
+    {
+      "icon" : "shippingbox.fill",
+      "id" : "materials",
+      "name" : "Materials & quantities"
+    }
+  ],
+  "resources" : [
+    {
+      "detail" : "The one the rest quote. Bearers, joists, lintels, studs, bracing and fixings for houses and small buildings.",
+      "group" : "code",
+      "groupName" : "Building Code & standards",
+      "id" : "nzs3604",
+      "note" : "Free — MBIE-sponsored. Standards NZ asks you to sign in first.",
+      "page" : "https:\/\/www.standards.govt.nz\/shop\/NZS-36042011",
+      "pdf" : "",
+      "publisher" : "Standards New Zealand",
+      "title" : "NZS 3604 Timber-framed buildings"
+    },
+    {
+      "detail" : "Acceptable solutions and verification methods for structure — what B1\/AS1 will accept.",
+      "group" : "code",
+      "groupName" : "Building Code & standards",
+      "id" : "nzbc-b1",
+      "note" : "",
+      "page" : "https:\/\/www.building.govt.nz\/building-code-compliance\/b-stability\/b1-structure\/",
+      "pdf" : "",
+      "publisher" : "MBIE Building Performance",
+      "title" : "B1 Structure"
+    },
+    {
+      "detail" : "How long each element has to last, and what counts as meeting it.",
+      "group" : "code",
+      "groupName" : "Building Code & standards",
+      "id" : "nzbc-b2",
+      "note" : "",
+      "page" : "https:\/\/www.building.govt.nz\/building-code-compliance\/b-stability\/b2-durability\/",
+      "pdf" : "",
+      "publisher" : "MBIE Building Performance",
+      "title" : "B2 Durability"
+    },
+    {
+      "detail" : "C\/AS1 and C\/AS2 — fire separations, escape routes and ratings.",
+      "group" : "code",
+      "groupName" : "Building Code & standards",
+      "id" : "nzbc-c",
+      "note" : "",
+      "page" : "https:\/\/www.building.govt.nz\/building-code-compliance\/c-protection-from-fire\/",
+      "pdf" : "",
+      "publisher" : "MBIE Building Performance",
+      "title" : "C Protection from fire"
+    },
+    {
+      "detail" : "Stairs, ramps, handrails, landings — the geometry an inspector measures.",
+      "group" : "code",
+      "groupName" : "Building Code & standards",
+      "id" : "nzbc-d1",
+      "note" : "",
+      "page" : "https:\/\/www.building.govt.nz\/building-code-compliance\/d-access\/d1-access-routes\/",
+      "pdf" : "",
+      "publisher" : "MBIE Building Performance",
+      "title" : "D1 Access routes"
+    },
+    {
+      "detail" : "Where stormwater goes: roof drainage, gutters, downpipes and the fall on a surface-water drain.",
+      "group" : "code",
+      "groupName" : "Building Code & standards",
+      "id" : "nzbc-e1",
+      "note" : "",
+      "page" : "https:\/\/www.building.govt.nz\/building-code-compliance\/e-moisture\/e1-surface-water\/",
+      "pdf" : "",
+      "publisher" : "MBIE Building Performance",
+      "title" : "E1 Surface water"
+    },
+    {
+      "detail" : "Waste and soil pipes — gradients, venting, traps and the rules a drain is laid to.",
+      "group" : "code",
+      "groupName" : "Building Code & standards",
+      "id" : "nzbc-g13",
+      "note" : "",
+      "page" : "https:\/\/www.building.govt.nz\/building-code-compliance\/g-services-and-facilities\/g13-foul-water\/",
+      "pdf" : "",
+      "publisher" : "MBIE Building Performance",
+      "title" : "G13 Foul water"
+    },
+    {
+      "detail" : "E2\/AS1 — the weathertightness details: cavities, flashings, junctions, risk matrix.",
+      "group" : "code",
+      "groupName" : "Building Code & standards",
+      "id" : "nzbc-e2",
+      "note" : "",
+      "page" : "https:\/\/www.building.govt.nz\/building-code-compliance\/e-moisture\/e2-external-moisture\/",
+      "pdf" : "",
+      "publisher" : "MBIE Building Performance",
+      "title" : "E2 External moisture"
+    },
+    {
+      "detail" : "Wet areas, splashbacks, floor falls and surface finishes.",
+      "group" : "code",
+      "groupName" : "Building Code & standards",
+      "id" : "nzbc-e3",
+      "note" : "",
+      "page" : "https:\/\/www.building.govt.nz\/building-code-compliance\/e-moisture\/e3-internal-moisture\/",
+      "pdf" : "",
+      "publisher" : "MBIE Building Performance",
+      "title" : "E3 Internal moisture"
+    },
+    {
+      "detail" : "Barrier heights and loadings for decks, stairs and landings.",
+      "group" : "code",
+      "groupName" : "Building Code & standards",
+      "id" : "nzbc-f4",
+      "note" : "",
+      "page" : "https:\/\/www.building.govt.nz\/building-code-compliance\/f-safety-of-users\/f4-safety-from-falling\/",
+      "pdf" : "",
+      "publisher" : "MBIE Building Performance",
+      "title" : "F4 Safety from falling"
+    },
+    {
+      "detail" : "Insulation R-values by climate zone, and the schedule and calculation methods.",
+      "group" : "code",
+      "groupName" : "Building Code & standards",
+      "id" : "nzbc-h1",
+      "note" : "",
+      "page" : "https:\/\/www.building.govt.nz\/building-code-compliance\/h1-energy-efficiency\/",
+      "pdf" : "",
+      "publisher" : "MBIE Building Performance",
+      "title" : "H1 Energy efficiency"
+    },
+    {
+      "detail" : "MBIE's index of everything the Code cites — standards, acceptable solutions, appraisals.",
+      "group" : "code",
+      "groupName" : "Building Code & standards",
+      "id" : "codehub",
+      "note" : "",
+      "page" : "https:\/\/codehub.building.govt.nz\/",
+      "pdf" : "",
+      "publisher" : "MBIE, Standards NZ & BRANZ",
+      "title" : "Building CodeHub"
+    },
+    {
+      "detail" : "Net surface area, spreading rate and coat count, with worked paint estimates.",
+      "group" : "linings",
+      "groupName" : "Plasterboard & linings",
+      "id" : "resene-paint-quantity",
+      "note" : "",
+      "page" : "https:\/\/www.resene.co.nz\/homeown\/problem-solver\/paint-calculator.htm",
+      "pdf" : "https:\/\/www.resene.co.nz\/homeown\/how_to_diy\/paint_calculator.pdf",
+      "publisher" : "Resene",
+      "title" : "Estimating paint quantities"
+    },
+    {
+      "detail" : "The site book. Fixing centres, stopping levels, control joints, wet areas, ceiling battens.",
+      "group" : "linings",
+      "groupName" : "Plasterboard & linings",
+      "id" : "gib-site-guide",
+      "note" : "",
+      "page" : "https:\/\/www.gib.co.nz\/",
+      "pdf" : "https:\/\/www.gib.co.nz\/assets\/Uploads\/GIB-Site-Guide-0525.pdf",
+      "publisher" : "Winstone Wallboards",
+      "title" : "GIB Site Guide"
+    },
+    {
+      "detail" : "Bracing ratings, fixing patterns and the hold-down details, to NZS 3604.",
+      "group" : "linings",
+      "groupName" : "Plasterboard & linings",
+      "id" : "gib-ezybrace",
+      "note" : "",
+      "page" : "https:\/\/www.gib.co.nz\/",
+      "pdf" : "https:\/\/www.gib.co.nz\/assets\/Uploads\/LiteratureFile\/System-Brochures\/EzyBrace\/GIB-EzyBrace-Systems-2016-August.pdf",
+      "publisher" : "Winstone Wallboards",
+      "title" : "GIB EzyBrace Systems"
+    },
+    {
+      "detail" : "FRR systems by wall and ceiling type — board, framing, fixings and penetrations.",
+      "group" : "linings",
+      "groupName" : "Plasterboard & linings",
+      "id" : "gib-fire",
+      "note" : "",
+      "page" : "https:\/\/www.gib.co.nz\/",
+      "pdf" : "https:\/\/www.gib.co.nz\/assets\/Uploads\/GIB-Fire-Rated-Systems-Web-1124.pdf",
+      "publisher" : "Winstone Wallboards",
+      "title" : "GIB Fire Rated Systems"
+    },
+    {
+      "detail" : "STC and IIC ratings, resilient channel, and the details that hold them.",
+      "group" : "linings",
+      "groupName" : "Plasterboard & linings",
+      "id" : "gib-noise",
+      "note" : "",
+      "page" : "https:\/\/www.gib.co.nz\/",
+      "pdf" : "https:\/\/www.gib.co.nz\/assets\/Uploads\/GIB-Noise-Control-Systems-Manual-May22.pdf",
+      "publisher" : "Winstone Wallboards",
+      "title" : "GIB Noise Control Systems"
+    },
+    {
+      "detail" : "Terrace-home separating walls — fire and acoustic in one system.",
+      "group" : "linings",
+      "groupName" : "Plasterboard & linings",
+      "id" : "gib-barrier",
+      "note" : "",
+      "page" : "https:\/\/www.gib.co.nz\/",
+      "pdf" : "https:\/\/www.gib.co.nz\/assets\/Uploads\/00432-GIB-Barrier-System-30-10-17-07web-2.pdf",
+      "publisher" : "Winstone Wallboards",
+      "title" : "GIB Intertenancy Barrier Systems"
+    },
+    {
+      "detail" : "Which board for which job — Standard, Braceline, Noiseline, Fyreline, Aqualine, Toughline.",
+      "group" : "linings",
+      "groupName" : "Plasterboard & linings",
+      "id" : "gib-range",
+      "note" : "",
+      "page" : "https:\/\/www.gib.co.nz\/",
+      "pdf" : "https:\/\/www.gib.co.nz\/assets\/Uploads\/2023-08-GIB-site-guide-product-range.pdf",
+      "publisher" : "Winstone Wallboards",
+      "title" : "GIB board range"
+    },
+    {
+      "detail" : "Residential truss manual — layouts, bracing, girder trusses and tie-downs.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-truss-manual",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2024\/03\/Residential-Manual-March-2024.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "GangNail Roof Truss System"
+    },
+    {
+      "detail" : "Handling, standing, plumbing and bracing trusses on site.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-truss-install",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2024\/03\/MiTek-Roof-Truss-Installation.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "Roof truss installation guide"
+    },
+    {
+      "detail" : "Open-web joist spans, service holes, bearing and trimming.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-posistrut",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2021\/06\/PosiStrut-Manual.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "Posi-Strut floor and roof system"
+    },
+    {
+      "detail" : "Site handling, support, strongbacks and what you may not cut.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-posistrut-install",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2021\/06\/PosiStrut-Installation.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "Posi-Strut installation"
+    },
+    {
+      "detail" : "LVL beam and lintel spans, notching limits and fixing.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-ganglam",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2021\/06\/GANGLAM-Manual.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "GangLam LVL"
+    },
+    {
+      "detail" : "Steel-plated timber beams — sizes, bolt patterns and capacities.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-flitch",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2021\/06\/FLITCH-BEAM-Manual.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "Flitch beam manual"
+    },
+    {
+      "detail" : "The full connector catalogue with nailing schedules and rated loads.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-lumberlok",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2024\/03\/LUMBERLOK-Timber-Connectors_2024-v1.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "LUMBERLOK timber connectors"
+    },
+    {
+      "detail" : "The stainless range for exposure zones D and E and treated timber.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-lumberlok-ss",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2024\/03\/LUMBERLOK-Stainless-Steel-Connectors_2024-v1.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "LUMBERLOK stainless connectors"
+    },
+    {
+      "detail" : "Post bases, angle brackets, straps and their rated capacities.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-bowmac",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2024\/03\/BOWMAC-Structural-Brackets_2024-v1.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "BOWMAC structural brackets"
+    },
+    {
+      "detail" : "What fixes a lintel at each span and load — straight off the chart.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-lintel",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2024\/03\/Lintel-Fixing-Schedule_2024-v1.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "Lintel fixing schedule"
+    },
+    {
+      "detail" : "Uplift fixings by wind zone and stud spacing.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-stud-topplate",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2024\/03\/Stud-to-Top-Plate-Fixing-Schedule_2024-v1.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "Stud to top plate fixing schedule"
+    },
+    {
+      "detail" : "The high-uplift stud fixings and how they are installed.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-stud-bottomplate",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2024\/03\/6kN-12kN-Stud-to-Bottom-Plate-Fixing_2024-v1.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "6kN & 12kN stud to bottom plate"
+    },
+    {
+      "detail" : "Truss tie-downs where the wind zone asks for more than a wire dog.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-truss-topplate",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2024\/03\/9kN-16kN-Truss-to-Top-Plate-Fixing_2024-v1.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "9kN & 16kN truss to top plate"
+    },
+    {
+      "detail" : "Pile-to-bearer connections at the braced-pile rating.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-pile-12kn",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2024\/03\/12kN-Pile-Fixing_2024-v1.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "12kN pile fixing"
+    },
+    {
+      "detail" : "Purlin fixings by wind zone, spacing and roof weight.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-purlin",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2024\/03\/Purlin-Batten-Fixing-Chart_2024-v1.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "Purlin & batten fixing chart"
+    },
+    {
+      "detail" : "Where roof bracing goes and what it is made of.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-roof-bracing",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2024\/03\/Roof-Bracing-Specification_2024-v1.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "Roof bracing specification"
+    },
+    {
+      "detail" : "Bracing a gable end and the raking verge that goes with it.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-gable-bracing",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2024\/03\/MiTek-Gable-End-Bracing_2024-v1.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "Gable end bracing"
+    },
+    {
+      "detail" : "Where you may joint a top plate and what holds the joint.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-topplate-joint",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2024\/03\/Top-Plate-Jointing_2024-v1.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "Top plate jointing"
+    },
+    {
+      "detail" : "Hanger selection by joist size, with nailing and capacities.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-joist-hangers",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2024\/03\/Joist-Hangers_2024-v1.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "Joist hangers"
+    },
+    {
+      "detail" : "Fixing deck joists and the ledger, including the durability call.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-deck-joist",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2024\/03\/Deck-Joist-Fixing_2024-v1.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "Deck joist fixing"
+    },
+    {
+      "detail" : "Bracket-fixed treads and stringer joiners.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-stair-bracket",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2024\/03\/Stair-Tread-Bracket-Stair-Tread-Joiner_2024-v1.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "Stair tread brackets"
+    },
+    {
+      "detail" : "The one-page lookup from connection to product.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-easyfix",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2024\/03\/Easy-Fix-Chart_2023.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "Easy-Fix chart"
+    },
+    {
+      "detail" : "Which coating or grade survives your exposure zone.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-durability",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2024\/03\/MiTek-Durability-Product-Selection_2024-v1.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "Durability product selection"
+    },
+    {
+      "detail" : "Zone B to E by location — settles the stainless argument.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-exposure-map",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2024\/03\/New-Zealand-Exposure-Zone-Map.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "NZ exposure zone map"
+    },
+    {
+      "detail" : "Grade properties for the timber the schedules assume.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "mitek-timber-strength",
+      "note" : "",
+      "page" : "https:\/\/mitek.co.nz\/services\/literature\/",
+      "pdf" : "https:\/\/mitek.co.nz\/wp-content\/uploads\/2024\/03\/Timber-Characteristic-Strength_2024-v1.pdf",
+      "publisher" : "MiTek NZ",
+      "title" : "Timber characteristic strength"
+    },
+    {
+      "detail" : "Fixing and installing the whole Pryda range, on site.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "pryda-builders",
+      "note" : "",
+      "page" : "https:\/\/www.pryda.co.nz\/pryda-resources\/",
+      "pdf" : "https:\/\/www.pryda.co.nz\/wp-content\/uploads\/Pryda-Builders-Guide-NZ.pdf",
+      "publisher" : "Pryda NZ",
+      "title" : "Pryda Builder's Guide"
+    },
+    {
+      "detail" : "Design guide with rated capacities for connectors and tie-downs.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "pryda-connectors",
+      "note" : "",
+      "page" : "https:\/\/www.pryda.co.nz\/pryda-resources\/",
+      "pdf" : "https:\/\/www.pryda.co.nz\/wp-content\/uploads\/NZ-Pryda-Connectors-Tie-downs-Design-Guide.pdf",
+      "publisher" : "Pryda NZ",
+      "title" : "Pryda connectors & tie-downs"
+    },
+    {
+      "detail" : "Hanger and truss boot selection with load tables.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "pryda-hangers",
+      "note" : "",
+      "page" : "https:\/\/www.pryda.co.nz\/pryda-resources\/",
+      "pdf" : "https:\/\/www.pryda.co.nz\/wp-content\/uploads\/NZ-Pryda-Hangers-Truss-Boots-Design-Guide.pdf",
+      "publisher" : "Pryda NZ",
+      "title" : "Pryda hangers & truss boots"
+    },
+    {
+      "detail" : "Brackets, post fixings and their capacities.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "pryda-brackets",
+      "note" : "",
+      "page" : "https:\/\/www.pryda.co.nz\/pryda-resources\/",
+      "pdf" : "https:\/\/www.pryda.co.nz\/wp-content\/uploads\/NZ-Pryda-Brackets-Fixes-Design-Guide.pdf",
+      "publisher" : "Pryda NZ",
+      "title" : "Pryda brackets & fixes"
+    },
+    {
+      "detail" : "Screws, nails and bolts — sizes, spacings and rated loads.",
+      "group" : "structure",
+      "groupName" : "Framing, trusses & connectors",
+      "id" : "pryda-fasteners",
+      "note" : "",
+      "page" : "https:\/\/www.pryda.co.nz\/pryda-resources\/",
+      "pdf" : "https:\/\/www.pryda.co.nz\/wp-content\/uploads\/NZ-Pryda-Fasteners-Design-Guide.pdf",
+      "publisher" : "Pryda NZ",
+      "title" : "Pryda fasteners"
+    },
+    {
+      "detail" : "Cutting, fixing, gaps and finishing across the fibre cement range.",
+      "group" : "cladding",
+      "groupName" : "Cladding & weathertightness",
+      "id" : "jh-best-practice",
+      "note" : "",
+      "page" : "https:\/\/www.jameshardie.co.nz\/resources\/technical-literature",
+      "pdf" : "https:\/\/www.jameshardie.co.nz\/web\/assets\/general\/Best-Practice-Book-September-2024.pdf",
+      "publisher" : "James Hardie NZ",
+      "title" : "James Hardie Best Practice Guide"
+    },
+    {
+      "detail" : "The junctions that leak if you get them wrong — drawn, dimensioned.",
+      "group" : "cladding",
+      "groupName" : "Cladding & weathertightness",
+      "id" : "jh-junctions",
+      "note" : "",
+      "page" : "https:\/\/www.jameshardie.co.nz\/resources\/technical-literature",
+      "pdf" : "https:\/\/www.jameshardie.co.nz\/web\/assets\/general\/Cladding-Junction-Details-Design-Manual.pdf",
+      "publisher" : "James Hardie NZ",
+      "title" : "Cladding junction details"
+    },
+    {
+      "detail" : "Bracing ratings for HardieBrace and RAB systems.",
+      "group" : "cladding",
+      "groupName" : "Cladding & weathertightness",
+      "id" : "jh-bracing",
+      "note" : "",
+      "page" : "https:\/\/www.jameshardie.co.nz\/resources\/technical-literature",
+      "pdf" : "https:\/\/www.jameshardie.co.nz\/web\/assets\/general\/Bracing-Design-Manual.pdf",
+      "publisher" : "James Hardie NZ",
+      "title" : "James Hardie bracing design"
+    },
+    {
+      "detail" : "Rigid air barrier installation, fixing and taping.",
+      "group" : "cladding",
+      "groupName" : "Cladding & weathertightness",
+      "id" : "jh-rab",
+      "note" : "",
+      "page" : "https:\/\/www.jameshardie.co.nz\/resources\/technical-literature",
+      "pdf" : "https:\/\/www.jameshardie.co.nz\/web\/assets\/general\/HomeRAB-Pre-Cladding-RAB-Board-Installation-Manual.pdf",
+      "publisher" : "James Hardie NZ",
+      "title" : "HomeRAB pre-cladding & RAB board"
+    },
+    {
+      "detail" : "Cover, gauge, scribers, corners and the cavity batten layout.",
+      "group" : "cladding",
+      "groupName" : "Cladding & weathertightness",
+      "id" : "jh-linea-cavity",
+      "note" : "",
+      "page" : "https:\/\/www.jameshardie.co.nz\/resources\/technical-literature",
+      "pdf" : "https:\/\/www.jameshardie.co.nz\/web\/assets\/general\/Linea-Weatherboard-Cavity-Fix-Technical-Specification.pdf",
+      "publisher" : "James Hardie NZ",
+      "title" : "Linea weatherboard — cavity fix"
+    },
+    {
+      "detail" : "The direct-fixed version, and where it is allowed.",
+      "group" : "cladding",
+      "groupName" : "Cladding & weathertightness",
+      "id" : "jh-linea-direct",
+      "note" : "",
+      "page" : "https:\/\/www.jameshardie.co.nz\/resources\/technical-literature",
+      "pdf" : "https:\/\/www.jameshardie.co.nz\/web\/assets\/general\/Linea-Weatherboard-Direct-Fix-Technical-Specification.pdf",
+      "publisher" : "James Hardie NZ",
+      "title" : "Linea weatherboard — direct fix"
+    },
+    {
+      "detail" : "Lap, fixing and end-joint details.",
+      "group" : "cladding",
+      "groupName" : "Cladding & weathertightness",
+      "id" : "jh-hardieplank",
+      "note" : "",
+      "page" : "https:\/\/www.jameshardie.co.nz\/resources\/technical-literature",
+      "pdf" : "https:\/\/www.jameshardie.co.nz\/web\/assets\/general\/Hardie-Plank-Weatherboard-10mm-Technical-Specification.pdf",
+      "publisher" : "James Hardie NZ",
+      "title" : "HardiePlank 10mm weatherboard"
+    },
+    {
+      "detail" : "Grooved sheet cladding — sheet layout, joints and fixings.",
+      "group" : "cladding",
+      "groupName" : "Cladding & weathertightness",
+      "id" : "jh-axon",
+      "note" : "",
+      "page" : "https:\/\/www.jameshardie.co.nz\/resources\/technical-literature",
+      "pdf" : "https:\/\/www.jameshardie.co.nz\/web\/assets\/general\/Axon-Panel-Direct-Fix-Technical-Specification.pdf",
+      "publisher" : "James Hardie NZ",
+      "title" : "Axon Panel — direct fix"
+    },
+    {
+      "detail" : "Express-jointed horizontal cladding, smooth finish.",
+      "group" : "cladding",
+      "groupName" : "Cladding & weathertightness",
+      "id" : "jh-stria",
+      "note" : "",
+      "page" : "https:\/\/www.jameshardie.co.nz\/resources\/technical-literature",
+      "pdf" : "https:\/\/www.jameshardie.co.nz\/web\/assets\/general\/Stria-Cladding-Smooth-Horizontal-Installation-Technical-Specification.pdf",
+      "publisher" : "James Hardie NZ",
+      "title" : "Stria cladding — horizontal"
+    },
+    {
+      "detail" : "Soffit sheet layout, fixing centres and trims.",
+      "group" : "cladding",
+      "groupName" : "Cladding & weathertightness",
+      "id" : "jh-eaves",
+      "note" : "",
+      "page" : "https:\/\/www.jameshardie.co.nz\/resources\/technical-literature",
+      "pdf" : "https:\/\/www.jameshardie.co.nz\/web\/assets\/general\/James-Hardie-Eaves-and-Soffit-Installation-Manual.pdf",
+      "publisher" : "James Hardie NZ",
+      "title" : "Eaves and soffit installation"
+    },
+    {
+      "detail" : "Wet-area sheet lining — fixing, jointing and tiling over.",
+      "group" : "cladding",
+      "groupName" : "Cladding & weathertightness",
+      "id" : "jh-villaboard",
+      "note" : "",
+      "page" : "https:\/\/www.jameshardie.co.nz\/resources\/technical-literature",
+      "pdf" : "https:\/\/www.jameshardie.co.nz\/web\/assets\/general\/Villaboard-Lining-Installation-Manual.pdf",
+      "publisher" : "James Hardie NZ",
+      "title" : "Villaboard lining"
+    },
+    {
+      "detail" : "General-purpose fibre cement sheet specification.",
+      "group" : "cladding",
+      "groupName" : "Cladding & weathertightness",
+      "id" : "jh-hardieflex",
+      "note" : "",
+      "page" : "https:\/\/www.jameshardie.co.nz\/resources\/technical-literature",
+      "pdf" : "https:\/\/www.jameshardie.co.nz\/web\/assets\/general\/Hardie-Flex-Sheet-Technical-Specification.pdf",
+      "publisher" : "James Hardie NZ",
+      "title" : "HardieFlex sheet"
+    },
+    {
+      "detail" : "Deck and wet-area flooring — joist spacing, fixing and falls.",
+      "group" : "cladding",
+      "groupName" : "Cladding & weathertightness",
+      "id" : "jh-secura",
+      "note" : "",
+      "page" : "https:\/\/www.jameshardie.co.nz\/resources\/technical-literature",
+      "pdf" : "https:\/\/www.jameshardie.co.nz\/web\/assets\/general\/Secura-Flooring-Installation-Manual-2025.pdf",
+      "publisher" : "James Hardie NZ",
+      "title" : "Secura exterior flooring"
+    },
+    {
+      "detail" : "Rated systems built from James Hardie boards.",
+      "group" : "cladding",
+      "groupName" : "Cladding & weathertightness",
+      "id" : "jh-fire-acoustic",
+      "note" : "",
+      "page" : "https:\/\/www.jameshardie.co.nz\/resources\/technical-literature",
+      "pdf" : "https:\/\/www.jameshardie.co.nz\/web\/assets\/general\/Fire-Acoustic-Manual-May-2026.pdf",
+      "publisher" : "James Hardie NZ",
+      "title" : "Fire & acoustic design manual"
+    },
+    {
+      "detail" : "Grades, spans, fixing centres and bracing for structural ply.",
+      "group" : "cladding",
+      "groupName" : "Cladding & weathertightness",
+      "id" : "chh-ecoply",
+      "note" : "",
+      "page" : "https:\/\/chhply.co.nz\/librarytools\/",
+      "pdf" : "https:\/\/chhply.co.nz\/assets\/Uploads\/EcoplySpecificationInstallationGuideCurrent.pdf",
+      "publisher" : "CHH Woodproducts",
+      "title" : "Ecoply structural plywood"
+    },
+    {
+      "detail" : "Grooved ply cladding over a cavity: sheet layout, joints, flashings.",
+      "group" : "cladding",
+      "groupName" : "Cladding & weathertightness",
+      "id" : "chh-shadowclad",
+      "note" : "",
+      "page" : "https:\/\/chhply.co.nz\/librarytools\/",
+      "pdf" : "https:\/\/chhply.co.nz\/assets\/Uploads\/ShadowcladCavityConstructionInstallationGuideCurrent.pdf",
+      "publisher" : "CHH Woodproducts",
+      "title" : "Shadowclad — cavity construction"
+    },
+    {
+      "detail" : "Where Shadowclad meets another cladding, and how that junction is made.",
+      "group" : "cladding",
+      "groupName" : "Cladding & weathertightness",
+      "id" : "chh-shadowclad-mixed",
+      "note" : "",
+      "page" : "https:\/\/chhply.co.nz\/librarytools\/",
+      "pdf" : "https:\/\/chhply.co.nz\/assets\/Uploads\/ShadowcladMixedCladdingSpecificationInstallationGuideCurrent.pdf",
+      "publisher" : "CHH Woodproducts",
+      "title" : "Shadowclad — mixed cladding"
+    },
+    {
+      "detail" : "The roofing bible — minimum pitches, laps, flashings, fastener patterns, drainage.",
+      "group" : "roofing",
+      "groupName" : "Roofing",
+      "id" : "nzmrm-cop",
+      "note" : "",
+      "page" : "https:\/\/www.metalroofing.org.nz\/cop",
+      "pdf" : "https:\/\/www.metalroofing.org.nz\/sites\/default\/files\/RoofingCOP_v26-06_2026-06-01.pdf",
+      "publisher" : "NZ Metal Roofing Manufacturers",
+      "title" : "Metal Roof & Wall Cladding Code of Practice"
+    },
+    {
+      "detail" : "The same Code of Practice as MBIE publishes it, if the roofing site is down.",
+      "group" : "roofing",
+      "groupName" : "Roofing",
+      "id" : "nzmrm-cop-codehub",
+      "note" : "",
+      "page" : "https:\/\/codehub.building.govt.nz\/resources\/cp-new-zealand-metal-roof-and-wall-cladding-code-of-practice",
+      "pdf" : "https:\/\/codehub.building.govt.nz\/assets\/_generated_pdfs\/new-zealand-metal-roof-and-wall-cladding-code-of-practice-8841.pdf",
+      "publisher" : "MBIE Building CodeHub",
+      "title" : "Metal cladding COP — CodeHub copy"
+    },
+    {
+      "detail" : "Paving bases, bedding, edge restraint, laying patterns, joints and cut pieces.",
+      "group" : "concrete",
+      "groupName" : "Concrete & foundations",
+      "id" : "firth-paving",
+      "note" : "",
+      "page" : "https:\/\/www.firth.co.nz\/resources\/technical-documents?category=84",
+      "pdf" : "https:\/\/www.firth.co.nz\/assets\/Uploads\/Resources\/Documents\/FIRTH-Paving-Installation-Guide-2026-web.pdf",
+      "publisher" : "Firth",
+      "title" : "Firth Paving Installation Guide"
+    },
+    {
+      "detail" : "Preparing, pouring, finishing and curing a house slab.",
+      "group" : "concrete",
+      "groupName" : "Concrete & foundations",
+      "id" : "ccanz-ms17",
+      "note" : "The publisher currently requires a browser download. Save its PDF there, then use Add your own to keep it offline.",
+      "page" : "https:\/\/www.concretenz.org.nz\/",
+      "pdf" : "",
+      "publisher" : "Concrete NZ",
+      "title" : "Residential concrete slab-on-ground floors"
+    },
+    {
+      "detail" : "Specific design for floors and pavements — thickness, joints, reinforcement.",
+      "group" : "concrete",
+      "groupName" : "Concrete & foundations",
+      "id" : "ccanz-tm38",
+      "note" : "The publisher currently requires a browser download. Save its PDF there, then use Add your own to keep it offline.",
+      "page" : "https:\/\/www.concretenz.org.nz\/",
+      "pdf" : "",
+      "publisher" : "Concrete NZ",
+      "title" : "Concrete ground floors & pavements"
+    },
+    {
+      "detail" : "Retaining, waterproofing and drainage below ground.",
+      "group" : "concrete",
+      "groupName" : "Concrete & foundations",
+      "id" : "cnz-basement",
+      "note" : "The publisher currently requires a browser download. Save its PDF there, then use Add your own to keep it offline.",
+      "page" : "https:\/\/www.concretenz.org.nz\/",
+      "pdf" : "",
+      "publisher" : "Concrete NZ",
+      "title" : "Basement design guide"
+    },
+    {
+      "detail" : "Placing and finishing fibre-reinforced concrete in a raft slab.",
+      "group" : "concrete",
+      "groupName" : "Concrete & foundations",
+      "id" : "firth-ribraft",
+      "note" : "",
+      "page" : "https:\/\/www.firth.co.nz\/resources\/",
+      "pdf" : "https:\/\/www.firth.co.nz\/assets\/Uploads\/Resources\/Documents\/Best-Practice-Guide-For-Placing-And-Finishing-Steel-Fibre-Reinforced-Concrete-For-Firth-Ribraft-Floors.pdf",
+      "publisher" : "Firth",
+      "title" : "Steel fibre concrete for RibRaft floors"
+    },
+    {
+      "detail" : "Good practice guidelines — edge protection, ladders, roof work, harnesses.",
+      "group" : "safety",
+      "groupName" : "Site safety",
+      "id" : "worksafe-height",
+      "note" : "",
+      "page" : "https:\/\/www.worksafe.govt.nz\/topic-and-industry\/working-at-height\/",
+      "pdf" : "https:\/\/www.worksafe.govt.nz\/dmsdocument\/500-best-practice-guidelines-for-working-at-height-in-new-zealand",
+      "publisher" : "WorkSafe NZ",
+      "title" : "Working at height"
+    },
+    {
+      "detail" : "Design, erection, inspection and the competency the job needs.",
+      "group" : "safety",
+      "groupName" : "Site safety",
+      "id" : "worksafe-scaffolding",
+      "note" : "",
+      "page" : "https:\/\/www.worksafe.govt.nz\/topic-and-industry\/working-at-height\/scaffolding-in-new-zealand\/",
+      "pdf" : "https:\/\/www.worksafe.govt.nz\/assets\/dmsassets\/WKS-5-scaffolding-in-New-Zealand.pdf",
+      "publisher" : "WorkSafe NZ",
+      "title" : "Scaffolding in New Zealand"
+    },
+    {
+      "detail" : "Shoring, benching, battering and spoil placement.",
+      "group" : "safety",
+      "groupName" : "Site safety",
+      "id" : "worksafe-excavation",
+      "note" : "",
+      "page" : "https:\/\/www.worksafe.govt.nz\/topic-and-industry\/excavation\/",
+      "pdf" : "https:\/\/www.worksafe.govt.nz\/assets\/dmsassets\/zero\/17WKS-4-excavations-excavation-safety-guide.pdf",
+      "publisher" : "WorkSafe NZ",
+      "title" : "Excavation safety"
+    }
+  ],
+  "tools" : [
+    {
+      "category" : "roof",
+      "fields" : [
+        {
+          "default" : 3000,
+          "key" : "run",
+          "kind" : "length",
+          "label" : "Run to outer wall",
+          "max" : 20000,
+          "min" : 1
+        },
+        {
+          "default" : 22.5,
+          "key" : "angle",
+          "kind" : "angle",
+          "label" : "Roof angle",
+          "max" : 85,
+          "min" : 0.10000000000000001
+        },
+        {
+          "default" : 450,
+          "key" : "overhang",
+          "kind" : "length",
+          "label" : "Level overhang",
+          "max" : 3000,
+          "min" : 0
+        },
+        {
+          "default" : 190,
+          "key" : "depth",
+          "kind" : "length",
+          "label" : "Rafter depth",
+          "max" : 1200,
+          "min" : 1
+        },
+        {
+          "default" : 45,
+          "key" : "thickness",
+          "kind" : "length",
+          "label" : "Rafter thickness",
+          "max" : 400,
+          "min" : 1
+        },
+        {
+          "default" : 90,
+          "key" : "seat",
+          "kind" : "length",
+          "label" : "Birdsmouth seat",
+          "max" : 600,
+          "min" : 0
+        },
+        {
+          "default" : 2400,
+          "key" : "wallHeight",
+          "kind" : "length",
+          "label" : "Wall plate height",
+          "max" : 12000,
+          "min" : 0
+        }
+      ],
+      "name" : "Common rafter",
+      "popular" : true,
+      "sheets" : [
+        {
+          "kind" : "roof",
+          "label" : "Profile"
+        },
+        {
+          "kind" : "raftercut",
+          "label" : "Rafter"
+        },
+        {
+          "kind" : "roof3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "common-rafter",
+      "summary" : "Rafter length, rise, birdsmouth and live cutting diagram."
+    },
+    {
+      "category" : "roof",
+      "fields" : [
+        {
+          "default" : 8000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Wall length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 6000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Wall width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 30,
+          "key" : "angle",
+          "kind" : "angle",
+          "label" : "Main roof angle",
+          "max" : 75,
+          "min" : 1
+        },
+        {
+          "default" : 450,
+          "key" : "overhang",
+          "kind" : "length",
+          "label" : "Horizontal overhang",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 600,
+          "key" : "spacing",
+          "kind" : "length",
+          "label" : "Rafter spacing",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Hip roof framing",
+      "popular" : true,
+      "sheets" : [
+        {
+          "kind" : "roof",
+          "label" : "Profile"
+        },
+        {
+          "kind" : "roofplan",
+          "label" : "Framing plan"
+        },
+        {
+          "kind" : "raftercut",
+          "label" : "Member detail"
+        },
+        {
+          "kind" : "roof3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "hip-roof",
+      "summary" : "Plan rafters, hips, jacks and material lengths."
+    },
+    {
+      "category" : "roof",
+      "fields" : [
+        {
+          "default" : 8000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Wall length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 6000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Wall width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 30,
+          "key" : "angle",
+          "kind" : "angle",
+          "label" : "Main roof angle",
+          "max" : 75,
+          "min" : 1
+        },
+        {
+          "default" : 450,
+          "key" : "overhang",
+          "kind" : "length",
+          "label" : "Horizontal overhang",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 600,
+          "key" : "spacing",
+          "kind" : "length",
+          "label" : "Rafter spacing",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Gable roof framing",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "roof",
+          "label" : "Profile"
+        },
+        {
+          "kind" : "roofplan",
+          "label" : "Framing plan"
+        },
+        {
+          "kind" : "raftercut",
+          "label" : "Member detail"
+        },
+        {
+          "kind" : "roof3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "gable-roof",
+      "summary" : "Gable dimensions, rafters, ridge and cutting list."
+    },
+    {
+      "category" : "roof",
+      "fields" : [
+        {
+          "default" : 8000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Wall length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 6000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Wall width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 30,
+          "key" : "angle",
+          "kind" : "angle",
+          "label" : "Main roof angle",
+          "max" : 75,
+          "min" : 1
+        },
+        {
+          "default" : 450,
+          "key" : "overhang",
+          "kind" : "length",
+          "label" : "Horizontal overhang",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 600,
+          "key" : "spacing",
+          "kind" : "length",
+          "label" : "Rafter spacing",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Lean-to roof",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "roof",
+          "label" : "Profile"
+        },
+        {
+          "kind" : "roofplan",
+          "label" : "Framing plan"
+        },
+        {
+          "kind" : "raftercut",
+          "label" : "Member detail"
+        },
+        {
+          "kind" : "roof3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "lean-to-roof",
+      "summary" : "Single-pitch roof rise, run and rafter set-out."
+    },
+    {
+      "category" : "roof",
+      "fields" : [
+        {
+          "default" : 8000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Wall length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 6000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Wall width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 30,
+          "key" : "angle",
+          "kind" : "angle",
+          "label" : "Main roof angle",
+          "max" : 75,
+          "min" : 1
+        },
+        {
+          "default" : 60,
+          "key" : "angle2",
+          "kind" : "angle",
+          "label" : "Secondary roof angle",
+          "max" : 80,
+          "min" : 1
+        },
+        {
+          "default" : 450,
+          "key" : "overhang",
+          "kind" : "length",
+          "label" : "Horizontal overhang",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 600,
+          "key" : "spacing",
+          "kind" : "length",
+          "label" : "Rafter spacing",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Gambrel roof",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "roof",
+          "label" : "Profile"
+        },
+        {
+          "kind" : "roofplan",
+          "label" : "Framing plan"
+        },
+        {
+          "kind" : "raftercut",
+          "label" : "Member detail"
+        },
+        {
+          "kind" : "roof3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "gambrel-roof",
+      "summary" : "Two-pitch gambrel frame geometry and joints."
+    },
+    {
+      "category" : "roof",
+      "fields" : [
+        {
+          "default" : 8000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Wall length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 6000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Wall width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 30,
+          "key" : "angle",
+          "kind" : "angle",
+          "label" : "Main roof angle",
+          "max" : 75,
+          "min" : 1
+        },
+        {
+          "default" : 22,
+          "key" : "angle2",
+          "kind" : "angle",
+          "label" : "Secondary roof angle",
+          "max" : 80,
+          "min" : 1
+        },
+        {
+          "default" : 450,
+          "key" : "overhang",
+          "kind" : "length",
+          "label" : "Horizontal overhang",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 600,
+          "key" : "spacing",
+          "kind" : "length",
+          "label" : "Rafter spacing",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Saltbox roof",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "roof",
+          "label" : "Profile"
+        },
+        {
+          "kind" : "roofplan",
+          "label" : "Framing plan"
+        },
+        {
+          "kind" : "raftercut",
+          "label" : "Member detail"
+        },
+        {
+          "kind" : "roof3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "saltbox-roof",
+      "summary" : "Asymmetric roof frame and rafter dimensions."
+    },
+    {
+      "category" : "roof",
+      "fields" : [
+        {
+          "default" : 3000,
+          "key" : "run",
+          "kind" : "length",
+          "label" : "Roof run",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 30,
+          "key" : "angle",
+          "kind" : "angle",
+          "label" : "Roof angle",
+          "max" : 89.900000000000006,
+          "min" : 0
+        },
+        {
+          "default" : 190,
+          "key" : "depth",
+          "kind" : "length",
+          "label" : "Rafter depth",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 90,
+          "key" : "seat",
+          "kind" : "length",
+          "label" : "Seat width",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Rafter cut templates",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "cuttemplate",
+          "label" : "Cut templates"
+        },
+        {
+          "kind" : "raftercut",
+          "label" : "Rafter"
+        },
+        {
+          "kind" : "roof3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "rafter-templates",
+      "summary" : "Full-scale plumb, seat and side-cut templates."
+    },
+    {
+      "category" : "roof",
+      "fields" : [
+        {
+          "default" : 600,
+          "key" : "run",
+          "kind" : "length",
+          "label" : "Horizontal overhang",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 30,
+          "key" : "angle",
+          "kind" : "angle",
+          "label" : "Roof angle",
+          "max" : 89.900000000000006,
+          "min" : 0
+        },
+        {
+          "default" : 190,
+          "key" : "fascia",
+          "kind" : "length",
+          "label" : "Fascia depth",
+          "max" : 1000000,
+          "min" : 0
+        }
+      ],
+      "name" : "Soffit drop",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "soffitdetail",
+          "label" : "Eave section"
+        },
+        {
+          "kind" : "roof",
+          "label" : "Roof line"
+        },
+        {
+          "kind" : "roof3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "soffit-drop",
+      "summary" : "Horizontal soffit, fascia and drop geometry."
+    },
+    {
+      "category" : "roof",
+      "fields" : [
+        {
+          "default" : 8000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Roof length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 6000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Roof width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 762,
+          "key" : "sheetWidth",
+          "kind" : "length",
+          "label" : "Sheet cover width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 30,
+          "key" : "angle",
+          "kind" : "angle",
+          "label" : "Roof angle",
+          "max" : 89.900000000000006,
+          "min" : 0
+        }
+      ],
+      "name" : "Hip and valley sheeting",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "roof",
+          "label" : "Roof plane"
+        },
+        {
+          "kind" : "sheetlayout",
+          "label" : "Sheet plan"
+        },
+        {
+          "kind" : "roof3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "hip-valley-sheet",
+      "summary" : "Sheet layout and diagonal cutting dimensions."
+    },
+    {
+      "category" : "roof",
+      "fields" : [
+        {
+          "default" : 900,
+          "key" : "radius",
+          "kind" : "length",
+          "label" : "Curve radius",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 70,
+          "key" : "angle",
+          "kind" : "angle",
+          "label" : "Arc sweep",
+          "max" : 170,
+          "min" : 1
+        },
+        {
+          "default" : 2400,
+          "key" : "straight",
+          "kind" : "length",
+          "label" : "Straight roof length",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 6000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Roof width",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Bullnose roofing",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "bullnoseprofile",
+          "label" : "Profile"
+        },
+        {
+          "kind" : "roof",
+          "label" : "Roof line"
+        },
+        {
+          "kind" : "roof3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "bullnose-roof",
+      "summary" : "Curved roof sheet length and pitch transition."
+    },
+    {
+      "category" : "stairs",
+      "fields" : [
+        {
+          "default" : 2800,
+          "key" : "totalRise",
+          "kind" : "length",
+          "label" : "Finished total rise",
+          "max" : 6000,
+          "min" : 1
+        },
+        {
+          "default" : 175,
+          "key" : "preferredRise",
+          "kind" : "length",
+          "label" : "Preferred riser",
+          "max" : 400,
+          "min" : 1
+        },
+        {
+          "default" : 250,
+          "key" : "run",
+          "kind" : "length",
+          "label" : "Tread run",
+          "max" : 600,
+          "min" : 1
+        },
+        {
+          "default" : 1000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Stair width",
+          "max" : 4000,
+          "min" : 1
+        },
+        {
+          "default" : 260,
+          "key" : "floorThickness",
+          "kind" : "length",
+          "label" : "Upper floor thickness",
+          "max" : 1200,
+          "min" : 0
+        },
+        {
+          "default" : 2000,
+          "key" : "headroom",
+          "kind" : "length",
+          "label" : "Required vertical headroom",
+          "max" : 4000,
+          "min" : 1
+        },
+        {
+          "default" : 300,
+          "key" : "stringerWidth",
+          "kind" : "length",
+          "label" : "Stringer board width",
+          "max" : 800,
+          "min" : 1
+        },
+        {
+          "default" : 40,
+          "key" : "treadThickness",
+          "kind" : "length",
+          "label" : "Tread thickness",
+          "max" : 200,
+          "min" : 0
+        }
+      ],
+      "name" : "Straight stairs",
+      "popular" : true,
+      "sheets" : [
+        {
+          "kind" : "stairs",
+          "label" : "Measured view"
+        },
+        {
+          "kind" : "stairdetail",
+          "label" : "Tread detail"
+        },
+        {
+          "kind" : "stringermark",
+          "label" : "Stringer template"
+        },
+        {
+          "kind" : "stairs3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "straight-stairs",
+      "summary" : "Even risers, total run, stringer marks and headroom."
+    },
+    {
+      "category" : "stairs",
+      "fields" : [
+        {
+          "default" : 2800,
+          "key" : "totalRise",
+          "kind" : "length",
+          "label" : "Floor-to-floor rise",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 1800,
+          "key" : "diameter",
+          "kind" : "length",
+          "label" : "Outside diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 150,
+          "key" : "column",
+          "kind" : "length",
+          "label" : "Column diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 16,
+          "key" : "count",
+          "kind" : "count",
+          "label" : "Number of risers",
+          "max" : 40,
+          "min" : 3
+        },
+        {
+          "default" : 600,
+          "key" : "walkLine",
+          "kind" : "length",
+          "label" : "Walk-line radius",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Spiral stairs",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "spiralplan",
+          "label" : "Tread plan"
+        },
+        {
+          "kind" : "stairs",
+          "label" : "Walking-line rise"
+        },
+        {
+          "kind" : "spiral3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "spiral-stairs",
+      "summary" : "Tread rotation, rise and central column geometry."
+    },
+    {
+      "category" : "stairs",
+      "fields" : [
+        {
+          "default" : 2800,
+          "key" : "totalRise",
+          "kind" : "length",
+          "label" : "Total rise",
+          "max" : 6000,
+          "min" : 1
+        },
+        {
+          "default" : 270,
+          "key" : "going",
+          "kind" : "length",
+          "label" : "Tread going",
+          "max" : 600,
+          "min" : 1
+        },
+        {
+          "default" : 16,
+          "key" : "count",
+          "kind" : "count",
+          "label" : "Riser count",
+          "max" : 40,
+          "min" : 2
+        },
+        {
+          "default" : 1000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Tread width",
+          "max" : 4000,
+          "min" : 1
+        }
+      ],
+      "name" : "Steel spine stairs",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "stairs",
+          "label" : "Measured view"
+        },
+        {
+          "kind" : "spinedetail",
+          "label" : "Bracket detail"
+        },
+        {
+          "kind" : "stairs3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "steel-spine-stairs",
+      "summary" : "Spine set-out, brackets and tread positions."
+    },
+    {
+      "category" : "stairs",
+      "fields" : [
+        {
+          "default" : 3600,
+          "key" : "span",
+          "kind" : "length",
+          "label" : "Overall clear span",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 45,
+          "key" : "memberWidth",
+          "kind" : "length",
+          "label" : "baluster width",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 100,
+          "key" : "targetGap",
+          "kind" : "length",
+          "label" : "Maximum clear gap",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 900,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Member height",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 45,
+          "key" : "memberDepth",
+          "kind" : "length",
+          "label" : "Member depth",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Baluster spacing",
+      "popular" : true,
+      "sheets" : [
+        {
+          "kind" : "balusters",
+          "label" : "Elevation"
+        },
+        {
+          "kind" : "railsection",
+          "label" : "Rail section"
+        },
+        {
+          "kind" : "spacing3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "baluster-spacing",
+      "summary" : "Equal baluster gaps and on-tread positions."
+    },
+    {
+      "category" : "stairs",
+      "fields" : [
+        {
+          "default" : 2400,
+          "key" : "totalRise",
+          "kind" : "length",
+          "label" : "Rise along the lower rail",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 3600,
+          "key" : "run",
+          "kind" : "length",
+          "label" : "Panel run",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 900,
+          "key" : "panelHeight",
+          "kind" : "length",
+          "label" : "Overall vertical panel height",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 6,
+          "key" : "count",
+          "kind" : "count",
+          "label" : "Equal panel columns",
+          "max" : 30,
+          "min" : 1
+        },
+        {
+          "default" : 1,
+          "key" : "rows",
+          "kind" : "count",
+          "label" : "Equal panel rows",
+          "max" : 20,
+          "min" : 1
+        },
+        {
+          "default" : 70,
+          "key" : "rail",
+          "kind" : "length",
+          "label" : "Rail\/stile width",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 18,
+          "key" : "thickness",
+          "kind" : "length",
+          "label" : "Frame thickness",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Stair panel layout",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "stairs",
+          "label" : "Panel layout"
+        },
+        {
+          "kind" : "panelelev",
+          "label" : "Opening detail"
+        },
+        {
+          "kind" : "stairs3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "stair-panels",
+      "summary" : "Equal raked panel openings with measured rails, stiles and cut blanks."
+    },
+    {
+      "category" : "stairs",
+      "fields" : [
+        {
+          "default" : 450,
+          "key" : "rise",
+          "kind" : "length",
+          "label" : "Total rise",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 14,
+          "key" : "gradient",
+          "kind" : "number",
+          "label" : "Gradient 1 in",
+          "max" : 1000000000,
+          "min" : 1
+        },
+        {
+          "default" : 1200,
+          "key" : "rampWidth",
+          "kind" : "length",
+          "label" : "Clear ramp width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 1500,
+          "key" : "bottomLanding",
+          "kind" : "length",
+          "label" : "Bottom landing length",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 1500,
+          "key" : "topLanding",
+          "kind" : "length",
+          "label" : "Top landing length",
+          "max" : 1000000,
+          "min" : 0
+        }
+      ],
+      "name" : "Access ramp",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "rampside",
+          "label" : "Side view"
+        },
+        {
+          "kind" : "rampplan",
+          "label" : "Plan"
+        },
+        {
+          "kind" : "stairs3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "access-ramp",
+      "summary" : "One straight ramp flight, entered landings and a measured footprint."
+    },
+    {
+      "category" : "spacing",
+      "fields" : [
+        {
+          "default" : 3600,
+          "key" : "span",
+          "kind" : "length",
+          "label" : "Overall span",
+          "max" : 1000000,
+          "min" : 1
+        },
+        {
+          "default" : 45,
+          "key" : "memberWidth",
+          "kind" : "length",
+          "label" : "Member width",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 450,
+          "key" : "targetGap",
+          "kind" : "length",
+          "label" : "Target clear gap",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 900,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Member length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 45,
+          "key" : "memberDepth",
+          "kind" : "length",
+          "label" : "Member depth",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Equal spacing",
+      "popular" : true,
+      "sheets" : [
+        {
+          "kind" : "spacing",
+          "label" : "Plan"
+        },
+        {
+          "kind" : "markplate",
+          "label" : "Mark-out stick"
+        },
+        {
+          "kind" : "spacing3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "equal-spacing",
+      "summary" : "Centers, clear gaps and a running mark-out list."
+    },
+    {
+      "category" : "spacing",
+      "fields" : [
+        {
+          "default" : 3600,
+          "key" : "span",
+          "kind" : "length",
+          "label" : "Overall clear span",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 45,
+          "key" : "memberWidth",
+          "kind" : "length",
+          "label" : "member width",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 450,
+          "key" : "targetGap",
+          "kind" : "length",
+          "label" : "Target clear gap",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 900,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Member height",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 45,
+          "key" : "memberDepth",
+          "kind" : "length",
+          "label" : "Member depth",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Board and batten",
+      "popular" : true,
+      "sheets" : [
+        {
+          "kind" : "cladding",
+          "label" : "Elevation"
+        },
+        {
+          "kind" : "battensection",
+          "label" : "Section"
+        },
+        {
+          "kind" : "masonry3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "board-batten",
+      "summary" : "Equal field spacing for any wall length."
+    },
+    {
+      "category" : "spacing",
+      "fields" : [
+        {
+          "default" : 3600,
+          "key" : "span",
+          "kind" : "length",
+          "label" : "Overall clear span",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 1000,
+          "key" : "memberWidth",
+          "kind" : "length",
+          "label" : "member width",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 20,
+          "key" : "targetGap",
+          "kind" : "length",
+          "label" : "Target clear gap",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 1100,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Member height",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 12,
+          "key" : "memberDepth",
+          "kind" : "length",
+          "label" : "Member depth",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Glass balustrade panels",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "glasspanel",
+          "label" : "Elevation"
+        },
+        {
+          "kind" : "glassplan",
+          "label" : "Panel plan"
+        },
+        {
+          "kind" : "spacing3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "glass-panels",
+      "summary" : "Fixed-width panels with balanced clear gaps."
+    },
+    {
+      "category" : "spacing",
+      "fields" : [
+        {
+          "default" : 3600,
+          "key" : "span",
+          "kind" : "length",
+          "label" : "Wall length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 45,
+          "key" : "memberWidth",
+          "kind" : "length",
+          "label" : "Stile width",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 450,
+          "key" : "targetGap",
+          "kind" : "length",
+          "label" : "Target panel width",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 1000,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Height to cap",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 45,
+          "key" : "memberDepth",
+          "kind" : "length",
+          "label" : "Member depth",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Wainscoting layout",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "wainscotelev",
+          "label" : "Elevation"
+        },
+        {
+          "kind" : "wainscotsection",
+          "label" : "Section"
+        },
+        {
+          "kind" : "spacing3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "wainscoting",
+      "summary" : "Balanced stile positions and clear panel widths."
+    },
+    {
+      "category" : "spacing",
+      "fields" : [
+        {
+          "default" : 3600,
+          "key" : "span",
+          "kind" : "length",
+          "label" : "Clear bay height",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 45,
+          "key" : "memberWidth",
+          "kind" : "length",
+          "label" : "Shelf thickness",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 450,
+          "key" : "targetGap",
+          "kind" : "length",
+          "label" : "Target clear opening",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 800,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Shelf width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 400,
+          "key" : "memberDepth",
+          "kind" : "length",
+          "label" : "Shelf depth",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Shelf and drawer spacing",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "shelfbay",
+          "label" : "Elevation"
+        },
+        {
+          "kind" : "shelfsection",
+          "label" : "Side section"
+        },
+        {
+          "kind" : "spacing3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "shelf-spacing",
+      "summary" : "Shelf heights with thickness and equal end openings."
+    },
+    {
+      "category" : "spacing",
+      "fields" : [
+        {
+          "default" : 6000,
+          "key" : "span",
+          "kind" : "length",
+          "label" : "Wall length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 2400,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Overall wall height",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 45,
+          "key" : "memberWidth",
+          "kind" : "length",
+          "label" : "Timber thickness",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 600,
+          "key" : "targetGap",
+          "kind" : "length",
+          "label" : "Maximum stud centres",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 3,
+          "key" : "plates",
+          "kind" : "count",
+          "label" : "Plate runs",
+          "max" : 4,
+          "min" : 2
+        },
+        {
+          "default" : 1,
+          "key" : "nogRows",
+          "kind" : "count",
+          "label" : "Rows of noggins",
+          "max" : 10,
+          "min" : 0
+        }
+      ],
+      "name" : "Wall framing quantities",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "studwall",
+          "label" : "Framing"
+        },
+        {
+          "kind" : "platemark",
+          "label" : "Plate mark-out"
+        }
+      ],
+      "slug" : "wall-framing",
+      "summary" : "A straight wall with full-height end studs, equal centres and continuous plates. Openings are handled separately."
+    },
+    {
+      "category" : "spacing",
+      "fields" : [
+        {
+          "default" : 6000,
+          "key" : "span",
+          "kind" : "length",
+          "label" : "Wall length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 2400,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Overall wall height",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 45,
+          "key" : "memberWidth",
+          "kind" : "length",
+          "label" : "Timber thickness",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 600,
+          "key" : "targetGap",
+          "kind" : "length",
+          "label" : "Maximum stud centres",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 1800,
+          "key" : "openLeft",
+          "kind" : "length",
+          "label" : "Opening left from wall end",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 1200,
+          "key" : "openWidth",
+          "kind" : "length",
+          "label" : "Clear opening width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 1200,
+          "key" : "openHeight",
+          "kind" : "length",
+          "label" : "Clear opening height",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 900,
+          "key" : "openBottom",
+          "kind" : "length",
+          "label" : "Opening bottom above floor",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 190,
+          "key" : "headerDepth",
+          "kind" : "length",
+          "label" : "Designed header depth",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 3,
+          "key" : "plates",
+          "kind" : "count",
+          "label" : "Plate runs",
+          "max" : 4,
+          "min" : 2
+        }
+      ],
+      "name" : "Opening layout",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "studwall",
+          "label" : "Framing"
+        },
+        {
+          "kind" : "openingdetail",
+          "label" : "Opening detail"
+        }
+      ],
+      "slug" : "opening-layout",
+      "summary" : "One rectangular rough opening. Enter the header depth from the approved design; this sets out members and does not size structural headers."
+    },
+    {
+      "category" : "spacing",
+      "fields" : [
+        {
+          "default" : 500,
+          "key" : "radius",
+          "kind" : "length",
+          "label" : "Outside bend radius",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 90,
+          "key" : "angle",
+          "kind" : "angle",
+          "label" : "Sweep angle",
+          "max" : 360,
+          "min" : 0.10000000000000001
+        },
+        {
+          "default" : 18,
+          "key" : "thickness",
+          "kind" : "length",
+          "label" : "Board thickness",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 3,
+          "key" : "skin",
+          "kind" : "length",
+          "label" : "Remaining skin",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 3.2000000000000002,
+          "key" : "kerf",
+          "kind" : "length",
+          "label" : "Saw kerf width",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Kerf bending",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "kerf",
+          "label" : "Cut layout"
+        },
+        {
+          "kind" : "kerfbent",
+          "label" : "Bent profile"
+        }
+      ],
+      "slug" : "kerf-bending",
+      "summary" : "Outside radius and saw-cut geometry. Remaining skin and grain flexibility need a test piece; hold the board to the target curve."
+    },
+    {
+      "category" : "spacing",
+      "fields" : [
+        {
+          "default" : 6000,
+          "key" : "span",
+          "kind" : "length",
+          "label" : "Slab length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 4000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Slab width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 12,
+          "key" : "memberWidth",
+          "kind" : "length",
+          "label" : "Bar diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 200,
+          "key" : "targetGap",
+          "kind" : "length",
+          "label" : "Maximum bar centres",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 50,
+          "key" : "cover",
+          "kind" : "length",
+          "label" : "Clear edge cover",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 1,
+          "key" : "layers",
+          "kind" : "count",
+          "label" : "Mesh layers",
+          "max" : 4,
+          "min" : 1
+        }
+      ],
+      "name" : "Rebar spacing",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "rebarplan",
+          "label" : "Bar plan"
+        },
+        {
+          "kind" : "barsection",
+          "label" : "Bar schedule"
+        }
+      ],
+      "slug" : "rebar-spacing",
+      "summary" : "Straight bars in both directions, equal centres within the selected maximum. Add lap, bend and anchorage allowances from the design."
+    },
+    {
+      "category" : "spacing",
+      "fields" : [
+        {
+          "default" : 3600,
+          "key" : "span",
+          "kind" : "length",
+          "label" : "Overall clear span",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 6,
+          "key" : "memberWidth",
+          "kind" : "length",
+          "label" : "Fixing diameter",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 200,
+          "key" : "targetGap",
+          "kind" : "length",
+          "label" : "Target clear gap",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 100,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Stock width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 20,
+          "key" : "memberDepth",
+          "kind" : "length",
+          "label" : "Stock thickness",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Fastener set-out",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "fastenrow",
+          "label" : "Fixing run"
+        },
+        {
+          "kind" : "fastendetail",
+          "label" : "Edge distance"
+        },
+        {
+          "kind" : "spacing3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "fastener-spacing",
+      "summary" : "Balanced running marks for fixings."
+    },
+    {
+      "category" : "concrete",
+      "fields" : [
+        {
+          "default" : 6000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Length",
+          "max" : 100000,
+          "min" : 1
+        },
+        {
+          "default" : 4000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Width",
+          "max" : 100000,
+          "min" : 1
+        },
+        {
+          "default" : 100,
+          "key" : "thickness",
+          "kind" : "length",
+          "label" : "Thickness",
+          "max" : 2000,
+          "min" : 1
+        },
+        {
+          "default" : 8,
+          "key" : "waste",
+          "kind" : "percent",
+          "label" : "Order allowance",
+          "max" : 30,
+          "min" : 0
+        },
+        {
+          "default" : 240,
+          "key" : "rate",
+          "kind" : "volumeRate",
+          "label" : "Concrete rate per m³\/yd³",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 2400,
+          "key" : "density",
+          "kind" : "number",
+          "label" : "Concrete density (kg\/m³)",
+          "max" : 10000,
+          "min" : 1
+        }
+      ],
+      "name" : "Concrete slab",
+      "popular" : true,
+      "sheets" : [
+        {
+          "kind" : "slabsection",
+          "label" : "Section"
+        },
+        {
+          "kind" : "rebarplan",
+          "label" : "Plan"
+        },
+        {
+          "kind" : "slab3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "concrete-slab",
+      "summary" : "Slab volume, order quantity, weight and cost."
+    },
+    {
+      "category" : "concrete",
+      "fields" : [
+        {
+          "default" : 6000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Slab length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 4000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Slab width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 100,
+          "key" : "thickness",
+          "kind" : "length",
+          "label" : "Slab thickness",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 300,
+          "key" : "beamWidth",
+          "kind" : "length",
+          "label" : "Edge beam width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 450,
+          "key" : "beamDepth",
+          "kind" : "length",
+          "label" : "Total beam depth",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 8,
+          "key" : "waste",
+          "kind" : "percent",
+          "label" : "Order allowance",
+          "max" : 100,
+          "min" : 0
+        }
+      ],
+      "name" : "Slab with edge beams",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "edgebeamplan",
+          "label" : "Plan"
+        },
+        {
+          "kind" : "slabsection",
+          "label" : "Cross section"
+        },
+        {
+          "kind" : "slab3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "slab-edge-beams",
+      "summary" : "Rectangular slab and thickened edge volumes."
+    },
+    {
+      "category" : "concrete",
+      "fields" : [
+        {
+          "default" : 6000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Wall length",
+          "max" : 100000,
+          "min" : 1
+        },
+        {
+          "default" : 2400,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Wall height",
+          "max" : 20000,
+          "min" : 1
+        },
+        {
+          "default" : 390,
+          "key" : "blockLength",
+          "kind" : "length",
+          "label" : "Block length",
+          "max" : 2000,
+          "min" : 1
+        },
+        {
+          "default" : 190,
+          "key" : "blockHeight",
+          "kind" : "length",
+          "label" : "Block height",
+          "max" : 1000,
+          "min" : 1
+        },
+        {
+          "default" : 190,
+          "key" : "wallDepth",
+          "kind" : "length",
+          "label" : "Block width",
+          "max" : 2000,
+          "min" : 1
+        },
+        {
+          "default" : 10,
+          "key" : "joint",
+          "kind" : "length",
+          "label" : "Joint",
+          "max" : 60,
+          "min" : 0
+        },
+        {
+          "default" : 2,
+          "key" : "openingArea",
+          "kind" : "area",
+          "label" : "Openings area",
+          "max" : 10000,
+          "min" : 0
+        },
+        {
+          "default" : 5,
+          "key" : "waste",
+          "kind" : "percent",
+          "label" : "Waste allowance",
+          "max" : 30,
+          "min" : 0
+        }
+      ],
+      "name" : "Concrete block quantities",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "masonry",
+          "label" : "Measured view"
+        },
+        {
+          "kind" : "masonry3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "block-quantities",
+      "summary" : "Blocks by wall area, courses and openings."
+    },
+    {
+      "category" : "concrete",
+      "fields" : [
+        {
+          "default" : 6000,
+          "key" : "diameter",
+          "kind" : "length",
+          "label" : "Block centre-circle diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 390,
+          "key" : "blockLength",
+          "kind" : "length",
+          "label" : "Block length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 190,
+          "key" : "blockWidth",
+          "kind" : "length",
+          "label" : "Block width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 190,
+          "key" : "blockHeight",
+          "kind" : "length",
+          "label" : "Block height",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 10,
+          "key" : "joint",
+          "kind" : "length",
+          "label" : "Target joint at block centre",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 10,
+          "key" : "bedJoint",
+          "kind" : "length",
+          "label" : "Bed joint between courses",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 10,
+          "key" : "courses",
+          "kind" : "count",
+          "label" : "Courses",
+          "max" : 100,
+          "min" : 1
+        },
+        {
+          "default" : 0,
+          "key" : "blockCount",
+          "kind" : "count",
+          "label" : "Blocks per course (0 = auto)",
+          "max" : 10000,
+          "min" : 0
+        },
+        {
+          "default" : 0,
+          "key" : "originHeight",
+          "kind" : "length",
+          "label" : "Set-out origin above base",
+          "max" : 1000000,
+          "min" : 0
+        }
+      ],
+      "name" : "Block wall circle",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "blockring",
+          "label" : "Plan"
+        },
+        {
+          "kind" : "grid",
+          "label" : "Course set-out"
+        },
+        {
+          "kind" : "circle3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "circular-block-wall",
+      "summary" : "Rectangular blocks, tapered joints and course set-out."
+    },
+    {
+      "category" : "concrete",
+      "fields" : [
+        {
+          "default" : 1800,
+          "key" : "span",
+          "kind" : "length",
+          "label" : "Clear span",
+          "max" : 20000,
+          "min" : 1
+        },
+        {
+          "default" : 230,
+          "key" : "ringDepth",
+          "kind" : "length",
+          "label" : "Arch ring depth",
+          "max" : 2000,
+          "min" : 1
+        },
+        {
+          "default" : 110,
+          "key" : "wallDepth",
+          "kind" : "length",
+          "label" : "Wall thickness",
+          "max" : 2000,
+          "min" : 1
+        },
+        {
+          "default" : 17,
+          "key" : "count",
+          "kind" : "count",
+          "label" : "Voussoir count",
+          "max" : 99,
+          "min" : 3
+        },
+        {
+          "default" : 10,
+          "key" : "joint",
+          "kind" : "length",
+          "label" : "Joint at intrados",
+          "max" : 60,
+          "min" : 0
+        }
+      ],
+      "name" : "Masonry arch",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "arch",
+          "label" : "Measured view"
+        },
+        {
+          "kind" : "arch3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "masonry-arch",
+      "summary" : "Arch voussoir layout and cut dimensions."
+    },
+    {
+      "category" : "concrete",
+      "fields" : [
+        {
+          "default" : 2000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Pour length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 1000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Pour width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 100,
+          "key" : "thickness",
+          "kind" : "length",
+          "label" : "Thickness",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 0.010999999999999999,
+          "key" : "bagYield",
+          "kind" : "number",
+          "label" : "Bag yield (m³)",
+          "max" : 1000000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 2400,
+          "key" : "density",
+          "kind" : "number",
+          "label" : "Mixed density (kg\/m³)",
+          "max" : 10000,
+          "min" : 1
+        }
+      ],
+      "name" : "Concrete by the bag",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "slabpour",
+          "label" : "Plan"
+        },
+        {
+          "kind" : "slabsection",
+          "label" : "Cross section"
+        },
+        {
+          "kind" : "slab3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "concrete-bags",
+      "summary" : "Bagged-mix count for small pours."
+    },
+    {
+      "category" : "concrete",
+      "fields" : [
+        {
+          "default" : 6000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Dig length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 4000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Dig width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 300,
+          "key" : "depth",
+          "kind" : "length",
+          "label" : "Dig depth",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 25,
+          "key" : "swell",
+          "kind" : "percent",
+          "label" : "Swell factor",
+          "max" : 100,
+          "min" : 0
+        },
+        {
+          "default" : 6,
+          "key" : "truck",
+          "kind" : "number",
+          "label" : "Truck capacity (m³)",
+          "max" : 1000000000,
+          "min" : 0.5
+        }
+      ],
+      "name" : "Excavation & truck loads",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "trench",
+          "label" : "Plan"
+        },
+        {
+          "kind" : "slabsection",
+          "label" : "Cross section"
+        },
+        {
+          "kind" : "slab3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "excavation",
+      "summary" : "Bank and loose volumes with swell and loads."
+    },
+    {
+      "category" : "concrete",
+      "fields" : [
+        {
+          "default" : 12000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Footing length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 300,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Footing width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 300,
+          "key" : "depth",
+          "kind" : "length",
+          "label" : "Footing depth",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 5,
+          "key" : "waste",
+          "kind" : "percent",
+          "label" : "Order allowance",
+          "max" : 30,
+          "min" : 0
+        },
+        {
+          "default" : 0.010999999999999999,
+          "key" : "bagYield",
+          "kind" : "number",
+          "label" : "Bag yield (m³)",
+          "max" : 1000000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Strip footing",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "trench",
+          "label" : "Plan"
+        },
+        {
+          "kind" : "slabsection",
+          "label" : "Cross section"
+        },
+        {
+          "kind" : "slab3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "strip-footing",
+      "summary" : "Trench concrete with readymix and bags."
+    },
+    {
+      "category" : "concrete",
+      "fields" : [
+        {
+          "default" : 6000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Wall length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 2400,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Wall height",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 230,
+          "key" : "brickLength",
+          "kind" : "length",
+          "label" : "Brick length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 76,
+          "key" : "brickHeight",
+          "kind" : "length",
+          "label" : "Brick height",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 110,
+          "key" : "wallDepth",
+          "kind" : "length",
+          "label" : "Brick width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 10,
+          "key" : "joint",
+          "kind" : "length",
+          "label" : "Joint",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 5,
+          "key" : "waste",
+          "kind" : "percent",
+          "label" : "Waste allowance",
+          "max" : 100,
+          "min" : 0
+        }
+      ],
+      "name" : "Brick quantities",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "masonry",
+          "label" : "Measured view"
+        },
+        {
+          "kind" : "masonry3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "brick-quantities",
+      "summary" : "Bricks by wall area, courses and waste."
+    },
+    {
+      "category" : "concrete",
+      "fields" : [
+        {
+          "default" : 3600,
+          "key" : "span",
+          "kind" : "length",
+          "label" : "Overall clear span",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 45,
+          "key" : "memberWidth",
+          "kind" : "length",
+          "label" : "bar width",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 450,
+          "key" : "targetGap",
+          "kind" : "length",
+          "label" : "Target clear gap",
+          "max" : 1000000,
+          "min" : 0
+        }
+      ],
+      "name" : "Starter bars",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "rebarplan",
+          "label" : "Plan"
+        },
+        {
+          "kind" : "barbend",
+          "label" : "Bar shape"
+        },
+        {
+          "kind" : "slab3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "starter-bars",
+      "summary" : "Block core alignment and starter positions."
+    },
+    {
+      "category" : "concrete",
+      "fields" : [
+        {
+          "default" : 2700,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Wall height",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 76,
+          "key" : "brickHeight",
+          "kind" : "length",
+          "label" : "Brick height",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 6000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Wall length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 230,
+          "key" : "brickLength",
+          "kind" : "length",
+          "label" : "Brick length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 110,
+          "key" : "wallDepth",
+          "kind" : "length",
+          "label" : "Brick width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 10,
+          "key" : "targetJoint",
+          "kind" : "length",
+          "label" : "Target joint",
+          "max" : 1000000,
+          "min" : 0
+        }
+      ],
+      "name" : "Brick gauge and bond",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "masonry",
+          "label" : "Measured view"
+        },
+        {
+          "kind" : "masonry3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "brick-gauge",
+      "summary" : "Course gauge, joint size and bond set-out."
+    },
+    {
+      "category" : "metal",
+      "fields" : [
+        {
+          "default" : 60,
+          "key" : "diameter",
+          "kind" : "length",
+          "label" : "Cut tube diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 90,
+          "key" : "parentDiameter",
+          "kind" : "length",
+          "label" : "Parent tube diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 45,
+          "key" : "angle",
+          "kind" : "angle",
+          "label" : "Intersection angle",
+          "max" : 179,
+          "min" : 1
+        },
+        {
+          "default" : 24,
+          "key" : "stations",
+          "kind" : "count",
+          "label" : "Plot stations",
+          "max" : 96,
+          "min" : 8
+        }
+      ],
+      "name" : "Round tube notch",
+      "popular" : true,
+      "sheets" : [
+        {
+          "kind" : "tube",
+          "label" : "Wrap template"
+        },
+        {
+          "kind" : "tubeend",
+          "label" : "End view"
+        },
+        {
+          "kind" : "tube3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "tube-notch",
+      "summary" : "Printable branch-to-tube coping pattern."
+    },
+    {
+      "category" : "metal",
+      "fields" : [
+        {
+          "default" : 60,
+          "key" : "diameter",
+          "kind" : "length",
+          "label" : "Cut tube diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 45,
+          "key" : "angle",
+          "kind" : "angle",
+          "label" : "Intersection angle",
+          "max" : 179,
+          "min" : 1
+        },
+        {
+          "default" : 24,
+          "key" : "stations",
+          "kind" : "count",
+          "label" : "Plot stations",
+          "max" : 96,
+          "min" : 8
+        }
+      ],
+      "name" : "Round tube miter",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "tube",
+          "label" : "Wrap template"
+        },
+        {
+          "kind" : "miterend",
+          "label" : "End view"
+        },
+        {
+          "kind" : "tube3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "tube-miter",
+      "summary" : "Angled end miter wrap template."
+    },
+    {
+      "category" : "metal",
+      "fields" : [
+        {
+          "default" : 60,
+          "key" : "diameter",
+          "kind" : "length",
+          "label" : "Cut tube diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 45,
+          "key" : "angle",
+          "kind" : "angle",
+          "label" : "Tube axis to sheet plane",
+          "max" : 179,
+          "min" : 1
+        },
+        {
+          "default" : 24,
+          "key" : "stations",
+          "kind" : "count",
+          "label" : "Plot stations",
+          "max" : 96,
+          "min" : 8
+        }
+      ],
+      "name" : "Tube through sheet",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "tube",
+          "label" : "Wrap template"
+        },
+        {
+          "kind" : "sheetpierce",
+          "label" : "End view"
+        },
+        {
+          "kind" : "tube3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "tube-through-sheet",
+      "summary" : "Hole profile through sloped sheet material."
+    },
+    {
+      "category" : "metal",
+      "fields" : [
+        {
+          "default" : 60,
+          "key" : "diameter",
+          "kind" : "length",
+          "label" : "Tube outside diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 180,
+          "key" : "radius",
+          "kind" : "length",
+          "label" : "Centre-line radius",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 90,
+          "key" : "angle",
+          "kind" : "angle",
+          "label" : "Bend angle",
+          "max" : 180,
+          "min" : 0
+        },
+        {
+          "default" : 300,
+          "key" : "straight",
+          "kind" : "length",
+          "label" : "Straight each side",
+          "max" : 1000000,
+          "min" : 0
+        }
+      ],
+      "name" : "Tube bend",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "bendarc",
+          "label" : "Bend set-out"
+        },
+        {
+          "kind" : "tube",
+          "label" : "Centre-line development"
+        },
+        {
+          "kind" : "tube3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "tube-bend",
+      "summary" : "Bend allowance, tangent points and set-out."
+    },
+    {
+      "category" : "metal",
+      "fields" : [
+        {
+          "default" : 76,
+          "key" : "diameter",
+          "kind" : "length",
+          "label" : "Tube diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 250,
+          "key" : "radius",
+          "kind" : "length",
+          "label" : "Target bend radius",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 90,
+          "key" : "angle",
+          "kind" : "angle",
+          "label" : "Total bend",
+          "max" : 180,
+          "min" : 1
+        },
+        {
+          "default" : 6,
+          "key" : "count",
+          "kind" : "count",
+          "label" : "Weld joints",
+          "max" : 40,
+          "min" : 1
+        }
+      ],
+      "name" : "Pie-cut bend",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "piecutwedges",
+          "label" : "Wedges"
+        },
+        {
+          "kind" : "bendarc",
+          "label" : "Bend"
+        },
+        {
+          "kind" : "tube3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "pie-cut-bend",
+      "summary" : "Segment count, cut angle and developed length."
+    },
+    {
+      "category" : "metal",
+      "fields" : [
+        {
+          "default" : 600,
+          "key" : "diameter",
+          "kind" : "length",
+          "label" : "Round diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 450,
+          "key" : "square",
+          "kind" : "length",
+          "label" : "Square side",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 700,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Transition height",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 12,
+          "key" : "facets",
+          "kind" : "count",
+          "label" : "Facets per corner",
+          "max" : 48,
+          "min" : 2
+        }
+      ],
+      "name" : "Round-to-square reducer",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "reducerelev",
+          "label" : "Elevation"
+        },
+        {
+          "kind" : "cone",
+          "label" : "Quarter pattern"
+        },
+        {
+          "kind" : "cone3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "round-square-reducer",
+      "summary" : "Transition panels and full-scale patterns."
+    },
+    {
+      "category" : "metal",
+      "fields" : [
+        {
+          "default" : 50,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Section width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 50,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Section depth",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 90,
+          "key" : "angle",
+          "kind" : "angle",
+          "label" : "Included joint angle",
+          "max" : 179,
+          "min" : 1
+        }
+      ],
+      "name" : "Square tube miter",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "sqtubemiter",
+          "label" : "Faces"
+        },
+        {
+          "kind" : "miterend",
+          "label" : "Joint"
+        },
+        {
+          "kind" : "tube3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "square-tube-miter",
+      "summary" : "Planar miter for matching rectangular tube sections."
+    },
+    {
+      "category" : "metal",
+      "fields" : [
+        {
+          "default" : 50,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Section width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 50,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Section depth",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 90,
+          "key" : "angle",
+          "kind" : "angle",
+          "label" : "Included joint angle",
+          "max" : 179,
+          "min" : 1
+        }
+      ],
+      "name" : "Three-way square-tube corner",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "threewayjoint",
+          "label" : "Corner plan"
+        },
+        {
+          "kind" : "sqtubemiter",
+          "label" : "Arm wrap"
+        },
+        {
+          "kind" : "tube3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "three-way-joint",
+      "summary" : "Equal square sections meeting on three perpendicular axes."
+    },
+    {
+      "category" : "templates",
+      "fields" : [
+        {
+          "default" : 1200,
+          "key" : "diameter",
+          "kind" : "length",
+          "label" : "Diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 5,
+          "key" : "count",
+          "kind" : "count",
+          "label" : "Degree increment",
+          "max" : 180,
+          "min" : 1
+        }
+      ],
+      "name" : "Protractor",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "protractorface",
+          "label" : "Face"
+        },
+        {
+          "kind" : "anglelegs",
+          "label" : "Angle set-out"
+        }
+      ],
+      "slug" : "protractor",
+      "summary" : "Printable custom-size degree protractor."
+    },
+    {
+      "category" : "templates",
+      "fields" : [
+        {
+          "default" : 1200,
+          "key" : "diameter",
+          "kind" : "length",
+          "label" : "Diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 12,
+          "key" : "count",
+          "kind" : "count",
+          "label" : "Equal divisions",
+          "max" : 360,
+          "min" : 3
+        }
+      ],
+      "name" : "Circle divider",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "dividerstep",
+          "label" : "Stepping the chord"
+        },
+        {
+          "kind" : "circle3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "circle-divider",
+      "summary" : "Equal divisions, chords and cutting angles."
+    },
+    {
+      "category" : "templates",
+      "fields" : [
+        {
+          "default" : 1200,
+          "key" : "diameter",
+          "kind" : "length",
+          "label" : "Diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 12,
+          "key" : "count",
+          "kind" : "count",
+          "label" : "Equal divisions",
+          "max" : 360,
+          "min" : 3
+        }
+      ],
+      "name" : "Circle template",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "circlequad",
+          "label" : "Ordinates"
+        },
+        {
+          "kind" : "circle3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "circle-template",
+      "summary" : "Full-scale circle across tiled print pages."
+    },
+    {
+      "category" : "templates",
+      "fields" : [
+        {
+          "default" : 2400,
+          "key" : "span",
+          "kind" : "length",
+          "label" : "Chord span",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 400,
+          "key" : "rise",
+          "kind" : "length",
+          "label" : "Arc rise",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Arc template",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "arch",
+          "label" : "Measured view"
+        },
+        {
+          "kind" : "arch3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "arc-template",
+      "summary" : "Large-radius printable arc set-out."
+    },
+    {
+      "category" : "templates",
+      "fields" : [
+        {
+          "default" : 1600,
+          "key" : "diameter",
+          "kind" : "length",
+          "label" : "Major axis",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 1000,
+          "key" : "minor",
+          "kind" : "length",
+          "label" : "Minor axis",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Oval template",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "ovalplan",
+          "label" : "Measured view"
+        },
+        {
+          "kind" : "circle3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "oval-template",
+      "summary" : "Printable true ellipse and oval layouts."
+    },
+    {
+      "category" : "templates",
+      "fields" : [
+        {
+          "default" : 900,
+          "key" : "bottomDiameter",
+          "kind" : "length",
+          "label" : "Bottom diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 300,
+          "key" : "topDiameter",
+          "kind" : "length",
+          "label" : "Top diameter",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 800,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Vertical height",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 20,
+          "key" : "seam",
+          "kind" : "length",
+          "label" : "Seam allowance",
+          "max" : 1000000,
+          "min" : 0
+        }
+      ],
+      "name" : "Cone pattern",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "cone",
+          "label" : "Measured view"
+        },
+        {
+          "kind" : "cone3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "cone-pattern",
+      "summary" : "Flat development for frustums and cones."
+    },
+    {
+      "category" : "templates",
+      "fields" : [
+        {
+          "default" : 1200,
+          "key" : "diameter",
+          "kind" : "length",
+          "label" : "Pitch circle diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 12,
+          "key" : "count",
+          "kind" : "count",
+          "label" : "Hole count",
+          "max" : 360,
+          "min" : 3
+        },
+        {
+          "default" : 12,
+          "key" : "holeDiameter",
+          "kind" : "length",
+          "label" : "Hole diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Bolt circle",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "boltring",
+          "label" : "Bolt circle"
+        },
+        {
+          "kind" : "circle3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "bolt-circle",
+      "summary" : "Equal hole positions and drill template."
+    },
+    {
+      "category" : "templates",
+      "fields" : [
+        {
+          "default" : 1000,
+          "key" : "diameter",
+          "kind" : "length",
+          "label" : "Maximum diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 10,
+          "key" : "increment",
+          "kind" : "length",
+          "label" : "Diameter increment",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 50,
+          "key" : "overlap",
+          "kind" : "length",
+          "label" : "Tape overlap",
+          "max" : 1000000,
+          "min" : 0
+        }
+      ],
+      "name" : "Diameter tape",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "tapewrap",
+          "label" : "Tape"
+        },
+        {
+          "kind" : "scale",
+          "label" : "Reference scale"
+        },
+        {
+          "kind" : "circle3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "diameter-tape",
+      "summary" : "Wraparound tape that reads diameter directly."
+    },
+    {
+      "category" : "deck",
+      "fields" : [
+        {
+          "default" : 6000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Deck length",
+          "max" : 40000,
+          "min" : 1
+        },
+        {
+          "default" : 4000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Deck width",
+          "max" : 40000,
+          "min" : 1
+        },
+        {
+          "default" : 140,
+          "key" : "boardWidth",
+          "kind" : "length",
+          "label" : "Board width",
+          "max" : 600,
+          "min" : 1
+        },
+        {
+          "default" : 5,
+          "key" : "gap",
+          "kind" : "length",
+          "label" : "Board gap",
+          "max" : 100,
+          "min" : 0
+        },
+        {
+          "default" : 450,
+          "key" : "joistSpacing",
+          "kind" : "length",
+          "label" : "Joist max centres",
+          "max" : 2000,
+          "min" : 1
+        },
+        {
+          "default" : 1800,
+          "key" : "bearerSpacing",
+          "kind" : "length",
+          "label" : "Bearer max centres",
+          "max" : 6000,
+          "min" : 1
+        },
+        {
+          "default" : 45,
+          "key" : "joistWidth",
+          "kind" : "length",
+          "label" : "Joist width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 190,
+          "key" : "joistDepth",
+          "kind" : "length",
+          "label" : "Joist depth",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 90,
+          "key" : "bearerWidth",
+          "kind" : "length",
+          "label" : "Bearer width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 190,
+          "key" : "bearerDepth",
+          "kind" : "length",
+          "label" : "Bearer depth",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 20,
+          "key" : "boardDepth",
+          "kind" : "length",
+          "label" : "Board thickness",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Deck subframe",
+      "popular" : true,
+      "sheets" : [
+        {
+          "kind" : "deck",
+          "label" : "Measured view"
+        },
+        {
+          "kind" : "deck3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "deck-subframe",
+      "summary" : "Bearers, joists, boards and measured set-out."
+    },
+    {
+      "category" : "deck",
+      "fields" : [
+        {
+          "default" : 6000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Board run length",
+          "max" : 40000,
+          "min" : 1
+        },
+        {
+          "default" : 4000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Deck width",
+          "max" : 40000,
+          "min" : 1
+        },
+        {
+          "default" : 140,
+          "key" : "boardWidth",
+          "kind" : "length",
+          "label" : "Board width",
+          "max" : 600,
+          "min" : 1
+        },
+        {
+          "default" : 5,
+          "key" : "gap",
+          "kind" : "length",
+          "label" : "Gap",
+          "max" : 100,
+          "min" : 0
+        },
+        {
+          "default" : 20,
+          "key" : "boardDepth",
+          "kind" : "length",
+          "label" : "Board thickness",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 10,
+          "key" : "waste",
+          "kind" : "percent",
+          "label" : "Waste allowance",
+          "max" : 100,
+          "min" : 0
+        },
+        {
+          "default" : 8,
+          "key" : "rate",
+          "kind" : "linearRate",
+          "label" : "Price per metre\/foot",
+          "max" : 1000000,
+          "min" : 0
+        }
+      ],
+      "name" : "Deck board layout",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "deck",
+          "label" : "Measured view"
+        },
+        {
+          "kind" : "deck3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "deck-boards",
+      "summary" : "Board count, gaps, cuts and cost."
+    },
+    {
+      "category" : "deck",
+      "fields" : [
+        {
+          "default" : 3600,
+          "key" : "span",
+          "kind" : "length",
+          "label" : "Overall clear span",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 45,
+          "key" : "memberWidth",
+          "kind" : "length",
+          "label" : "post width",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 450,
+          "key" : "targetGap",
+          "kind" : "length",
+          "label" : "Target clear gap",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 1800,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Member height",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 45,
+          "key" : "memberDepth",
+          "kind" : "length",
+          "label" : "Member depth",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Fence posts and panels",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "fencebay",
+          "label" : "Bay elevation"
+        },
+        {
+          "kind" : "fenceplan",
+          "label" : "Plan"
+        },
+        {
+          "kind" : "spacing3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "fence-panels",
+      "summary" : "Post centers, panel widths and quantities."
+    },
+    {
+      "category" : "deck",
+      "fields" : [
+        {
+          "default" : 3600,
+          "key" : "span",
+          "kind" : "length",
+          "label" : "Span between end centres",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 1200,
+          "key" : "baseHeight",
+          "kind" : "length",
+          "label" : "Spring height",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 450,
+          "key" : "rise",
+          "kind" : "length",
+          "label" : "Arch rise",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 90,
+          "key" : "palingWidth",
+          "kind" : "length",
+          "label" : "Paling width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 20,
+          "key" : "palingDepth",
+          "kind" : "length",
+          "label" : "Paling thickness",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 21,
+          "key" : "count",
+          "kind" : "count",
+          "label" : "Paling count",
+          "max" : 99,
+          "min" : 3
+        }
+      ],
+      "name" : "Arched fence palings",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "arch",
+          "label" : "Measured view"
+        },
+        {
+          "kind" : "arch3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "arched-fence",
+      "summary" : "Individual paling heights along an arc."
+    },
+    {
+      "category" : "deck",
+      "fields" : [
+        {
+          "default" : 12000,
+          "key" : "span",
+          "kind" : "length",
+          "label" : "Fence length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 2400,
+          "key" : "bay",
+          "kind" : "length",
+          "label" : "Maximum post bay",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 2,
+          "key" : "rails",
+          "kind" : "count",
+          "label" : "Rails per bay",
+          "max" : 6,
+          "min" : 1
+        },
+        {
+          "default" : 100,
+          "key" : "palingWidth",
+          "kind" : "length",
+          "label" : "Paling width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 10,
+          "key" : "gap",
+          "kind" : "length",
+          "label" : "Paling gap",
+          "max" : 1000000,
+          "min" : 0
+        }
+      ],
+      "name" : "Paling fence rails",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "balusters",
+          "label" : "Elevation"
+        },
+        {
+          "kind" : "postmortise",
+          "label" : "Post housing"
+        },
+        {
+          "kind" : "spacing3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "fence-rails",
+      "summary" : "Rail joins, post positions and paling count."
+    },
+    {
+      "category" : "deck",
+      "fields" : [
+        {
+          "default" : 4000,
+          "key" : "diameter",
+          "kind" : "length",
+          "label" : "Across-corners diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 8,
+          "key" : "count",
+          "kind" : "count",
+          "label" : "Number of sides",
+          "max" : 16,
+          "min" : 3
+        },
+        {
+          "default" : 30,
+          "key" : "angle",
+          "kind" : "angle",
+          "label" : "Roof pitch at centre rafter",
+          "max" : 89.900000000000006,
+          "min" : 0
+        }
+      ],
+      "name" : "Gazebo roof and floor",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "circle",
+          "label" : "Plan"
+        },
+        {
+          "kind" : "roof",
+          "label" : "Roof panel"
+        },
+        {
+          "kind" : "roof3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "gazebo",
+      "summary" : "Polygon gazebo rafters, floor and plan geometry."
+    },
+    {
+      "category" : "deck",
+      "fields" : [
+        {
+          "default" : 6,
+          "key" : "count",
+          "kind" : "count",
+          "label" : "Number of holes",
+          "max" : 60,
+          "min" : 1
+        },
+        {
+          "default" : 300,
+          "key" : "diameter",
+          "kind" : "length",
+          "label" : "Hole diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 600,
+          "key" : "depth",
+          "kind" : "length",
+          "label" : "Hole depth",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 1800,
+          "key" : "spacing",
+          "kind" : "length",
+          "label" : "Hole centres",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 0,
+          "key" : "postShape",
+          "kind" : "count",
+          "label" : "Post deduction",
+          "max" : 2,
+          "min" : 0
+        },
+        {
+          "default" : 100,
+          "key" : "postWidth",
+          "kind" : "length",
+          "label" : "Post width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 100,
+          "key" : "postDepth",
+          "kind" : "length",
+          "label" : "Post thickness",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 100,
+          "key" : "postDiameter",
+          "kind" : "length",
+          "label" : "Post diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 600,
+          "key" : "embedment",
+          "kind" : "length",
+          "label" : "Embedded post length",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 5,
+          "key" : "waste",
+          "kind" : "percent",
+          "label" : "Order allowance",
+          "max" : 30,
+          "min" : 0
+        },
+        {
+          "default" : 0.010999999999999999,
+          "key" : "bagYield",
+          "kind" : "number",
+          "label" : "Mixed yield per bag (m³)",
+          "max" : 1000000000,
+          "min" : 0.0001
+        }
+      ],
+      "name" : "Post holes & concrete",
+      "popular" : true,
+      "sheets" : [
+        {
+          "kind" : "postholes",
+          "label" : "Hole plan"
+        },
+        {
+          "kind" : "slabsection",
+          "label" : "Hole section"
+        },
+        {
+          "kind" : "slab3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "post-holes",
+      "summary" : "Concrete after post displacement, bag orders and hole set-out."
+    },
+    {
+      "category" : "deck",
+      "fields" : [
+        {
+          "default" : 6000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Deck length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 4000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Deck width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 140,
+          "key" : "boardWidth",
+          "kind" : "length",
+          "label" : "Board width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 5,
+          "key" : "gap",
+          "kind" : "length",
+          "label" : "Board gap",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 450,
+          "key" : "joistSpacing",
+          "kind" : "length",
+          "label" : "Joist max centres",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 45,
+          "key" : "joistWidth",
+          "kind" : "length",
+          "label" : "Joist width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 190,
+          "key" : "joistDepth",
+          "kind" : "length",
+          "label" : "Joist depth",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 20,
+          "key" : "boardDepth",
+          "kind" : "length",
+          "label" : "Board thickness",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 2,
+          "key" : "perJunction",
+          "kind" : "count",
+          "label" : "Screws per junction",
+          "max" : 4,
+          "min" : 1
+        },
+        {
+          "default" : 500,
+          "key" : "box",
+          "kind" : "count",
+          "label" : "Screws per box",
+          "max" : 5000,
+          "min" : 50
+        }
+      ],
+      "name" : "Decking screws",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "deck",
+          "label" : "Measured view"
+        },
+        {
+          "kind" : "deck3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "decking-screws",
+      "summary" : "Fixings from the board and joist grid."
+    },
+    {
+      "category" : "convert",
+      "fields" : [
+        {
+          "default" : 2400,
+          "key" : "value",
+          "kind" : "number",
+          "label" : "Value",
+          "max" : 1000000000,
+          "min" : 0
+        },
+        {
+          "default" : 0,
+          "key" : "fromUnit",
+          "kind" : "count",
+          "label" : "From unit",
+          "max" : 7,
+          "min" : 0
+        },
+        {
+          "default" : 1,
+          "key" : "toUnit",
+          "kind" : "count",
+          "label" : "To unit",
+          "max" : 7,
+          "min" : 0
+        }
+      ],
+      "name" : "All-unit converter",
+      "popular" : true,
+      "sheets" : [
+        {
+          "kind" : "dualscale",
+          "label" : "Matched scales"
+        },
+        {
+          "kind" : "convtable",
+          "label" : "All equivalents"
+        }
+      ],
+      "slug" : "all-unit-converter",
+      "summary" : "Convert common site lengths from any listed unit."
+    },
+    {
+      "category" : "convert",
+      "fields" : [
+        {
+          "default" : 400,
+          "key" : "rise",
+          "kind" : "length",
+          "label" : "Rise",
+          "max" : 50000,
+          "min" : 0
+        },
+        {
+          "default" : 1200,
+          "key" : "run",
+          "kind" : "length",
+          "label" : "Run",
+          "max" : 50000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Pitch, rise & angle",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "pitchgauge",
+          "label" : "Gauge"
+        },
+        {
+          "kind" : "triangle",
+          "label" : "Rise and run"
+        }
+      ],
+      "slug" : "pitch-angle",
+      "summary" : "Move between angle, percent grade and pitch ratios."
+    },
+    {
+      "category" : "convert",
+      "fields" : [
+        {
+          "default" : 1,
+          "key" : "value",
+          "kind" : "number",
+          "label" : "Value",
+          "max" : 1000000000,
+          "min" : 0
+        },
+        {
+          "default" : 0,
+          "key" : "fromUnit",
+          "kind" : "count",
+          "label" : "From unit",
+          "max" : 7,
+          "min" : 0
+        },
+        {
+          "default" : 1,
+          "key" : "toUnit",
+          "kind" : "count",
+          "label" : "To unit",
+          "max" : 7,
+          "min" : 0
+        }
+      ],
+      "name" : "Length converter",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "dualscale",
+          "label" : "Matched scales"
+        },
+        {
+          "kind" : "convtable",
+          "label" : "All equivalents"
+        }
+      ],
+      "slug" : "length-converter",
+      "summary" : "Metric, imperial and decimal lengths."
+    },
+    {
+      "category" : "convert",
+      "fields" : [
+        {
+          "default" : 1,
+          "key" : "value",
+          "kind" : "number",
+          "label" : "Value",
+          "max" : 1000000000,
+          "min" : 0
+        },
+        {
+          "default" : 0,
+          "key" : "fromUnit",
+          "kind" : "count",
+          "label" : "From unit",
+          "max" : 8,
+          "min" : 0
+        },
+        {
+          "default" : 1,
+          "key" : "toUnit",
+          "kind" : "count",
+          "label" : "To unit",
+          "max" : 8,
+          "min" : 0
+        }
+      ],
+      "name" : "Area converter",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "dualscale",
+          "label" : "Matched scales"
+        },
+        {
+          "kind" : "convtable",
+          "label" : "All equivalents"
+        }
+      ],
+      "slug" : "area-converter",
+      "summary" : "Square units, hectares and international acres."
+    },
+    {
+      "category" : "convert",
+      "fields" : [
+        {
+          "default" : 1,
+          "key" : "value",
+          "kind" : "number",
+          "label" : "Value",
+          "max" : 1000000000,
+          "min" : 0
+        },
+        {
+          "default" : 0,
+          "key" : "fromUnit",
+          "kind" : "count",
+          "label" : "From unit",
+          "max" : 8,
+          "min" : 0
+        },
+        {
+          "default" : 1,
+          "key" : "toUnit",
+          "kind" : "count",
+          "label" : "To unit",
+          "max" : 8,
+          "min" : 0
+        }
+      ],
+      "name" : "Volume converter",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "dualscale",
+          "label" : "Matched scales"
+        },
+        {
+          "kind" : "convtable",
+          "label" : "All equivalents"
+        }
+      ],
+      "slug" : "volume-converter",
+      "summary" : "Cubic units, litres, US liquid and imperial gallons."
+    },
+    {
+      "category" : "convert",
+      "fields" : [
+        {
+          "default" : 1,
+          "key" : "value",
+          "kind" : "number",
+          "label" : "Value",
+          "max" : 1000000000,
+          "min" : 0
+        },
+        {
+          "default" : 0,
+          "key" : "fromUnit",
+          "kind" : "count",
+          "label" : "From unit",
+          "max" : 6,
+          "min" : 0
+        },
+        {
+          "default" : 1,
+          "key" : "toUnit",
+          "kind" : "count",
+          "label" : "To unit",
+          "max" : 6,
+          "min" : 0
+        }
+      ],
+      "name" : "Weight converter",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "dualscale",
+          "label" : "Matched scales"
+        },
+        {
+          "kind" : "convtable",
+          "label" : "All equivalents"
+        }
+      ],
+      "slug" : "weight-converter",
+      "summary" : "Metric and avoirdupois workshop weights."
+    },
+    {
+      "category" : "convert",
+      "fields" : [
+        {
+          "default" : 2400,
+          "key" : "known",
+          "kind" : "length",
+          "label" : "Known real length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 820,
+          "key" : "knownPixels",
+          "kind" : "number",
+          "label" : "Reference length (pixels)",
+          "max" : 1000000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 475,
+          "key" : "measuredPixels",
+          "kind" : "number",
+          "label" : "Target length (pixels)",
+          "max" : 1000000000,
+          "min" : 0
+        }
+      ],
+      "name" : "Scale from image",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "scaledraw",
+          "label" : "From the image"
+        },
+        {
+          "kind" : "scale",
+          "label" : "Calibration"
+        }
+      ],
+      "slug" : "image-scale",
+      "summary" : "Recover real dimensions from a known feature."
+    },
+    {
+      "category" : "convert",
+      "fields" : [
+        {
+          "default" : 0.6875,
+          "key" : "value",
+          "kind" : "number",
+          "label" : "Decimal inches",
+          "max" : 1000000000,
+          "min" : 0
+        },
+        {
+          "default" : 64,
+          "key" : "denominator",
+          "kind" : "count",
+          "label" : "Maximum denominator",
+          "max" : 256,
+          "min" : 2
+        }
+      ],
+      "name" : "Fraction and decimal",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "rulerin",
+          "label" : "Inch rule"
+        },
+        {
+          "kind" : "sixteenthrule",
+          "label" : "Approximation"
+        }
+      ],
+      "slug" : "fraction-decimal",
+      "summary" : "Nearest reduced fraction within your denominator limit."
+    },
+    {
+      "category" : "convert",
+      "fields" : [
+        {
+          "default" : 20,
+          "key" : "rise",
+          "kind" : "length",
+          "label" : "Rise",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 1000,
+          "key" : "run",
+          "kind" : "length",
+          "label" : "Run",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Bubble level",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "levelvial",
+          "label" : "Vial"
+        },
+        {
+          "kind" : "fallsection",
+          "label" : "Fall"
+        }
+      ],
+      "slug" : "bubble-level",
+      "summary" : "Device angle and rise-over-run level."
+    },
+    {
+      "category" : "convert",
+      "fields" : [
+        {
+          "default" : 1000,
+          "key" : "cost",
+          "kind" : "money",
+          "label" : "Job cost",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 30,
+          "key" : "markup",
+          "kind" : "percent",
+          "label" : "Markup",
+          "max" : 100,
+          "min" : 0
+        },
+        {
+          "default" : 15,
+          "key" : "gst",
+          "kind" : "percent",
+          "label" : "GST",
+          "max" : 100,
+          "min" : 0
+        }
+      ],
+      "name" : "Quote markup & GST",
+      "popular" : true,
+      "sheets" : [
+        {
+          "kind" : "moneybar",
+          "label" : "Quote bar"
+        },
+        {
+          "kind" : "costsplit",
+          "label" : "Breakdown"
+        }
+      ],
+      "slug" : "quote-markup",
+      "summary" : "Cost to quoted price with markup, GST and margin."
+    },
+    {
+      "category" : "geometry",
+      "fields" : [
+        {
+          "default" : 1200,
+          "key" : "diameter",
+          "kind" : "length",
+          "label" : "Diameter",
+          "max" : 50000,
+          "min" : 1
+        },
+        {
+          "default" : 12,
+          "key" : "segments",
+          "kind" : "count",
+          "label" : "Equal segments",
+          "max" : 96,
+          "min" : 3
+        }
+      ],
+      "name" : "Arc & circle",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "circle",
+          "label" : "Divided circle"
+        },
+        {
+          "kind" : "segmentdetail",
+          "label" : "Segment"
+        },
+        {
+          "kind" : "circle3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "arc-circle",
+      "summary" : "Circumference, chord, segment angle and full diagram."
+    },
+    {
+      "category" : "geometry",
+      "fields" : [
+        {
+          "default" : 4000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Rectangle width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 3000,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Rectangle length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 5000,
+          "key" : "measured",
+          "kind" : "length",
+          "label" : "Measured second diagonal",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Square-up diagonal",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "bracedframe",
+          "label" : "Frame"
+        },
+        {
+          "kind" : "diagcheck",
+          "label" : "3-4-5 check"
+        }
+      ],
+      "slug" : "square-up",
+      "summary" : "Rectangle diagonals and corner verification."
+    },
+    {
+      "category" : "geometry",
+      "fields" : [
+        {
+          "default" : 1000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Long dimension",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Golden ratio",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "goldenspiral",
+          "label" : "Spiral"
+        },
+        {
+          "kind" : "goldenline",
+          "label" : "Divided line"
+        }
+      ],
+      "slug" : "golden-ratio",
+      "summary" : "Generate related golden-section dimensions."
+    },
+    {
+      "category" : "geometry",
+      "fields" : [
+        {
+          "default" : 2000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Square base side",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 1800,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Vertical height",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Pyramid",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "pyramidplan",
+          "label" : "Measured view"
+        },
+        {
+          "kind" : "pyramid3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "pyramid",
+      "summary" : "Slant, edge and face dimensions."
+    },
+    {
+      "category" : "geometry",
+      "fields" : [
+        {
+          "default" : 1800,
+          "key" : "span",
+          "kind" : "length",
+          "label" : "Opening span",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 1200,
+          "key" : "rise",
+          "kind" : "length",
+          "label" : "Rise above spring",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Gothic arch",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "arch",
+          "label" : "Measured view"
+        },
+        {
+          "kind" : "arch3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "gothic-arch",
+      "summary" : "Pointed arch centers and radius layout."
+    },
+    {
+      "category" : "geometry",
+      "fields" : [
+        {
+          "default" : 2400,
+          "key" : "diameter",
+          "kind" : "length",
+          "label" : "Centre-line joint diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 180,
+          "key" : "sweep",
+          "kind" : "angle",
+          "label" : "Arc sweep",
+          "max" : 360,
+          "min" : 1
+        },
+        {
+          "default" : 12,
+          "key" : "count",
+          "kind" : "count",
+          "label" : "Segments",
+          "max" : 100,
+          "min" : 2
+        },
+        {
+          "default" : 80,
+          "key" : "moldingWidth",
+          "kind" : "length",
+          "label" : "Stock face width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 18,
+          "key" : "moldingDepth",
+          "kind" : "length",
+          "label" : "Stock thickness",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Curved molding",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "segmentarc",
+          "label" : "Segmented curve"
+        },
+        {
+          "kind" : "cuttemplate",
+          "label" : "Piece template"
+        },
+        {
+          "kind" : "circle3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "curved-molding",
+      "summary" : "Segment widths and miter angles for curved trim."
+    },
+    {
+      "category" : "geometry",
+      "fields" : [
+        {
+          "default" : 4000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Horizontal run",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 3000,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Vertical rise",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Diagonal bracing",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "bracedframe",
+          "label" : "Frame"
+        },
+        {
+          "kind" : "bracecut",
+          "label" : "End cut"
+        }
+      ],
+      "slug" : "diagonal-brace",
+      "summary" : "Brace length, cut angle and offsets."
+    },
+    {
+      "category" : "geometry",
+      "fields" : [
+        {
+          "default" : 90,
+          "key" : "planAngle",
+          "kind" : "angle",
+          "label" : "Included plan angle",
+          "max" : 180,
+          "min" : 1
+        },
+        {
+          "default" : 35,
+          "key" : "slope",
+          "kind" : "angle",
+          "label" : "Side angle from horizontal",
+          "max" : 90,
+          "min" : 0
+        },
+        {
+          "default" : 140,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Panel face width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 19,
+          "key" : "thickness",
+          "kind" : "length",
+          "label" : "Panel thickness",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 600,
+          "key" : "tail",
+          "kind" : "length",
+          "label" : "Straight allowance beyond cut",
+          "max" : 1000000,
+          "min" : 0.001
+        }
+      ],
+      "name" : "Compound miter",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "miterjoint",
+          "label" : "Joined corner"
+        },
+        {
+          "kind" : "cuttemplate",
+          "label" : "End wrap"
+        },
+        {
+          "kind" : "solid3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "compound-miter",
+      "summary" : "Saw settings and cut wrap for equal sloping panels."
+    },
+    {
+      "category" : "materials",
+      "fields" : [
+        {
+          "default" : 3600,
+          "key" : "floorWidth",
+          "kind" : "length",
+          "label" : "Floor width",
+          "max" : 100000,
+          "min" : 1
+        },
+        {
+          "default" : 600,
+          "key" : "tileWidth",
+          "kind" : "length",
+          "label" : "Tile width",
+          "max" : 3000,
+          "min" : 1
+        },
+        {
+          "default" : 600,
+          "key" : "tileLength",
+          "kind" : "length",
+          "label" : "Tile length",
+          "max" : 3000,
+          "min" : 1
+        },
+        {
+          "default" : 10,
+          "key" : "tileDepth",
+          "kind" : "length",
+          "label" : "Tile thickness",
+          "max" : 100,
+          "min" : 1
+        },
+        {
+          "default" : 3,
+          "key" : "joint",
+          "kind" : "length",
+          "label" : "Joint width",
+          "max" : 60,
+          "min" : 0
+        },
+        {
+          "default" : 5,
+          "key" : "rows",
+          "kind" : "count",
+          "label" : "Rows to draw",
+          "max" : 24,
+          "min" : 1
+        },
+        {
+          "default" : 10,
+          "key" : "waste",
+          "kind" : "percent",
+          "label" : "Waste allowance",
+          "max" : 30,
+          "min" : 0
+        }
+      ],
+      "name" : "Tile layout",
+      "popular" : true,
+      "sheets" : [
+        {
+          "kind" : "tilerow",
+          "label" : "Measured view"
+        },
+        {
+          "kind" : "deck3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "tile-layout",
+      "summary" : "Best fit, equal edge cuts, joints and tile quantity."
+    },
+    {
+      "category" : "materials",
+      "fields" : [
+        {
+          "default" : 6000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Room length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 4000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Room width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 10,
+          "key" : "waste",
+          "kind" : "percent",
+          "label" : "Material allowance",
+          "max" : 100,
+          "min" : 0
+        }
+      ],
+      "name" : "Floor area",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "roomplan",
+          "label" : "Measured view"
+        },
+        {
+          "kind" : "slab3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "floor-area",
+      "summary" : "Rectangular floor area, perimeter and diagonal."
+    },
+    {
+      "category" : "materials",
+      "fields" : [
+        {
+          "default" : 6000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Floor length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 4000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Floor width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 600,
+          "key" : "tileLength",
+          "kind" : "length",
+          "label" : "Tile length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 600,
+          "key" : "tileWidth",
+          "kind" : "length",
+          "label" : "Tile width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 4,
+          "key" : "boxQty",
+          "kind" : "count",
+          "label" : "Tiles per box",
+          "max" : 1000,
+          "min" : 1
+        },
+        {
+          "default" : 10,
+          "key" : "materialDepth",
+          "kind" : "length",
+          "label" : "Material thickness",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 3,
+          "key" : "cutKerf",
+          "kind" : "length",
+          "label" : "Cut allowance",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 10,
+          "key" : "waste",
+          "kind" : "percent",
+          "label" : "Waste allowance",
+          "max" : 100,
+          "min" : 0
+        },
+        {
+          "default" : 55,
+          "key" : "boxPrice",
+          "kind" : "money",
+          "label" : "Price per box",
+          "max" : 1000000,
+          "min" : 0
+        }
+      ],
+      "name" : "Tile quantity and cost",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "sheetlayout",
+          "label" : "Covering layout"
+        },
+        {
+          "kind" : "grid",
+          "label" : "Stock cuts"
+        },
+        {
+          "kind" : "slab3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "tile-quantity",
+      "summary" : "Tile, box, waste and budget estimate."
+    },
+    {
+      "category" : "materials",
+      "fields" : [
+        {
+          "default" : 6000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Wall length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 2700,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Wall height",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 180,
+          "key" : "boardWidth",
+          "kind" : "length",
+          "label" : "Board width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 30,
+          "key" : "overlap",
+          "kind" : "length",
+          "label" : "Minimum overlap",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 0,
+          "key" : "openingArea",
+          "kind" : "area",
+          "label" : "Opening deduction",
+          "max" : 10000,
+          "min" : 0
+        },
+        {
+          "default" : 10,
+          "key" : "waste",
+          "kind" : "percent",
+          "label" : "Waste allowance",
+          "max" : 100,
+          "min" : 0
+        }
+      ],
+      "name" : "Weatherboard cladding",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "cladding",
+          "label" : "Course elevation"
+        },
+        {
+          "kind" : "platemark",
+          "label" : "Lap set-out"
+        }
+      ],
+      "slug" : "weatherboard",
+      "summary" : "Equal course cover, overlap, set-out and lineal quantity."
+    },
+    {
+      "category" : "materials",
+      "fields" : [
+        {
+          "default" : 5000,
+          "key" : "diameter",
+          "kind" : "length",
+          "label" : "Paved diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 200,
+          "key" : "paverLength",
+          "kind" : "length",
+          "label" : "Actual paver length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 100,
+          "key" : "paverWidth",
+          "kind" : "length",
+          "label" : "Actual paver width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 50,
+          "key" : "paverThickness",
+          "kind" : "length",
+          "label" : "Paver thickness",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 3,
+          "key" : "joint",
+          "kind" : "length",
+          "label" : "Joint width",
+          "max" : 100,
+          "min" : 0
+        },
+        {
+          "default" : 0,
+          "key" : "bond",
+          "kind" : "count",
+          "label" : "Pattern",
+          "max" : 1,
+          "min" : 0
+        },
+        {
+          "default" : 0,
+          "key" : "origin",
+          "kind" : "count",
+          "label" : "Circle centre",
+          "max" : 1,
+          "min" : 0
+        },
+        {
+          "default" : 10,
+          "key" : "waste",
+          "kind" : "percent",
+          "label" : "Waste allowance",
+          "max" : 100,
+          "min" : 0
+        }
+      ],
+      "name" : "Circular paving patio",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "paving",
+          "label" : "Patio plan"
+        },
+        {
+          "kind" : "circle3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "circular-paving",
+      "summary" : "Rectangular paver layouts, curved edge cuts and orders."
+    },
+    {
+      "category" : "materials",
+      "fields" : [
+        {
+          "default" : 2000,
+          "key" : "diameter",
+          "kind" : "length",
+          "label" : "Outside corner diameter",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 200,
+          "key" : "unitDepth",
+          "kind" : "length",
+          "label" : "Paver radial depth",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 50,
+          "key" : "paverThickness",
+          "kind" : "length",
+          "label" : "Paver thickness",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 24,
+          "key" : "count",
+          "kind" : "count",
+          "label" : "Pavers in ring",
+          "max" : 360,
+          "min" : 3
+        },
+        {
+          "default" : 3,
+          "key" : "joint",
+          "kind" : "length",
+          "label" : "Perpendicular side joint",
+          "max" : 100,
+          "min" : 0
+        },
+        {
+          "default" : 10,
+          "key" : "waste",
+          "kind" : "percent",
+          "label" : "Waste allowance",
+          "max" : 100,
+          "min" : 0
+        }
+      ],
+      "name" : "Circular paving ring",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "paving",
+          "label" : "Ring plan"
+        },
+        {
+          "kind" : "cuttemplate",
+          "label" : "Paver template"
+        },
+        {
+          "kind" : "circle3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "paving-ring",
+      "summary" : "Tapered pavers, constant side joints and a cutting template."
+    },
+    {
+      "category" : "materials",
+      "fields" : [
+        {
+          "default" : 90,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Section width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 45,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Section depth",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 24000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Total lineal length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 5,
+          "key" : "count",
+          "kind" : "count",
+          "label" : "Equal piece count",
+          "max" : 1000,
+          "min" : 1
+        },
+        {
+          "default" : 1200,
+          "key" : "rate",
+          "kind" : "cubicFootRate",
+          "label" : "Price per m³\/ft³",
+          "max" : 1000000,
+          "min" : 0
+        }
+      ],
+      "name" : "Timber linear to cubic",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "timberstack",
+          "label" : "Stack ends"
+        },
+        {
+          "kind" : "barsection",
+          "label" : "Piece section"
+        },
+        {
+          "kind" : "solid3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "timber-volume",
+      "summary" : "Convert section and length to material volume."
+    },
+    {
+      "category" : "materials",
+      "fields" : [
+        {
+          "default" : 50.799999999999997,
+          "key" : "thickness",
+          "kind" : "length",
+          "label" : "Thickness",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 203.19999999999999,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 2438.4000000000001,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 10,
+          "key" : "count",
+          "kind" : "count",
+          "label" : "Piece count",
+          "max" : 1000,
+          "min" : 1
+        },
+        {
+          "default" : 2400,
+          "key" : "rate",
+          "kind" : "money",
+          "label" : "Price per 1000 board feet",
+          "max" : 1000000,
+          "min" : 0
+        }
+      ],
+      "name" : "Lumber board-foot price",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "timberstack",
+          "label" : "Stack ends"
+        },
+        {
+          "kind" : "barsection",
+          "label" : "Piece section"
+        },
+        {
+          "kind" : "solid3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "board-foot",
+      "summary" : "Price per thousand board feet and per piece."
+    },
+    {
+      "category" : "materials",
+      "fields" : [
+        {
+          "default" : 12000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Wall length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 2400,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Wall height",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 0,
+          "key" : "openingArea",
+          "kind" : "area",
+          "label" : "Unpainted openings",
+          "max" : 10000,
+          "min" : 0
+        },
+        {
+          "default" : 2,
+          "key" : "coats",
+          "kind" : "count",
+          "label" : "Coats",
+          "max" : 6,
+          "min" : 1
+        },
+        {
+          "default" : 11,
+          "key" : "coverage",
+          "kind" : "number",
+          "label" : "Coverage per coat (m²\/L)",
+          "max" : 100,
+          "min" : 0.01
+        },
+        {
+          "default" : 0,
+          "key" : "waste",
+          "kind" : "percent",
+          "label" : "Extra paint allowance",
+          "max" : 100,
+          "min" : 0
+        },
+        {
+          "default" : 4,
+          "key" : "canLitres",
+          "kind" : "number",
+          "label" : "Can size (L)",
+          "max" : 1000,
+          "min" : 0.01
+        }
+      ],
+      "name" : "Paint coverage",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "paintwall",
+          "label" : "Wall face"
+        }
+      ],
+      "slug" : "paint-coverage",
+      "summary" : "Litres, coats and cans for a wall."
+    },
+    {
+      "category" : "materials",
+      "fields" : [
+        {
+          "default" : 6000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Wall length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 2400,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Wall height",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 2400,
+          "key" : "sheetLength",
+          "kind" : "length",
+          "label" : "Sheet length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 1200,
+          "key" : "sheetWidth",
+          "kind" : "length",
+          "label" : "Sheet width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 13,
+          "key" : "materialDepth",
+          "kind" : "length",
+          "label" : "Material thickness",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 0,
+          "key" : "cutKerf",
+          "kind" : "length",
+          "label" : "Cut allowance",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 10,
+          "key" : "waste",
+          "kind" : "percent",
+          "label" : "Waste allowance",
+          "max" : 100,
+          "min" : 0
+        }
+      ],
+      "name" : "Plasterboard sheets",
+      "popular" : true,
+      "sheets" : [
+        {
+          "kind" : "sheetlayout",
+          "label" : "Covering layout"
+        },
+        {
+          "kind" : "grid",
+          "label" : "Stock cuts"
+        },
+        {
+          "kind" : "masonry3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "plasterboard",
+      "summary" : "Sheet count, screws and compound."
+    },
+    {
+      "category" : "materials",
+      "fields" : [
+        {
+          "default" : 4000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Room length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 3000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Room width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 1,
+          "key" : "doors",
+          "kind" : "count",
+          "label" : "Door openings",
+          "max" : 20,
+          "min" : 0
+        },
+        {
+          "default" : 820,
+          "key" : "doorWidth",
+          "kind" : "length",
+          "label" : "Door width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 5400,
+          "key" : "stock",
+          "kind" : "length",
+          "label" : "Stock length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 10,
+          "key" : "waste",
+          "kind" : "percent",
+          "label" : "Waste allowance",
+          "max" : 100,
+          "min" : 0
+        }
+      ],
+      "name" : "Skirting & trim",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "roomplan",
+          "label" : "Measured view"
+        },
+        {
+          "kind" : "slab3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "skirting",
+      "summary" : "Lineal trim around a room in stock lengths."
+    },
+    {
+      "category" : "materials",
+      "fields" : [
+        {
+          "default" : 6000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Area length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 2400,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Area width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 1160,
+          "key" : "battLength",
+          "kind" : "length",
+          "label" : "Batt length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 580,
+          "key" : "battWidth",
+          "kind" : "length",
+          "label" : "Batt width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 10,
+          "key" : "pack",
+          "kind" : "count",
+          "label" : "Batts per pack",
+          "max" : 1000,
+          "min" : 1
+        },
+        {
+          "default" : 90,
+          "key" : "materialDepth",
+          "kind" : "length",
+          "label" : "Material thickness",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 0,
+          "key" : "cutKerf",
+          "kind" : "length",
+          "label" : "Cut allowance",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 8,
+          "key" : "waste",
+          "kind" : "percent",
+          "label" : "Waste allowance",
+          "max" : 100,
+          "min" : 0
+        }
+      ],
+      "name" : "Insulation batts",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "sheetlayout",
+          "label" : "Covering layout"
+        },
+        {
+          "kind" : "grid",
+          "label" : "Stock cuts"
+        },
+        {
+          "kind" : "masonry3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "insulation-batts",
+      "summary" : "Batts and packs for an area."
+    },
+    {
+      "category" : "materials",
+      "fields" : [
+        {
+          "default" : 14000,
+          "key" : "span",
+          "kind" : "length",
+          "label" : "Wall run (total)",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 2400,
+          "key" : "height",
+          "kind" : "length",
+          "label" : "Wall height",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 10050,
+          "key" : "rollLength",
+          "kind" : "length",
+          "label" : "Roll length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 530,
+          "key" : "rollWidth",
+          "kind" : "length",
+          "label" : "Roll width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 100,
+          "key" : "trim",
+          "kind" : "length",
+          "label" : "Total trim per drop",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 0,
+          "key" : "repeatLength",
+          "kind" : "length",
+          "label" : "Straight match repeat (0 = none)",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 0,
+          "key" : "rollLead",
+          "kind" : "length",
+          "label" : "Lead-in loss per roll",
+          "max" : 1000000,
+          "min" : 0
+        }
+      ],
+      "name" : "Wallpaper rolls",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "cladding",
+          "label" : "Wall drops"
+        },
+        {
+          "kind" : "grid",
+          "label" : "Roll cuts"
+        },
+        {
+          "kind" : "masonry3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "wallpaper-rolls",
+      "summary" : "Drops, trim and straight-match pattern repeat."
+    },
+    {
+      "category" : "materials",
+      "fields" : [
+        {
+          "default" : 5000,
+          "key" : "length",
+          "kind" : "length",
+          "label" : "Area length",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 3000,
+          "key" : "width",
+          "kind" : "length",
+          "label" : "Area width",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 100,
+          "key" : "depth",
+          "kind" : "length",
+          "label" : "Spread depth",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 25,
+          "key" : "bagLitres",
+          "kind" : "count",
+          "label" : "Bag size (litres)",
+          "max" : 100,
+          "min" : 5
+        },
+        {
+          "default" : 1400,
+          "key" : "density",
+          "kind" : "number",
+          "label" : "Bulk density (kg\/m³)",
+          "max" : 10000,
+          "min" : 1
+        }
+      ],
+      "name" : "Soil & mulch",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "slabpour",
+          "label" : "Plan"
+        },
+        {
+          "kind" : "slabsection",
+          "label" : "Cross section"
+        },
+        {
+          "kind" : "slab3d",
+          "label" : "3D assembly"
+        }
+      ],
+      "slug" : "soil-mulch",
+      "summary" : "Cubic metres, bags and tonnes."
+    },
+    {
+      "category" : "concrete",
+      "fields" : [
+        {
+          "default" : 12000,
+          "key" : "run",
+          "kind" : "length",
+          "label" : "Horizontal pipe run",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 60,
+          "key" : "grade",
+          "kind" : "number",
+          "label" : "Fall 1 in",
+          "max" : 500,
+          "min" : 1
+        },
+        {
+          "default" : 600,
+          "key" : "startInvert",
+          "kind" : "length",
+          "label" : "Start invert depth below datum",
+          "max" : 1000000,
+          "min" : 0
+        },
+        {
+          "default" : 3,
+          "key" : "marks",
+          "kind" : "number",
+          "label" : "Peg spacing (m)",
+          "max" : 1000,
+          "min" : 0.01
+        }
+      ],
+      "name" : "Pipe & drainage fall",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "pipefall",
+          "label" : "Long section"
+        },
+        {
+          "kind" : "pipeprofile",
+          "label" : "Station profile"
+        }
+      ],
+      "slug" : "pipe-fall",
+      "summary" : "Straight invert fall, depths below a level datum and every peg position."
+    },
+    {
+      "category" : "roof",
+      "fields" : [
+        {
+          "default" : 12000,
+          "key" : "eave",
+          "kind" : "length",
+          "label" : "Eave run",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 5000,
+          "key" : "catchment",
+          "kind" : "length",
+          "label" : "Horizontal catchment depth",
+          "max" : 1000000,
+          "min" : 0.001
+        },
+        {
+          "default" : 150,
+          "key" : "intensity",
+          "kind" : "number",
+          "label" : "Design rainfall (mm\/hr)",
+          "max" : 500,
+          "min" : 1
+        },
+        {
+          "default" : 2.5,
+          "key" : "capacity",
+          "kind" : "number",
+          "label" : "Verified outlet capacity (L\/s)",
+          "max" : 50,
+          "min" : 0.10000000000000001
+        }
+      ],
+      "name" : "Spouting & downpipes",
+      "popular" : false,
+      "sheets" : [
+        {
+          "kind" : "gutterplan",
+          "label" : "Outlet plan"
+        },
+        {
+          "kind" : "guttersection",
+          "label" : "Catchment per outlet"
+        }
+      ],
+      "slug" : "spouting-downpipes",
+      "summary" : "Rectangular roof catchment, peak flow and equal outlet tributaries."
+    }
+  ]
+}
