@@ -17,15 +17,12 @@ import {
   PencilSimple,
   Question,
   Robot,
-  Ruler,
   ShieldCheck,
   Sparkle,
   Stack,
 } from "@phosphor-icons/react/dist/ssr";
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 import { getCachedAuthUser } from "@/lib/supabase/auth";
-import { isNativeShellRequest } from "@/lib/native-shell";
-import { shouldOfferCalculatorApp } from "@/lib/calculator-app";
 import { AppHeader } from "../../_components/AppHeader";
 
 /**
@@ -665,73 +662,6 @@ const SECTIONS: ReadonlyArray<Section> = [
     ],
   },
   {
-    id: "t2qcal",
-    title: "T2QCAL — the site calculator",
-    icon: Ruler,
-    intro: (
-      <>
-        <p>
-          T2QCAL is the companion calculator app for iPhone — 94 construction
-          calculators (rafters, stairs, slabs, spacings, drainage), each one
-          drawing the job as you type it, plus camera measuring and set-out.
-          It signs in with your Tradies2Quote account, so a quantity worked
-          out on site lands back here as a draft quote at your own markup and
-          GST.
-        </p>
-      </>
-    ),
-    steps: [
-      {
-        label: "Open it from the dashboard",
-        body: (
-          <>
-            Tap the{" "}
-            <strong className="text-white">T2QCAL</strong> card near the
-            bottom of your dashboard. If the app is on your phone it opens
-            straight away.
-          </>
-        ),
-      },
-      {
-        label: "Sign in once",
-        body: (
-          <>
-            Use your{" "}
-            <strong className="text-white">Tradies2Quote email and
-            password</strong> — there is no second account and nothing extra
-            to pay. Your labour rate, markup and GST come off the same
-            profile this app prices from.
-          </>
-        ),
-      },
-      {
-        label: "Work it out, tick it, send it",
-        body: (
-          <>
-            Run the calculator, then tap{" "}
-            <strong className="text-white">Send to a quote</strong>. You tick
-            the lines you&apos;re actually ordering; they arrive on your
-            quote list as a draft, marked as measured so T2Q won&apos;t ask
-            you to confirm them again.
-          </>
-        ),
-      },
-      {
-        label: "Finish it here",
-        body: (
-          <>
-            Open the draft in Tradies2Quote to add labour, pick the client
-            and send it — same as any other quote.
-          </>
-        ),
-      },
-    ],
-    tips: [
-      "74 trade manuals — GIB, MiTek, James Hardie, Pryda, Concrete NZ — download to the phone and read with no signal.",
-      "Every calculator works signed out. The account only matters when you want a quantity to become a quote.",
-    ],
-  },
-  {
     id: "settings-deep",
     title: "Settings — every field explained",
     icon: Gear,
@@ -800,18 +730,7 @@ export default async function GuidePage() {
   const { user } = await getCachedAuthUser();
   if (!user) redirect("/login");
 
-  // Guideline 2.5.2 — the App Store shell must not point at software that is
-  // not itself on the store, so the T2QCAL section is withheld there until
-  // the calculator is published. Same gate, same reasoning, same env var as
-  // the dashboard card (see CalculatorLaunch.tsx).
-  const nativeShell = await isNativeShellRequest();
-  const offerCalculator = shouldOfferCalculatorApp({
-    nativeShell,
-    appStoreUrl: process.env.NEXT_PUBLIC_T2QCAL_APPSTORE_URL,
-  });
-  const sections = offerCalculator
-    ? SECTIONS
-    : SECTIONS.filter((s) => s.id !== "t2qcal");
+  const sections = SECTIONS;
 
   return (
     <div className="min-h-screen text-white">

@@ -8,7 +8,6 @@ import {
   Briefcase,
   Bug,
   Camera,
-  Calculator,
   ChatCircleDots,
   CloudSun,
   GearSix,
@@ -86,7 +85,6 @@ interface HubLink {
 }
 
 const PRIMARY_ITEMS: ReadonlyArray<HubLink> = [
-  { href: "/t2qcal", label: "T2QCAL calculators", caption: "Measure, save working and quote", Icon: Calculator },
   {
     href: "/app/settings",
     hash: "profile",

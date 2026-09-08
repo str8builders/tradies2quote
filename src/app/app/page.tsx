@@ -20,7 +20,6 @@ import { STAGE_LABELS } from "@/lib/lifecycle/stages";
 import { AppHeader } from "./_components/AppHeader";
 import { DashboardSkeleton } from "./_components/DashboardSkeleton";
 import { StaggerIn } from "./_components/StaggerIn";
-import CalculatorLaunch from "./_components/CalculatorLaunch";
 import {
   QuotesListClient,
   type QuoteListRow,
@@ -684,14 +683,6 @@ async function DashboardData({
           <QuotesListClient rows={recent} />
         )}
       </section>
-      </StaggerIn>
-
-      {/* The companion calculator. Absent from the App Store shell until
-          T2QCAL is actually on the store — see CalculatorLaunch for why. */}
-      <StaggerIn index={5}>
-        <section className="mt-5" aria-label="Companion calculator">
-          <CalculatorLaunch />
-        </section>
       </StaggerIn>
 
       {recent.length > 0 ? (

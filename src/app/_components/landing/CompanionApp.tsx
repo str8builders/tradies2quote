@@ -1,72 +1,31 @@
-import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight, Check } from "@phosphor-icons/react/dist/ssr";
+import { ArrowUpRight, Calculator, Receipt } from "@phosphor-icons/react/dist/ssr";
+
+/** Public install choice. Neither app is presented as a feature inside the other. */
 export function CompanionApp() {
   return (
-    <section
-      id="calculator"
-      data-testid="section-companion-app"
-      className="studio-section"
-    >
-      <div className="studio-container studio-calculator">
-        <div className="studio-calculator-art">
-          <div className="studio-calculator-title">
-            T<span>2</span>Q<span>CAL</span>
-          </div>
-          <div className="studio-calculator-screen">
-            <Image
-              src="/screens/t2qcal-drawing.jpg"
-              alt="T2QCAL showing a measured stair drawing"
-              width={720}
-              height={1560}
-              sizes="(max-width: 800px) 240px, 300px"
-            />
-          </div>
-          <div className="studio-calculator-badge">
-            <span>MEASURE. CHECK. QUOTE.</span>
-            <strong>Built to work together.</strong>
-          </div>
+    <section id="calculator" data-testid="section-companion-app" className="studio-section">
+      <div className="studio-container">
+        <div className="studio-eyebrow">TWO APPS / YOUR CHOICE</div>
+        <h2 className="mt-4 font-display text-3xl uppercase text-white sm:text-5xl">Choose your app.</h2>
+        <p className="mt-5 max-w-2xl text-lg text-ink-300">Install Tradies2Quote, T2QCAL, or both. Each opens as its own app on your Home Screen.</p>
+        <div className="mt-8 grid gap-6 md:grid-cols-2">
+          <article className="flex flex-col rounded-2xl border border-ink-700 bg-ink-900 p-6 sm:p-8">
+            <Receipt size={36} className="text-brand" aria-hidden />
+            <h3 className="mt-5 font-display text-2xl text-white">Tradies2Quote</h3>
+            <p className="mt-3 flex-1 text-ink-300">Create and manage your quotes, invoices, clients and material prices.</p>
+            <Link href="/app" className="studio-button studio-button-secondary mt-7">Open &amp; install Tradies2Quote <ArrowUpRight size={20} /></Link>
+            <p className="mt-3 text-sm text-ink-400">Sign in, then use Install or Add to Home Screen.</p>
+          </article>
+          <article className="flex flex-col rounded-2xl border border-brand/50 bg-ink-900 p-6 sm:p-8">
+            <Calculator size={36} className="text-brand" aria-hidden />
+            <h3 className="mt-5 font-display text-2xl text-white">T2QCAL</h3>
+            <p className="mt-3 flex-1 text-ink-300">Your separate construction calculator app, with measurements, drawings and saved working.</p>
+            <Link href="/t2qcal" className="studio-button studio-button-secondary mt-7">Open &amp; install T2QCAL web app <ArrowUpRight size={20} /></Link>
+            <p className="mt-3 text-sm text-ink-400">Calculators open without signing in. Use Install T2QCAL to add this web app.</p>
+          </article>
         </div>
-        <div className="studio-calculator-copy">
-          <div className="studio-eyebrow">04 / MEET YOUR OTHER POWER TOOL</div>
-          <h2>
-            From a measurement.
-            <br />
-            <em>To a priced quote.</em>
-          </h2>
-          <p>
-            T2QCAL brings construction calculations and measured drawings to
-            your phone, tablet or computer. Install it separately from Tradies2Quote. Send selected quantities into a Tradies2Quote draft,
-            using your own rates, markup and GST.
-          </p>
-          <div className="studio-calculator-stats">
-            <div data-testid="companion-proof-calculators">
-              <strong>02</strong>
-              <span>installable web apps</span>
-            </div>
-            <div data-testid="companion-proof-library">
-              <strong>Live</strong>
-              <span>calculator drawings</span>
-            </div>
-            <div data-testid="companion-proof-account">
-              <strong>01</strong>
-              <span>account for both</span>
-            </div>
-          </div>
-          <p className="studio-calculator-note">
-            <Check size={17} /> Calculators work signed out. Sign in to connect
-            your quotes.
-          </p>
-          <Link
-            href="/t2qcal"
-            className="studio-button studio-button-secondary"
-          >
-            Explore T2QCAL <ArrowUpRight size={20} />
-          </Link>
-          <span className="studio-availability">
-            Open in your browser · Add each app to your Home Screen
-          </span>
-        </div>
+        <p className="mt-6 max-w-3xl text-sm leading-relaxed text-ink-400">On iPhone, open your chosen web app in Safari, tap Share, then Add to Home Screen. Repeat for the other app if you want both. The native T2QCAL iPhone app is being prepared for the App Store; its download will be added here when available.</p>
       </div>
     </section>
   );

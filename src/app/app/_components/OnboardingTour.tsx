@@ -427,23 +427,6 @@ export function OnboardingTour({ onFinished }: OnboardingTourProps) {
         }),
       );
 
-      // The T2QCAL companion-app card. Conditional because the card is
-      // withheld from the App Store shell until T2QCAL is itself on the
-      // store (Guideline 2.5.2 — see CalculatorLaunch.tsx); the tour must
-      // run cleanly in both worlds.
-      const calculator = firstVisible(TARGETS.calculator);
-      if (calculator) {
-        steps.push(
-          edgeAwareStep(calculator, {
-            title: "T2QCAL — the site calculator",
-            description:
-              "94 construction calculators that send measured quantities back here as a draft quote. Same login, both apps — tap this card any time to open it.",
-            side: "top",
-            align: "center",
-          }),
-        );
-      }
-
       steps.push(
         edgeAwareStep(navigation, {
           title: "Main navigation",

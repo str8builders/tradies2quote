@@ -24,7 +24,7 @@ import InstallPWAButton from "./InstallPWAButton";
 const LINKS = [
   { href: "#how", label: "How it works" },
   { href: "#features", label: "Features" },
-  { href: "#calculator", label: "Calculator app" },
+  { href: "#calculator", label: "Get the apps" },
   { href: "#pricing", label: "Pricing" },
   { href: "#faq", label: "FAQ" },
 ];
