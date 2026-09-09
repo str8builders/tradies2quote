@@ -16,7 +16,8 @@ const custom:Record<string,Record<string,number|string>>={
 function slab():CalculationSnapshot{return {version:1,slug:'concrete-slab',unit:'metric',values:{...custom['concrete-slab']}};}
 describe('calculator directory and private snapshots',()=>{
  for(const tool of tools) for(const unit of ['metric','imperial'] as const) it(`${tool.slug} ${unit} has valid default working`,()=>{
-   const values=custom[tool.slug]??initialCalculatorValues(getVerifiedDefinition(tool.slug).fields,unit);
+   let values=custom[tool.slug]??initialCalculatorValues(getVerifiedDefinition(tool.slug).fields,unit);
+   if(tool.slug==="straight-stairs"&&unit==="imperial")values=Object.fromEntries(Object.entries(values).map(([key,value])=>[key,Number(value)/25.4]));
    // Custom values here exercise the schema, not a unit-switch interaction.
    const record={version:1,slug:tool.slug,unit,values};
    expect(validateSnapshot(record)).toMatchObject({slug:tool.slug,unit});

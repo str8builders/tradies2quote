@@ -100,8 +100,10 @@ function StairCalculator({ tool }: { tool: ToolEntry }) {
   const [totalRise,setTotalRise]=useCalculationValue<number>("totalRise",2800); const [idealRise,setIdealRise]=useCalculationValue<number>("idealRise",175);
   const [run,setRun]=useCalculationValue<number>("run",250); const [width,setWidth]=useCalculationValue<number>("width",1000); const [floorThickness,setFloorThickness]=useCalculationValue<number>("floorThickness",260);
   const [headroom,setHeadroom]=useCalculationValue<number>("headroom",unit === "metric" ? 2000 : 2000/25.4);
-  const { risers, actualRise, treads, totalRun, angle, stringer, stockGuide, openingRun, bridge } = calculateStairs(totalRise, idealRise, run, floorThickness, headroom);
-  function changeUnit(next: UnitSystem) { if (next === unit) return; const c = next === "imperial" ? toImperial : toMetric; [setTotalRise,setIdealRise,setRun,setWidth,setFloorThickness,setHeadroom].forEach((setter) => setter((v) => c(v))); setUnit(next); }
+  const [stringerWidth,setStringerWidth]=useCalculationValue<number>("stringerWidth",300/(unit==="imperial"?25.4:1));
+  const [treadThickness,setTreadThickness]=useCalculationValue<number>("treadThickness",40/(unit==="imperial"?25.4:1));
+  const { risers, actualRise, treads, totalRun, angle, stringer, stockGuide, openingRun, bridge, notchDepth } = calculateStairs(totalRise, idealRise, run, floorThickness, headroom);
+  function changeUnit(next: UnitSystem) { if (next === unit) return; const c = next === "imperial" ? toImperial : toMetric; [setTotalRise,setIdealRise,setRun,setWidth,setFloorThickness,setHeadroom,setStringerWidth,setTreadThickness].forEach((setter) => setter((v) => c(v))); setUnit(next); }
   const draw = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
     setupCanvas(ctx, w, h);
     const pad = Math.min(72, Math.max(48, w * .11)), base = h - 76, top = 112, usableW = w - pad * 2, usableH = base - top;
@@ -109,7 +111,7 @@ function StairCalculator({ tool }: { tool: ToolEntry }) {
     const sx = run * scale, sy = actualRise * scale;
     const topX = pad + treads * sx, topY = base - risers * sy;
     // stringer band swept below the nosing line, then treads on top
-    const drop = Math.max(26, sy * 0.95);
+    const drop = stringerWidth * scale;
     const firstNosing=base-sy;
     const dx = topX - pad, dy = topY - firstNosing, len = Math.hypot(dx, dy) || 1;
     const ox = -dy / len * drop, oy = dx / len * drop;
@@ -117,7 +119,7 @@ function StairCalculator({ tool }: { tool: ToolEntry }) {
     for (let i = 0; i < treads; i++) {
       const ty = base - (i + 1) * sy;
       plate(ctx, pad + i * sx, ty, 4, sy);          // riser
-      plate(ctx, pad + i * sx, ty - 7, sx, 7);      // tread
+      plate(ctx, pad + i * sx, ty, sx, treadThickness * scale);      // tread
     }
     hairline(ctx, pad, firstNosing, topX, topY);
     // upper-floor landing at the top nosing level — the context blocklayer shows
@@ -148,7 +150,7 @@ function StairCalculator({ tool }: { tool: ToolEntry }) {
     return { unitsPerPixel: 1 / scale, unit: unitLabel };
   };
   const marks = Array.from({length:treads},(_,i)=>`Tread ${i+1} · nose ${nfmt(i*run,2)} ${unitLabel} · height ${nfmt((i+1)*actualRise,2)} ${unitLabel} · along pitch ${nfmt(i*bridge,2)} ${unitLabel}`);
-  return <CalculatorFrame values={{totalRise,idealRise,run,width,floorThickness,headroom}} tool={tool} unit={unit} onUnitChange={changeUnit}>
+  return <CalculatorFrame values={{totalRise,idealRise,run,width,floorThickness,headroom,stringerWidth,treadThickness}} tool={tool} unit={unit} onUnitChange={changeUnit}>
     <div className="calculator-workbench">
       <section className="input-panel"><SectionHead index="01" title="Stair inputs" note="All rises are balanced evenly into the total rise." /><div className="field-grid">
         <NumberField label="Finished total rise" value={totalRise} onChange={setTotalRise} unit={unitLabel} min={1} range max={unit === "metric" ? 5000 : 200} step={unit === "metric" ? 5 : .125} />
@@ -157,11 +159,13 @@ function StairCalculator({ tool }: { tool: ToolEntry }) {
         <NumberField label="Stair width" value={width} onChange={setWidth} unit={unitLabel} min={1} />
         <NumberField label="Required vertical headroom" value={headroom} onChange={setHeadroom} unit={unitLabel} min={0} />
         <NumberField label="Upper floor thickness" value={floorThickness} onChange={setFloorThickness} unit={unitLabel} min={0} />
+        <NumberField label="Stringer board width" value={stringerWidth} onChange={setStringerWidth} unit={unitLabel} min={1/(unit==="imperial"?25.4:1)} max={800/(unit==="imperial"?25.4:1)}/>
+        <NumberField label="Tread thickness" value={treadThickness} onChange={setTreadThickness} unit={unitLabel} min={0} max={200/(unit==="imperial"?25.4:1)}/>
       </div></section>
-      <section className="diagram-panel"><div className="diagram-toolbar"><span>Stringer set-out</span><span>{risers} rises · {treads} treads</span></div><TechnicalCanvas measurable draw={draw} label="Straight stair side profile with equal rises and tread runs" model={{kind:"stairs",values:{risers,totalRun,totalRise,width,run,rise:actualRise,floorThickness,headroom,openingRun},unit:unitLabel,title:"Straight stairs"}} /></section>
+      <section className="diagram-panel"><div className="diagram-toolbar"><span>Stringer set-out</span><span>{risers} rises · {treads} treads</span></div><TechnicalCanvas measurable draw={draw} label="Straight stair side profile with equal rises and tread runs" model={{kind:"stairs",values:{risers,totalRun,totalRise,width,run,rise:actualRise,floorThickness,headroom,openingRun,stringerWidth,treadThickness,nativeStair:1},unit:unitLabel,title:"Straight stairs"}} /></section>
     </div>
     <section className="results-section"><SectionHead index="02" title="Stair geometry" /><ResultGrid results={[
-      {label:"Actual rise",value:`${nfmt(actualRise,2)} ${unitLabel}`,primary:true},{label:"Number of rises",value:String(risers)},{label:"Number of treads",value:String(treads)},{label:"Total run",value:`${nfmt(totalRun)} ${unitLabel}`},{label:"Stair angle",value:`${nfmt(angle,2)}°`},{label:"Stringer line",value:`${nfmt(stringer)} ${unitLabel}`},{label:"Clear width",value:`${nfmt(width)} ${unitLabel}`},{label:"Stringer stock guide",value:`${nfmt(stockGuide)} ${unitLabel}`},{label:"Opening for entered headroom",value:`${nfmt(openingRun)} ${unitLabel}`},
+      {label:"Actual rise",value:`${nfmt(actualRise,2)} ${unitLabel}`,primary:true},{label:"Number of rises",value:String(risers)},{label:"Number of treads",value:String(treads)},{label:"Total run",value:`${nfmt(totalRun)} ${unitLabel}`},{label:"Stair angle",value:`${nfmt(angle,2)}°`},{label:"Stringer line",value:`${nfmt(stringer)} ${unitLabel}`},{label:"Remaining stringer throat",value:`${nfmt(stringerWidth-notchDepth,2)} ${unitLabel}`},{label:"First riser before tread",value:`${nfmt(actualRise-treadThickness,2)} ${unitLabel}`},{label:"Notch depth normal to board",value:`${nfmt(notchDepth,2)} ${unitLabel}`},{label:"Clear width",value:`${nfmt(width)} ${unitLabel}`},{label:"Stringer stock guide",value:`${nfmt(stockGuide)} ${unitLabel}`},{label:"Opening for entered headroom",value:`${nfmt(openingRun)} ${unitLabel}`},
     ]} /></section>
     <section className="markout-section"><SectionHead index="03" title="Running stringer marks" note="Nose run and pitch distance from the first nosing; height above the lower finished floor." /><DimensionLine values={marks} /></section>
   </CalculatorFrame>;

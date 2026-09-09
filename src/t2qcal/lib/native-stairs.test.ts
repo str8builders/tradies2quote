@@ -11,3 +11,28 @@ describe('native T2QCAL stair geometry compatibility',()=>{
   }
  });
 });
+
+import {validateSnapshot} from './calculation-record';
+const legacy={version:1,slug:'straight-stairs',unit:'metric',values:{totalRise:2800,idealRise:175,run:250,width:1000,floorThickness:260,headroom:2000}};
+it('upgrades old saved stair inputs without mutating the saved source',()=>{
+ const upgraded=validateSnapshot(legacy);
+ expect(upgraded.values.stringerWidth).toBe(300);expect(upgraded.values.treadThickness).toBe(40);
+ expect(legacy.values).not.toHaveProperty('stringerWidth');
+ const imperial={...legacy,unit:'imperial',values:Object.fromEntries(Object.entries(legacy.values).map(([k,v])=>[k,v/25.4]))};
+ expect(validateSnapshot(imperial).values.treadThickness).toBeCloseTo(40/25.4,10);
+});
+it('rejects a tread as thick as the rise and a board without a remaining throat',()=>{
+ expect(()=>validateSnapshot({...legacy,values:{...legacy.values,treadThickness:175,stringerWidth:300}})).toThrow('Treads must');
+ const geometry=calculateStairs(2800,175,250,260,2000);
+ expect(()=>validateSnapshot({...legacy,values:{...legacy.values,treadThickness:40,stringerWidth:geometry.notchDepth}})).toThrow('stringer wider');
+});
+import {stairNotchPath} from './calculations';
+it('draws exact rise/run notch lengths and square cuts for 2–60 risers',()=>{
+ for(const risers of [2,16,60])for(const factor of [1,1/25.4]){
+ const rise=175*factor,run=250*factor,path=stairNotchPath(risers,rise,run);
+ expect(path).toHaveLength(2*(risers-1)+1);
+ for(let i=0;i<path.length-2;i+=2){const [a,b,c]=path.slice(i,i+3),u={x:b.x-a.x,y:b.y-a.y},v={x:c.x-b.x,y:c.y-b.y};
+ expect(Math.hypot(u.x,u.y)).toBeCloseTo(run,8);expect(Math.hypot(v.x,v.y)).toBeCloseTo(rise,8);expect(u.x*v.x+u.y*v.y).toBeCloseTo(0,7);}
+ expect(path.at(-1)?.x).toBeCloseTo((risers-1)*Math.hypot(rise,run),8);
+ }
+});

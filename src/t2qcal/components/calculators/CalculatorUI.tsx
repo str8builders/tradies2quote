@@ -115,13 +115,13 @@ export function TechnicalCanvas({ draw, label, height = 440, zoom = 1, model, me
   const drawingSize=useRef("");
   const [imageError,setImageError]=useState("");
   // Blocklayer leads with the measured 2D drawing; 3D is a secondary reference view.
-  const [view, setView] = useState<"measured" | "detail" | "3d">("measured");
+  const [view, setView] = useState<"measured" | "detail" | "template" | "3d">("measured");
   // Only offer the set-out sheet when it resolves to a genuinely different drawing.
   const hasDetail = !!model && detailKind(model.kind) !== model.kind;
   const active = view === "detail" && !hasDetail ? "measured" : view;
   const drawingKey=JSON.stringify([model?.values,model?.unit,active,magnification,pan,zoom]);
   const currentMeasurement=measurement?.key===drawingKey?measurement:null;
-  const measureEnabled=measurable && active==="measured" && measuring;
+  const measureEnabled=measurable && (active==="measured"||active==="template") && measuring;
   function fit(){tapAnchor.current=null;setMagnification(1);setPan({x:0,y:0});setMeasurement(null);}
   const render = useCallback(() => {
     const canvas = ref.current;
@@ -145,6 +145,7 @@ export function TechnicalCanvas({ draw, label, height = 440, zoom = 1, model, me
     ctx.scale(safeZoom, safeZoom);
     scaleRef.current=null;
     if (model && active === "3d") drawDiagram(ctx, rect.width, rect.height, to3DKind(model.kind), model.values, model.unit, `${model.title} · 3D assembly`);
+    else if(model && active === "template"){const scale=drawDiagram(ctx,rect.width,rect.height,"stringermark",model.values,model.unit,model.title);if(scale)scaleRef.current={unitsPerPixel:scale.unitsPerPixel/safeZoom,unit:scale.unit};}
     else if (model && active === "detail") drawDiagram(ctx, rect.width, rect.height, detailKind(model.kind), model.values, model.unit, `${model.title} · set-out detail`);
     else {const scale=draw(ctx, rect.width, rect.height);if(scale)scaleRef.current={unitsPerPixel:scale.unitsPerPixel/safeZoom,unit:scale.unit};}
   }, [draw, model, active, zoom, valid,magnification,pan]);
@@ -157,11 +158,11 @@ export function TechnicalCanvas({ draw, label, height = 440, zoom = 1, model, me
   }, [render]);
 
   return <>
-    {model && <div className="diagram-toolbar"><label className="native-drawing-picker">Drawing<select aria-label={`${model.title} drawing view`} value={active} onChange={e=>{setView(e.target.value as "measured"|"detail"|"3d");fit();}}><option value="measured">Measured view</option>{hasDetail&&<option value="detail">Set-out detail</option>}<option value="3d">3D assembly</option></select></label></div>}
+    {model && <div className="diagram-toolbar"><label className="native-drawing-picker">Drawing<select aria-label={`${model.title} drawing view`} value={active} onChange={e=>{setView(e.target.value as "measured"|"detail"|"template"|"3d");fit();}}><option value="measured">Measured view</option>{hasDetail&&<option value="detail">{model.kind==="stairs"?"Tread detail":"Set-out detail"}</option>}{model.kind==="stairs"&&<option value="template">Stringer template</option>}<option value="3d">3D assembly</option></select></label></div>}
     <div className="drawing-controls" aria-label="Drawing controls">
       <label>Zoom <input aria-label="Drawing zoom" type="range" min="1" max="4" step="0.25" value={magnification} onChange={e=>setMagnification(Number(e.target.value))}/><output>{Math.round(magnification*100)}%</output></label>
       <button onClick={fit}>Fit drawing</button>
-      {measurable&&<button disabled={active!=="measured"} aria-pressed={measureEnabled} onClick={()=>{setMeasuring(!measuring);setMeasurement(null);tapAnchor.current=null;}}>Measure diagram</button>}
+      {measurable&&<button disabled={active!=="measured"&&active!=="template"} aria-pressed={measureEnabled} onClick={()=>{setMeasuring(!measuring);setMeasurement(null);tapAnchor.current=null;}}>Measure diagram</button>}
       <button disabled={!valid||copies.length>=4} onClick={()=>{try{const image=ref.current?.toDataURL("image/png");if(image){const id=++copyID.current;setCopies(old=>[...old,{id,image,caption:`${model?.title??label} · ${active} · ${model?.unit??""} · option ${id}`}]);setImageError("");}}catch{setImageError("Could not copy the drawing. Please try again.");}}}>Keep comparison</button>
     </div>
     <details className="drawing-help"><summary>Drawing controls & help</summary><p>{measureEnabled?"Tap two points or drag to measure. Keyboard: Enter starts at the centre; arrows move the endpoint.":"Zoom in, then drag to inspect. Arrow keys pan the focused drawing; Home fits it."} Comparisons keep the visible drawing; print at page-fit size.</p></details>

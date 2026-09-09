@@ -94,3 +94,11 @@ export function calculatePitch(rise: number, run: number) {
     slopeLength: Math.hypot(rise, run),
   };
 }
+
+/** Native StairGeometry.notchPath: along-board coordinates, in input units. */
+export function stairNotchPath(risers:number,rise:number,run:number){
+ const bridge=Math.hypot(rise,run),notchDepth=rise*run/bridge;
+ const points=[{x:0,y:0}];
+ for(let i=0;i<risers-1;i++)points.push({x:i*bridge+run*run/bridge,y:notchDepth},{x:(i+1)*bridge,y:0});
+ return points;
+}

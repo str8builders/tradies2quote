@@ -1,5 +1,5 @@
 /* T2QCAL's public calculator cache. Never cache accounts, APIs or saved URLs. */
-const CACHE = "t2qcal-web-20260909-native-3";
+const CACHE = "t2qcal-web-20260909-native-stairs-4";
 const HOME = "/t2qcal/calculators";
 const OFFLINE = "/t2qcal/offline.html";
 const publicPage = url => !url.search && (url.pathname === "/t2qcal" || [HOME,"/t2qcal/device","/t2qcal/install","/t2qcal/jobs","/t2qcal/measure","/t2qcal/resources"].includes(url.pathname) || /^\/t2qcal\/calculator\/[a-z0-9-]+$/.test(url.pathname));

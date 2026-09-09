@@ -1,3 +1,4 @@
+import {drawNativeStair} from "./nativeStairDrawing";
 import {drawNativeExtra} from "./nativeExtraDrawing";
 import { drawLayout } from "./layoutDrawing";
 import { drawTradeSheet, ROOF_PROFILES } from "./tradeSheets";
@@ -1359,6 +1360,7 @@ function drawIsoDiagram(ctx: CanvasRenderingContext2D, width: number, height: nu
 }
 
 export function drawDiagram(ctx: CanvasRenderingContext2D, width: number, height: number, kind: DiagramKind, values: Record<string, number>, unit: string, title: string) {
+  if(values.nativeStair&&(kind==="stringermark"||kind==="stairs3d"))return drawNativeStair(ctx,width,height,kind,values,unit);
   if(values.nativeRing||values.nativePipe||values.nativeRoofDrain)return drawNativeExtra(ctx,width,height,kind,values,unit);
   if (values.layoutKind) { drawLayout(ctx, width, height, kind, values, unit); return; }
   if (kind.endsWith("3d")) { drawIsoDiagram(ctx, width, height, kind, values, unit); return; }
@@ -1529,7 +1531,7 @@ export function drawDiagram(ctx: CanvasRenderingContext2D, width: number, height
     const fit = Math.min(1, 1.25 * runValue / Math.max(riseValue, runValue));
     const sRun = R * .88 * fit;
     const sRise = sRun * riseValue / Math.max(runValue, 1e-6);
-    const treadThk = Math.max(10, R * .085);
+    const treadThk = values.nativeStair ? values.treadThickness * sRun / runValue : Math.max(10, R * .085);
     const riserThk = Math.max(7, R * .05);
     const reveal = riserThk * .7;   // visual nosing overhang only, not dimensioned
     const nose1 = { x: cx - sRun * .58, y: cy + sRise * .3 };
