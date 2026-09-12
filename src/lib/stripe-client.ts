@@ -1,5 +1,6 @@
 import "server-only";
 import Stripe from "stripe";
+import { type PlanId, PLANS } from "./plans";
 
 /**
  * Server-only Stripe SDK init.
@@ -26,6 +27,8 @@ export function stripeClient(): Stripe {
     // The SDK auto-reads STRIPE_SECRET_KEY but we pass it explicitly so
     // env-injection mistakes fail loudly here instead of mid-checkout.
     typescript: true,
+    timeout: 10_000,
+    maxNetworkRetries: 0,
   });
   return cached;
 }
@@ -54,9 +57,10 @@ export function isStripeConfigured(): boolean {
   );
 }
 
-/** The single recurring price (NZD $49/mo). Defined as a Stripe Price
- *  in the dashboard and referenced by id via env var so we don't have
- *  to redeploy to change pricing. */
-export function getPlanPriceId(): string | null {
-  return process.env.STRIPE_PRICE_ID ?? null;
+/** Only server-owned price IDs can be submitted to Checkout. */
+export function getPlanPriceId(plan: PlanId = "solo"): string | null {
+  return (plan === "solo" ? process.env.STRIPE_PRICE_ID : plan === "crew" ? process.env.STRIPE_PRICE_CREW : process.env.STRIPE_PRICE_BUILDER)?.trim() || null;
+}
+export function planForPrice(priceId: string): PlanId | null {
+  return (Object.keys(PLANS) as PlanId[]).find((id) => getPlanPriceId(id) === priceId) ?? null;
 }

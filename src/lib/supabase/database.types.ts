@@ -14,6 +14,13 @@ export type Database = {
   }
   public: {
     Tables: {
+      quote_attachments: {
+        Row: { id: string; quote_id: string; user_id: string; path: string; name: string; content_type: string; created_at: string; deleted_at: string | null }
+        Insert: { id?: string; quote_id: string; user_id: string; path: string; name: string; content_type: string; created_at?: string; deleted_at?: string | null }
+        Update: { deleted_at?: string | null }
+        Relationships: []
+      }
+
       agent_events: {
         Row: {
           agent_name: string
@@ -1618,6 +1625,9 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      sync_stripe_subscription: { Args: { p_data: Json }; Returns: undefined }
+      register_quote_photo: { Args: { p_data: Json }; Returns: Json }
+      remove_quote_photo: { Args: { p_id: string; p_user: string }; Returns: undefined }
       accept_quote: {
         Args: {
           p_email: string

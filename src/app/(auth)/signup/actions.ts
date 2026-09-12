@@ -1,18 +1,21 @@
 "use server";
 
+import { safeNextPath } from "@/lib/safe-redirect";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 export async function signupAction(formData: FormData) {
+  const next = safeNextPath(formData.get("next"));
+  const nextQuery = `&next=${encodeURIComponent(next)}`;
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
   if (!email || !password) {
-    redirect("/signup?error=Email%20and%20password%20required");
+    redirect(`/signup?error=Email%20and%20password%20required${nextQuery}`);
   }
 
   if (password.length < 8) {
-    redirect("/signup?error=Password%20must%20be%20at%20least%208%20characters");
+    redirect(`/signup?error=Password%20must%20be%20at%20least%208%20characters${nextQuery}`);
   }
 
   const supabase = await createClient();
@@ -28,11 +31,11 @@ export async function signupAction(formData: FormData) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { emailRedirectTo: `${appUrl}/auth/callback` },
+    options: { emailRedirectTo: `${appUrl}/auth/callback?next=${encodeURIComponent(next)}` },
   });
 
   if (error) {
-    redirect(`/signup?error=${encodeURIComponent(error.message)}`);
+    redirect(`/signup?error=${encodeURIComponent(error.message)}${nextQuery}`);
   }
 
   // Supabase does NOT return an error for an already-registered email
@@ -42,7 +45,7 @@ export async function signupAction(formData: FormData) {
   // for a confirmation email that will never arrive.
   if (data.user && (data.user.identities?.length ?? 0) === 0) {
     redirect(
-      "/login?message=That%20email%20is%20already%20registered.%20Please%20log%20in.",
+      `/login?message=That%20email%20is%20already%20registered.%20Please%20log%20in.${nextQuery}`,
     );
   }
 
@@ -55,9 +58,9 @@ export async function signupAction(formData: FormData) {
   // already-registered or error redirects above.
   if (!data.session) {
     redirect(
-      "/login?signup=1&message=Check%20your%20inbox%20to%20confirm%20your%20email%20before%20logging%20in.",
+      `/login?signup=1&message=Check%20your%20inbox%20to%20confirm%20your%20email%20before%20logging%20in.${nextQuery}`,
     );
   }
 
-  redirect("/app?signup=1");
+  redirect(`${next}${next.includes("?") ? "&" : "?"}signup=1`);
 }

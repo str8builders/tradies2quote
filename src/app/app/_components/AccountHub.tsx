@@ -85,6 +85,8 @@ interface HubLink {
 }
 
 const PRIMARY_ITEMS: ReadonlyArray<HubLink> = [
+  { href: "/app/team", label: "Your team", caption: "People, invitations & shared clients", Icon: UsersThree },
+  { href: "/app/templates", label: "Terms templates", caption: "Reusable wording for Builder teams", Icon: Receipt },
   {
     href: "/app/settings",
     hash: "profile",

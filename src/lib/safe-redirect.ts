@@ -15,6 +15,6 @@ export function safeNextPath(raw: unknown, fallback = "/app"): string {
   if (!value.startsWith("/")) return fallback;
   // Reject protocol-relative (`//host`) and backslash (`/\host`)
   // variants — browsers treat both as off-site navigations.
-  if (value.startsWith("//") || value.startsWith("/\\")) return fallback;
+  if (value.startsWith("//") || /[\\\x00-\x20]/.test(value)) return fallback;
   return value;
 }

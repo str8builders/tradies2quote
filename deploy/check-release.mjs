@@ -64,7 +64,8 @@ export function checkRelease(env, authEnv = {}, now = Date.now()) {
   add("auth-email-port", /^\d+$/.test(authEnv.GOTRUE_SMTP_PORT ?? "") && Number(authEnv.GOTRUE_SMTP_PORT) > 0 && Number(authEnv.GOTRUE_SMTP_PORT) <= 65535,
       "Auth SMTP is separate from quote email; signup and password-reset delivery must both pass.");
   requireKeys("subscriptions", ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_ID"]);
-  add("stripe-live-mode", /^sk_live_\S+$/.test(env.STRIPE_SECRET_KEY ?? ""), "Client billing needs a live Stripe key; test-mode validation precedes release.");
+  add("stripe-live-mode", /^(?:sk|rk)_live_\S+$/.test(env.STRIPE_SECRET_KEY ?? ""), "Client billing needs a live Stripe key; test-mode validation precedes release.");
+  if (env.TEAM_PLANS_ENABLED === "true") requireKeys("team-billing", ["STRIPE_PRICE_CREW", "STRIPE_PRICE_BUILDER", "STRIPE_PORTAL_CONFIGURATION"]);
   requireKeys("quote-deposits", ["STRIPE_PAYMENTS_WEBHOOK_SECRET"]);
   add("client-deposits", env.PAYMENTS_ENABLED === "true", "PAYMENTS_ENABLED=true is required for client deposits after Connect/webhook acceptance tests.");
   requireKeys("sms", ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER"]);

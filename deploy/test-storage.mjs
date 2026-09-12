@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkStorage } from './check-storage.mjs';
+import { checkStorage, REQUIRED_BUCKETS } from './check-storage.mjs';
 
 test('read-only check reports absent private document storage without writes', async () => {
   await assert.rejects(checkStorage({ listBuckets: async () => ({ data: [] }), createBucket: () => assert.fail('write') }), /missing or public/);
@@ -15,7 +15,7 @@ test('apply creates missing buckets privately, verifies them, and is idempotent'
   };
   assert.equal((await checkStorage(storage, { apply: true })).ok, true);
   await checkStorage(storage, { apply: true });
-  assert.equal(writes, 2);
+  assert.equal(writes, REQUIRED_BUCKETS.length);
 });
 test('does not silently reuse a public bucket or change its permissions', async () => {
   await assert.rejects(checkStorage({ listBuckets: async () => ({ data: [{ id: 'quote-pdfs', public: true }] }) }, { apply: true }), /missing or public/);

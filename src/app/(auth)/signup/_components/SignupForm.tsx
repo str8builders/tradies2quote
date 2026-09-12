@@ -28,9 +28,10 @@ import { signupAction } from "../actions";
  */
 type Props = {
   error?: string;
+  next?: string;
 };
 
-export function SignupForm({ error }: Props) {
+export function SignupForm({ error, next }: Props) {
   const [show, setShow] = useState(false);
 
   return (
@@ -40,6 +41,7 @@ export function SignupForm({ error }: Props) {
       className="space-y-4"
       data-testid="signup-form"
     >
+      <input type="hidden" name="next" value={next ?? "/app"} />
       {error && (
         <div
           role="alert"
@@ -102,7 +104,7 @@ export function SignupForm({ error }: Props) {
       <div className="text-sm text-ink-400">
         Already on it?{" "}
         <Link
-          href="/login"
+          href={`/login?next=${encodeURIComponent(next ?? "/app")}`}
           className="text-brand hover:text-hivis font-semibold"
           data-testid="signup-to-login"
         >

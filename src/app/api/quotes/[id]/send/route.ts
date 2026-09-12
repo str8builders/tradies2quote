@@ -222,6 +222,12 @@ export async function POST(
     console.error("quote_events 'sent' insert failed", evErr);
   }
 
+  // Saving the address book must not turn an already-delivered email into a retry.
+  try {
+    const contactSave = await supabase.rpc("save_client_contact", { p_data: quoteData.client });
+    if (contactSave.error) throw contactSave.error;
+  } catch (error) { captureError(error, { route: "/api/quotes/[id]/send", extra: { step: "save_client" } }); }
+
   return NextResponse.json({
     ok: true,
     public_token: token,

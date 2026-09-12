@@ -8,17 +8,17 @@ import { consumeFixedWindow } from "@/lib/rate-limit";
 export async function loginAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const next = String(formData.get("next") ?? "/app");
+  const next = safeNextPath(formData.get("next"));
 
   if (!email || !password) {
-    redirect("/login?error=Email%20and%20password%20required");
+    redirect(`/login?error=Email%20and%20password%20required&next=${encodeURIComponent(next)}`);
   }
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    redirect(`/login?error=${encodeURIComponent(error.message)}`);
+    redirect(`/login?error=${encodeURIComponent(error.message)}&next=${encodeURIComponent(next)}`);
   }
 
   redirect(safeNextPath(next));
@@ -41,6 +41,7 @@ export async function loginAction(formData: FormData) {
  *     indistinguishable to the caller.
  */
 export async function resendConfirmationAction(formData: FormData) {
+  const next = safeNextPath(formData.get("next"));
   const email = String(formData.get("email") ?? "")
     .trim()
     .toLowerCase();
@@ -53,7 +54,7 @@ export async function resendConfirmationAction(formData: FormData) {
     "/login?message=" +
     encodeURIComponent(
       "If that account exists, a fresh confirmation email is on its way. Check spam too.",
-    );
+    ) + `&next=${encodeURIComponent(next)}`;
 
   const quota = consumeFixedWindow(`resend-confirm:${email}`, 3, 15 * 60_000);
   if (!quota.ok) {
@@ -68,7 +69,7 @@ export async function resendConfirmationAction(formData: FormData) {
   await supabase.auth.resend({
     type: "signup",
     email,
-    options: { emailRedirectTo: `${appUrl}/auth/callback` },
+    options: { emailRedirectTo: `${appUrl}/auth/callback?next=${encodeURIComponent(next)}` },
   });
 
   redirect(neutral);

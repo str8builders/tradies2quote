@@ -1,4 +1,5 @@
 import "server-only";
+import { storedPlan, type PlanId } from "./plans";
 import { cache } from "react";
 import { adminClient } from "@/lib/supabase/admin";
 import { isStripeConfigured } from "@/lib/stripe-client";
@@ -32,6 +33,8 @@ export type SubscriptionState = "trialing" | "paid" | "expired";
 
 export interface SubscriptionStatus {
   state: SubscriptionState;
+  plan?: PlanId | null;
+  managedByTeam?: boolean;
   /** When the trial ends (or ended). Always populated, even if user is
    *  on a paid plan — useful for "trial converted on day X" analytics. */
   trialEndsAt: Date;
@@ -142,6 +145,12 @@ export async function getSubscriptionStatus(args: {
   // (supabase/scripts/restart_all_trials.sql) gives every existing
   // user a fresh 7-day window without recreating their auth rows.
   const admin = adminClient();
+  let billingUserId = userId;
+  if (isStripeConfigured()) {
+    const result = await admin.rpc("active_team_owner" as never, { p_user: userId } as never);
+    if (result.error) throw result.error;
+    billingUserId = (result.data as string | null) ?? userId;
+  }
   // `trial_started_at` is the Wave 39 column added by
   // supabase/migrations/20260519_trial_started_at.sql. Generated
   // Supabase types don't include it until you regenerate via
@@ -159,9 +168,9 @@ export async function getSubscriptionStatus(args: {
       ? admin
           .from("subscriptions")
           .select(
-            "stripe_customer_id, stripe_subscription_id, status, current_period_end",
+            "stripe_customer_id, stripe_subscription_id, status, current_period_end, plan",
           )
-          .eq("user_id", userId)
+          .eq("user_id", billingUserId)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null } as const),
   ]);
@@ -218,7 +227,7 @@ export async function getSubscriptionStatus(args: {
     ACTIVE_STATUSES.has(subStatus) &&
     // If the period has ended and Stripe hasn't bumped us yet, treat
     // as expired so the user can't slip through a webhook delay.
-    (!periodEnd || periodEnd.getTime() > now.getTime());
+    periodEnd !== null && periodEnd.getTime() > now.getTime() && storedPlan(sub?.plan) !== null;
 
   if (hasActiveSub) {
     return {
@@ -226,7 +235,9 @@ export async function getSubscriptionStatus(args: {
       trialEndsAt,
       trialDaysLeft: null,
       currentPeriodEnd: periodEnd,
-      stripeCustomerId: sub?.stripe_customer_id ?? null,
+      plan: storedPlan(sub?.plan),
+      managedByTeam: billingUserId !== userId,
+      stripeCustomerId: billingUserId === userId ? sub?.stripe_customer_id ?? null : null,
       stripeSubscriptionStatus: subStatus,
       betaFreeUntil: null,
     };

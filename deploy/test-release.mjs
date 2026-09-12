@@ -91,3 +91,11 @@ for (const tracker of ["t","f"]) test(`migration dry-run issues SELECTs only (tr
     assert.equal(queries.includes("select name"),tracker==="t");
   } finally {rmSync(dir,{recursive:true,force:true});}
 });
+
+test("restricted live keys are supported and enabled teams require their full billing configuration", () => {
+  const {env,auth}=fixture(); env.STRIPE_SECRET_KEY="rk_live_synthetic";
+  assert.equal(checkRelease(env,auth).configurationReady,true);
+  env.TEAM_PLANS_ENABLED="true"; assert.ok(blocked(checkRelease(env,auth)).includes("team-billing"));
+  Object.assign(env,{STRIPE_PRICE_CREW:"price_crew",STRIPE_PRICE_BUILDER:"price_builder",STRIPE_PORTAL_CONFIGURATION:"bpc_fixture"});
+  assert.equal(checkRelease(env,auth).configurationReady,true);
+});

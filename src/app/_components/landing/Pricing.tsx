@@ -1,49 +1,9 @@
 import Link from "next/link";
 import { Check, ArrowUpRight } from "@phosphor-icons/react/dist/ssr";
-const TIERS = [
-  {
-    name: "Solo",
-    slug: "solo",
-    tag: "For your own business",
-    price: 49,
-    comingSoon: false,
-    features: [
-      "Unlimited quotes & invoices",
-      "1 user account",
-      "Branded PDF + email",
-      "Client list",
-      "Email support",
-    ],
-  },
-  {
-    name: "Crew",
-    slug: "crew",
-    tag: "For a small team",
-    price: 79,
-    comingSoon: true,
-    features: [
-      "Everything in Solo",
-      "Up to 5 users",
-      "Shared client list",
-      "Photo attachments",
-      "Priority support",
-    ],
-  },
-  {
-    name: "Builder",
-    slug: "builder",
-    tag: "For a growing business",
-    price: 199,
-    comingSoon: true,
-    features: [
-      "Everything in Crew",
-      "Up to 20 users",
-      "Custom terms templates",
-      "Dedicated success support",
-    ],
-  },
-];
+import { PLANS } from "@/lib/plans";
+import { getPlanPriceId, isStripeConfigured } from "@/lib/stripe-client";
 export function Pricing() {
+  const tiers = Object.values(PLANS).map((p) => ({ ...p, slug: p.id, comingSoon: p.id !== "solo" && !(process.env.TEAM_PLANS_ENABLED === "true" && isStripeConfigured() && getPlanPriceId(p.id)) }));
   return (
     <section
       id="pricing"
@@ -67,7 +27,7 @@ export function Pricing() {
           </p>
         </div>
         <div className="studio-pricing-grid">
-          {TIERS.map((t) => (
+          {tiers.map((t) => (
             <article
               key={t.slug}
               data-testid={`pricing-tier-${t.slug}`}
@@ -91,11 +51,11 @@ export function Pricing() {
                 GST inclusive{t.comingSoon ? " · planned pricing" : ""}
               </span>
               <Link
-                href="/signup"
+                href={t.comingSoon || t.id === "solo" ? "/signup" : `/signup?next=${encodeURIComponent(`/app/upgrade?plan=${t.id}`)}`}
                 data-testid={`pricing-cta-${t.slug}`}
                 className={`studio-button ${t.comingSoon ? "studio-button-secondary" : ""}`}
               >
-                {t.comingSoon ? "Start with Solo" : "Start your free trial"}
+                {t.comingSoon ? "Start with Solo" : t.id === "solo" ? "Start your free trial" : `Choose ${t.name}`}
                 <ArrowUpRight size={19} />
               </Link>
               <ul>

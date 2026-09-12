@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 
 // Documents are served by authenticated/token-validated app routes using the
 // service role. No public buckets or client storage policies are needed.
-export const REQUIRED_BUCKETS = ['quote-pdfs', 'signatures'];
+export const REQUIRED_BUCKETS = ['quote-pdfs', 'signatures', 'quote-attachments'];
 
 export async function checkStorage(storage, { apply = false } = {}) {
   const listed = await storage.listBuckets();

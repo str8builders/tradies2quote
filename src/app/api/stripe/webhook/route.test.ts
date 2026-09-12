@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 const mock = vi.hoisted(() => ({
   configured: true, construct: vi.fn(), retrieve: vi.fn(), from: vi.fn(),
-  capture: vi.fn(), calls: [] as string[], errors: {} as Record<string, { code: string }>, completed: false,
+  rpc: vi.fn(), capture: vi.fn(), calls: [] as string[], errors: {} as Record<string, { code: string }>, completed: false,
 }));
 vi.mock('@/lib/observability', () => ({ captureError: mock.capture }));
-vi.mock('@/lib/supabase/admin', () => ({ adminClient: () => ({ from: mock.from }) }));
-vi.mock('@/lib/stripe-client', () => ({ isStripeConfigured: () => mock.configured, stripeClient: () => ({ webhooks: { constructEvent: mock.construct }, subscriptions: { retrieve: mock.retrieve } }) }));
+vi.mock('@/lib/supabase/admin', () => ({ adminClient: () => ({ from: mock.from, rpc: mock.rpc }) }));
+vi.mock('@/lib/stripe-client', () => ({ planForPrice: (id: string) => id === "price_crew" ? "crew" : null, isStripeConfigured: () => mock.configured, stripeClient: () => ({ webhooks: { constructEvent: mock.construct }, subscriptions: { retrieve: mock.retrieve } }) }));
 import { POST } from './route';
-const subscription = { id: 'sub_1', customer: 'cus_1', status: 'active', metadata: { t2q_user_id: 'user_1' }, items: { data: [{ current_period_end: 1800000000 }] } };
+const subscription = { id: 'sub_1', created: 1780000000, customer: 'cus_1', status: 'active', metadata: { t2q_user_id: 'user_1' }, items: { data: [{ price: { id: "price_crew" }, quantity: 1, current_period_end: 1800000000 }] } };
 const request = (signature = 'signed') => new NextRequest('https://tradies2quote.com/api/stripe/webhook', { method: 'POST', headers: { 'stripe-signature': signature }, body: '{"test":true}' });
 beforeEach(() => {
   vi.clearAllMocks();
@@ -16,6 +16,7 @@ beforeEach(() => {
   mock.configured = true; mock.errors = {}; mock.completed = false; mock.calls = [];
   mock.construct.mockReturnValue({ id: 'evt_1', type: 'customer.subscription.updated', data: { object: { ...subscription, status: 'past_due' } } });
   mock.retrieve.mockResolvedValue(subscription);
+  mock.rpc.mockImplementation(async () => { mock.calls.push('subscriptions.sync'); return { error: mock.errors['subscriptions.sync'] ?? null }; });
   mock.from.mockImplementation((table: string) => {
     let op = 'select';
     const query: Record<string, unknown> = {};
@@ -37,12 +38,12 @@ beforeEach(() => {
 });
 describe('Stripe durable acknowledgement', () => {
   it('returns a retryable failure on DB error without recording completion, and succeeds on retry', async () => {
-    mock.errors['subscriptions.upsert'] = { code: '08006' };
+    mock.errors['subscriptions.sync'] = { code: '08006' };
     expect((await POST(request())).status).toBe(500);
     expect(mock.calls).not.toContain('stripe_webhook_events.insert');
     mock.errors = {};
     expect((await POST(request())).status).toBe(200);
-    expect(mock.calls.slice(-2)).toEqual(['subscriptions.upsert', 'stripe_webhook_events.insert']);
+    expect(mock.calls.slice(-2)).toEqual(['subscriptions.sync', 'stripe_webhook_events.insert']);
   });
   it('fails closed on ledger read failure', async () => {
     mock.errors['stripe_webhook_events.select'] = { code: '08006' };
@@ -65,7 +66,7 @@ describe('Stripe durable acknowledgement', () => {
   it('cannot grant subscription access from a one-time payment checkout', async () => {
     mock.construct.mockReturnValue({ id: 'evt_2', type: 'checkout.session.completed', data: { object: { mode: 'payment', customer: 'cus_1', metadata: { t2q_user_id: 'user_1' } } } });
     expect((await POST(request())).status).toBe(200);
-    expect(mock.calls).not.toContain('subscriptions.upsert');
+    expect(mock.calls).not.toContain('subscriptions.sync');
   });
   it('rejects an invalid signature before reading the database', async () => {
     mock.construct.mockImplementation(() => { throw new Error('invalid signature'); });

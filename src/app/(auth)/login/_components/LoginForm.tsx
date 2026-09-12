@@ -116,7 +116,7 @@ export function LoginForm({ next, error, message }: Props) {
         <span className="text-ink-400">
           No account?{" "}
           <Link
-            href="/signup"
+            href={`/signup?next=${encodeURIComponent(next ?? "/app")}`}
             className="text-brand hover:text-hivis font-semibold"
             data-testid="login-to-signup"
           >
@@ -137,6 +137,7 @@ export function LoginForm({ next, error, message }: Props) {
         className="mt-4 border border-ink-700 bg-ink-800/60 rounded-sm p-3 space-y-2"
         data-testid="resend-confirmation-form"
       >
+        <input type="hidden" name="next" value={next ?? "/app"} />
         <div className="text-sm text-ink-300">
           Didn&apos;t get the confirmation email?
         </div>

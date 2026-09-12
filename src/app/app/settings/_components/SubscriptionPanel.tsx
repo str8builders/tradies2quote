@@ -1,3 +1,4 @@
+import { PLANS } from "@/lib/plans";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -27,7 +28,7 @@ export function SubscriptionPanel({
 }) {
   if (status.state === "paid") {
     const renewalLabel = status.currentPeriodEnd
-      ? `Next charge ${formatDate(status.currentPeriodEnd)}`
+      ? `Current period ends ${formatDate(status.currentPeriodEnd)}`
       : "Active subscription";
     return (
       <section
@@ -36,16 +37,16 @@ export function SubscriptionPanel({
       >
         <div className="flex items-center gap-2">
           <CheckCircle size={18} weight="fill" className="text-brand" />
-          <p className="t2q-section-label-pro !text-brand">{"// pro"}</p>
+          <p className="t2q-section-label-pro !text-brand">{status.managedByTeam ? "// team access" : "// subscription"}</p>
         </div>
         <h2 className="mt-2 font-display text-xl uppercase tracking-tight text-white">
-          tradies2Quote Pro
+          Tradies2Quote {status.plan ? PLANS[status.plan].name : "access"}
         </h2>
         <p className="mt-1 text-sm text-ink-300">
-          $49 NZD / month · {renewalLabel}
+          {status.managedByTeam ? "Your team owner manages billing." : status.plan ? `$${PLANS[status.plan].price} NZD / month · ${renewalLabel}` : "Your account has complimentary access."}
         </p>
         <div className="mt-4">
-          <ManageBillingButton />
+          {status.stripeCustomerId && !status.managedByTeam ? <ManageBillingButton /> : null}
         </div>
       </section>
     );
@@ -89,7 +90,7 @@ export function SubscriptionPanel({
             className="t2q-btn-primary-pro inline-flex h-11 items-center gap-2 px-5"
           >
             <CreditCard size={16} weight="bold" />
-            Subscribe — $49/mo
+            Choose a plan
             <ArrowRight size={14} weight="bold" />
           </Link>
         ) : (

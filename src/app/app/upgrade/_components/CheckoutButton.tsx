@@ -1,5 +1,6 @@
 "use client";
 
+import { PLANS, type PlanId } from "@/lib/plans";
 import { useState } from "react";
 import { ArrowRight, Lock } from "@phosphor-icons/react/dist/ssr";
 
@@ -11,7 +12,7 @@ import { ArrowRight, Lock } from "@phosphor-icons/react/dist/ssr";
  * server action) so the user's tab navigates directly to Stripe
  * without an intermediate full-page reload.
  */
-export function CheckoutButton() {
+export function CheckoutButton({plan = "solo"}: {plan?: PlanId}) {
   const [state, setState] = useState<"idle" | "loading" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string>("");
 
@@ -19,7 +20,7 @@ export function CheckoutButton() {
     setState("loading");
     setErrorMsg("");
     try {
-      const res = await fetch("/api/stripe/checkout", { method: "POST" });
+      const res = await fetch("/api/stripe/checkout", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({plan}) });
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean;
         url?: string;
@@ -55,7 +56,7 @@ export function CheckoutButton() {
           </>
         ) : (
           <>
-            Subscribe — $49/mo
+            Choose {PLANS[plan].name} — ${PLANS[plan].price}/mo
             <ArrowRight size={16} weight="bold" />
           </>
         )}

@@ -1,227 +1,31 @@
-import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import {
-  CheckCircle,
-  Info,
-  Lock,
-  Sparkle,
-} from "@phosphor-icons/react/dist/ssr";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getSubscriptionStatus } from "@/lib/subscription";
-import { isStripeConfigured } from "@/lib/stripe-client";
+import { getTeamContext } from "@/lib/team";
+import { isStripeConfigured, getPlanPriceId } from "@/lib/stripe-client";
+import { PLANS, type PlanId } from "@/lib/plans";
 import { HideInNativeApp } from "@/app/_components/HideInNativeApp";
 import { isNativeShellRequest } from "@/lib/native-shell";
 import { AppHeader } from "../_components/AppHeader";
 import { CheckoutButton } from "./_components/CheckoutButton";
-
-export const metadata: Metadata = {
-  title: "Upgrade",
-};
-
-export const dynamic = "force-dynamic";
-
-/**
- * /app/upgrade — paywall + checkout entry point.
- *
- * Three states render here:
- *   - trialing → "X days left, no rush, here's the plan"
- *   - expired  → "your trial ended — subscribe to keep going"
- *   - paid     → bounce them straight to settings (already subscribed)
- *
- * Also handles ?stripe=cancelled from the Stripe checkout cancel_url
- * so the user gets a soft "checkout cancelled" note instead of a
- * silent re-land.
- */
-export default async function UpgradePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ stripe?: string; from?: string }>;
-}) {
-  const { stripe: stripeQuery, from } = await searchParams;
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  // eslint-disable-next-line react-hooks/purity -- server component, one-shot per request
-  const signedUpAt = new Date(user.created_at ?? Date.now());
-  const sub = await getSubscriptionStatus({
-    userId: user.id,
-    signedUpAt,
-    email: user.email,
-  });
-
-  // Already paying? Send them to settings → "Manage subscription" link.
-  if (sub.state === "paid") {
-    redirect("/app/settings?already=subscribed");
-  }
-
-  const cancelled = stripeQuery === "cancelled";
-  const stripeReady = isStripeConfigured();
-
-  // 3.1.3(f) — inside the iOS App Store shell this whole page's
-  // pricing/checkout content is replaced by a neutral note (no amounts, no
-  // billing links — not even a pointer to the website, which the guideline
-  // also disallows). SERVER-gated: the priced HTML below is never emitted
-  // to the shell at all; the <HideInNativeApp> wrapper further down stays
-  // as defence-in-depth for pre-marker shells.
-  //
-  // ?from=new-quote means the quotes/new gate bounced a trial-expired user
-  // here — the copy must be HONEST about that state ("everything works as
-  // normal" while quote creation is blocked reads as a broken app) while
-  // still steering nowhere.
-  const nativeFallback =
-    from === "new-quote" ? (
-      <main className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
-        <div className="t2q-section-label-pro mb-3">{"// account"}</div>
-        <h1 className="font-display text-3xl uppercase tracking-tight sm:text-4xl">
-          New quotes are paused on your account.
-        </h1>
-        <p className="mt-3 text-sm text-ink-300 sm:text-base">
-          Your free trial has ended. You can still view, send and
-          download all your existing quotes and invoices — creating
-          new ones is paused for now.
-        </p>
-      </main>
-    ) : (
-      <main className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
-        <div className="t2q-section-label-pro mb-3">{"// account"}</div>
-        <h1 className="font-display text-3xl uppercase tracking-tight sm:text-4xl">
-          Plan management isn&apos;t available in the app.
-        </h1>
-        <p className="mt-3 text-sm text-ink-300 sm:text-base">
-          Your quotes, invoices and clients all keep working as
-          normal.
-        </p>
-      </main>
-    );
-
-  if (await isNativeShellRequest()) {
-    return (
-      <div className="min-h-screen text-white">
-        <AppHeader context="Upgrade" />
-        {nativeFallback}
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen text-white">
-      <AppHeader context="Upgrade" />
-
-      <HideInNativeApp fallback={nativeFallback}>
-
-      <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
-        <div className="mb-8">
-          <div className="t2q-section-label-pro mb-3">{"// upgrade"}</div>
-          <h1 className="font-display text-3xl uppercase tracking-tight sm:text-4xl">
-            {sub.state === "expired"
-              ? "Your trial ended."
-              : "Keep the lights on."}
-          </h1>
-          <p className="mt-3 text-sm text-ink-300 sm:text-base">
-            {sub.state === "expired" ? (
-              <>
-                You can still <strong className="text-ink-100">view
-                and send existing quotes</strong>, but creating new
-                ones is paused until you subscribe.
-              </>
-            ) : (
-              <>
-                {sub.trialDaysLeft === 1
-                  ? "Last day of your free trial. "
-                  : sub.trialDaysLeft && sub.trialDaysLeft > 0
-                    ? `${sub.trialDaysLeft} days left in your free trial. `
-                    : ""}
-                Subscribe now and the app keeps working the second your
-                trial ends — no interruption.
-              </>
-            )}
-          </p>
-        </div>
-
-        {cancelled && (
-          <p
-            data-testid="upgrade-cancelled"
-            role="status"
-            className="mb-6 rounded-sm border border-hivis/40 bg-hivis/10 px-3 py-2 font-mono text-[11px] uppercase tracking-[0.18em] text-hivis"
-          >
-            {"// checkout cancelled — nothing was charged."}
-          </p>
-        )}
-
-        <section
-          aria-label="Plan"
-          data-testid="upgrade-plan-card"
-          className="t2q-card-pro p-6 sm:p-8"
-        >
-          <div className="flex items-baseline gap-2">
-            <Sparkle size={18} weight="fill" className="text-brand" />
-            <p className="t2q-section-label-pro !text-brand">{"// pro"}</p>
-          </div>
-          <h2 className="mt-2 font-display text-2xl uppercase tracking-tight text-white sm:text-3xl">
-            tradies2Quote Pro
-          </h2>
-          <p className="mt-3 flex items-baseline gap-2">
-            <span className="font-display text-4xl text-brand sm:text-5xl">
-              $49
-            </span>
-            <span className="font-mono text-xs uppercase tracking-[0.2em] text-ink-300">
-              NZD / month · incl. GST
-            </span>
-          </p>
-          <p className="mt-1 text-xs text-ink-400">
-            Cancel anytime from settings — no contracts, no annual lock-in.
-          </p>
-
-          <ul className="mt-6 space-y-2.5 text-sm text-ink-100">
-            <Bullet>Unlimited voice-to-quote generation</Bullet>
-            <Bullet>Unlimited quote sends (email + SMS)</Bullet>
-            <Bullet>Invoice generation, send + mark-paid</Bullet>
-            <Bullet>Branded PDFs with your logo</Bullet>
-            <Bullet>Materials library + supplier price import</Bullet>
-            <Bullet>All T2Q agents (compliance, voice cleanup, follow-up, more)</Bullet>
-            <Bullet>NZ Building Code + GST compliance baked in</Bullet>
-          </ul>
-
-          <div className="mt-7">
-            {stripeReady ? (
-              <CheckoutButton />
-            ) : (
-              <p
-                data-testid="upgrade-stripe-missing"
-                className="inline-flex items-center gap-2 rounded-sm border border-hivis/40 bg-hivis/10 px-3 py-2 text-xs text-hivis"
-              >
-                <Lock size={14} weight="bold" />
-                Paid plans open soon. Your trial keeps running free until
-                checkout is switched on — nothing to do for now.
-              </p>
-            )}
-          </div>
-
-          <p className="mt-5 inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-400">
-            <Info size={12} weight="bold" />
-            Payment is processed by Stripe — your card never touches our
-            servers. NZ GST handled by Stripe Tax.
-          </p>
-        </section>
-      </main>
-      </HideInNativeApp>
-    </div>
-  );
-}
-
-function Bullet({ children }: { children: React.ReactNode }) {
-  return (
-    <li className="flex items-start gap-2">
-      <CheckCircle
-        size={16}
-        weight="fill"
-        className="mt-0.5 shrink-0 text-brand"
-      />
-      <span>{children}</span>
-    </li>
-  );
+import { ManageBillingButton } from "../settings/_components/ManageBillingButton";
+export const metadata={title:"Choose your plan"};
+export const dynamic="force-dynamic";
+export default async function UpgradePage({searchParams}:{searchParams:Promise<{stripe?:string;plan?:string;from?:string}>}){
+ const query=await searchParams;const db=await createClient();const{data:{user}}=await db.auth.getUser();if(!user)redirect('/login');
+ const sub=await getSubscriptionStatus({userId:user.id,signedUpAt:new Date(user.created_at!),email:user.email});
+ const nativeFallback=<main className="mx-auto max-w-3xl px-4 py-14"><h1 className="text-3xl font-semibold">{sub.state==='expired'?'New quotes are paused on your account.':'Account information'}</h1><p className="mt-4 text-sm text-ink-300">You can still view, send and download your existing quotes and invoices.</p></main>;
+ if(await isNativeShellRequest())return <div className="text-white"><AppHeader context="Account"/>{nativeFallback}</div>;
+ const team=await getTeamContext(user.id);
+ const managed=team.team&&!team.isOwner;
+ const activeBilling=!!sub.stripeCustomerId&&sub.state==='paid';
+ return <div className="min-h-screen text-white"><AppHeader context="Plans"/><HideInNativeApp fallback={nativeFallback}><main className="mx-auto max-w-6xl px-4 py-10 sm:px-6"><div className="t2q-section-label-pro">{"// room to grow"}</div><h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">A plan for the way you work.</h1><p className="mt-4 max-w-2xl text-sm leading-relaxed text-ink-300">{sub.state==='expired'?'Your trial has ended. Choose a plan to create new quotes. Existing quotes remain available.':'Start on your own, or bring your crew. One monthly price, including GST. Cancel anytime.'}</p>
+ {query.stripe==='cancelled'&&<p role="status" className="mt-6 text-sm text-ink-300">Checkout was cancelled. You can choose a plan when you’re ready.</p>}
+ {query.stripe==='success'&&<div role="status" className="t2q-card-pro mt-6 p-5"><p>{sub.state==='paid'?'Your subscription is active.':'Your checkout is complete. We are waiting for Stripe to confirm your subscription.'}</p><Link href={sub.state==='paid'?'/app/team':'/app/upgrade?stripe=success'} className="mt-2 inline-flex min-h-11 items-center text-sm text-brand">{sub.state==='paid'?'Set up your team':'Refresh subscription status'}</Link></div>}
+ {managed?<section className="t2q-card-pro mt-8 p-6"><h2 className="text-xl font-semibold">Your team owner manages billing</h2><p className="my-4 text-sm text-ink-300">You belong to {team.team!.name}. Contact the owner for plan changes.</p><Link href="/app/team" className="t2q-btn-ghost-pro">Your team</Link></section>:<>
+ {activeBilling&&<section className="t2q-card-pro mt-8 flex flex-wrap items-center justify-between gap-4 p-6"><div><h2 className="font-semibold">Your subscription is active</h2><p className="mt-2 text-sm text-ink-300">Change plans, update payment details or cancel through Stripe. When reducing seats, remove extra team members first.</p></div><ManageBillingButton/></section>}
+ <div className="mt-8 grid gap-5 lg:grid-cols-3">{(Object.keys(PLANS) as PlanId[]).map(id=>{const plan=PLANS[id];const ready=isStripeConfigured()&&!!getPlanPriceId(id)&&(id==='solo'||process.env.TEAM_PLANS_ENABLED==='true');return <section key={id} data-testid={`upgrade-plan-${id}`} className={`t2q-card-pro flex flex-col p-6 ${query.plan===id?'!border-brand/70':''}`}><p className="text-xs uppercase tracking-widest text-ink-400">{plan.tag}</p><h2 className="mt-3 text-2xl font-semibold">{plan.name}</h2><p className="my-5"><strong className="text-4xl text-brand">${plan.price}</strong><span className="ml-2 text-xs text-ink-300">NZD / month · incl. GST</span></p><ul className="mb-7 flex-1 space-y-3 text-sm text-ink-200">{plan.features.map(f=><li key={f} className="flex gap-2"><span aria-hidden="true" className="text-brand">✓</span>{f}</li>)}</ul>{activeBilling?<p className="text-sm text-ink-300">Use Manage subscription above to change plans.</p>:ready?<CheckoutButton plan={id}/>:<p data-testid="upgrade-stripe-missing" className="text-sm text-ink-300">This plan opens after setup and verification are complete.</p>}</section>;})}</div>
+ <p className="mt-6 text-xs leading-relaxed text-ink-400">Your payment details are handled by Stripe. A subscription starts when you complete checkout. Crew and Builder seat counts include the owner. Team members share clients and keep their quotes in their own accounts.</p></>}
+ </main></HideInNativeApp></div>;
 }

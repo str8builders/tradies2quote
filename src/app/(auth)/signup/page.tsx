@@ -23,9 +23,9 @@ export const metadata: Metadata = {
 export default async function SignupPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; next?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, next } = await searchParams;
 
   return (
     <AuthSplitShell
@@ -44,7 +44,7 @@ export default async function SignupPage({
           </p>
 
           <div className="mt-8">
-            <SignupForm error={error} />
+            <SignupForm error={error} next={next} />
           </div>
         </>
       }

@@ -55,6 +55,8 @@ import { MaterialsListButton } from "./MaterialsListButton";
 import { hasT2QCALWorking, T2QCALWorking } from "./T2QCALWorking";
 import { MobileCollapsibleCard } from "./MobileCollapsibleCard";
 import { CsiGroupedView } from "./CsiGroupedView";
+import { QuotePhotos } from "@/app/_components/quote/QuotePhotos";
+import { SavedClientPicker, TermsTemplatePicker } from "./SavedQuoteDetails";
 import { StickyActionBar } from "./StickyActionBar";
 
 type Props = {
@@ -542,7 +544,9 @@ export function QuoteEditor({
     // rendered AFTER the editor (Review tools, invoice draft) clear the
     // fixed StickyActionBar too — pb here only cleared the editor's own tail.
     <div className="space-y-6">
+      <QuotePhotos quoteId={quoteId} />
       <section className="t2q-card-pro p-5 sm:p-6">
+        <SavedClientPicker onSelect={setClient} disabled={isAccepted} />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex-1">
             <div className="font-mono text-xs uppercase tracking-[0.2em] text-ink-400">
@@ -1232,6 +1236,7 @@ export function QuoteEditor({
           <div className="font-mono text-xs uppercase tracking-[0.2em] text-ink-400">
             Terms
           </div>
+          <TermsTemplatePicker onSelect={setTerms} disabled={isAccepted} />
           <textarea
             data-testid="quote-terms"
             aria-label="Quote terms"

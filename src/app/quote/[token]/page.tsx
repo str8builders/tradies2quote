@@ -1,3 +1,4 @@
+import { QuotePhotos } from "@/app/_components/quote/QuotePhotos";
 import type { Metadata } from "next";
 import { cache } from "react";
 import { headers } from "next/headers";
@@ -141,6 +142,7 @@ export default async function PublicQuotePage({
     return (
       <PageShell>
         <AcceptedView token={token} quote={quote} />
+        <QuotePhotos token={token} />
         {showDeposit ? (
           <PayDepositButton
             token={token}
@@ -202,6 +204,7 @@ export default async function PublicQuotePage({
   return (
     <PageShell>
       <PublicQuoteSummary token={token} quote={quote} />
+      <QuotePhotos token={token} />
       <AcceptForm token={token} quote={quote} />
       {/* Wave 36 — "The Quote That Sells Itself" chat bubble. Only on
           live (sent/viewed) quotes — the API gates this server-side

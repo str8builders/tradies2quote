@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
+import { isNativeShellRequest } from "@/lib/native-shell";
 import { isStripeConfigured, stripeClient } from "@/lib/stripe-client";
 
 export const runtime = "nodejs";
@@ -20,7 +21,8 @@ export const dynamic = "force-dynamic";
  * of showing a broken button.
  */
 export async function POST(_request: NextRequest) {
-  if (!isStripeConfigured()) {
+  if (await isNativeShellRequest()) return NextResponse.json({ error: "unavailable" }, { status: 403 });
+  if (!isStripeConfigured() || !process.env.STRIPE_PORTAL_CONFIGURATION) {
     return NextResponse.json(
       { error: "stripe_not_configured" },
       { status: 503 },
@@ -36,12 +38,16 @@ export async function POST(_request: NextRequest) {
   }
 
   const admin = adminClient();
-  const { data: sub } = await admin
+  const { data: sub, error: lookupError } = await admin
     .from("subscriptions")
     .select("stripe_customer_id")
     .eq("user_id", user.id)
     .maybeSingle();
 
+  if (lookupError) {
+    captureError(lookupError, { route: "/api/stripe/portal" });
+    return NextResponse.json({ message: "Billing is temporarily unavailable. Please retry." }, { status: 503 });
+  }
   const customerId = sub?.stripe_customer_id;
   if (!customerId) {
     return NextResponse.json(
@@ -64,6 +70,7 @@ export async function POST(_request: NextRequest) {
   try {
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
+      configuration: process.env.STRIPE_PORTAL_CONFIGURATION || undefined,
       return_url: `${appUrl}/app/settings`,
     });
     return NextResponse.json({ ok: true, url: session.url });
