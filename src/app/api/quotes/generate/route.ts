@@ -946,8 +946,13 @@ export async function POST(request: NextRequest) {
   const vocab = await loadUserVocab(supabase, user.id, {
     includeRecentQuotes: true,
   });
+  // TRANSCRIPT_SUMMARY=off skips the second model call (the structured
+  // job summary). On the CPU-only local model that call adds minutes to
+  // every quote; with a hosted model it is cheap and should stay on.
   const cleaned = await cleanTranscript(transcript, {
     vocab,
+    summaryDisabled:
+      process.env.TRANSCRIPT_SUMMARY?.trim().toLowerCase() === "off",
   });
   parsed.transcript = {
     raw: transcript,

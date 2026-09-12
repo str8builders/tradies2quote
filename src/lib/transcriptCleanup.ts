@@ -36,7 +36,7 @@
 import { applyGlossaryCorrections } from "./transcript/glossaryCorrect";
 import { normalizeSpokenMeasurements } from "./transcript/measureNormalize";
 import type { VocabSet, VocabTermType } from "./transcript/glossary";
-import { fetchWithTimeout } from "@/lib/fetchTimeout";
+import { postJsonWithoutHeaderTimeout } from "@/lib/llm/local-chat";
 import { parseModelJsonObject } from "@/lib/modelJson";
 
 // ---------------------------------------------------------------------------
@@ -548,32 +548,32 @@ async function defaultAnthropicCall({
       confidence: { type: "number", minimum: 0, maximum: 1 },
     },
   };
-  const res = await fetchWithTimeout(
+  // node:http, not fetch: undici's fixed 300 s response-header timeout
+  // silently killed this call on the CPU-only local model, so every quote
+  // waited five minutes for a summary that could never arrive.
+  const res = await postJsonWithoutHeaderTimeout(
     `${baseUrl}/chat/completions`,
     {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: Math.min(maxTokens, maxTokensCeiling),
-        temperature: 0,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: "transcript_summary",
-            strict: true,
-            schema: summarySchema,
-          },
-        },
-      }),
+      authorization: `Bearer ${apiKey}`,
+      "content-type": "application/json",
     },
+    JSON.stringify({
+      model,
+      max_tokens: Math.min(maxTokens, maxTokensCeiling),
+      temperature: 0,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "transcript_summary",
+          strict: true,
+          schema: summarySchema,
+        },
+      },
+    }),
     timeoutMs,
   );
   if (!res.ok) {

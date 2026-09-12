@@ -33,6 +33,8 @@ const eslintConfig = defineConfig([
     // they contain duplicate copies of the codebase and bundled output.
     ".claude/**",
     ".vercel/**",
+    // Plain CommonJS maintenance scripts legitimately use require().
+    "scripts/**/*.cjs",
     "**/.next/**",
   ]),
 ]);
