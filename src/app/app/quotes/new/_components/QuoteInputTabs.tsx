@@ -1,5 +1,6 @@
 "use client";
 
+import { VoiceSignal } from "@/app/_components/VoiceSignal";
 import { useEffect, useRef, useState } from "react";
 import { createDraftQuote } from "../actions";
 import type { Clarification } from "@/lib/clarifications";
@@ -179,6 +180,9 @@ function VoicePanel({
   const [seconds, setSeconds] = useState<number>(0);
   const [error, setError] = useState<string>("");
 
+  const activeRef = useRef(true);
+  const requestingRef = useRef(false);
+  const uploadRef = useRef<AbortController | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
@@ -186,12 +190,21 @@ function VoicePanel({
   const stopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    activeRef.current = true;
     return () => {
+      activeRef.current = false;
       cleanup();
     };
   }, []);
 
   function cleanup() {
+    uploadRef.current?.abort();
+    const recorder = recorderRef.current;
+    if (recorder) {
+      recorder.onstop = null;
+      recorder.ondataavailable = null;
+      if (recorder.state !== "inactive") recorder.stop();
+    }
     if (tickRef.current) clearInterval(tickRef.current);
     if (stopTimeoutRef.current) clearTimeout(stopTimeoutRef.current);
     tickRef.current = null;
@@ -203,6 +216,7 @@ function VoicePanel({
   }
 
   async function startRecording() {
+    if (requestingRef.current || recorderRef.current?.state === "recording") return;
     setError("");
     if (typeof navigator === "undefined" || !navigator.mediaDevices) {
       setError("Microphone access isn't available in this browser.");
@@ -210,13 +224,18 @@ function VoicePanel({
       return;
     }
     let stream: MediaStream;
+    requestingRef.current = true;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
+      requestingRef.current = false;
+      if (!activeRef.current) return;
       setError("Microphone permission denied. Allow access and try again.");
       setState("error");
       return;
     }
+    requestingRef.current = false;
+    if (!activeRef.current) { stream.getTracks().forEach((track) => track.stop()); return; }
     const mimeType = pickMimeType();
     let recorder: MediaRecorder;
     try {
@@ -271,6 +290,9 @@ function VoicePanel({
   }
 
   async function uploadAudio(blob: Blob, type: string) {
+    if (!activeRef.current) return;
+    if (blob.size === 0) { setError("No audio was recorded. Try again or type the job details."); setState("error"); return; }
+    uploadRef.current = new AbortController();
     const ext = type.includes("mp4") ? "m4a" : type.includes("ogg") ? "ogg" : "webm";
     const form = new FormData();
     form.append("audio", new File([blob], `recording.${ext}`, { type }));
@@ -278,7 +300,7 @@ function VoicePanel({
       const res = await fetch("/api/quotes/transcribe", {
         method: "POST",
         body: form,
-        signal: AbortSignal.timeout(90_000),
+        signal: AbortSignal.any([uploadRef.current.signal, AbortSignal.timeout(90_000)]),
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -287,9 +309,13 @@ function VoicePanel({
         return;
       }
       const data = (await res.json()) as { transcript?: string };
-      setTranscript((data.transcript ?? "").trim());
+      if (!activeRef.current) return;
+      const text = (data.transcript ?? "").trim();
+      if (!text) { setError("No speech was detected. Try again or type the job details."); setState("error"); return; }
+      setTranscript(text);
       setState("idle");
     } catch (e) {
+      if (!activeRef.current) return;
       setError(
         e instanceof DOMException && e.name === "TimeoutError"
           ? "Transcription is taking too long. Check your connection and try again."
@@ -328,7 +354,7 @@ function VoicePanel({
             onStart={startRecording}
             onStop={stopRecording}
           />
-          <div className="mt-5 font-mono text-2xl tabular-nums text-white">
+          <div className="mt-5 text-3xl font-semibold tabular-nums tracking-tight text-white">
             {formatTime(seconds)}
             <span className="ml-2 text-sm text-ink-400">
               / {formatTime(MAX_SECONDS)}
@@ -344,7 +370,7 @@ function VoicePanel({
             aria-live="polite"
             className="mt-2 min-h-5 text-sm text-ink-300"
           >
-            {state === "idle" && "Tap to record. Up to 3 minutes."}
+            {state === "idle" && "Tap the microphone to start. Up to 3 minutes."}
             {state === "recording" && "Recording — tap again to stop."}
             {state === "processing" && "Transcribing…"}
             {state === "error" && (
@@ -390,34 +416,9 @@ function RecordButton({
       aria-label={recording ? "Stop recording" : "Start recording"}
       onClick={onClick}
       disabled={disabled}
-      className={[
-        "relative grid h-28 w-28 place-items-center rounded-full border-2 transition-colors disabled:opacity-60",
-        recording
-          ? "border-brand bg-brand text-ink-900"
-          : "border-brand bg-ink-900 text-brand hover:bg-brand hover:text-ink-900",
-      ].join(" ")}
+      className="rounded-[32px] border border-transparent p-3 transition-colors hover:border-brand/30 hover:bg-brand/5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand disabled:cursor-wait disabled:opacity-60"
     >
-      {recording && (
-        <span
-          aria-hidden="true"
-          className="absolute inset-0 rounded-full border-2 border-brand animate-pulse-ring"
-        />
-      )}
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 24 24"
-        className="h-10 w-10"
-        fill="currentColor"
-      >
-        {recording ? (
-          <rect x="6" y="6" width="12" height="12" rx="1" />
-        ) : (
-          <>
-            <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z" />
-            <path d="M19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V20H8a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2h-3v-2.08A7 7 0 0 0 19 11z" />
-          </>
-        )}
-      </svg>
+      <VoiceSignal state={state} />
     </button>
   );
 }

@@ -29,6 +29,7 @@
     "@capacitor/splash-screen": "^8.0.2",
     "@phosphor-icons/react": "^2.1.10",
     "@remotion/player": "^4.0.488",
+    "@remotion/three": "4.0.488",
     "@sentry/nextjs": "^10.55.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.105.3",

@@ -32,12 +32,12 @@ const STORAGE_KEY = "t2q-tour-done";
  *  other Driver.js instance someone might add later. */
 const POPOVER_CSS = `
 .driver-popover.t2q-tour {
-  background-color: #FFFFFF;
-  color: #17212B;
-  border: 1px solid #DDE3EA;
-  border-radius: 12px;
-  padding: 18px 18px 16px;
-  max-width: 340px;
+  background-color: #1A201E;
+  color: #F4F5EF;
+  border: 1px solid #ffffff20;
+  border-radius: 18px;
+  padding: 24px 24px 20px;
+  max-width: 370px;
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
 }
 @media (max-width: 480px) {
@@ -47,16 +47,16 @@ const POPOVER_CSS = `
 }
 .driver-popover.t2q-tour .driver-popover-title {
   font-family: var(--font-plus-jakarta), 'Inter', system-ui, sans-serif;
-  font-size: 16px;
+  font-size: 21px;
   font-weight: 700;
   letter-spacing: -0.01em;
-  color: #17212B;
+  color: #F4F5EF;
   margin-bottom: 8px;
 }
 .driver-popover.t2q-tour .driver-popover-description {
   font-size: 13.5px;
   line-height: 1.55;
-  color: #4B5563;
+  color: #B8C0B9;
 }
 .driver-popover.t2q-tour .driver-popover-progress-text {
   font-family: var(--font-plus-jakarta), 'Inter', system-ui, sans-serif;
@@ -73,16 +73,17 @@ const POPOVER_CSS = `
   font-family: var(--font-plus-jakarta), 'Inter', system-ui, sans-serif;
   font-size: 12px;
   font-weight: 700;
-  padding: 8px 14px;
+  padding: 12px 18px;
+  min-height: 44px;
   border-radius: 8px;
-  border: 1px solid #DDE3EA;
-  background: #FFFFFF;
-  color: #17212B;
+  border: 1px solid #ffffff20;
+  background: #242D28;
+  color: #F4F5EF;
   text-shadow: none;
   transition: background-color 0.15s, color 0.15s, border-color 0.15s;
 }
 .driver-popover.t2q-tour .driver-popover-footer button:hover {
-  background: #F8FAFC;
+  background: #303A33;
   border-color: #FFB68A;
   color: #E04F0A;
 }
@@ -99,15 +100,15 @@ const POPOVER_CSS = `
 .driver-popover.t2q-tour .driver-popover-close-btn {
   color: #94A3B8;
   font-size: 22px;
-  width: 36px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
 }
 .driver-popover.t2q-tour .driver-popover-close-btn:hover,
 .driver-popover.t2q-tour .driver-popover-close-btn:focus {
   color: #FF5F15;
 }
 .driver-popover.t2q-tour .driver-popover-arrow {
-  border-color: #FFFFFF;
+  border-color: #1A201E;
 }
 .driver-popover.t2q-tour .driver-popover-arrow-side-top { border-bottom-color: transparent; border-left-color: transparent; border-right-color: transparent; }
 .driver-popover.t2q-tour .driver-popover-arrow-side-bottom { border-top-color: transparent; border-left-color: transparent; border-right-color: transparent; }
@@ -148,7 +149,6 @@ const TARGETS = {
   calendar: '[data-testid="dashboard-calendar"]',
   recent:
     '[data-testid="quotes-list-client"], [data-testid="dashboard-empty"]',
-  calculator: '[data-testid="dashboard-calculator"]',
   navigation:
     '[data-testid="app-header-tabs"], [data-testid="app-bottom-nav"]',
   materials:
@@ -341,7 +341,7 @@ export function OnboardingTour({ onFinished }: OnboardingTourProps) {
           popover: {
             title: "Welcome to Tradies2Quote",
             description:
-              "This quick tour points to the real controls you will use to create quotes, plan work, manage materials, and update your account.",
+              "A quick walk through your workspace: set up your business, capture a job, review the figures and send a professional quote.",
             showButtons: ["next", "close"],
             nextBtnText: "Start tour",
           },
@@ -367,7 +367,7 @@ export function OnboardingTour({ onFinished }: OnboardingTourProps) {
           edgeAwareStep(quickStart, {
             title: "Set up common materials",
             description:
-              "This quick start adds the materials and real prices you use most, which improves every quote that follows.",
+              "Add your commonly used materials, then check each price against your own suppliers. Starter prices are a starting point, not live supplier prices.",
             side: "bottom",
             align: "center",
           }),
@@ -378,21 +378,21 @@ export function OnboardingTour({ onFinished }: OnboardingTourProps) {
         edgeAwareStep(newQuote, {
           title: "Create a quote",
           description:
-            "Tap New quote to record, type, or scan the job details. This is where every quote starts.",
+            "Open New quote. Describe the scope, measurements, materials and labour. Type your notes, or use voice and drawing scan when available. You can edit the draft before sending.",
           side: "bottom",
           align: "center",
         }),
         edgeAwareStep(today, {
           title: "Your work today",
           description:
-            "Today keeps the next job, follow-ups, material readiness, and site conditions together in one live workboard.",
+            "See upcoming work and items that need attention. Site conditions and readiness suggestions support your own checks before starting a job.",
           side: "bottom",
           align: "center",
         }),
         edgeAwareStep(moreToggle, {
           title: "Pipeline, metrics, and calendar",
           description:
-            "This disclosure keeps deeper planning tools tidy. The tour will open it now and point to each live section.",
+            "Open this section for your quote stages and schedule. We will open it for the next two steps, then restore how you had it.",
           side: "top",
           align: "center",
         }),
@@ -401,7 +401,7 @@ export function OnboardingTour({ onFinished }: OnboardingTourProps) {
           popover: {
             title: "Quote pipeline",
             description: pipeline.matches('[data-testid="dashboard-stage-tiles"]')
-              ? "Quotes move from draft through to completed. Each tile opens the quote list filtered to that stage."
+              ? "Track each stage from draft to completed. Sending, customer views and acceptance update the quote; you record the job’s later progress. Select a tile to see that stage."
               : "Your first quote will appear here and move through each stage as the job progresses.",
             side: "top",
             align: "center",
@@ -446,7 +446,7 @@ export function OnboardingTour({ onFinished }: OnboardingTourProps) {
         edgeAwareStep(account, {
           title: "Account and settings",
           description:
-            "Open your account for business details, quote and invoice defaults, clients, the full guide, and sign out.",
+            "Set your business name, logo, contact details, rates and document defaults here. Your client list and help guide are available from this menu.",
           side: "left",
           align: "start",
         }),
@@ -454,7 +454,7 @@ export function OnboardingTour({ onFinished }: OnboardingTourProps) {
           popover: {
             title: "You're ready",
             description:
-              "Start with New quote and review every draft before sending. You can replay this tour any time from Settings.",
+              "Review quantities, rates, GST, client details and terms before you send. Nothing is emailed until you choose Send. Replay this walkthrough from Settings whenever you need it.",
             showButtons: ["previous", "next", "close"],
             doneBtnText: "Get started",
           },
@@ -512,7 +512,8 @@ export function OnboardingTour({ onFinished }: OnboardingTourProps) {
           nextBtnText: "Next",
           prevBtnText: "Back",
           doneBtnText: "Done",
-          smoothScroll: true,
+          animate: !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+          smoothScroll: !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
           disableActiveInteraction: true,
           steps,
           onPopoverRender: (popover) => {

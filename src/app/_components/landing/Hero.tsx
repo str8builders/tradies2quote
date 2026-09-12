@@ -3,10 +3,10 @@ import {
   ArrowRight,
   Play,
   Check,
-  Microphone,
   ArrowUpRight,
   FileText,
 } from "@phosphor-icons/react/dist/ssr";
+import { VoiceSignal } from "../VoiceSignal";
 import InstallPWAButton from "./InstallPWAButton";
 
 export function Hero() {
@@ -69,9 +69,7 @@ export function Hero() {
             <span /> FROM A QUICK SITE NOTE
           </div>
           <div className="studio-voice-card">
-            <span className="studio-mic">
-              <Microphone size={23} weight="fill" />
-            </span>
+            <VoiceSignal compact />
             <div>
               <strong>Your words. Your quote.</strong>
               <p>“New timber deck, 24 square metres...”</p>
