@@ -1,0 +1,11 @@
+[Unit]
+Description=Tradies2Quote error-digest (New Zealand time)
+
+[Timer]
+OnCalendar=*-*-* 06:45:00 Pacific/Auckland
+Persistent=true
+RandomizedDelaySec=60
+Unit=t2q-cron@error-digest.service
+
+[Install]
+WantedBy=timers.target

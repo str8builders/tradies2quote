@@ -26,7 +26,7 @@ import {
 // need to hear about localhost.
 //
 // Everything is soft. No API key → digest sends without diagnoses. Query
-// failure → empty digest, never a thrown cron. The email is the product;
+// failures reach the scheduler; they must not be reported as a quiet night. The email is the product;
 // the AI paragraph is garnish.
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -63,6 +63,7 @@ export async function collectErrorDigest(
       .gte("occurred_at", sinceIso)
       .order("occurred_at", { ascending: false })
       .limit(2000);
+    if (eventsRes.error) throw eventsRes.error;
     events = ((eventsRes.data ?? []) as Record<string, unknown>[]).map((r) => ({
       group_id: strOrNull(r.group_id),
       fingerprint: str(r.fingerprint),
@@ -82,6 +83,7 @@ export async function collectErrorDigest(
           "id, fingerprint, title, surface, route, event_count, first_seen_at, last_seen_at, resolved_at",
         )
         .in("id", ids);
+      if (groupsRes.error) throw groupsRes.error;
       groups = ((groupsRes.data ?? []) as Record<string, unknown>[]).map((r) => ({
         id: str(r.id),
         fingerprint: str(r.fingerprint),
@@ -96,7 +98,7 @@ export async function collectErrorDigest(
     }
   } catch (err) {
     console.error("[error-digest] collection failed", err);
-    return empty;
+    throw err;
   }
 
   const summary = summariseWindow(events, groups, sinceIso);

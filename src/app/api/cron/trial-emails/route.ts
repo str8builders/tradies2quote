@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
 import { adminClient } from "@/lib/supabase/admin";
 import { isAuthorizedCron } from "@/lib/cron-auth";
+import { getSubscriptionStatus } from "@/lib/subscription";
+import { isStripeConfigured } from "@/lib/stripe-client";
 import {
   EMAIL_KINDS,
   firstNameFromEmail,
@@ -12,21 +14,6 @@ import {
   trialEndsLabel,
   type EmailKind,
 } from "@/lib/trial-emails";
-
-/** Stripe subscription statuses that mean "user has paid access". A
- *  paid user must NEVER receive trial-expiry warnings — those go out
- *  for trial users only. */
-const PAID_STATUSES = new Set(["active", "trialing", "past_due"]);
-
-/** Kinds that warn about trial expiry. Paid users skip these. The
- *  earlier "onboarding" kinds still go out to paid users because they
- *  haven't necessarily sent a first quote — those are activation
- *  nudges, not billing nudges. */
-const TRIAL_EXPIRY_KINDS: ReadonlySet<EmailKind> = new Set([
-  "trial_minus_2",
-  "trial_day_0",
-  "trial_plus_3",
-]);
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -69,6 +56,12 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  // Never warn that access ends while billing is deliberately disabled.
+  if (!isStripeConfigured()) {
+    return NextResponse.json({ ok: true, skipped: "billing_not_configured" });
+  }
+  const dryRun = request.nextUrl.searchParams.get("dry_run") === "1";
+
   // Wrap the whole run in try/catch — Vercel Cron retries on 500, and
   // partial progress (counters) is preserved across the catch so the
   // log line always tells us what actually got sent before the error.
@@ -99,9 +92,8 @@ async function handle(request: NextRequest): Promise<NextResponse> {
   // in one page for a long time; we still loop for safety.
   let page = 1;
   const pageSize = 1000;
-  // We can't filter listUsers() by created_at server-side, so we pull
-  // pages and filter in memory. Stop once a page returns nothing newer
-  // than minCreatedAt (auth.users is ordered DESC by created_at).
+  // Page through all users: an old signup may have a restarted trial.
+  // Never infer trial dates or page ordering from auth signup timestamps.
   while (true) {
     const { data, error } = await admin.auth.admin.listUsers({
       page,
@@ -123,9 +115,13 @@ async function handle(request: NextRequest): Promise<NextResponse> {
         ? new Date(user.created_at)
         : null;
       if (!createdAt || !user.email) continue;
-      if (createdAt < minCreatedAt) continue; // too old, skip
-      if (createdAt > maxCreatedAt) continue; // too new, skip
-      const kind = kindForUser(createdAt, now);
+      const subscription = await getSubscriptionStatus({
+        userId: user.id, signedUpAt: createdAt, email: user.email,
+      });
+      if (subscription.state === "paid") continue;
+      const trialAnchor = new Date(subscription.trialEndsAt.getTime() - 7 * 24 * 60 * 60 * 1000);
+      if (trialAnchor < minCreatedAt || trialAnchor > maxCreatedAt) continue;
+      const kind = kindForUser(trialAnchor, now);
       if (!kind) continue;
       counters.windowed += 1;
 
@@ -146,26 +142,6 @@ async function handle(request: NextRequest): Promise<NextResponse> {
         continue;
       }
 
-      // Trial-expiry kinds skip users with an active Stripe sub —
-      // we already promised them in the email copy that subscribing
-      // saves them from the "trial ends" warnings.
-      if (TRIAL_EXPIRY_KINDS.has(kind)) {
-        const { data: sub } = await admin
-          .from("subscriptions")
-          .select("status")
-          .eq("user_id", user.id)
-          .maybeSingle();
-        if (sub?.status && PAID_STATUSES.has(sub.status)) {
-          // Record a dedup row so we don't re-check every day until
-          // the window ends.
-          await admin
-            .from("lifecycle_emails")
-            .insert({ user_id: user.id, kind, provider_message_id: null });
-          counters.alreadySent += 1;
-          continue;
-        }
-      }
-
       // Onboarding kinds skip users who've already sent a quote.
       if (requiresZeroSentQuotes(kind)) {
         const { count, error: countErr } = await admin
@@ -183,32 +159,35 @@ async function handle(request: NextRequest): Promise<NextResponse> {
           // Record a dedup row anyway so we don't re-check this user
           // every hour for the rest of the window — they've graduated
           // past needing the nudge.
-          await admin
-            .from("lifecycle_emails")
-            .insert({ user_id: user.id, kind, provider_message_id: null });
+          if (!dryRun) {
+            const { error } = await admin.from("lifecycle_emails")
+              .insert({ user_id: user.id, kind, provider_message_id: null });
+            if (error && error.code !== "23505") throw error;
+          }
           continue;
         }
       }
 
+      if (dryRun) continue;
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://tradies2quote.com";
       const rendered = renderEmail(kind, {
         firstName: firstNameFromEmail(user.email),
         appUrl,
         videoUrl: process.env.TRIAL_QUICKSTART_VIDEO_URL || undefined,
         calendlyUrl: process.env.TRIAL_CALENDLY_URL || undefined,
-        trialEndsLabel: trialEndsLabel(createdAt),
+        trialEndsLabel: trialEndsLabel(trialAnchor),
       });
 
-      const result = await sendTrialEmail({ to: user.email, rendered });
+      const result = await sendTrialEmail({ to: user.email, rendered,
+        idempotencyKey: `trial/${user.id}/${kind}/${trialAnchor.toISOString()}` });
       if (!result.ok) {
         counters.failed += 1;
         counters.errors.push({ user_id: user.id, kind, error: result.error });
         continue;
       }
 
-      // Record AFTER the successful send. If the insert fails for a
-      // race-condition reason (unique constraint hit by a concurrent
-      // run), we just log — the email did go out.
+      // Record successful delivery. The provider key protects near-term
+      // retries; a recording failure must surface to the operator.
       const { error: insErr } = await admin
         .from("lifecycle_emails")
         .insert({
@@ -217,7 +196,8 @@ async function handle(request: NextRequest): Promise<NextResponse> {
           provider_message_id: result.messageId,
         });
       if (insErr) {
-        console.warn("lifecycle_emails insert raced", {
+        counters.failed += 1;
+        console.warn("lifecycle_emails recording failed", {
           user_id: user.id,
           kind,
           error: insErr.message,
@@ -227,20 +207,16 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     }
 
     if (data.users.length < pageSize) break;
-    // Stop early if the LAST user on this page is older than our window.
-    const oldest = data.users[data.users.length - 1];
-    if (oldest?.created_at && new Date(oldest.created_at) < minCreatedAt) {
-      break;
-    }
     page += 1;
   }
 
   return NextResponse.json({
-    ok: true,
+    ok: counters.failed === 0,
+    dryRun,
     now: now.toISOString(),
     kinds: EMAIL_KINDS,
     ...counters,
-  });
+  }, { status: counters.failed ? 502 : 200 });
   } catch (err) {
     console.error("[cron/trial-emails] run failed", err);
     captureError(err, { route: "/api/cron/trial-emails" });

@@ -82,21 +82,18 @@ export async function POST(request: NextRequest) {
 
   const admin = adminClient();
 
-  // Idempotency ledger: skip if this event id was already processed.
-  // A duplicate delivery hits the primary key and we ack without re-running.
-  {
-    const { error: dupErr } = await admin
-      .from("stripe_webhook_events")
-      .insert({ event_id: event.id, type: event.type });
-    if (dupErr) {
-      if (dupErr.code === "23505") {
-        return NextResponse.json({ received: true, duplicate: true });
-      }
-      // Non-conflict ledger error: log and continue — handlers are
-      // user_id-keyed upserts, so re-processing is safe.
-      console.error("[stripe/webhook] ledger insert failed", dupErr);
-    }
+  // This table records COMPLETED events. A crash before the subscription
+  // write must leave the event retryable, never permanently acknowledged.
+  const { data: completed, error: ledgerReadError } = await admin
+    .from("stripe_webhook_events")
+    .select("event_id")
+    .eq("event_id", event.id)
+    .maybeSingle();
+  if (ledgerReadError) {
+    captureError(ledgerReadError, { route: "stripe/webhook" });
+    return NextResponse.json({ error: "ledger_unavailable" }, { status: 500 });
   }
+  if (completed) return NextResponse.json({ received: true, duplicate: true });
 
   try {
     switch (event.type) {
@@ -109,12 +106,14 @@ export async function POST(request: NextRequest) {
           typeof session.subscription === "string"
             ? session.subscription
             : null;
-        if (!userId || !customerId) {
+        // One-time payments share the Stripe account but cannot grant a subscription.
+        if (session.mode !== "subscription") break;
+        if (!userId || !customerId || !subscriptionId) {
           console.warn(
             "checkout.session.completed without t2q_user_id or customer",
             { sessionId: session.id },
           );
-          break;
+          throw new Error("Subscription checkout is missing its account mapping.");
         }
 
         // Read the full subscription so we get accurate status + period_end.
@@ -131,7 +130,7 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        await admin.from("subscriptions").upsert(
+        const { error: saveError } = await admin.from("subscriptions").upsert(
           {
             user_id: userId,
             stripe_customer_id: customerId,
@@ -143,13 +142,17 @@ export async function POST(request: NextRequest) {
           },
           { onConflict: "user_id" },
         );
+        if (saveError) throw saveError;
         break;
       }
 
       case "customer.subscription.created":
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
-        const sub = event.data.object as Stripe.Subscription;
+        // Stripe does not guarantee delivery order. Retrieve its current state
+        // so a late "created"/"updated" event cannot replay its old snapshot.
+        const snapshot = event.data.object as Stripe.Subscription;
+        const sub = await stripe.subscriptions.retrieve(snapshot.id);
         const userId = sub.metadata?.t2q_user_id;
         const customerId =
           typeof sub.customer === "string" ? sub.customer : null;
@@ -179,17 +182,21 @@ export async function POST(request: NextRequest) {
         if (userId) {
           // Preferred path: we have the user id from metadata so the
           // upsert handles "user never had a row" gracefully.
-          await admin
+          const { error: saveError } = await admin
             .from("subscriptions")
             .upsert({ ...patch, user_id: userId }, { onConflict: "user_id" });
+          if (saveError) throw saveError;
         } else {
           // Fallback: match by stripe_customer_id. Won't fire on the
           // first event for a brand-new customer (no row yet) but
           // checkout.session.completed handler above covers that case.
-          await admin
+          const { data: updated, error: saveError } = await admin
             .from("subscriptions")
             .update(patch)
-            .eq("stripe_customer_id", customerId);
+            .eq("stripe_customer_id", customerId)
+            .select("user_id");
+          if (saveError) throw saveError;
+          if (!updated?.length) throw new Error("Subscription customer is not mapped yet.");
         }
         break;
       }
@@ -209,6 +216,11 @@ export async function POST(request: NextRequest) {
         break;
       }
     }
+    const { error: ledgerError } = await admin
+      .from("stripe_webhook_events")
+      .insert({ event_id: event.id, type: event.type });
+    // Concurrent successful handling is safe; all other errors must retry.
+    if (ledgerError && ledgerError.code !== "23505") throw ledgerError;
   } catch (err) {
     captureError(err, { route: "stripe/webhook" });
     // If a handler throws, return 500 so Stripe retries. Be careful:
@@ -219,13 +231,6 @@ export async function POST(request: NextRequest) {
       event.type,
       err instanceof Error ? err.message : String(err),
     );
-    // The ledger row was inserted before processing — remove it, or the
-    // retry this 500 asks for would be deduped as already-processed and
-    // the event lost for good.
-    await admin
-      .from("stripe_webhook_events")
-      .delete()
-      .eq("event_id", event.id);
     return NextResponse.json(
       { error: "handler_failed", type: event.type },
       { status: 500 },

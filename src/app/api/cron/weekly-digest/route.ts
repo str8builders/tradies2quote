@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
 import { adminClient } from "@/lib/supabase/admin";
 import { isAuthorizedCron } from "@/lib/cron-auth";
+import { fetchWithTimeout, TIMEOUTS } from "@/lib/fetchTimeout";
 import { OWNER_EMAIL } from "@/lib/owner";
 import { collectWeeklyDigest } from "@/lib/digest/collect";
 import { buildWeeklyDigest } from "@/lib/digest/weekly";
@@ -45,10 +46,14 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  const dryRun = request.nextUrl.searchParams.get("dry_run") === "1";
+
   try {
     const admin = adminClient();
     const data = await collectWeeklyDigest(admin);
     const rendered = buildWeeklyDigest(data);
+
+    if (dryRun) return NextResponse.json({ ok: true, dryRun: true, sent: false });
 
     const apiKey = process.env.RESEND_API_KEY;
     const from = process.env.RESEND_FROM_EMAIL;
@@ -64,7 +69,7 @@ async function handle(request: NextRequest): Promise<NextResponse> {
       });
     }
 
-    const res = await fetch(RESEND_URL, {
+    const res = await fetchWithTimeout(RESEND_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -77,7 +82,7 @@ async function handle(request: NextRequest): Promise<NextResponse> {
         text: rendered.text,
         html: rendered.html,
       }),
-    });
+    }, TIMEOUTS.email);
 
     if (!res.ok) {
       const detail = await res.text().catch(() => "");

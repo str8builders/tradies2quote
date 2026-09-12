@@ -77,11 +77,12 @@ export async function POST(_request: NextRequest) {
   // t2q user_id (so a future Stripe-side audit can correlate without
   // hitting our DB).
   let customerId: string | null = null;
-  const { data: existingSub } = await admin
+  const { data: existingSub, error: lookupError } = await admin
     .from("subscriptions")
     .select("stripe_customer_id")
     .eq("user_id", user.id)
     .maybeSingle();
+  if (lookupError) throw lookupError;
   customerId = existingSub?.stripe_customer_id ?? null;
 
   if (!customerId) {
@@ -98,12 +99,12 @@ export async function POST(_request: NextRequest) {
     const customer = await stripe.customers.create({
       email: user.email,
       metadata: { t2q_user_id: user.id },
-    });
+    }, { idempotencyKey: `t2q-customer-${user.id}` });
     customerId = customer.id;
 
     // Seed the subscriptions row so the webhook has something to update
     // even if checkout completes before the user touches the app again.
-    await admin.from("subscriptions").upsert(
+    const { error: saveError } = await admin.from("subscriptions").upsert(
       {
         user_id: user.id,
         stripe_customer_id: customerId,
@@ -111,6 +112,7 @@ export async function POST(_request: NextRequest) {
       },
       { onConflict: "user_id" },
     );
+    if (saveError) throw saveError;
   }
 
   const appUrl =

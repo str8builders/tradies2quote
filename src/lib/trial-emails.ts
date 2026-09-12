@@ -271,6 +271,7 @@ export function trialEndsLabel(signedUpAt: Date): string {
     weekday: "short",
     day: "numeric",
     month: "short",
+    timeZone: "Pacific/Auckland",
   });
 }
 
@@ -281,6 +282,7 @@ export type SendResult =
 export async function sendTrialEmail(args: {
   to: string;
   rendered: RenderedEmail;
+  idempotencyKey: string;
 }): Promise<SendResult> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL;
@@ -292,6 +294,7 @@ export async function sendTrialEmail(args: {
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
+      "Idempotency-Key": args.idempotencyKey,
     },
     body: JSON.stringify({
       from,

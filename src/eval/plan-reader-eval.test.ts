@@ -16,11 +16,9 @@
  *   - required-dims-present rate     the required_dims gate outcome
  *   - per-sheet gate outcomes        full gate verdicts + final status
  *
- * Cases whose image file is missing are SKIPPED, so src/eval/plan-reader-cases.ts
- * can grow ahead of the fixtures. This harness is INFORMATIONAL: it asserts the
- * pipeline ran, and prints the metrics — it does not hard-fail on accuracy
- * (we are establishing a baseline, not regression-guarding, until the numbers
- * are known and agreed).
+ * A missing-fixture preflight FAILS deliberately; individual absent cases are skipped, so src/eval/plan-reader-cases.ts
+ * can document required coverage. Recorded classification, dimensions, scale
+ * usability and required-dimension expectations are release assertions.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -93,6 +91,11 @@ describe.skipIf(!ENABLED)("plan-reader classification + extraction eval", () => 
       apiKey,
       "Set ANTHROPIC_API_KEY in the env or .env.local to run the plan eval.",
     ).toBeTruthy();
+  });
+
+  it("has every required, hand-labelled drawing fixture", () => {
+    const missing = PLAN_READER_CASES.filter(c => !existsSync(resolve(DRAWINGS_DIR, c.image))).map(c => c.image);
+    expect(missing, "Add and hand-verify representative plan sheets before enabling plan reading.").toEqual([]);
   });
 
   for (const c of PLAN_READER_CASES) {
@@ -177,10 +180,12 @@ describe.skipIf(!ENABLED)("plan-reader classification + extraction eval", () => 
           finalStatus,
         });
 
-        // Informational harness: assert only that the pipeline produced a
-        // verdict. Accuracy is MEASURED in the report, not asserted (no fake
-        // pass/fail before the baseline is known).
-        expect(verdict.sheet_type).toBeTruthy();
+        // These expectations must be hand-verified against each fixture.
+        // A failed expectation blocks release; it is never just a log line.
+        expect(verdict.sheet_type).toBe(c.expect.sheet_type);
+        if (c.expect.scale_should_parse !== undefined) expect(scaleParsed).toBe(c.expect.scale_should_parse);
+        if (c.expect.expect_required_dims_present !== undefined) expect(requiredDimsPass).toBe(c.expect.expect_required_dims_present);
+        expect(dimsFound).toBe((c.expect.expected_dims_m ?? []).length);
       },
       120_000,
     );

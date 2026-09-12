@@ -43,6 +43,8 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  const dryRun = request.nextUrl.searchParams.get("dry_run") === "1";
+  let eligible = 0;
   const reviewsOn = reviewsEnabled();
   const followupsOn = followupsEnabled();
   if (!reviewsOn && !followupsOn) {
@@ -57,20 +59,22 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://tradies2quote.com";
 
     // Only opted-in tradies — one query, then everything below is scoped to them.
-    const { data: settings } = await admin
+    const { data: settings, error: settingsError } = await admin
       .from("feature_settings")
       .select("user_id, google_review_url, auto_review_enabled, auto_followup_enabled")
       .or("auto_review_enabled.eq.true,auto_followup_enabled.eq.true");
 
+    if (settingsError) throw settingsError;
     if (!settings || settings.length === 0) {
       return NextResponse.json({ ok: true, note: "no_opted_in_users", ...counters });
     }
 
     const userIds = settings.map((s) => s.user_id);
-    const { data: profiles } = await admin
+    const { data: profiles, error: profilesError } = await admin
       .from("profiles")
       .select("id, business_name, currency")
       .in("id", userIds);
+    if (profilesError) throw profilesError;
     const profById = new Map((profiles ?? []).map((p) => [p.id, p]));
 
     // ── Review requests: completed quotes, opted-in tradie with a review URL ──
@@ -78,7 +82,7 @@ async function handle(request: NextRequest): Promise<NextResponse> {
       const since = new Date(now - 30 * DAY_MS).toISOString();
       for (const s of settings) {
         if (!s.auto_review_enabled || !s.google_review_url) continue;
-        const { data: quotes } = await admin
+        const { data: quotes, error: quotesError } = await admin
           .from("quotes")
           .select("id, client_id, completed_at")
           .eq("user_id", s.user_id)
@@ -86,20 +90,25 @@ async function handle(request: NextRequest): Promise<NextResponse> {
           .gte("completed_at", since)
           .not("client_id", "is", null);
 
+        if (quotesError) throw quotesError;
         for (const q of quotes ?? []) {
-          const { data: existing } = await admin
+          const { data: existing, error: existingError } = await admin
             .from("review_requests")
             .select("id")
             .eq("quote_id", q.id)
             .maybeSingle();
+          if (existingError) throw existingError;
           if (existing) continue;
 
-          const { data: client } = await admin
+          const { data: client, error: clientError } = await admin
             .from("clients")
             .select("name, email")
             .eq("id", q.client_id as string)
             .maybeSingle();
+          if (clientError) throw clientError;
           if (!client?.email) continue;
+          eligible += 1;
+          if (dryRun) continue;
 
           const prof = profById.get(s.user_id);
           // Ledger-first: claim the quote_id (unique) BEFORE sending. If the
@@ -109,7 +118,8 @@ async function handle(request: NextRequest): Promise<NextResponse> {
           const { error: claimErr } = await admin
             .from("review_requests")
             .insert({ user_id: s.user_id, quote_id: q.id, channel: "email" });
-          if (claimErr) continue;
+          if (claimErr?.code === "23505") continue;
+          if (claimErr) throw claimErr;
           const result = await sendReviewRequestEmail({
             to: client.email,
             clientName: client.name || "there",
@@ -133,7 +143,7 @@ async function handle(request: NextRequest): Promise<NextResponse> {
       const twoDaysAgo = new Date(now - 2 * DAY_MS).toISOString();
       for (const s of settings) {
         if (!s.auto_followup_enabled) continue;
-        const { data: quotes } = await admin
+        const { data: quotes, error: quotesError } = await admin
           .from("quotes")
           .select("id, client_id, sent_at, public_token, total_amount, currency, created_at")
           .eq("user_id", s.user_id)
@@ -142,25 +152,30 @@ async function handle(request: NextRequest): Promise<NextResponse> {
           .not("public_token", "is", null)
           .lte("sent_at", twoDaysAgo);
 
+        if (quotesError) throw quotesError;
         for (const q of quotes ?? []) {
           if (!q.sent_at) continue;
           const days = Math.floor((now - Date.parse(q.sent_at)) / DAY_MS);
           const step = days >= 5 ? 2 : 1;
 
-          const { data: existing } = await admin
+          const { data: existing, error: existingError } = await admin
             .from("quote_followups")
             .select("id")
             .eq("quote_id", q.id)
             .eq("step", step)
             .maybeSingle();
+          if (existingError) throw existingError;
           if (existing) continue;
 
-          const { data: client } = await admin
+          const { data: client, error: clientError } = await admin
             .from("clients")
             .select("name, email")
             .eq("id", q.client_id as string)
             .maybeSingle();
+          if (clientError) throw clientError;
           if (!client?.email) continue;
+          eligible += 1;
+          if (dryRun) continue;
 
           const prof = profById.get(s.user_id);
           const currency = q.currency ?? prof?.currency ?? "NZD";
@@ -168,7 +183,8 @@ async function handle(request: NextRequest): Promise<NextResponse> {
           const { error: claimErr } = await admin
             .from("quote_followups")
             .insert({ user_id: s.user_id, quote_id: q.id, step, channel: "email" });
-          if (claimErr) continue;
+          if (claimErr?.code === "23505") continue;
+          if (claimErr) throw claimErr;
           const result = await sendFollowupEmail({
             to: client.email,
             clientName: client.name || "there",
@@ -193,7 +209,7 @@ async function handle(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    return NextResponse.json({ ok: true, now: new Date(now).toISOString(), ...counters });
+    return NextResponse.json({ ok: counters.failed === 0, dryRun, eligible, now: new Date(now).toISOString(), ...counters }, { status: counters.failed ? 502 : 200 });
   } catch (err) {
     console.error("[cron/engagement] run failed", err);
     captureError(err, { route: "/api/cron/engagement" });

@@ -166,6 +166,9 @@ export async function getSubscriptionStatus(args: {
       : Promise.resolve({ data: null, error: null } as const),
   ]);
 
+  if (profileRes.error) throw profileRes.error;
+  if (subRes.error) throw subRes.error;
+
   // Derive the real trial anchor.
   const profileRow = profileRes.data as {
     trial_started_at: string | null;

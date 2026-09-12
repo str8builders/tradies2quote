@@ -1,0 +1,11 @@
+[Unit]
+Description=Tradies2Quote weekly-digest (New Zealand time)
+
+[Timer]
+OnCalendar=Mon *-*-* 07:00:00 Pacific/Auckland
+Persistent=true
+RandomizedDelaySec=60
+Unit=t2q-cron@weekly-digest.service
+
+[Install]
+WantedBy=timers.target

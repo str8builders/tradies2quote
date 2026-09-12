@@ -13,8 +13,8 @@ import type {
 // Reads ONLY existing tables: `tradie_memories` (what the flywheel learned)
 // and `agent_events` (the agent-monitor log). No new schema. Tradie Brain
 // ingestion is owner-only today, so every row in `tradie_memories` is the
-// owner's — we don't need to resolve a user id. Everything is soft: a query
-// failure yields zeroes, never a thrown cron.
+// owner's — we don't need to resolve a user id. Query failures must reach
+// the scheduler; they must not become a misleading empty digest.
 // ─────────────────────────────────────────────────────────────────────────
 
 const num = (v: unknown): number | null => {
@@ -31,14 +31,6 @@ export async function collectWeeklyDigest(
   const now = opts.now ?? new Date();
   const sinceIso = new Date(now.getTime() - windowDays * 86_400_000).toISOString();
 
-  const empty: WeeklyDigestData = {
-    windowDays,
-    memoriesTotal: 0,
-    memoriesNewThisWeek: 0,
-    topCorrections: [],
-    topPrices: [],
-    agentStats: [],
-  };
 
   try {
     const [totalRes, newRes, corrRes, priceRes, eventRes] = await Promise.all([
@@ -72,6 +64,10 @@ export async function collectWeeklyDigest(
         .gte("created_at", sinceIso)
         .limit(2000),
     ]);
+
+    for (const result of [totalRes, newRes, corrRes, priceRes, eventRes]) {
+      if (result.error) throw result.error;
+    }
 
     const topCorrections: CorrectionItem[] = (corrRes.data ?? []).map((r) => {
       const value = (r.value ?? {}) as Record<string, unknown>;
@@ -120,7 +116,7 @@ export async function collectWeeklyDigest(
       agentStats,
     };
   } catch (e) {
-    console.warn("[weekly-digest] collect failed (non-fatal)", e);
-    return empty;
+    console.warn("[weekly-digest] collect failed", e);
+    throw e;
   }
 }

@@ -1,0 +1,11 @@
+[Unit]
+Description=Tradies2Quote engagement (New Zealand time)
+
+[Timer]
+OnCalendar=*-*-* 09:15:00 Pacific/Auckland
+Persistent=true
+RandomizedDelaySec=60
+Unit=t2q-cron@engagement.service
+
+[Install]
+WantedBy=timers.target
