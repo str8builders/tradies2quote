@@ -1,0 +1,178 @@
+/* App-only finish. Document scrolling and installed-app safe areas remain
+   owned by the existing mobile shell; this sheet changes appearance only. */
+[data-shell="app"].studio-app {
+  font-family: var(--font-plus-jakarta), var(--font-inter), sans-serif;
+  color: #f4f3ef;
+}
+body:has([data-shell="app"]) .studio-wallpaper {
+  opacity: 0.18;
+}
+[data-shell="app"] [data-testid="side-measure-tape"] {
+  opacity: 0.22;
+  filter: saturate(0.2);
+}
+[data-shell="app"] [data-testid="app-header"] {
+  background: rgba(13, 15, 16, 0.94);
+  border-bottom-color: #ffffff0f;
+  backdrop-filter: blur(18px);
+}
+[data-shell="app"] .t2q-nav-tab {
+  font-family: var(--font-plus-jakarta), sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: #b1b8ba;
+  border-radius: 10px;
+  padding-inline: 12px;
+}
+[data-shell="app"] .t2q-nav-tab:hover {
+  color: #f4f3ef;
+  background: #ffffff06;
+}
+[data-shell="app"] .t2q-nav-tab[aria-current="page"] {
+  color: #ffa06d;
+}
+[data-shell="app"] .t2q-avatar-online {
+  animation: none;
+  box-shadow: 0 0 0 1px #ffffff1a, 0 4px 12px #0003;
+}
+[data-shell="app"] .t2q-avatar-online::after {
+  background: #a8b6ab;
+  width: 7px;
+  height: 7px;
+}
+[data-shell="app"] :is(.t2q-card, .t2q-card-pro, .t2q-premium-card) {
+  background: linear-gradient(150deg, #1c2021, #141718);
+  border: 1px solid #ffffff12;
+  border-radius: 20px;
+  box-shadow: inset 0 1px 0 #ffffff03, 0 10px 32px -18px #0009;
+}
+[data-shell="app"] .t2q-card-pro-hover:hover {
+  border-color: #ffffff2a;
+  box-shadow: inset 0 1px 0 #ffffff05, 0 12px 34px -18px #000b;
+}
+[data-shell="app"] :is(h1, h2, h3, h4) {
+  font-family: var(--font-plus-jakarta), sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  text-transform: none;
+  text-wrap: balance;
+}
+[data-shell="app"] .t2q-section-label-pro {
+  font-family: var(--font-plus-jakarta), sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: #a1abae;
+}
+[data-shell="app"] [data-testid="dashboard-hero"] {
+  padding: clamp(22px, 3vw, 32px);
+  border: 1px solid #ffffff16;
+  border-radius: 22px;
+  background: linear-gradient(110deg, #212625, #151818);
+  box-shadow: inset 0 1px 0 #ffffff05;
+}
+[data-shell="app"] [data-testid="dashboard-hero"] h1 {
+  font-size: clamp(27px, 3vw, 38px);
+  line-height: 1.18;
+  letter-spacing: -0.045em;
+}
+[data-shell="app"] [data-testid="dashboard-hero"] p {
+  color: #a8b0b1;
+  line-height: 1.65;
+}
+[data-shell="app"] :is(.t2q-btn-primary, .t2q-btn-primary-pro) {
+  min-height: 46px;
+  border: 1px solid #ffad7c66;
+  border-radius: 12px;
+  background: #ff8b4b;
+  color: #201209;
+  font-weight: 700;
+  font-size: 14px;
+  box-shadow: inset 0 1px 0 #ffffff2a, 0 6px 16px -10px #ff8b4b70;
+}
+[data-shell="app"] :is(.t2q-btn-primary, .t2q-btn-primary-pro):hover {
+  background: #ff9a60;
+}
+[data-shell="app"] :is(.t2q-btn-ghost, .t2q-btn-ghost-pro) {
+  min-height: 44px;
+  border: 1px solid #ffffff1c;
+  border-radius: 12px;
+  background: #ffffff04;
+  color: #e8eae8;
+  font-family: var(--font-plus-jakarta), sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: none;
+}
+[data-shell="app"] :is(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid #ffa36e;
+  outline-offset: 3px;
+}
+[data-shell="app"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+[data-shell="app"] select,
+[data-shell="app"] textarea {
+  border-radius: 12px;
+  border-color: #ffffff1e;
+  background-color: #111516;
+  color: #f1f2ee;
+  box-shadow: inset 0 1px 2px #0002;
+}
+[data-shell="app"] [role="tablist"] {
+  padding: 5px;
+  border-radius: 14px;
+  border-color: #ffffff14;
+  background-color: #111415;
+}
+[data-shell="app"] [role="tab"] {
+  border-radius: 10px;
+  font-family: var(--font-plus-jakarta), sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+[data-shell="app"] [data-testid="quotes-list-client"] [data-testid^="quote-row-"] > div {
+  padding: 18px;
+}
+[data-shell="app"] .premium-quote-client {
+  margin-top: 7px;
+  font-family: var(--font-plus-jakarta), sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: -0.025em;
+}
+[data-shell="app"] .premium-quote-detail {
+  margin-top: 5px;
+  font-family: var(--font-plus-jakarta), sans-serif;
+  font-size: 11px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #9da8ab;
+}
+[data-shell="app"] .premium-quote-total {
+  font-family: var(--font-plus-jakarta), sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  color: #eceee9;
+}
+@media (min-width: 640px) and (max-width: 900px) {
+  [data-shell="app"] [data-testid="app-header-context"] { display: none; }
+  [data-shell="app"] .t2q-nav-tab { padding-inline: 8px; font-size: 11px; }
+}
+@media (max-width: 639px) {
+  [data-shell="app"] [data-testid="dashboard-hero"] { padding: 22px 20px; }
+  [data-shell="app"] [data-testid="dashboard-actions"] { flex-direction: row; }
+  [data-shell="app"] [data-testid="dashboard-actions"] > a { flex: 1; padding-inline: 10px; }
+  [data-shell="app"] [data-testid="quotes-list-client"] [data-testid^="quote-row-"] > div { padding: 14px 12px; }
+  [data-shell="app"] .premium-quote-total { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-shell="app"] :is(.t2q-btn-primary-pro, .t2q-btn-ghost-pro, .t2q-card-pro-hover) {
+    transition: none;
+    transform: none;
+  }
+}

@@ -1,5 +1,7 @@
 "use client";
 
+import "../premium.css";
+
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -177,8 +179,8 @@ export function AppHeaderClient({
                       layoutId="t2q-header-tab-pill"
                       aria-hidden="true"
                       transition={reduce ? { duration: 0 } : SPRING_SNAPPY}
-                      className="absolute inset-0 rounded-[0.125rem] border border-[rgba(255,95,21,0.4)] bg-[rgba(255,95,21,0.1)]"
-                      style={{ boxShadow: "inset 0 -2px 0 0 #FF5F15" }}
+                      className="absolute inset-0 rounded-[10px] border border-[rgba(255,160,109,0.2)] bg-[rgba(255,160,109,0.08)]"
+                      style={{ boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.04)" }}
                     />
                   ) : null}
                   <span className="relative">{tab.label}</span>

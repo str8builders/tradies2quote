@@ -229,18 +229,18 @@ export function QuotesListClient({ rows, isHub = false }: Props) {
                         </span>
                       ) : null}
                     </div>
-                    <p className="mt-1 truncate font-display text-sm uppercase tracking-tight text-white">
+                    <p className="premium-quote-client mt-1 truncate font-display text-sm uppercase tracking-tight text-white">
                       {/* Wave 14.4 — collapses "To be confirmed" /
                           TBC / blank to a single em-dash. */}
                       {displayClientName(q.clientName)}
                     </p>
-                    <p className="truncate font-mono text-[10px] uppercase tracking-[0.2em] text-ink-300">
+                    <p className="premium-quote-detail truncate font-mono text-[10px] uppercase tracking-[0.2em] text-ink-300">
                       {formatIssueDate(q.created_at)}
                       {q.jobSummary ? ` · ${q.jobSummary.slice(0, 80)}` : ""}
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="font-display text-lg tabular-nums text-brand">
+                    <p className="premium-quote-total font-display text-lg tabular-nums text-brand">
                       {formatCurrency(q.total, q.currency)}
                     </p>
                   </div>

@@ -89,7 +89,7 @@ export default async function DashboardPage() {
               Welcome, <span className="text-brand">{username}.</span>
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-300 sm:text-base">
-              Your jobs, your quotes, your next move. All in one place.
+              A clear view of your quotes, clients, and upcoming work.
             </p>
           </div>
           <div
@@ -392,8 +392,7 @@ async function DashboardData({
                 Today
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-ink-300">
-                Pat plans the field and Willa drafts customer messages. Site
-                conditions and what needs attention now.
+                Upcoming work, quotes awaiting a reply, and the conditions on site.
               </p>
             </div>
             <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-brand/40 bg-brand/10 text-brand">
