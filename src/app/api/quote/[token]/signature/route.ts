@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { downloadSignature } from "@/lib/quote-storage";
+import { classifyPublicQuote } from "@/lib/quote-public-view";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,13 +16,14 @@ export async function GET(
   const admin = adminClient();
   const { data: quoteRaw, error } = await admin
     .from("quotes")
-    .select("signature_path, accepted_at")
+    .select("signature_path, accepted_at, status, expires_at, deleted_at")
     .eq("public_token", token)
     .maybeSingle();
   const quote = quoteRaw as
-    | { signature_path: string | null; accepted_at: string | null }
+    | { signature_path: string | null; accepted_at: string | null; status: string; expires_at: string | null; deleted_at: string | null }
     | null;
-  if (error || !quote || !quote.signature_path || !quote.accepted_at) {
+  if (error || !quote || !quote.signature_path || !quote.accepted_at || quote.deleted_at ||
+    classifyPublicQuote(quote, new Date()).kind !== "accepted") {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
@@ -37,7 +39,7 @@ export async function GET(
     status: 200,
     headers: {
       "Content-Type": "image/png",
-      "Cache-Control": "private, max-age=300",
+      "Cache-Control": "private, no-store",
     },
   });
 }

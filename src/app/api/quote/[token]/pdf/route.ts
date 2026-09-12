@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { downloadPdf } from "@/lib/quote-storage";
 import { quoteNumber } from "@/lib/quote-defaults";
+import { classifyPublicQuote } from "@/lib/quote-public-view";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export async function GET(
   const admin = adminClient();
   const { data: quoteRaw, error } = await admin
     .from("quotes")
-    .select("id, pdf_path, created_at, expires_at, status")
+    .select("id, pdf_path, created_at, expires_at, status, deleted_at")
     .eq("public_token", token)
     .maybeSingle();
   const quote = quoteRaw as
@@ -26,13 +27,18 @@ export async function GET(
         created_at: string;
         expires_at: string | null;
         status: string;
+        deleted_at: string | null;
       }
     | null;
-  if (error || !quote || !quote.pdf_path) {
+  if (error || !quote || !quote.pdf_path || quote.deleted_at) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
-  if (quote.expires_at && new Date(quote.expires_at) < new Date()) {
+  const view = classifyPublicQuote(quote, new Date());
+  if (view.kind === "expired") {
     return NextResponse.json({ error: "expired" }, { status: 410 });
+  }
+  if (view.kind !== "live" && view.kind !== "accepted") {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
   let bytes: Uint8Array;
