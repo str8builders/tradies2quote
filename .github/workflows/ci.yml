@@ -1,8 +1,7 @@
 # Minimal CI — lint + unit tests only.
 #
 # Deliberately NO deploy steps, NO production actions, NO env writes, and NO
-# secrets: deployment is owned by the Vercel GitHub integration (push to
-# `prod-shell` = production; see CLAUDE.md → Deploy model). This workflow is
+# secrets: deployment is handled separately (see deploy/README.md). This workflow is
 # the pre-merge quality gate the release process requires.
 #
 # The eval suites (eval:quotes, eval:scan, …) are env-flag-gated inside
@@ -13,7 +12,7 @@ name: CI
 
 on:
   push:
-    branches: [main, prod-shell]
+    branches: [main, prod-shell, snapshot/production-2026-07-26]
   pull_request:
 
 jobs:
