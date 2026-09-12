@@ -71,15 +71,9 @@ export default function AppLayout({
         aria-hidden="true"
         className="pointer-events-none fixed inset-x-0 top-0 z-50 h-[env(safe-area-inset-top)] bg-transparent"
       />
-      {/* Soft-serif app splash. Renders once per session — the
-          sessionStorage check inside the component decides whether to
-          play or skip on each /app entry. Server-rendered visible so
-          there's no flash of dashboard before it appears. */}
-      <AppSplash
-        storageKey="t2q-app-splash-shown"
-        tagline="Voice in. Quote out."
-        holdMs={2600}
-      />
+      {/* The welcome owns its duration and versioned session key so the
+          full composition can play before the dashboard is revealed. */}
+      <AppSplash />
       <SideMeasureTape />
       {/* App content scroll region. Canonical mobile shell (see globals.css
           `@media (max-width: 639px)`): the page is normal document flow; the
