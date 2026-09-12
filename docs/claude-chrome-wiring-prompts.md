@@ -137,3 +137,31 @@ ssh str8-sydney 'cd /srv/t2q/supabase-official/docker && sudo docker compose up 
 ```
 
 Test it by clicking "Forgot password" on tradies2quote.com/login with your own email.
+
+---
+
+## Prompt 6 — GitHub SSH key (so the 58 unpushed commits can go up)
+
+```
+Add an SSH authentication key to my GitHub account so my Mac can push to the repository str8builders/tradies2quote.
+1. Open https://github.com/settings/keys and tell me which account is signed in (top-right avatar). It must be str8builders. If it is a different account, stop and let me switch.
+2. Click "New SSH key". Set Title to "MacBook Air". Set Key type to "Authentication Key" (NOT Signing Key).
+3. Paste exactly this into the Key box, as one line:
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBNStSs20gVqGUM0/8uAKeBeQPxOin1Y5KUGVLnlneN7 challis836@gmail.com str8builders
+4. Click "Add SSH key". If GitHub asks to confirm my password or 2FA, stop and let me do that, then continue.
+5. If GitHub says "Key is already in use", do NOT retry. Instead open https://github.com/str8builders/tradies2quote/settings/keys, tell me what deploy keys are listed, delete the one whose fingerprint is SHA256:cw+qKwVM9eH8crzSFgtSYruep2qVrU80nnvzH92e++4 if present, then click "Add deploy key", paste the same key, tick "Allow write access", and add it.
+6. Finish by showing me the keys page with the new key listed.
+Do not change any other settings and do not enter passwords yourself.
+```
+
+After it reports success, run in Terminal:
+
+```bash
+ssh -T git@github-str8builders
+```
+
+It should say "Hi str8builders! You've successfully authenticated". Then push:
+
+```bash
+cd ~/Desktop/tradies2quote && git push origin snapshot/production-2026-07-26
+```
