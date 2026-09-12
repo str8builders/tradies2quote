@@ -195,8 +195,8 @@ export default async function UpgradePage({
                 className="inline-flex items-center gap-2 rounded-sm border border-hivis/40 bg-hivis/10 px-3 py-2 text-xs text-hivis"
               >
                 <Lock size={14} weight="bold" />
-                Checkout isn&rsquo;t configured yet — STRIPE_SECRET_KEY,
-                STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_ID missing in env.
+                Paid plans open soon. Your trial keeps running free until
+                checkout is switched on — nothing to do for now.
               </p>
             )}
           </div>

@@ -47,10 +47,14 @@ import type {
 import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
 import {
-  isLocalTextAiProvider,
   resolveLocalLlmConfig,
   runLocalChatCompletion,
 } from "@/lib/llm/local-chat";
+import {
+  ANTHROPIC_QUOTE_MAX_TOKENS,
+  runAnthropicQuoteCompletion,
+} from "@/lib/llm/anthropic-quote";
+import { resolveQuoteTextProvider } from "@/lib/llm/quote-text-provider";
 
 const TAKEOFF_MATERIAL_PATTERNS: RegExp[] = [
   // Wall framing
@@ -167,12 +171,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const textProvider = resolveQuoteTextProvider();
   try {
-    if (!isLocalTextAiProvider()) throw new Error("local provider not selected");
-    resolveLocalLlmConfig();
+    if (!textProvider) throw new Error("no quote text provider configured");
+    if (textProvider === "local") resolveLocalLlmConfig();
   } catch {
     return NextResponse.json(
-      { error: "Local quote generation is not configured." },
+      { error: "Quote generation is not configured." },
       { status: 503 },
     );
   }
@@ -369,21 +374,43 @@ export async function POST(request: NextRequest) {
     `<job_transcript>\n${transcript}\n</job_transcript>`,
   ].join("\n\n");
 
-  let modelResult: Awaited<ReturnType<typeof runLocalChatCompletion>>;
+  // Normalised across providers: the JSON text plus whether the model hit
+  // its output cap (a truncated response can never parse, so it gets its
+  // own actionable message below instead of a generic "malformed").
+  let modelResult: { text: string; finishReason: string | null; truncated: boolean };
   try {
-    modelResult = await runLocalChatCompletion({
-      system: systemPrompt,
-      user: userMessage,
-      maxTokens: MAX_TOKENS,
-      temperature: 0,
-      responseSchema: {
-        name: "tradies2quote_quote",
-        description: "A structured quote matching the format in the system prompt.",
-        schema: { type: "object" },
-      },
-    });
+    if (textProvider === "anthropic") {
+      const r = await runAnthropicQuoteCompletion({
+        apiKey: process.env.ANTHROPIC_API_KEY!,
+        system: systemPrompt,
+        user: userMessage,
+        maxTokens: ANTHROPIC_QUOTE_MAX_TOKENS,
+      });
+      modelResult = {
+        text: r.text,
+        finishReason: r.stopReason,
+        truncated: r.stopReason === "max_tokens",
+      };
+    } else {
+      const r = await runLocalChatCompletion({
+        system: systemPrompt,
+        user: userMessage,
+        maxTokens: MAX_TOKENS,
+        temperature: 0,
+        responseSchema: {
+          name: "tradies2quote_quote",
+          description: "A structured quote matching the format in the system prompt.",
+          schema: { type: "object" },
+        },
+      });
+      modelResult = {
+        text: r.text,
+        finishReason: r.finishReason,
+        truncated: r.finishReason === "length",
+      };
+    }
   } catch (e) {
-    console.error("Local Qwen unreachable", e);
+    console.error(`Quote model (${textProvider}) unreachable`, e);
     captureError(e, { route: "/api/quotes/generate" });
     const timedOut = e instanceof FetchTimeoutError;
     return NextResponse.json(
@@ -406,7 +433,7 @@ export async function POST(request: NextRequest) {
   // A truncated response (`length`) can never parse as complete
   // JSON, so a retry just reproduces the failure — surface a distinct,
   // actionable message instead of the generic "malformed" one.
-  if (modelResult.finishReason === "length") {
+  if (modelResult.truncated) {
     return NextResponse.json(
       {
         error:
@@ -421,7 +448,7 @@ export async function POST(request: NextRequest) {
   } catch (e) {
     captureError(e, { route: "quotes/generate" });
     console.error(
-      "Failed to parse local Qwen JSON",
+      `Failed to parse quote model (${textProvider}) JSON`,
       e,
       "finish_reason:",
       modelResult.finishReason,

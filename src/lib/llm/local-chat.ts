@@ -1,6 +1,8 @@
 import "server-only";
 
-import { fetchWithTimeout } from "@/lib/fetchTimeout";
+import { request as httpRequest } from "node:http";
+import { request as httpsRequest } from "node:https";
+import { fetchWithTimeout, FetchTimeoutError } from "@/lib/fetchTimeout";
 
 export type LocalJsonSchema = {
   name: string;
@@ -141,16 +143,97 @@ export function resolveLocalLlmConfig(
   };
 }
 
+/**
+ * OpenAI-compatible response_format.
+ *
+ * A bare `{ type: "object" }` schema carries no shape, so it is sent as plain
+ * `json_object` mode — llama.cpp treats the two identically, and hosted
+ * OpenAI-compatible endpoints reject a shapeless strict json_schema. Shaped
+ * schemas keep `json_schema` (without `strict`, which hosted providers only
+ * accept for fully-closed schemas and llama.cpp ignores).
+ */
 export function buildLocalJsonSchemaResponseFormat(schema: LocalJsonSchema) {
+  const shapeKeys = Object.keys(schema.schema ?? {}).filter(
+    (key) => key !== "type" && key !== "description",
+  );
+  if (shapeKeys.length === 0) {
+    return { type: "json_object" as const };
+  }
   return {
     type: "json_schema" as const,
     json_schema: {
       name: schema.name,
       ...(schema.description ? { description: schema.description } : {}),
-      strict: true,
       schema: schema.schema,
     },
   };
+}
+
+type JsonHttpResponse = {
+  ok: boolean;
+  status: number;
+  text: () => Promise<string>;
+  json: () => Promise<unknown>;
+};
+
+/**
+ * POST JSON over node:http(s) with NO response-header timeout.
+ *
+ * Node's built-in fetch (undici) aborts any request whose response headers
+ * have not arrived within 300 s, regardless of the caller's AbortSignal. A
+ * CPU-only llama.cpp server spends several minutes on prompt processing
+ * before it writes headers, so every real-sized quote died with
+ * `HeadersTimeoutError`. The only timeout here is the caller's `timeoutMs`,
+ * surfaced as FetchTimeoutError so routes can answer 504 "took too long".
+ */
+export function postJsonWithoutHeaderTimeout(
+  url: string,
+  headers: Record<string, string>,
+  body: string,
+  timeoutMs: number,
+): Promise<JsonHttpResponse> {
+  return new Promise((resolve, reject) => {
+    const target = new URL(url);
+    const impl = target.protocol === "https:" ? httpsRequest : httpRequest;
+    let settled = false;
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn();
+    };
+    const req = impl(
+      target,
+      {
+        method: "POST",
+        headers: { ...headers, "content-length": Buffer.byteLength(body) },
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("error", (err) => finish(() => reject(err)));
+        res.on("end", () => {
+          const text = Buffer.concat(chunks).toString("utf8");
+          const status = res.statusCode ?? 0;
+          finish(() =>
+            resolve({
+              ok: status >= 200 && status < 300,
+              status,
+              text: async () => text,
+              json: async () => JSON.parse(text) as unknown,
+            }),
+          );
+        });
+      },
+    );
+    const timer = setTimeout(() => {
+      const err = new FetchTimeoutError(url, timeoutMs);
+      finish(() => reject(err));
+      req.destroy(err);
+    }, timeoutMs);
+    req.on("error", (err) => finish(() => reject(err)));
+    req.end(body);
+  });
 }
 
 /**
@@ -176,19 +259,27 @@ export async function runLocalChatCompletion(
     );
   }
 
-  const res = await fetchWithTimeout(
-    config.chatCompletionsUrl,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${config.apiKey}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(body),
-    },
-    config.timeoutMs,
-    opts.fetchImpl ?? fetch,
-  );
+  const headers = {
+    authorization: `Bearer ${config.apiKey}`,
+    "content-type": "application/json",
+  };
+  const payloadText = JSON.stringify(body);
+  // Tests inject fetchImpl; production goes through node:http so a slow
+  // model's silent prompt-processing phase cannot trip undici's fixed
+  // 300 s response-header timeout.
+  const res: JsonHttpResponse = opts.fetchImpl
+    ? await fetchWithTimeout(
+        config.chatCompletionsUrl,
+        { method: "POST", headers, body: payloadText },
+        config.timeoutMs,
+        opts.fetchImpl,
+      )
+    : await postJsonWithoutHeaderTimeout(
+        config.chatCompletionsUrl,
+        headers,
+        payloadText,
+        config.timeoutMs,
+      );
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");

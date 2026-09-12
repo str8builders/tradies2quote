@@ -41,11 +41,25 @@ function formatTime(seconds: number): string {
 
 export function QuoteInputTabs({
   needsAiConsent = false,
+  voiceEnabled = true,
+  scanEnabled = true,
 }: {
   /** iOS shell + not-yet-consented → show the 5.1.2(i) consent modal first. */
   needsAiConsent?: boolean;
+  /**
+   * Whether the transcription / drawing-scan providers are configured on the
+   * server. An unconfigured channel is hidden rather than shown as a button
+   * that can only fail — the same rule the SMS send button follows.
+   */
+  voiceEnabled?: boolean;
+  scanEnabled?: boolean;
 } = {}) {
-  const [tab, setTab] = useState<Tab>("voice");
+  const tabs: Tab[] = [
+    ...(voiceEnabled ? (["voice"] as Tab[]) : []),
+    "type",
+    ...(scanEnabled ? (["scan"] as Tab[]) : []),
+  ];
+  const [tab, setTab] = useState<Tab>(tabs[0]);
   const [transcript, setTranscript] = useState<string>("");
   const [typed, setTyped] = useState<string>("");
   const [scanned, setScanned] = useState<string>("");
@@ -70,16 +84,21 @@ export function QuoteInputTabs({
       <div
         role="tablist"
         aria-label="Input method"
-        className="grid grid-cols-3 gap-2 rounded-sm border border-ink-700 bg-ink-800 p-1"
+        className={[
+          "grid gap-2 rounded-sm border border-ink-700 bg-ink-800 p-1",
+          tabs.length === 3 ? "grid-cols-3" : tabs.length === 2 ? "grid-cols-2" : "grid-cols-1",
+        ].join(" ")}
       >
-        <TabButton
-          active={tab === "voice"}
-          onClick={() => setTab("voice")}
-          testId="tab-voice"
-          controls="panel-voice"
-        >
-          Voice
-        </TabButton>
+        {voiceEnabled && (
+          <TabButton
+            active={tab === "voice"}
+            onClick={() => setTab("voice")}
+            testId="tab-voice"
+            controls="panel-voice"
+          >
+            Voice
+          </TabButton>
+        )}
         <TabButton
           active={tab === "type"}
           onClick={() => setTab("type")}
@@ -88,14 +107,16 @@ export function QuoteInputTabs({
         >
           Type
         </TabButton>
-        <TabButton
-          active={tab === "scan"}
-          onClick={() => setTab("scan")}
-          testId="tab-scan"
-          controls="panel-scan"
-        >
-          Scan
-        </TabButton>
+        {scanEnabled && (
+          <TabButton
+            active={tab === "scan"}
+            onClick={() => setTab("scan")}
+            testId="tab-scan"
+            controls="panel-scan"
+          >
+            Scan
+          </TabButton>
+        )}
       </div>
 
       <div className="mt-6">

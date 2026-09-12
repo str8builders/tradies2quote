@@ -40,6 +40,19 @@ export default async function NewQuotePage() {
   ]);
   const needsAiConsent = nativeShell && !consented;
 
+  // Only offer input channels whose provider is actually configured —
+  // voice needs OpenAI transcription, scan needs Anthropic vision. Typed
+  // input always works.
+  const voiceEnabled = Boolean(process.env.OPENAI_API_KEY?.trim());
+  const scanEnabled = Boolean(process.env.ANTHROPIC_API_KEY?.trim());
+  const intro = [
+    voiceEnabled ? "Talk it through" : null,
+    "type it out",
+    scanEnabled ? "or scan a hand-drawn plan" : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
   return (
     <div className="min-h-screen text-white">
       <AppHeader context="New quote" />
@@ -51,12 +64,16 @@ export default async function NewQuotePage() {
             Describe the <span className="text-brand">job.</span>
           </h1>
           <p className="mt-3 text-sm text-ink-300 sm:text-base">
-            Talk it through, type it out, or scan a hand-drawn plan — either way
-            we turn it into a quote.
+            {intro.charAt(0).toUpperCase() + intro.slice(1)} — either way we
+            turn it into a quote.
           </p>
         </div>
 
-        <QuoteInputTabs needsAiConsent={needsAiConsent} />
+        <QuoteInputTabs
+          needsAiConsent={needsAiConsent}
+          voiceEnabled={voiceEnabled}
+          scanEnabled={scanEnabled}
+        />
       </main>
     </div>
   );

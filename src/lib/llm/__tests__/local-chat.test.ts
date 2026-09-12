@@ -1,10 +1,14 @@
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import type { AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
+import { FetchTimeoutError } from "@/lib/fetchTimeout";
 import {
   buildLocalJsonSchemaResponseFormat,
   clampLocalMaxTokens,
   DEFAULT_LOCAL_LLM_MAX_TOKENS,
   DEFAULT_LOCAL_LLM_TIMEOUT_MS,
   isLocalTextAiProvider,
+  postJsonWithoutHeaderTimeout,
   resolveLocalLlmConfig,
   runLocalChatCompletion,
   toChatCompletionsUrl,
@@ -64,16 +68,134 @@ describe("local chat configuration", () => {
     expect(config.maxTokensCeiling).toBe(512);
   });
 
-  it("builds llama.cpp-compatible json_schema output", () => {
+  it("builds json_schema output for shaped schemas without hosted-only strict mode", () => {
+    const format = buildLocalJsonSchemaResponseFormat({
+      name: "answer",
+      schema: { type: "object", properties: { ok: { type: "boolean" } } },
+    });
+    expect(format).toMatchObject({
+      type: "json_schema",
+      json_schema: { name: "answer" },
+    });
+    expect(format).not.toHaveProperty("json_schema.strict");
+  });
+
+  it("sends a shapeless object schema as plain json_object mode", () => {
     expect(
       buildLocalJsonSchemaResponseFormat({
-        name: "answer",
-        schema: { type: "object", properties: { ok: { type: "boolean" } } },
+        name: "quote",
+        description: "anything",
+        schema: { type: "object" },
       }),
-    ).toMatchObject({
-      type: "json_schema",
-      json_schema: { name: "answer", strict: true },
+    ).toEqual({ type: "json_object" });
+  });
+});
+
+describe("postJsonWithoutHeaderTimeout", () => {
+  async function listen(
+    handler: (req: IncomingMessage, res: ServerResponse) => void,
+  ): Promise<{ url: string; close: () => Promise<void> }> {
+    const server = createServer(handler);
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address() as AddressInfo;
+    return {
+      url: `http://127.0.0.1:${address.port}/v1/chat/completions`,
+      close: () => new Promise((resolve) => server.close(() => resolve())),
+    };
+  }
+
+  it("waits past a slow header phase and returns the JSON body", async () => {
+    let received = "";
+    const server = await listen((req, res) => {
+      const chunks: Buffer[] = [];
+      req.on("data", (c: Buffer) => chunks.push(c));
+      req.on("end", () => {
+        received = Buffer.concat(chunks).toString();
+        // Headers deliberately delayed: this is the phase undici gives up on.
+        setTimeout(() => {
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(JSON.stringify({ choices: [{ message: { content: "OK" } }] }));
+        }, 400);
+      });
     });
+    try {
+      const res = await postJsonWithoutHeaderTimeout(
+        server.url,
+        { authorization: "Bearer t", "content-type": "application/json" },
+        JSON.stringify({ model: "m" }),
+        5_000,
+      );
+      expect(res.ok).toBe(true);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ choices: [{ message: { content: "OK" } }] });
+      expect(JSON.parse(received)).toEqual({ model: "m" });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("aborts with FetchTimeoutError once the caller's budget is spent", async () => {
+    const server = await listen(() => {
+      /* never respond */
+    });
+    try {
+      await expect(
+        postJsonWithoutHeaderTimeout(server.url, {}, "{}", 150),
+      ).rejects.toBeInstanceOf(FetchTimeoutError);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("exposes non-2xx statuses with their body text", async () => {
+    const server = await listen((_req, res) => {
+      res.writeHead(503, { "content-type": "text/plain" });
+      res.end("loading model");
+    });
+    try {
+      const res = await postJsonWithoutHeaderTimeout(server.url, {}, "{}", 2_000);
+      expect(res.ok).toBe(false);
+      expect(res.status).toBe(503);
+      expect(await res.text()).toBe("loading model");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("drives runLocalChatCompletion end to end without a fetch implementation", async () => {
+    const server = await listen((req, res) => {
+      const chunks: Buffer[] = [];
+      req.on("data", (c: Buffer) => chunks.push(c));
+      req.on("end", () => {
+        const body = JSON.parse(Buffer.concat(chunks).toString()) as Record<string, unknown>;
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(
+          JSON.stringify({
+            choices: [
+              {
+                finish_reason: "stop",
+                message: { content: JSON.stringify({ format: body.response_format }) },
+              },
+            ],
+            usage: { prompt_tokens: 3, completion_tokens: 2 },
+          }),
+        );
+      });
+    });
+    try {
+      const result = await runLocalChatCompletion({
+        baseUrl: server.url.replace(/\/chat\/completions$/, ""),
+        apiKey: "k",
+        model: "m",
+        system: "s",
+        user: "u",
+        responseSchema: { name: "quote", schema: { type: "object" } },
+      });
+      expect(JSON.parse(result.text)).toEqual({ format: { type: "json_object" } });
+      expect(result.usage).toEqual({ inputTokens: 3, outputTokens: 2 });
+    } finally {
+      await server.close();
+    }
   });
 });
 
