@@ -19,6 +19,13 @@ create table public.team_invitations (
   email text not null check (email = lower(btrim(email)) and length(email) <= 254),
   token_hash text not null unique,
   expires_at timestamptz not null default now() + interval '7 days',
+  code_hash text,
+  code_user_id uuid references auth.users(id) on delete set null,
+  code_expires_at timestamptz,
+  code_attempts integer not null default 0,
+  code_sent_at timestamptz,
+  code_sends integer not null default 0,
+  code_window_started_at timestamptz,
   accepted_at timestamptz,
   revoked_at timestamptz,
   created_at timestamptz not null default now()
@@ -97,6 +104,11 @@ begin
     if inv.revoked_at is not null or inv.accepted_at is not null or inv.expires_at<=now() then raise exception 'This invitation is invalid or has expired.'; end if;
     select lower(email) into mail from auth.users where id=u and email_confirmed_at is not null;
     if mail is null or mail<>inv.email then raise exception 'Sign in with the verified email address this invitation was sent to.'; end if;
+    if inv.code_hash is null or inv.code_user_id is distinct from u or inv.code_expires_at<=now() or inv.code_attempts>=5 then raise exception 'Request a new email verification code.'; end if;
+    if inv.code_hash is distinct from p_data->>'code_hash' then
+      update public.team_invitations set code_attempts=code_attempts+1 where id=inv.id;
+      return jsonb_build_object('error','The verification code is incorrect.');
+    end if;
     if exists(select 1 from public.team_members where user_id=u) or exists(select 1 from public.teams where owner_id=u) then raise exception 'Leave your current team before joining another.'; end if;
     if exists(select 1 from public.subscriptions where user_id=u and stripe_subscription_id is not null and status not in ('canceled','incomplete_expired')) then raise exception 'Your account already has a subscription. Finish or cancel it before joining a team.'; end if;
     if exists(select 1 from public.checkout_attempts where user_id=u and created_at>now()-interval '1 hour') then raise exception 'A personal checkout is still open. Join after it expires to avoid overlapping subscriptions.'; end if;
@@ -247,4 +259,21 @@ begin
 end $$;
 revoke all on function public.register_quote_photo(jsonb),public.remove_quote_photo(uuid,uuid) from public,anon,authenticated;
 grant execute on function public.register_quote_photo(jsonb),public.remove_quote_photo(uuid,uuid) to service_role;
+-- Service-only code issuance prevents a caller from choosing their own verification hash.
+create function public.issue_team_code(p_user uuid,p_token_hash text,p_code_hash text) returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
+declare inv public.team_invitations; mail text;
+begin
+  select lower(email) into mail from auth.users where id=p_user;
+  select * into inv from public.team_invitations where token_hash=p_token_hash for update;
+  if not found or inv.email is distinct from mail or inv.accepted_at is not null or inv.revoked_at is not null or inv.expires_at<=now() then raise exception 'Sign in with the email address on a valid invitation.'; end if;
+  if inv.code_sent_at>now()-interval '60 seconds' then raise exception 'Wait a minute before requesting another code.'; end if;
+  if inv.code_window_started_at>now()-interval '1 hour' and inv.code_sends>=3 then raise exception 'Too many codes requested. Try again in an hour.'; end if;
+  if p_code_hash !~ '^[a-f0-9]{64}$' then raise exception 'Invalid verification code.'; end if;
+  update public.team_invitations set code_hash=p_code_hash,code_user_id=p_user,code_expires_at=now()+interval '10 minutes',code_attempts=0,code_sent_at=now(),
+    code_sends=case when code_window_started_at>now()-interval '1 hour' then code_sends+1 else 1 end,
+    code_window_started_at=case when code_window_started_at>now()-interval '1 hour' then code_window_started_at else now() end where id=inv.id;
+  return jsonb_build_object('email',mail,'id',inv.id);
+end $$;
+revoke all on function public.issue_team_code(uuid,text,text) from public,anon,authenticated;
+grant execute on function public.issue_team_code(uuid,text,text) to service_role;
 commit;

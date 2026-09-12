@@ -18,7 +18,15 @@ select set_config('request.jwt.claim.sub','a1000000-0000-0000-0000-000000000003'
 select pg_temp.assert_rejected(format('select public.manage_team(''accept'',''{"token_hash":"%s"}'')',repeat('a',64)),'verified email');
 select pg_temp.assert_true((select count(*) from public.clients)=0,'unrelated account cannot see clients');
 select set_config('request.jwt.claim.sub','a1000000-0000-0000-0000-000000000002',true);
-select public.manage_team('accept',jsonb_build_object('token_hash',repeat('a',64)));
+select pg_temp.assert_rejected(format('select public.issue_team_code(auth.uid(),%L,%L)',repeat('a',64),repeat('f',64)),'permission denied');
+reset role;
+select public.issue_team_code('a1000000-0000-0000-0000-000000000002',repeat('a',64),repeat('f',64));
+set local role authenticated;
+select pg_temp.assert_true(public.manage_team('accept',jsonb_build_object('token_hash',repeat('a',64),'code_hash',repeat('0',64)))->>'error'='The verification code is incorrect.','incorrect email code cannot join');
+select public.manage_team('accept',jsonb_build_object('token_hash',repeat('a',64),'code_hash',repeat('f',64)));
+reset role;
+select pg_temp.assert_true((select code_attempts from public.team_invitations where token_hash=repeat('a',64))=1,'wrong-code attempts persist');
+set local role authenticated;
 select pg_temp.assert_true(public.my_team_owner()='a1000000-0000-0000-0000-000000000001','accepted member inherits team');
 select pg_temp.assert_true((select count(*) from public.clients)=2,'member sees shared and their own records only');
 select pg_temp.assert_true((select count(*) from public.quotes)=0,'team membership does not expose owner quotes');
@@ -33,6 +41,21 @@ select public.manage_team('invite',jsonb_build_object('email','t2q-fixture-5@exa
 select pg_temp.assert_rejected(format('select public.manage_team(''invite'',''{"email":"t2q-fixture-6@example.invalid","token_hash":"%s"}'')',repeat('e',64)),'All seats');
 select pg_temp.assert_rejected('select public.manage_team(''remove'',''{"user_id":"a1000000-0000-0000-0000-000000000001"}'')','owner cannot be removed');
 select pg_temp.assert_rejected('insert into public.terms_templates(user_id,title,body) values(auth.uid(),''Crew template'',''Not allowed'')','row-level security');
+
+reset role;
+select public.issue_team_code('a1000000-0000-0000-0000-000000000005',repeat('d',64),repeat('e',64));
+select pg_temp.assert_rejected(format('select public.issue_team_code(%L,%L,%L)','a1000000-0000-0000-0000-000000000005',repeat('d',64),repeat('e',64)),'Wait a minute');
+set local role authenticated;
+select set_config('request.jwt.claim.sub','a1000000-0000-0000-0000-000000000005',true);
+select public.manage_team('accept',jsonb_build_object('token_hash',repeat('d',64),'code_hash',repeat('0',64))) from generate_series(1,5);
+select pg_temp.assert_rejected(format('select public.manage_team(''accept'',%L::jsonb)',jsonb_build_object('token_hash',repeat('d',64),'code_hash',repeat('e',64))::text),'Request a new');
+reset role;
+select pg_temp.assert_true((select code_attempts from public.team_invitations where token_hash=repeat('d',64))=5,'email verification has a durable five-attempt limit');
+update public.team_invitations set code_attempts=0,code_expires_at=now()-interval '1 second',code_sends=3,code_sent_at=now()-interval '2 minutes' where token_hash=repeat('d',64);
+select pg_temp.assert_rejected(format('select public.issue_team_code(%L,%L,%L)','a1000000-0000-0000-0000-000000000005',repeat('d',64),repeat('e',64)),'Too many codes');
+set local role authenticated;
+select pg_temp.assert_rejected(format('select public.manage_team(''accept'',%L::jsonb)',jsonb_build_object('token_hash',repeat('d',64),'code_hash',repeat('e',64))::text),'Request a new');
+select set_config('request.jwt.claim.sub','a1000000-0000-0000-0000-000000000001',true);
 select public.manage_team('revoke',jsonb_build_object('id',(select id from public.team_invitations where token_hash=repeat('b',64))));
 select set_config('request.jwt.claim.sub','a1000000-0000-0000-0000-000000000003',true);
 select pg_temp.assert_rejected(format('select public.manage_team(''accept'',''{"token_hash":"%s"}'')',repeat('b',64)),'invalid or has expired');

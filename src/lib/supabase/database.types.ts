@@ -1625,6 +1625,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      issue_team_code: { Args: { p_user: string; p_token_hash: string; p_code_hash: string }; Returns: Json }
       sync_stripe_subscription: { Args: { p_data: Json }; Returns: undefined }
       register_quote_photo: { Args: { p_data: Json }; Returns: Json }
       remove_quote_photo: { Args: { p_id: string; p_user: string }; Returns: undefined }
