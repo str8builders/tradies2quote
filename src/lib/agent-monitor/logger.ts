@@ -160,15 +160,60 @@ function normalize(type: EventType, input: AgentLogInput): NormalizedLog {
  * caller can never have a try/catch around this function trip on a log
  * failure.
  */
+/**
+ * Per-run write queue for the `agent_runs` lifecycle row.
+ *
+ * run.start (upsert) and run.finish (update) are usually issued back to
+ * back without awaiting. Fired concurrently, the update can land BEFORE
+ * the upsert, which then overwrites the row back to status=running — the
+ * run shows as "running" forever on the dashboard. Chaining the run-row
+ * writes for the same run_id keeps them in issue order while the public
+ * helpers stay fire-and-forget. Event-row inserts are append-only and
+ * stay concurrent.
+ */
+const runQueues = new Map<string, Promise<void>>();
+
+function enqueueRunWrite(
+  runId: string | null,
+  task: () => PromiseLike<unknown>,
+): void {
+  if (!runId) return;
+  const settle = (p: PromiseLike<unknown>): Promise<void> =>
+    Promise.resolve(p).then(
+      () => undefined,
+      () => undefined,
+    );
+  const previous = runQueues.get(runId);
+  // First write for a run is issued synchronously (unchanged behaviour);
+  // later writes for the same run wait for the earlier ones to settle.
+  const next = previous
+    ? previous.then(() => settle(task()))
+    : settle(task());
+  runQueues.set(runId, next);
+  void next.then(() => {
+    if (runQueues.get(runId) === next) runQueues.delete(runId);
+  });
+}
+
+/**
+ * Resolve once every queued run-row write for `runId` has settled. Server
+ * actions that record a whole run in one call await this so the response
+ * does not race the writes.
+ */
+export function flushAgentRun(runId: string): Promise<void> {
+  return runQueues.get(runId) ?? Promise.resolve();
+}
+
 function send(log: NormalizedLog): void {
   try {
     const admin = adminClient();
+    const runId = log.runId;
 
     // 1. Append-only event row, always written.
     admin
       .from("agent_events")
       .insert({
-        run_id: log.runId,
+        run_id: runId,
         agent_name: log.agent,
         event_type: log.type,
         status: log.status,
@@ -188,69 +233,76 @@ function send(log: NormalizedLog): void {
     //    Both keyed by the unique run_id. Without a run_id there's no
     //    way to correlate, so the run-table write is skipped — the
     //    event row above still lands.
-    if (log.type === "run.start" && log.runId) {
-      admin
-        .from("agent_runs")
-        .upsert(
-          {
-            run_id: log.runId,
-            agent_name: log.agent,
+    if (log.type === "run.start" && runId) {
+      enqueueRunWrite(runId, () =>
+        admin
+          .from("agent_runs")
+          .upsert(
+            {
+              run_id: runId,
+              agent_name: log.agent,
+              status: log.status,
+              quote_id: log.quoteId,
+              last_step: log.stepName,
+              last_message: log.message,
+              approval_required: log.approvalRequired,
+            },
+            { onConflict: "run_id" },
+          )
+          .then(({ error }) => {
+            if (error) {
+              console.warn(
+                "[agent-monitor] run upsert failed:",
+                error.message,
+              );
+            }
+          }),
+      );
+    } else if (log.type === "run.finish" && runId) {
+      const finishedAt = new Date().toISOString();
+      enqueueRunWrite(runId, () =>
+        admin
+          .from("agent_runs")
+          .update({
             status: log.status,
-            quote_id: log.quoteId,
+            finished_at: finishedAt,
             last_step: log.stepName,
             last_message: log.message,
-            approval_required: log.approvalRequired,
-          },
-          { onConflict: "run_id" },
-        )
-        .then(({ error }) => {
-          if (error) {
-            console.warn(
-              "[agent-monitor] run upsert failed:",
-              error.message,
-            );
-          }
-        });
-    } else if (log.type === "run.finish" && log.runId) {
-      admin
-        .from("agent_runs")
-        .update({
-          status: log.status,
-          finished_at: new Date().toISOString(),
-          last_step: log.stepName,
-          last_message: log.message,
-          error_message: log.errorMessage,
-        })
-        .eq("run_id", log.runId)
-        .then(({ error }) => {
-          if (error) {
-            console.warn(
-              "[agent-monitor] run update failed:",
-              error.message,
-            );
-          }
-        });
-    } else if (log.type === "event" && log.runId) {
+            error_message: log.errorMessage,
+          })
+          .eq("run_id", runId)
+          .then(({ error }) => {
+            if (error) {
+              console.warn(
+                "[agent-monitor] run update failed:",
+                error.message,
+              );
+            }
+          }),
+      );
+    } else if (log.type === "event" && runId) {
       // Mid-run heartbeat — refresh the run's last_step/last_message so
       // the dashboard's Runs view reflects current progress even before
       // run.finish lands. Status stays whatever the run.start set; we
       // only patch the cosmetic fields.
-      admin
-        .from("agent_runs")
-        .update({
-          last_step: log.stepName,
-          last_message: log.message,
-          approval_required: log.approvalRequired,
-        })
-        .eq("run_id", log.runId)
-        .then(({ error }) => {
-          if (error) {
-            console.warn(
-              "[agent-monitor] run heartbeat failed:",
-              error.message,
-            );
-          }
-        });
+      enqueueRunWrite(runId, () =>
+        admin
+          .from("agent_runs")
+          .update({
+            last_step: log.stepName,
+            last_message: log.message,
+            approval_required: log.approvalRequired,
+          })
+          .eq("run_id", runId)
+          .then(({ error }) => {
+            if (error) {
+              console.warn(
+                "[agent-monitor] run heartbeat failed:",
+                error.message,
+              );
+            }
+          }),
+      );
     }
   } catch (err) {
     console.warn(

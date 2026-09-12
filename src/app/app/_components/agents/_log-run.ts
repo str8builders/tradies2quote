@@ -1,6 +1,7 @@
 "use server";
 
 import {
+  flushAgentRun,
   logAgentRunStart,
   logAgentRunFinish,
 } from "@/lib/agent-monitor/logger";
@@ -40,4 +41,7 @@ export async function logClientAgentRun(input: {
     status: input.ok ? "complete" : "failed",
     message: input.message,
   });
+  // Both writes are queued in order; wait for them so the action's
+  // response never races the run.finish update.
+  await flushAgentRun(runId);
 }

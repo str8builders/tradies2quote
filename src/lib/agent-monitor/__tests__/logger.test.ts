@@ -308,3 +308,42 @@ describe("logger import boundary", () => {
     20_000,
   );
 });
+
+describe("run-row write ordering", () => {
+  beforeEach(() => {
+    resetMocks();
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "test-key";
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+  });
+  afterEach(restoreEnv);
+
+  it("does not let a fast run.finish overtake a slow run.start", async () => {
+    // Slow upsert: resolves only when we say so.
+    let releaseUpsert: (v: { error: null }) => void = () => {};
+    const upsertGate = new Promise<{ error: null }>((resolve) => {
+      releaseUpsert = resolve;
+    });
+    upsertMock.mockReset().mockReturnValue(upsertGate);
+    const order: string[] = [];
+    upsertMock.mockImplementation(() => {
+      order.push("upsert-issued");
+      return upsertGate;
+    });
+    eqMock.mockReset().mockImplementation(async () => {
+      order.push("update-issued");
+      return okResult;
+    });
+
+    const { flushAgentRun } = await import("../logger");
+    logAgentRunStart({ agentName: "A", runId: "r1", stepName: "run.start", status: "running", message: "go" });
+    logAgentRunFinish({ agentName: "A", runId: "r1", stepName: "run.finish", status: "complete", message: "done" });
+
+    // Let microtasks run: the finish update must still be waiting.
+    await new Promise((r) => setTimeout(r, 5));
+    expect(order).toEqual(["upsert-issued"]);
+
+    releaseUpsert(okResult);
+    await flushAgentRun("r1");
+    expect(order).toEqual(["upsert-issued", "update-issued"]);
+  });
+});
