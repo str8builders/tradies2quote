@@ -36,7 +36,7 @@
 import { applyGlossaryCorrections } from "./transcript/glossaryCorrect";
 import { normalizeSpokenMeasurements } from "./transcript/measureNormalize";
 import type { VocabSet, VocabTermType } from "./transcript/glossary";
-import { fetchWithTimeout } from "@/lib/fetchTimeout";
+import { fetchWithTimeout, TIMEOUTS } from "@/lib/fetchTimeout";
 import { parseModelJsonObject } from "@/lib/modelJson";
 
 // ---------------------------------------------------------------------------
@@ -493,7 +493,7 @@ export type AnthropicCallable = (
 ) => Promise<string>;
 
 /** Default local OpenAI-compatible call (used in production). */
-async function defaultAnthropicCall({
+async function callLocalSummary({
   apiKey,
   system,
   user,
@@ -586,9 +586,40 @@ async function defaultAnthropicCall({
   return payload.choices?.[0]?.message?.content ?? "";
 }
 
+// Keep this transport browser-import-safe: this module also supplies the
+// deterministic cleanup used by client code. Never import the server-only
+// quote completion module here.
+const callHostedSummary: AnthropicCallable = async ({ apiKey, system, user, model, maxTokens }) => {
+  const res = await fetchWithTimeout(
+    "https://api.anthropic.com/v1/messages",
+    {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        system,
+        messages: [{ role: "user", content: user }],
+      }),
+    },
+    TIMEOUTS.llm,
+  );
+  if (!res.ok) throw new Error(`Summary provider returned HTTP ${res.status}`);
+  const payload = (await res.json()) as {
+    content?: Array<{ type: string; text?: string }>;
+    stop_reason?: string;
+  };
+  if (payload.stop_reason === "max_tokens") throw new Error("Summary response was truncated");
+  return payload.content?.filter((block) => block.type === "text").map((block) => block.text ?? "").join("\n") ?? "";
+};
+
 export type BuildSummaryOptions = {
   apiKey?: string;
-  /** Defaults to LOCAL_LLM_MODEL. */
+  /** Defaults to the selected provider's model. */
   model?: string;
   /** Legacy-named test seam — pass a fake to avoid hitting the model. */
   callAnthropic?: AnthropicCallable;
@@ -602,16 +633,14 @@ export async function buildSummary(
   cleanedTranscript: string,
   options: BuildSummaryOptions = {},
 ): Promise<TranscriptSummary | null> {
-  const apiKey = options.apiKey ?? process.env.LOCAL_LLM_API_KEY;
+  if (process.env.TRANSCRIPT_SUMMARY?.trim().toLowerCase() === "off") return null;
+  const local = process.env.TEXT_AI_PROVIDER?.trim().toLowerCase() === "local";
+  const apiKey = options.apiKey ?? (local ? process.env.LOCAL_LLM_API_KEY : process.env.ANTHROPIC_API_KEY);
   if (!apiKey) return null;
-  if (
-    !options.callAnthropic &&
-    process.env.TEXT_AI_PROVIDER?.trim().toLowerCase() !== "local"
-  ) {
-    return null;
-  }
-  const model = options.model ?? process.env.LOCAL_LLM_MODEL ?? "qwen3.5-9b-uncensored";
-  const fn = options.callAnthropic ?? defaultAnthropicCall;
+  const model = options.model ?? (local
+    ? process.env.LOCAL_LLM_MODEL?.trim() || "qwen3.5-9b-uncensored"
+    : process.env.ANTHROPIC_QUOTE_MODEL?.trim() || "claude-sonnet-5");
+  const fn = options.callAnthropic ?? (local ? callLocalSummary : callHostedSummary);
 
   let raw: string;
   try {
@@ -685,7 +714,7 @@ export async function cleanTranscript(
 ): Promise<CleanedTranscript> {
   const det = applyDeterministicCorrections(raw, options.vocab);
 
-  if (options.summaryDisabled) {
+  if (options.summaryDisabled || process.env.TRANSCRIPT_SUMMARY?.trim().toLowerCase() === "off") {
     return {
       cleanedTranscript: det.cleanedTranscript,
       summary: null,
@@ -703,7 +732,7 @@ export async function cleanTranscript(
     summary = await buildSummary(det.cleanedTranscript, options);
     if (!summary) {
       fallback = "summary_failed";
-      fallbackReason = "Local text model returned null or unparsable JSON";
+      fallbackReason = "Text model returned null or unparsable JSON";
     }
   } catch (err) {
     fallback = "summary_failed";
