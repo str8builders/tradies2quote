@@ -9,6 +9,7 @@ import {
 import { formatCurrency, formatIssueDate, quoteNumber, splitDisplaySubtotals, validUntilDate } from "./quote-defaults";
 import type { QuoteData, QuoteLineItem, QuoteProfile } from "./quote-types";
 import { drawPdfLogo, type PdfLogo } from "./pdf-logo";
+import { BUSINESS_NAME_REQUIRED, businessNameForDocuments } from "./business-name";
 
 type GenerateArgs = {
   quoteId: string;
@@ -86,6 +87,8 @@ function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
 
 export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> {
   const { quoteId, createdAt, quote, profile, acceptUrl, logo } = args;
+  const businessName = businessNameForDocuments(profile.business_name);
+  if (!businessName) throw new Error(BUSINESS_NAME_REQUIRED.message);
 
   const pdf = await PDFDocument.create();
   const helv = await pdf.embedFont(StandardFonts.Helvetica);
@@ -143,7 +146,6 @@ export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> 
   // ===== Header =====
   // Optional logo top-left; pushes the business name down by whatever it used.
   y -= await drawPdfLogo(pdf, page, logo, MARGIN_X, y);
-  const businessName = profile.business_name || "Your business";
   y = drawText(businessName.toUpperCase(), MARGIN_X, y, { font: bold, size: 18, maxWidth: 280 }) - 4;
 
   const headerLines: string[] = [];

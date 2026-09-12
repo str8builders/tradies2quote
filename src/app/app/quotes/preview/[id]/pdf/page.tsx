@@ -3,6 +3,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
 import { createClient } from "@/lib/supabase/server";
+import { BUSINESS_NAME_REQUIRED, businessNameForDocuments } from "@/lib/business-name";
+import { BusinessSettingsLink } from "@/app/app/_components/BusinessSettingsLink";
 
 /**
  * /app/quotes/preview/[id]/pdf — in-app PDF viewer with a back button.
@@ -48,6 +50,15 @@ export default async function QuotePdfPage({
     .eq("user_id", user.id)
     .maybeSingle();
   if (!quote) redirect("/app/quotes");
+  const { data: profile, error: profileError } = await supabase.from("profiles").select("business_name").eq("id", user.id).maybeSingle();
+  if (profileError || !businessNameForDocuments(profile?.business_name)) {
+    return <main className="mx-auto max-w-xl space-y-5 p-6">
+      <Link href={`/app/quotes/preview/${id}`} className="t2q-btn-back">Back to quote</Link>
+      <h1 className="text-2xl font-semibold">Your quote PDF</h1>
+      <p role="alert">{profileError ? "Could not load your business details. Please try again." : BUSINESS_NAME_REQUIRED.message}</p>
+      {!profileError && <BusinessSettingsLink />}
+    </main>;
+  }
   if (!quote.pdf_path) redirect(`/app/quotes/preview/${id}`);
 
   return (

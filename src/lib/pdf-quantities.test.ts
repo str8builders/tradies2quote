@@ -9,6 +9,9 @@ import type { QuoteData, QuoteLineItem } from "./quote-types";
 afterEach(() => vi.restoreAllMocks());
 
 describe("quote and invoice quantity columns", () => {
+  it.each([null, "", " \t "])("refuses an unbranded quote PDF (%s)", async (business_name) => {
+    await expect(generateQuotePdf({ quoteId: "fixture", createdAt: "2026-09-13T00:00:00Z", quote: {} as QuoteData, profile: { business_name }, acceptUrl: null })).rejects.toThrow("Add your business name in Settings");
+  });
   it.each([["quote", false], ["invoice", false], ["quote", true], ["invoice", true]] as const)("%s keeps quantities within their cells (long description: %s)", async (kind, longDescription) => {
     const items: QuoteLineItem[] = Array.from({ length: 34 }, (_, i) => ({
       type: "material", description: i === 0 ? "Post-hole concrete after round post deduction" : `Material ${i + 1} — measured order from saved calculation`,

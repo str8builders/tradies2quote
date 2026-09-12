@@ -14,6 +14,8 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import type { QuoteStatus } from "@/lib/quote-types";
 import { SavePdfButton } from "@/app/app/_components/SavePdfButton";
+import { BusinessSettingsLink } from "@/app/app/_components/BusinessSettingsLink";
+import { BUSINESS_NAME_REQUIRED } from "@/lib/business-name";
 
 type Props = {
   quoteId: string;
@@ -72,6 +74,7 @@ export function SendQuoteButton({
   const [state, setState] = useState<SendState>("idle");
   const [activeChannel, setActiveChannel] = useState<"email" | "sms">("email");
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [needsBusinessName, setNeedsBusinessName] = useState(false);
   const [copyOk, setCopyOk] = useState(false);
   // Wave 45 — takeoff safety gate. `confirmReasons` drives the
   // acknowledge-before-send panel (caution-level); `blockReasons` shows
@@ -87,6 +90,7 @@ export function SendQuoteButton({
   async function sendVia(channel: "email" | "sms", acknowledged = false) {
     setActiveChannel(channel);
     setErrorMessage("");
+    setNeedsBusinessName(false);
     setBlockReasons(null);
     if (!acknowledged) setConfirmReasons(null);
     if (onSaveBeforeSend) {
@@ -119,6 +123,7 @@ export function SendQuoteButton({
           reasons?: string[];
         };
         const code = data.error ?? "send_failed";
+        setNeedsBusinessName(code === BUSINESS_NAME_REQUIRED.error);
         // Caution-level: surface the reasons + a confirm button rather
         // than a dead-end error. Re-sending with acknowledged=true clears it.
         if (code === "takeoff_unconfirmed") {
@@ -280,6 +285,7 @@ export function SendQuoteButton({
             className="rounded-sm border border-red-600 bg-red-600 px-2.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-white shadow"
           >
             {errorMessage}
+            {needsBusinessName && <BusinessSettingsLink />}
           </p>
         )}
         {state === "sent" && (

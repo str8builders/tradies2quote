@@ -7,6 +7,8 @@ import {
   DownloadSimple,
 } from "@phosphor-icons/react";
 import { isNativeIOSApp } from "@/lib/native-app";
+import { BusinessSettingsLink } from "./BusinessSettingsLink";
+import { BUSINESS_NAME_REQUIRED } from "@/lib/business-name";
 
 type Props = {
   /** A route that returns an `application/pdf` body (e.g. the owner PDF routes). */
@@ -32,13 +34,23 @@ export function SavePdfButton({ url, filename, label = "Save PDF", className }: 
   const [state, setState] = useState<"idle" | "working" | "done" | "error">(
     "idle",
   );
+  const [errorMessage, setErrorMessage] = useState("");
+  const [needsBusinessName, setNeedsBusinessName] = useState(false);
 
   async function onSave() {
     if (state === "working") return;
     setState("working");
+    setErrorMessage("");
+    setNeedsBusinessName(false);
     try {
       const res = await fetch(url);
-      if (!res.ok) throw new Error(`PDF request failed: ${res.status}`);
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({})) as { error?: string; message?: string };
+        setNeedsBusinessName(error.error === BUSINESS_NAME_REQUIRED.error);
+        setErrorMessage(error.message ?? "Could not prepare the PDF. Please try again.");
+        setState("error");
+        return;
+      }
       const blob = await res.blob();
 
       // Prefer the filename the route advertises (quote / invoice number).
@@ -110,6 +122,7 @@ export function SavePdfButton({ url, filename, label = "Save PDF", className }: 
       setState("done");
     } catch (e) {
       console.error("SavePdfButton failed", e);
+      setErrorMessage("Could not save the PDF. Please try again.");
       setState("error");
     }
   }
@@ -124,6 +137,7 @@ export function SavePdfButton({ url, filename, label = "Save PDF", className }: 
           : label;
 
   return (
+    <>
     <button
       type="button"
       onClick={onSave}
@@ -143,5 +157,7 @@ export function SavePdfButton({ url, filename, label = "Save PDF", className }: 
       )}
       {text}
     </button>
+    {state === "error" && <span role="alert" className="text-sm text-red-400">{errorMessage}{needsBusinessName && <BusinessSettingsLink />}</span>}
+    </>
   );
 }

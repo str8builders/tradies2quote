@@ -2,6 +2,8 @@
 
 import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
+import { BusinessSettingsLink } from "@/app/app/_components/BusinessSettingsLink";
+import { BUSINESS_NAME_REQUIRED } from "@/lib/business-name";
 import {
   ChatCircleText,
   EnvelopeSimple,
@@ -107,6 +109,7 @@ export function StickyActionBar({
   const [sendState, setSendState] = useState<SendState>("idle");
   const [activeChannel, setActiveChannel] = useState<"email" | "sms">("email");
   const [errorMessage, setErrorMessage] = useState("");
+  const [needsBusinessName, setNeedsBusinessName] = useState(false);
   // Wave 45 — takeoff safety gate (mirrors SendQuoteButton).
   const [confirmReasons, setConfirmReasons] = useState<string[] | null>(null);
   const [blockReasons, setBlockReasons] = useState<string[] | null>(null);
@@ -142,6 +145,7 @@ export function StickyActionBar({
   async function sendVia(channel: "email" | "sms", acknowledged = false) {
     setActiveChannel(channel);
     setErrorMessage("");
+    setNeedsBusinessName(false);
     setBlockReasons(null);
     if (!acknowledged) setConfirmReasons(null);
     setSendState("saving");
@@ -171,6 +175,7 @@ export function StickyActionBar({
           reasons?: string[];
         };
         const code = data.error ?? "send_failed";
+        setNeedsBusinessName(code === BUSINESS_NAME_REQUIRED.error);
         if (code === "takeoff_unconfirmed") {
           setConfirmReasons(data.reasons ?? []);
           setSendState("idle");
@@ -274,6 +279,7 @@ export function StickyActionBar({
               : activeChannel === "sms"
                 ? "// sms sent"
                 : "// quote sent"}
+            {sendState === "error" && needsBusinessName && <BusinessSettingsLink />}
           </p>
         </div>
       )}

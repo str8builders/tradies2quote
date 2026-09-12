@@ -5,6 +5,7 @@ import { generateQuotePdf } from "@/lib/pdf-generator";
 import { loadLogoForPdf } from "@/lib/pdf-logo";
 import { quoteNumber } from "@/lib/quote-defaults";
 import type { QuoteData } from "@/lib/quote-types";
+import { BUSINESS_NAME_REQUIRED, businessNameForDocuments } from "@/lib/business-name";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,11 +51,15 @@ export async function GET(
     return NextResponse.json({ error: "no_quote" }, { status: 404 });
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("business_name, email, phone, address, logo_url")
     .eq("id", user.id)
     .maybeSingle();
+
+  if (profileError) return NextResponse.json({ error: "profile_unavailable", message: "Could not load your business details. Please try again." }, { status: 503 });
+  const businessName = businessNameForDocuments(profile?.business_name);
+  if (!businessName) return NextResponse.json(BUSINESS_NAME_REQUIRED, { status: 400 });
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://tradies2quote.com";
   const acceptUrl = quote.public_token
@@ -69,7 +74,7 @@ export async function GET(
       quoteId: quote.id,
       createdAt: quote.created_at,
       quote: quote.quote_data as QuoteData,
-      profile: profile ?? { business_name: null },
+      profile: { ...profile, business_name: businessName },
       acceptUrl,
       logo,
     });
