@@ -2,12 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
 import {
+  CUSTOMER_REPLY_AGENT_NAME,
   runCustomerReplyAgent,
   type CustomerReplyInput,
 } from "@/lib/agents/customer-reply";
 import {
-  logAgentRunStart,
+  flushAgentRun,
   logAgentRunFinish,
+  newRunId,
 } from "@/lib/agent-monitor/logger";
 import { isOwnerEmail } from "@/lib/owner";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
@@ -60,43 +62,34 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const runId = `creply_${Math.random().toString(16).slice(2, 10)}`;
+  // ONE run id for the whole invocation: the shared runtime owns the
+  // run.start/run.finish pair, so the route only closes the row when the
+  // agent throws before the runtime opened it (a no-op update otherwise).
+  const runId = newRunId("creply");
   const startedAt = Date.now();
-  logAgentRunStart({
-    agentName: "Customer Reply Agent",
-    runId,
-    stepName: "run.start",
-    status: "running",
-    message: `Drafting a reply to a ${customerMessage.trim().length}-char customer message`,
-    startedAt,
-  });
 
   try {
-    const result = await runCustomerReplyAgent({
-      customerMessage,
-      quote: body.quote ?? null,
-      businessName: body.businessName ?? null,
-    });
-    logAgentRunFinish({
-      agentName: "Customer Reply Agent",
-      runId,
-      stepName: "run.finish",
-      status: "complete",
-      message: "Reply draft generated",
-      durationMs: Date.now() - startedAt,
-    });
+    const result = await runCustomerReplyAgent(
+      {
+        customerMessage,
+        quote: body.quote ?? null,
+        businessName: body.businessName ?? null,
+      },
+      { runId },
+    );
     return NextResponse.json({ ok: true, result });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     captureError(err, { route: "/api/agents/customer-reply" });
     logAgentRunFinish({
-      agentName: "Customer Reply Agent",
+      agentName: CUSTOMER_REPLY_AGENT_NAME,
       runId,
       stepName: "run.finish",
       status: "failed",
       message,
       durationMs: Date.now() - startedAt,
     });
+    await flushAgentRun(runId);
     const isConfig = /not configured/i.test(message);
     return NextResponse.json(
       { error: message },

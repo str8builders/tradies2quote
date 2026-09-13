@@ -2,12 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
 import {
+  QUOTE_GENERATION_AGENT_NAME,
   runQuoteGenerationAgent,
   type QuoteGenerationInput,
 } from "@/lib/agents/quote-generation";
 import {
-  logAgentRunStart,
+  flushAgentRun,
   logAgentRunFinish,
+  newRunId,
 } from "@/lib/agent-monitor/logger";
 import { isOwnerEmail } from "@/lib/owner";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
@@ -64,48 +66,42 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const runId = `qgen_${Math.random().toString(16).slice(2, 10)}`;
+  // ONE run id for the whole invocation. `runStructuredAgent` owns the
+  // run.start/run.finish pair for it, so the route must not mint a second id
+  // (that produced two `agent_runs` rows per call with two different agent
+  // names). The route only closes the row when the agent throws BEFORE the
+  // runtime got involved — an update on a run_id the runtime never opened
+  // matches zero rows, so this can never create a duplicate.
+  const runId = newRunId("qgen");
   const startedAt = Date.now();
-  logAgentRunStart({
-    agentName: "Quote Generation Agent",
-    runId,
-    stepName: "run.start",
-    status: "running",
-    message: `Generating a quote from a ${transcript.trim().length}-char transcript`,
-    startedAt,
-  });
 
   try {
-    const result = await runQuoteGenerationAgent({
-      transcript,
-      labourRate:
-        typeof body.labourRate === "number" ? body.labourRate : undefined,
-      markupPct:
-        typeof body.markupPct === "number" ? body.markupPct : undefined,
-      // Enables learned-memory injection when TRADIE_BRAIN_ENABLED=true.
-      // No-op otherwise — the agent ignores it unless the flag is on.
-      memory: { supabase, userId: user.id },
-    });
-    logAgentRunFinish({
-      agentName: "Quote Generation Agent",
-      runId,
-      stepName: "run.finish",
-      status: "complete",
-      message: "Quote draft generated",
-      durationMs: Date.now() - startedAt,
-    });
+    const result = await runQuoteGenerationAgent(
+      {
+        transcript,
+        labourRate:
+          typeof body.labourRate === "number" ? body.labourRate : undefined,
+        markupPct:
+          typeof body.markupPct === "number" ? body.markupPct : undefined,
+        // Enables learned-memory injection when TRADIE_BRAIN_ENABLED=true.
+        // No-op otherwise — the agent ignores it unless the flag is on.
+        memory: { supabase, userId: user.id },
+      },
+      { runId },
+    );
     return NextResponse.json({ ok: true, result });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     captureError(err, { route: "/api/agents/quote-generation" });
     logAgentRunFinish({
-      agentName: "Quote Generation Agent",
+      agentName: QUOTE_GENERATION_AGENT_NAME,
       runId,
       stepName: "run.finish",
       status: "failed",
       message,
       durationMs: Date.now() - startedAt,
     });
+    await flushAgentRun(runId);
     const isConfig = /not configured/i.test(message);
     return NextResponse.json(
       { error: message },

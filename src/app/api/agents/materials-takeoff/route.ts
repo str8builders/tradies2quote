@@ -2,12 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
 import {
+  MATERIALS_TAKEOFF_AGENT_NAME,
   runMaterialsTakeoffAgent,
   type MaterialsTakeoffInput,
 } from "@/lib/agents/materials-takeoff";
 import {
-  logAgentRunStart,
+  flushAgentRun,
   logAgentRunFinish,
+  newRunId,
 } from "@/lib/agent-monitor/logger";
 import { isOwnerEmail } from "@/lib/owner";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
@@ -61,42 +63,36 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const runId = `mtake_${Math.random().toString(16).slice(2, 10)}`;
+  // ONE run id for the whole invocation. `runStructuredAgent` owns the
+  // run.start/run.finish pair for it, so the route must not mint a second id
+  // (that produced two `agent_runs` rows per call with two different agent
+  // names). The route only closes the row when the agent throws BEFORE the
+  // runtime got involved — an update on a run_id the runtime never opened
+  // matches zero rows, so this can never create a duplicate.
+  const runId = newRunId("mtake");
   const startedAt = Date.now();
-  logAgentRunStart({
-    agentName: "Materials & Takeoff Agent",
-    runId,
-    stepName: "run.start",
-    status: "running",
-    message: `Reading a ${jobText.trim().length}-char job description`,
-    startedAt,
-  });
 
   try {
-    const result = await runMaterialsTakeoffAgent({
-      jobText,
-      country: body.country ?? "NZ",
-    });
-    logAgentRunFinish({
-      agentName: "Materials & Takeoff Agent",
-      runId,
-      stepName: "run.finish",
-      status: "complete",
-      message: "Takeoff generated",
-      durationMs: Date.now() - startedAt,
-    });
+    const result = await runMaterialsTakeoffAgent(
+      {
+        jobText,
+        country: body.country ?? "NZ",
+      },
+      { runId },
+    );
     return NextResponse.json({ ok: true, result });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     captureError(err, { route: "/api/agents/materials-takeoff" });
     logAgentRunFinish({
-      agentName: "Materials & Takeoff Agent",
+      agentName: MATERIALS_TAKEOFF_AGENT_NAME,
       runId,
       stepName: "run.finish",
       status: "failed",
       message,
       durationMs: Date.now() - startedAt,
     });
+    await flushAgentRun(runId);
     const isConfig = /not configured/i.test(message);
     return NextResponse.json(
       { error: message },

@@ -14,7 +14,11 @@
  * Server-only. Needs ANTHROPIC_API_KEY at runtime.
  */
 import "server-only";
-import { runStructuredAgent, type ParseResult } from "./runtime";
+import {
+  runStructuredAgent,
+  type AgentRunOptions,
+  type ParseResult,
+} from "./runtime";
 
 export type TakeoffLineUnit =
   | "each"
@@ -252,8 +256,16 @@ export function parseTakeoff(
   };
 }
 
+/**
+ * Display name on /app/agents/monitor. Exported so the route that mints the
+ * run id logs against the SAME name the shared runtime writes — one
+ * invocation must produce exactly one `agent_runs` row.
+ */
+export const MATERIALS_TAKEOFF_AGENT_NAME = "Materials Takeoff";
+
 export async function runMaterialsTakeoffAgent(
   input: MaterialsTakeoffInput,
+  opts: AgentRunOptions = {},
 ): Promise<TakeoffResult> {
   const jobText = (input.jobText ?? "").trim();
   if (jobText.length === 0) {
@@ -267,12 +279,14 @@ export async function runMaterialsTakeoffAgent(
   const userPrompt = `COUNTRY: ${country}\n\nJOB DESCRIPTION:\n"""\n${jobText}\n"""`;
 
   const result = await runStructuredAgent<TakeoffResult>({
-    agentName: "Materials Takeoff",
+    agentName: MATERIALS_TAKEOFF_AGENT_NAME,
     system: SYSTEM_PROMPT,
     user: userPrompt,
     tool: TAKEOFF_TOOL,
     parse: (raw) => parseTakeoff(raw, jobText),
     maxTokens: MAX_TOKENS,
+    // Caller-supplied so the route and the runtime share one run row.
+    runId: opts.runId,
   });
 
   return result.value;

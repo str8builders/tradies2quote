@@ -14,7 +14,11 @@
  * Server-only. Needs ANTHROPIC_API_KEY at runtime.
  */
 import "server-only";
-import { runStructuredAgent, type ParseResult } from "./runtime";
+import {
+  runStructuredAgent,
+  type AgentRunOptions,
+  type ParseResult,
+} from "./runtime";
 import {
   formatMemoriesForPrompt,
   tradieBrainEnabledFromEnv,
@@ -284,8 +288,16 @@ async function buildMemoryBlock(
   }
 }
 
+/**
+ * Display name on /app/agents/monitor. Exported so the route that mints the
+ * run id logs against the SAME name the shared runtime writes — one
+ * invocation must produce exactly one `agent_runs` row.
+ */
+export const QUOTE_GENERATION_AGENT_NAME = "Quote Generation";
+
 export async function runQuoteGenerationAgent(
   input: QuoteGenerationInput,
+  opts: AgentRunOptions = {},
 ): Promise<GeneratedQuote> {
   const transcript = (input.transcript ?? "").trim();
   if (transcript.length === 0) {
@@ -320,13 +332,15 @@ export async function runQuoteGenerationAgent(
     .join("\n");
 
   const result = await runStructuredAgent<GeneratedQuote>({
-    agentName: "Quote Generation",
+    agentName: QUOTE_GENERATION_AGENT_NAME,
     system: SYSTEM_PROMPT,
     user: userPrompt,
     tool: QUOTE_TOOL,
     parse: parseQuote,
     maxTokens: MAX_TOKENS,
     userId: input.memory?.userId,
+    // Caller-supplied so the route and the runtime share one run row.
+    runId: opts.runId,
   });
 
   const quote = result.value;

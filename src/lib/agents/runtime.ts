@@ -58,6 +58,15 @@ export type ParseResult<T> =
   | { ok: true; value: T }
   | { ok: false; error: string };
 
+/**
+ * Per-invocation options an agent wrapper accepts from its caller (a route
+ * handler, a server action). Threading `runId` in means the caller and the
+ * shared runtime write to ONE `agent_runs` row instead of two.
+ */
+export interface AgentRunOptions {
+  runId?: string;
+}
+
 export interface StructuredAgentOptions<T> {
   /** Display name for the monitor dashboard, e.g. "Quote Generation". */
   agentName: string;
@@ -71,6 +80,11 @@ export interface StructuredAgentOptions<T> {
   parse: (input: unknown) => ParseResult<T>;
   tier?: ModelTier;
   maxTokens?: number;
+  /**
+   * Outbound ceiling for the Anthropic call. Defaults by output size — see
+   * `resolveAgentTimeoutMs`. Override only when an agent knows better.
+   */
+  timeoutMs?: number;
   /** Cache the system block (default true). */
   cacheSystem?: boolean;
   runId?: string;
@@ -150,6 +164,27 @@ export function buildRequestBody(args: {
 
 /** Caps at or below this get `effort: "low"` so reasoning can't starve the answer. */
 export const SMALL_CAP_TOKENS = 1024;
+
+/**
+ * Output caps above this are "big completion" territory and need the longer
+ * `generation` ceiling. The 4096-token agents (Quote Generation, Materials
+ * Takeoff) were timing out on the 50s `llm` ceiling — see the note on
+ * `TIMEOUTS.generation` in src/lib/fetchTimeout.ts, which records two live
+ * 504s at exactly 50s for that output size.
+ */
+export const LARGE_CAP_TOKENS = 4000;
+
+/**
+ * Pick the outbound timeout for an agent call. Pure — exported for tests.
+ * An explicit `override` always wins.
+ */
+export function resolveAgentTimeoutMs(
+  maxTokens: number,
+  override?: number,
+): number {
+  if (override !== undefined) return override;
+  return maxTokens > LARGE_CAP_TOKENS ? TIMEOUTS.generation : TIMEOUTS.llm;
+}
 
 interface AnthropicResponsePayload {
   content?: Array<{
@@ -255,6 +290,7 @@ export async function runStructuredAgent<T>(
   const model = resolveModel(tier);
   const maxTokens = opts.maxTokens ?? 4096;
   const cacheSystem = opts.cacheSystem ?? true;
+  const timeoutMs = resolveAgentTimeoutMs(maxTokens, opts.timeoutMs);
   const runId = opts.runId ?? newRunId(opts.agentName.toLowerCase());
 
   const userContent: AgentContentBlock[] =
@@ -304,7 +340,7 @@ export async function runStructuredAgent<T>(
           },
           body: JSON.stringify(body),
         },
-        TIMEOUTS.llm,
+        timeoutMs,
         doFetch,
       );
 

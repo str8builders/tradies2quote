@@ -151,8 +151,12 @@ const ALLOWED_MIME = new Set([
 /** Max raw bytes accepted. Photos are usually 0.5–3 MB; cap at 8 MB. */
 export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
+/** Display name on /app/agents/monitor; the route logs against the same name. */
+export const PHOTO_PLAN_AGENT_NAME = "Photo Plan";
+
 export async function runPhotoPlanAgent(
   input: PhotoPlanInput,
+  opts: { runId?: string } = {},
 ): Promise<PhotoPlanResult> {
   if (!input.imageBase64 || input.imageBase64.length === 0) {
     throw new Error("Image is empty.");
@@ -182,13 +186,15 @@ export async function runPhotoPlanAgent(
   ];
 
   const result = await runOpenAIStructuredAgent<PhotoPlanResult>({
-    agentName: "Photo Plan",
+    agentName: PHOTO_PLAN_AGENT_NAME,
     system: SYSTEM_PROMPT,
     user: userContent,
     tool: PHOTO_PLAN_TOOL,
     parse: parsePhotoPlan,
     model: MODEL,
     maxTokens: MAX_TOKENS,
+    // Caller-supplied so the route and the runtime share one run row.
+    runId: opts.runId,
   });
 
   return result.value;

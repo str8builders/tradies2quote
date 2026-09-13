@@ -5,10 +5,11 @@ import { adminClient } from "@/lib/supabase/admin";
 import { isOwnerEmail } from "@/lib/owner";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
 import {
-  isLocalTextAiProvider,
   resolveLocalLlmConfig,
   runLocalChatCompletion,
 } from "@/lib/llm/local-chat";
+import { resolveQuoteTextProvider } from "@/lib/llm/quote-text-provider";
+import { runStructuredAgent } from "@/lib/agents/runtime";
 
 /**
  * Owner-only triage endpoint for failed (or any) agent run.
@@ -20,7 +21,12 @@ import {
  * Flow:
  *   1. Auth gate — only the project owner can call this.
  *   2. Read the run row + the last 20 events for that run.
- *   3. Send the lot to the configured local text model with a triage prompt.
+ *   3. Send the lot to the configured text model with a triage prompt —
+ *      the local OpenAI-compatible endpoint when TEXT_AI_PROVIDER=local,
+ *      otherwise hosted Claude through the shared agent runtime. (Until
+ *      Wave 41 this required the local provider and 503'd in production,
+ *      where TEXT_AI_PROVIDER=anthropic — the dashboard's Diagnose button
+ *      was simply dead.)
  *   4. Return the model's markdown analysis — probable cause, suggested
  *      fix, what to check, retry suitability.
  *
@@ -53,6 +59,39 @@ interface DiagnoseBody {
   run_id?: string;
 }
 
+/** Output cap for the triage report. At/below `SMALL_CAP_TOKENS` the shared
+ *  runtime adds `output_config: { effort: "low" }`, so a thinking model can't
+ *  spend the whole cap reasoning and return nothing. */
+const DIAGNOSE_MAX_TOKENS = 1024;
+
+/** Forced-tool shape for the hosted path — markdown in one string field. */
+const DIAGNOSE_TOOL = {
+  name: "report_diagnosis",
+  description: "Return the triage report as markdown.",
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["diagnosis"],
+    properties: {
+      diagnosis: {
+        type: "string",
+        description:
+          "The markdown triage report, with the four required sections.",
+      },
+    },
+  },
+};
+
+function parseDiagnosis(input: unknown):
+  | { ok: true; value: string }
+  | { ok: false; error: string } {
+  const text = (input as { diagnosis?: unknown } | null)?.diagnosis;
+  if (typeof text !== "string" || !text.trim()) {
+    return { ok: false, error: "diagnosis must be a non-empty string" };
+  }
+  return { ok: true, value: text.trim() };
+}
+
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
   const {
@@ -70,14 +109,15 @@ export async function POST(request: NextRequest) {
   const quota = consumeDailyQuota("diagnose:" + user.id, 200);
   if (!quota.ok) return tooManyRequestsResponse(quota.resetAt);
 
+  const provider = resolveQuoteTextProvider();
   try {
-    if (!isLocalTextAiProvider()) throw new Error("local provider not selected");
-    resolveLocalLlmConfig();
+    if (!provider) throw new Error("no text provider configured");
+    if (provider === "local") resolveLocalLlmConfig();
   } catch {
     return NextResponse.json(
       {
         error: "ai_not_configured",
-        message: "Local AI diagnosis is not configured.",
+        message: "AI diagnosis is not configured.",
       },
       { status: 503 },
     );
@@ -152,32 +192,50 @@ export async function POST(request: NextRequest) {
     events,
   };
 
-  let modelResult: Awaited<ReturnType<typeof runLocalChatCompletion>>;
+  const userPrompt = `Here is the run + recent events as JSON:\n\n\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\`\n\nProduce the triage report.`;
+
+  let diagnosis = "";
   try {
-    modelResult = await runLocalChatCompletion({
-      system: SYSTEM_PROMPT,
-      user: `Here is the run + recent events as JSON:\n\n\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\`\n\nProduce the triage report.`,
-      maxTokens: 800,
-      temperature: 0,
-    });
+    if (provider === "local") {
+      const modelResult = await runLocalChatCompletion({
+        system: SYSTEM_PROMPT,
+        user: userPrompt,
+        maxTokens: DIAGNOSE_MAX_TOKENS,
+        temperature: 0,
+      });
+      diagnosis = modelResult.text.trim();
+    } else {
+      // Hosted Claude through the shared runtime: forced structured output,
+      // prompt caching on the system block, and the monitor logging every
+      // other agent gets. Diagnosing a run is itself a run.
+      const agentResult = await runStructuredAgent<string>({
+        agentName: "Run Diagnosis",
+        system: SYSTEM_PROMPT,
+        user: userPrompt,
+        tool: DIAGNOSE_TOOL,
+        parse: parseDiagnosis,
+        maxTokens: DIAGNOSE_MAX_TOKENS,
+        userId: user.id,
+      });
+      diagnosis = agentResult.value.trim();
+    }
   } catch (error) {
-    console.error("Local Qwen diagnose call failed", error);
+    console.error(`Diagnose call failed (${provider})`, error);
     captureError(error, { route: "/api/agents/diagnose" });
     return NextResponse.json(
       {
         error: "ai_error",
-        message: "The local AI couldn't analyze the run. Try again in a moment.",
+        message: "The AI couldn't analyze the run. Try again in a moment.",
       },
       { status: 502 },
     );
   }
-  const diagnosis = modelResult.text.trim();
 
   if (!diagnosis) {
     return NextResponse.json(
       {
         error: "empty_response",
-        message: "The local AI returned no analysis.",
+        message: "The AI returned no analysis.",
       },
       { status: 502 },
     );

@@ -49,6 +49,12 @@ import {
   runAnthropicQuoteCompletion,
 } from "@/lib/llm/anthropic-quote";
 import type { QuoteTextProvider } from "@/lib/llm/quote-text-provider";
+import {
+  flushAgentRun,
+  logAgentRunFinish,
+  logAgentRunStart,
+  newRunId,
+} from "@/lib/agent-monitor/logger";
 
 
 /**
@@ -144,14 +150,95 @@ function looksLikeTakeoffMaterial(description: string): boolean {
 const MAX_TOKENS = 2048;
 
 
-export async function generateQuoteForUser(opts: {
+export interface GenerateQuoteOptions {
   db: SupabaseClient<Database>;
   userId: string;
   quoteId: string;
   textProvider: QuoteTextProvider;
   /** True when `db` is the service-role client (no signed-in request). */
   asAdmin?: boolean;
-}): Promise<QuoteGenerationResult> {
+}
+
+/**
+ * Display name for this pipeline on /app/agents/monitor. The stand-alone
+ * "Quote Generation" agent (src/lib/agents/quote-generation.ts) is a
+ * different, owner-only tool — this is the real pipeline every tradie's
+ * quote goes through, so it gets its own row on the dashboard.
+ */
+export const QUOTE_PIPELINE_AGENT_NAME = "Quote Pipeline";
+
+/**
+ * Monitor-instrumented entry point. The whole invocation is ONE
+ * `agent_runs` row (run.start → run.finish under a single run id) so the
+ * tradie's actual quote generations are visible on /app/agents/monitor
+ * instead of only the owner-only agent tools.
+ *
+ * Logging rules honoured here:
+ *  - failure-safe: every logger helper swallows its own errors and returns
+ *    void, so nothing in this wrapper can fail a generation;
+ *  - off the hot path: the inserts are queued, never awaited inline;
+ *  - `last_message` is an operator-facing summary only — never the
+ *    transcript, the client's details, or any quote content.
+ */
+export async function generateQuoteForUser(
+  opts: GenerateQuoteOptions,
+): Promise<QuoteGenerationResult> {
+  const runId = newRunId("qpipe");
+  const startedAt = Date.now();
+  logAgentRunStart({
+    agentName: QUOTE_PIPELINE_AGENT_NAME,
+    runId,
+    stepName: "run.start",
+    status: "running",
+    message: `Generating via ${opts.textProvider}${
+      opts.asAdmin === true ? " (public request)" : ""
+    }`,
+    quoteId: opts.quoteId,
+    userId: opts.userId,
+  });
+
+  try {
+    const result = await runQuotePipeline(opts);
+    logAgentRunFinish({
+      agentName: QUOTE_PIPELINE_AGENT_NAME,
+      runId,
+      stepName: "run.finish",
+      status: result.ok ? "complete" : "failed",
+      // Status code only — the failure bodies are user-facing copy and a
+      // future one could carry quote detail we must not log.
+      message: result.ok
+        ? "Quote saved"
+        : `Stopped with HTTP ${result.status}`,
+      quoteId: opts.quoteId,
+      durationMs: Date.now() - startedAt,
+    });
+    return result;
+  } catch (e) {
+    logAgentRunFinish({
+      agentName: QUOTE_PIPELINE_AGENT_NAME,
+      runId,
+      stepName: "run.finish",
+      status: "failed",
+      message: `Failed: ${
+        e instanceof Error ? e.message : "unknown error"
+      }`.slice(0, 160),
+      quoteId: opts.quoteId,
+      durationMs: Date.now() - startedAt,
+    });
+    throw e;
+  } finally {
+    // The callers return their HTTP response the moment this resolves, so
+    // wait for the two queued run-row writes to settle — otherwise a
+    // serverless/`after()`-style teardown can drop the run.finish update and
+    // the dashboard shows the run "running" forever. Never rejects, and the
+    // writes are milliseconds against a multi-second generation.
+    await flushAgentRun(runId);
+  }
+}
+
+async function runQuotePipeline(
+  opts: GenerateQuoteOptions,
+): Promise<QuoteGenerationResult> {
   const { db, userId, quoteId, textProvider } = opts;
   const asAdmin = opts.asAdmin === true;
   const id = quoteId;

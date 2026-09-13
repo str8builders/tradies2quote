@@ -1,26 +1,30 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
-import { extractModelJsonObject } from "@/lib/modelJson";
+import { parseModelJsonObject } from "@/lib/modelJson";
 import { createClient } from "@/lib/supabase/server";
 import { isOwnerEmail } from "@/lib/owner";
 import {
-  isLocalTextAiProvider,
   resolveLocalLlmConfig,
   runLocalChatCompletion,
 } from "@/lib/llm/local-chat";
+import { resolveQuoteTextProvider } from "@/lib/llm/quote-text-provider";
+import { runStructuredAgent } from "@/lib/agents/runtime";
 
 /**
  * POST /api/suppliers/extract
  *
  * Body: { url: string }
  *
- * Fetches the supplier product page HTML, hands a bounded slice to local Qwen
- * and asks for the product name + price + unit. Returns:
+ * Fetches the supplier product page HTML, hands a bounded slice to the
+ * configured text model (local OpenAI-compatible endpoint when
+ * TEXT_AI_PROVIDER=local, otherwise hosted Claude through the shared agent
+ * runtime) and asks for the product name + price + unit. Returns:
  *   200 { product: { name, price, unit } | null, url, fetched: boolean }
  *   400 if the URL is missing or malformed
  *   401 if the user isn't signed in
  *   429 if the user is over their daily quota
- *   502 if the local model call fails
+ *   502 if the model call fails, or its answer can't be parsed
+ *   503 if no text provider is configured
  *
  * The route never throws on supplier-side failures (CORS-equivalent on
  * the server, 4xx/5xx responses, timeouts, blocked HEAD/GET): it
@@ -91,6 +95,72 @@ type ExtractResponse = {
   reason?: string;
 };
 
+/**
+ * Coerce a model-produced object into a product, or null when it doesn't
+ * describe one. Shared by both providers so they can't drift.
+ */
+function normaliseExtractedProduct(parsed: unknown): ExtractedProduct | null {
+  if (!parsed || typeof parsed !== "object") return null;
+  const obj = parsed as Record<string, unknown>;
+  const name = typeof obj.name === "string" ? obj.name.trim() : "";
+  const price = typeof obj.price === "number" ? obj.price : NaN;
+  const unit =
+    typeof obj.unit === "string" && obj.unit.trim().length > 0
+      ? obj.unit.trim()
+      : "each";
+  if (!name || !Number.isFinite(price) || price < 0) return null;
+  return { name, price: Math.round(price * 100) / 100, unit };
+}
+
+/**
+ * Forced-tool shape for the hosted path. A tool input_schema must be an
+ * object, so "no product here" is expressed with `found: false` rather than
+ * the bare `null` the local text prompt allows.
+ */
+const EXTRACT_TOOL = {
+  name: "report_product",
+  description:
+    "Report the single product shown on the supplier page, or that the page doesn't show one.",
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["found"],
+    properties: {
+      found: {
+        type: "boolean",
+        description:
+          "False for a category/listing page, a missing price, POA, or anything unclear.",
+      },
+      name: { type: "string", description: "Product name." },
+      price: {
+        type: "number",
+        minimum: 0,
+        description: "Displayed price for ONE unit, as a number.",
+      },
+      unit: {
+        type: "string",
+        description:
+          "each, m, m2, m3, kg, sheet, pair, roll, box, bag or lot.",
+      },
+    },
+  },
+};
+
+function parseExtractTool(
+  input: unknown,
+): { ok: true; value: ExtractedProduct | null } | { ok: false; error: string } {
+  const obj = (input ?? {}) as Record<string, unknown>;
+  if (obj.found !== true) return { ok: true, value: null };
+  const product = normaliseExtractedProduct(obj);
+  if (!product) {
+    return {
+      ok: false,
+      error: "found was true but name/price were missing or invalid",
+    };
+  }
+  return { ok: true, value: product };
+}
+
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
   const {
@@ -120,9 +190,10 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  const provider = resolveQuoteTextProvider();
   try {
-    if (!isLocalTextAiProvider()) throw new Error("local provider not selected");
-    resolveLocalLlmConfig();
+    if (!provider) throw new Error("no text provider configured");
+    if (provider === "local") resolveLocalLlmConfig();
   } catch {
     return NextResponse.json(
       { error: "Product extraction is not configured." },
@@ -232,70 +303,87 @@ Rules:
     `<supplier_page>\n${cleaned}\n</supplier_page>`,
   ].join("\n\n");
 
-  let modelResult: Awaited<ReturnType<typeof runLocalChatCompletion>>;
+  let product: ExtractedProduct | null = null;
+  // Local models answer with free text we have to parse; the hosted path
+  // returns a validated tool input, so there is nothing to parse there.
+  let rawText: string | null = null;
+
   try {
-    modelResult = await runLocalChatCompletion({
-      system,
-      user: userMsg,
-      maxTokens: MAX_TOKENS,
-      temperature: 0,
-      responseSchema: {
-        name: "supplier_product",
-        schema: {
-          anyOf: [
-            {
-              type: "object",
-              additionalProperties: false,
-              required: ["name", "price", "unit"],
-              properties: {
-                name: { type: "string" },
-                price: { type: "number", minimum: 0 },
-                unit: { type: "string" },
+    if (provider === "local") {
+      const modelResult = await runLocalChatCompletion({
+        system,
+        user: userMsg,
+        maxTokens: MAX_TOKENS,
+        temperature: 0,
+        responseSchema: {
+          name: "supplier_product",
+          schema: {
+            anyOf: [
+              {
+                type: "object",
+                additionalProperties: false,
+                required: ["name", "price", "unit"],
+                properties: {
+                  name: { type: "string" },
+                  price: { type: "number", minimum: 0 },
+                  unit: { type: "string" },
+                },
               },
-            },
-            { type: "null" },
-          ],
+              { type: "null" },
+            ],
+          },
         },
-      },
-    });
+      });
+      rawText = modelResult.text.trim();
+    } else {
+      // Hosted Claude through the shared runtime: forced structured output,
+      // one retry on invalid input, and — because MAX_TOKENS is at or below
+      // the runtime's SMALL_CAP_TOKENS — `effort: "low"`, so a thinking model
+      // can't spend the whole cap reasoning and answer with nothing.
+      const agentResult = await runStructuredAgent<ExtractedProduct | null>({
+        agentName: "Supplier Extract",
+        system,
+        user: userMsg,
+        tool: EXTRACT_TOOL,
+        parse: parseExtractTool,
+        maxTokens: MAX_TOKENS,
+        userId: user.id,
+      });
+      product = agentResult.value;
+    }
   } catch (e) {
     captureError(e, { route: "suppliers/extract" });
-    console.error("Local Qwen fetch failed", e);
+    console.error(`Supplier extraction model call failed (${provider})`, e);
     return NextResponse.json(
       { error: "Extraction service unreachable." },
       { status: 502 },
     );
   }
-  const text = modelResult.text.trim();
 
-  // extractModelJsonObject tolerates code fences and returns null when the
-  // model answered "null" (no product found) — both cases leave product null.
-  let product: ExtractedProduct | null = null;
-  const jsonText = extractModelJsonObject(text);
-  if (jsonText) {
+  if (rawText !== null && rawText.includes("{")) {
+    // A bare `null` is the prompt's documented "no single product on this
+    // page" answer, so only text that actually contains an object is parsed.
+    // parseModelJsonObject strips code fences and finds the object; anything
+    // it can't read is a real failure, not a silent "no product".
     try {
-      const parsed = JSON.parse(jsonText) as unknown;
-      if (parsed && typeof parsed === "object") {
-        const obj = parsed as Record<string, unknown>;
-        const name =
-          typeof obj.name === "string" ? obj.name.trim() : "";
-        const price = typeof obj.price === "number" ? obj.price : NaN;
-        const unit =
-          typeof obj.unit === "string" && obj.unit.trim().length > 0
-            ? obj.unit.trim()
-            : "each";
-        if (name && Number.isFinite(price) && price >= 0) {
-          product = {
-            name,
-            price: Math.round(price * 100) / 100,
-            unit,
-          };
-        }
-      }
-    } catch {
-      // The model returned an unusable result despite schema constraints — treat as
-      // "couldn't find a product" rather than a server error.
-      product = null;
+      product = normaliseExtractedProduct(
+        parseModelJsonObject<Record<string, unknown>>(rawText),
+      );
+    } catch (e) {
+      captureError(e, { route: "suppliers/extract" });
+      console.error(
+        "Supplier extraction returned unparsable output",
+        e,
+        "raw (first 400):",
+        rawText.slice(0, 400),
+      );
+      return NextResponse.json(
+        {
+          error:
+            "The AI returned an unreadable product response. Add this material manually.",
+        },
+        { status: 502 },
+      );
     }
   }
 

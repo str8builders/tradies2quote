@@ -3,6 +3,7 @@ import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
 import {
   MAX_IMAGE_BYTES,
+  PHOTO_PLAN_AGENT_NAME,
   runPhotoPlanAgent,
 } from "@/lib/agents/photo-plan";
 import {
@@ -11,8 +12,9 @@ import {
   sniffPreparedImageMime,
 } from "@/lib/imageUpload";
 import {
-  logAgentRunStart,
+  flushAgentRun,
   logAgentRunFinish,
+  newRunId,
 } from "@/lib/agent-monitor/logger";
 import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
@@ -126,43 +128,34 @@ export async function POST(req: NextRequest) {
   }
   const imageBase64 = Buffer.from(arrayBuf).toString("base64");
 
-  const runId = `photo_${Math.random().toString(16).slice(2, 10)}`;
+  // ONE run id for the whole invocation: the shared runtime owns the
+  // run.start/run.finish pair, so the route only closes the row when the
+  // agent throws before the runtime opened it (a no-op update otherwise).
+  const runId = newRunId("photo");
   const startedAt = Date.now();
-  logAgentRunStart({
-    agentName: "Photo / Plan Reading Agent",
-    runId,
-    stepName: "run.start",
-    status: "running",
-    message: `Reading a ${(file.size / 1024).toFixed(0)} KB ${file.type} image`,
-    startedAt,
-  });
 
   try {
-    const result = await runPhotoPlanAgent({
-      imageBase64,
-      mimeType: sniffedMediaType,
-      hint,
-    });
-    logAgentRunFinish({
-      agentName: "Photo / Plan Reading Agent",
-      runId,
-      stepName: "run.finish",
-      status: "complete",
-      message: "Image read complete",
-      durationMs: Date.now() - startedAt,
-    });
+    const result = await runPhotoPlanAgent(
+      {
+        imageBase64,
+        mimeType: sniffedMediaType,
+        hint,
+      },
+      { runId },
+    );
     return NextResponse.json({ ok: true, result });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     captureError(err, { route: "/api/agents/photo-plan" });
     logAgentRunFinish({
-      agentName: "Photo / Plan Reading Agent",
+      agentName: PHOTO_PLAN_AGENT_NAME,
       runId,
       stepName: "run.finish",
       status: "failed",
       message,
       durationMs: Date.now() - startedAt,
     });
+    await flushAgentRun(runId);
     const isConfig = /not configured/i.test(message);
     return NextResponse.json(
       { error: message },
