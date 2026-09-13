@@ -5,12 +5,31 @@ import { calculatorInputErrors } from "./calculator-inputs";
 import type { DiagramKind } from "@/t2qcal/components/calculators/technicalDrawing";
 import { roofGeometry } from "./roof-geometry";
 import { tubeCutProfile, tubeCutPeak } from "./tube-cut";
+import { nativePortDefinition } from "./native";
 
 export type VerifiedUnit = "metric" | "imperial";
-export type FieldKind = "length" | "angle" | "count" | "percent" | "money" | "number";
-export type CalculatorField = { key: string; label: string; default: number; kind?: FieldKind; min?: number; max?: number; step?: number; hint?: string };
+/** Mirrors the native FieldKind; the rate/area kinds convert on the unit switch. */
+export type FieldKind = "length" | "area" | "volumeRate" | "linearRate" | "cubicFootRate" | "angle" | "count" | "percent" | "money" | "number";
+export type FieldOption = { id: number; label: string };
+export type CalculatorField = {
+  key: string; label: string; default: number; kind?: FieldKind; min?: number; max?: number; step?: number; hint?: string;
+  /** A choice field: the value is one of these ids (stored as a count). */
+  options?: FieldOption[];
+  /** Only shown while `values[key]` is one of `allowed` (native `Field.when`). */
+  visibleWhen?: { key: string; allowed: number[] };
+};
 export type CalculatorResult = { label: string; value: string; primary?: boolean };
-export type CalculatorOutput = { errors?: string[]; results: CalculatorResult[]; marks?: string[]; diagramValues?: Record<string, number> };
+/** Mirrors the native ToolHandoff — a quantity the tradie can carry into a quote. */
+export type CalculatorHandoff = {
+  key: string; label: string; quantity: number; unit: string;
+  role: "material" | "work" | "measurement" | "legacy"; includeByDefault: boolean;
+  basisFingerprint?: string | null; formula?: string | null; assumptions?: string[]; checks?: string[];
+};
+export type CalculatorCut = { mm: number; count: number; label: string };
+export type CalculatorOutput = {
+  errors?: string[]; results: CalculatorResult[]; marks?: string[]; diagramValues?: Record<string, number>;
+  handoffs?: CalculatorHandoff[]; cuts?: CalculatorCut[];
+};
 export type VerifiedDefinition = {
   title: string;
   note: string;
@@ -398,6 +417,8 @@ const geometrySlugs = new Set(["square-up", "golden-ratio", "pyramid", "gothic-a
 const materialSlugs = new Set(["floor-area", "tile-quantity", "weatherboard", "circular-paving", "timber-volume", "board-foot"]);
 
 function rawDefinition(slug: string): VerifiedDefinition {
+  // One-for-one ports of the native calculators win over the older web ones.
+  const ported = nativePortDefinition(slug); if (ported) return ported;
   const nativeExtra=nativeExtraDefinition(slug);if(nativeExtra)return nativeExtra;
   const layout = layoutDefinition(slug);
   if (layout) return layout;
@@ -441,19 +462,22 @@ export function expectedVerifiedSlugs() {
 /** Validate before allocating set-out arrays or presenting a cutting dimension. */
 export function getVerifiedDefinition(slug: string): VerifiedDefinition {
   const definition = rawDefinition(slug);
+  const isPort = nativePortDefinition(slug) !== null;
   return { ...definition, compute(values, unit) {
     const errors = calculatorInputErrors(definition.fields, values, unit);
-    if(slug === "wallpaper-rolls" && values.height > values.rollLength) errors.push("The roll must be long enough for one full-height drop. Choose a longer roll or calculate a seamed layout separately.");
-    if (slug === "tube-notch" && values.diameter > values.parentDiameter) errors.push("Branch diameter must not exceed the parent tube diameter for this coping template.");
-    if (slug === "opening-layout" && (values.openLeft < 3 * values.memberWidth || values.openLeft + values.openWidth + 3 * values.memberWidth > values.span || values.openBottom + values.openHeight + values.headerDepth > values.height - (values.plates - 1) * values.memberWidth || (values.openBottom > 0 && values.openBottom < 2 * values.memberWidth) || values.targetGap <= values.memberWidth || values.span / values.targetGap > 1000)) errors.push("The opening, header, king studs and plates must fit inside the wall. Keep stud centres larger than timber thickness (up to 1,000 bays).");
-    if (slug === "wall-framing" && (values.height <= values.plates * values.memberWidth || values.targetGap <= values.memberWidth || values.span <= values.memberWidth)) errors.push("Wall height must exceed plate thickness; stud centres must exceed timber thickness.");
-    if (slug === "rebar-spacing" && (Math.min(values.span, values.width) <= 2 * values.cover + values.memberWidth || values.targetGap < values.memberWidth)) errors.push("The bars and edge cover must fit inside the slab, with centres at least the bar diameter.");
-    if (slug === "kerf-bending" && (values.skin >= values.thickness || values.radius <= values.thickness)) errors.push("Remaining skin must be less than board thickness, and outside radius must exceed board thickness.");
-    if (slug === "weatherboard" && values.overlap >= values.boardWidth) errors.push("Overlap must be smaller than board width.");
-    if (slug === "hip-roof" && values.width > values.length) errors.push("Wall length must be the longer side for a hip roof. Swap length and width.");
-    if (slug === "spiral-stairs" && (values.walkLine <= values.column / 2 || values.walkLine >= values.diameter / 2)) errors.push("The walk line must be between the column and the outside edge.");
-    if (definition.fields.some(f => f.key === "memberWidth") && values.memberWidth > values.span) errors.push("Member width cannot exceed the overall span.");
-    if (values.memberWidth === 0 && values.targetGap === 0) errors.push("Enter a positive member width or clear gap.");
+    // The cross-checks below belong to the older web definitions; a native
+    // port carries the native app's own guards inside its compute.
+    if(!isPort && slug === "wallpaper-rolls" && values.height > values.rollLength) errors.push("The roll must be long enough for one full-height drop. Choose a longer roll or calculate a seamed layout separately.");
+    if (!isPort && slug === "tube-notch" && values.diameter > values.parentDiameter) errors.push("Branch diameter must not exceed the parent tube diameter for this coping template.");
+    if (!isPort && slug === "opening-layout" && (values.openLeft < 3 * values.memberWidth || values.openLeft + values.openWidth + 3 * values.memberWidth > values.span || values.openBottom + values.openHeight + values.headerDepth > values.height - (values.plates - 1) * values.memberWidth || (values.openBottom > 0 && values.openBottom < 2 * values.memberWidth) || values.targetGap <= values.memberWidth || values.span / values.targetGap > 1000)) errors.push("The opening, header, king studs and plates must fit inside the wall. Keep stud centres larger than timber thickness (up to 1,000 bays).");
+    if (!isPort && slug === "wall-framing" && (values.height <= values.plates * values.memberWidth || values.targetGap <= values.memberWidth || values.span <= values.memberWidth)) errors.push("Wall height must exceed plate thickness; stud centres must exceed timber thickness.");
+    if (!isPort && slug === "rebar-spacing" && (Math.min(values.span, values.width) <= 2 * values.cover + values.memberWidth || values.targetGap < values.memberWidth)) errors.push("The bars and edge cover must fit inside the slab, with centres at least the bar diameter.");
+    if (!isPort && slug === "kerf-bending" && (values.skin >= values.thickness || values.radius <= values.thickness)) errors.push("Remaining skin must be less than board thickness, and outside radius must exceed board thickness.");
+    if (!isPort && slug === "weatherboard" && values.overlap >= values.boardWidth) errors.push("Overlap must be smaller than board width.");
+    if (!isPort && slug === "hip-roof" && values.width > values.length) errors.push("Wall length must be the longer side for a hip roof. Swap length and width.");
+    if (!isPort && slug === "spiral-stairs" && (values.walkLine <= values.column / 2 || values.walkLine >= values.diameter / 2)) errors.push("The walk line must be between the column and the outside edge.");
+    if (!isPort && definition.fields.some(f => f.key === "memberWidth") && values.memberWidth > values.span) errors.push("Member width cannot exceed the overall span.");
+    if (!isPort && values.memberWidth === 0 && values.targetGap === 0) errors.push("Enter a positive member width or clear gap.");
     if (errors.length) return { errors, results: errors.map((value, i) => ({ label: `Check input ${i + 1}`, value, primary: i === 0 })) };
     const output = definition.compute(values, unit);
     if (output.diagramValues && Object.values(output.diagramValues).some(value => !Number.isFinite(value))) {

@@ -2,10 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { useCalculationSeed } from "./CalculationSeed";
-import { initialCalculatorValues, fieldBounds } from "@/t2qcal/lib/calculator-inputs";
+import { fieldBounds, initialCalculatorValues, displayFactor, fieldVisible } from "@/t2qcal/lib/calculator-inputs";
 import type { ToolEntry } from "@/t2qcal/lib/tools";
 import { getVerifiedDefinition, type VerifiedUnit } from "@/t2qcal/lib/verified-calculators";
-import { CalculatorFrame, DimensionLine, NumberField, ResultGrid, SectionHead, TechnicalCanvas } from "./CalculatorUI";
+import { CalculatorFrame, DimensionLine, NumberField, SelectField, ResultGrid, SectionHead, TechnicalCanvas } from "./CalculatorUI";
 import { detailKind, drawDiagram, to3DKind, type DiagramKind } from "./technicalDrawing";
 
 const inchFactor = 25.4;
@@ -18,6 +18,22 @@ function calculatorModelKind(slug: string, base: DiagramKind): DiagramKind {
   if (slug === "pyramid") return "pyramid3d";
   if (slug === "gazebo") return "roof3d";
   return to3DKind(base);
+}
+
+/** Input suffix per native field kind, in the selected unit system. */
+function fieldUnitLabel(kind: string | undefined, unit: VerifiedUnit): string | undefined {
+  const metric = unit === "metric";
+  switch (kind) {
+    case "length": return metric ? "mm" : "in";
+    case "area": return metric ? "m²" : "ft²";
+    case "volumeRate": return metric ? "$/m³" : "$/yd³";
+    case "linearRate": return metric ? "$/m" : "$/ft";
+    case "cubicFootRate": return metric ? "$/m³" : "$/ft³";
+    case "angle": return "°";
+    case "percent": return "%";
+    case "money": return "$";
+    default: return undefined;
+  }
 }
 
 export function VerifiedCalculator({ tool }: { tool: ToolEntry }) {
@@ -54,7 +70,17 @@ export function VerifiedCalculator({ tool }: { tool: ToolEntry }) {
   function changeUnit(next: VerifiedUnit) {
     if (next === unit) return;
     const factor = next === "imperial" ? 1 / inchFactor : inchFactor;
-    setValues((current) => Object.fromEntries(definition.fields.map((field) => [field.key, field.kind === "length" ? current[field.key] * factor : field.key === "rate" && tool.slug === "deck-boards" ? current[field.key] * (next === "imperial" ? .3048 : 1/.3048) : field.key === "rate" && tool.slug === "timber-volume" ? current[field.key] * (next === "imperial" ? .028316846592 : 1/.028316846592) : current[field.key]])));
+    setValues((current) => Object.fromEntries(definition.fields.map((field) => {
+      // Native kinds convert by their own factor; the two legacy money-rate
+      // fields keep their historical per-length / per-volume behaviour.
+      if (field.kind === "length") return [field.key, current[field.key] * factor];
+      if (field.kind === "area" || field.kind === "volumeRate" || field.kind === "linearRate" || field.kind === "cubicFootRate") {
+        return [field.key, current[field.key] * displayFactor(field.kind, next) / displayFactor(field.kind, unit)];
+      }
+      if (field.key === "rate" && tool.slug === "deck-boards") return [field.key, current[field.key] * (next === "imperial" ? .3048 : 1/.3048)];
+      if (field.key === "rate" && tool.slug === "timber-volume") return [field.key, current[field.key] * (next === "imperial" ? .028316846592 : 1/.028316846592)];
+      return [field.key, current[field.key]];
+    })));
     setUnit(next);
   }
 
@@ -65,12 +91,18 @@ export function VerifiedCalculator({ tool }: { tool: ToolEntry }) {
       <section className="input-panel">
         <SectionHead index="01" title={definition.title} note={definition.note} />
         <div className="field-grid">
-          {definition.fields.map((field) => <NumberField
+          {definition.fields.filter((field) => fieldVisible(field, values)).map((field) => field.options ? <SelectField
+            key={field.key}
+            label={field.label}
+            value={String(Math.round(values[field.key]))}
+            onChange={(next) => update(field.key, Number(next))}
+            options={field.options.map((option) => ({ value: String(option.id), label: option.label }))}
+          /> : <NumberField
             key={field.key}
             label={field.label}
             value={values[field.key]}
             onChange={(next) => update(field.key, field.kind === "count" ? Math.round(next) : next)}
-            unit={field.kind === "length" ? unitLabel : field.kind === "angle" ? "°" : field.kind === "percent" ? "%" : field.kind === "money" ? "$" : undefined}
+            unit={fieldUnitLabel(field.kind, unit)}
             min={fieldBounds(field, unit).min}
             max={fieldBounds(field, unit).max}
             step={field.kind === "length" ? (unit === "metric" ? field.step || 1 : field.step || .0625) : field.step}
