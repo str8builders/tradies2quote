@@ -40,6 +40,8 @@ export type EnrichmentOptions = {
   enabled: boolean;
   /** Test seam — replace the matcher in unit tests. */
   matcher?: MatcherFn;
+  /** Search the catalogue as the service role (no signed-in request). */
+  asAdmin?: boolean;
 };
 
 function confidenceFromScore(score: number): PriceConfidence {
@@ -60,7 +62,11 @@ export async function enrichLineItemsWithCatalogue(
   options: EnrichmentOptions,
 ): Promise<QuoteLineItem[]> {
   if (!options.enabled) return items;
-  const match = options.matcher ?? matchMaterial;
+  const match: MatcherFn =
+    options.matcher ??
+    (options.asAdmin
+      ? (input) => matchMaterial({ ...input, asAdmin: true })
+      : matchMaterial);
 
   const out: QuoteLineItem[] = [];
   for (const item of items) {

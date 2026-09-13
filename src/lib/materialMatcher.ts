@@ -35,6 +35,12 @@ export type MaterialMatchInput = {
   brand?: string;
   /** Optional override; only useful for supplier-specific searches. */
   supplier?: string;
+  /**
+   * Run the catalogue search with the service-role client. Needed when the
+   * pipeline runs outside a signed-in request (public quote requests) —
+   * the cookie client there is anonymous and the RPC denies it.
+   */
+  asAdmin?: boolean;
 };
 
 export type MaterialMatched = {
@@ -77,6 +83,7 @@ export async function matchMaterial(
     // keeps working unchanged for non-treatment-class queries.
     treatmentClass: normalized.treatmentClass,
     limit: 5,
+    asAdmin: input.asAdmin === true,
   });
 
   if (hits.length === 0) {

@@ -149,8 +149,11 @@ export async function generateQuoteForUser(opts: {
   userId: string;
   quoteId: string;
   textProvider: QuoteTextProvider;
+  /** True when `db` is the service-role client (no signed-in request). */
+  asAdmin?: boolean;
 }): Promise<QuoteGenerationResult> {
   const { db, userId, quoteId, textProvider } = opts;
+  const asAdmin = opts.asAdmin === true;
   const id = quoteId;
 
   const { data: quote, error: qErr } = await db
@@ -835,7 +838,7 @@ export async function generateQuoteForUser(opts: {
   // logs); never returned to the client or surfaced in the public quote.
   const enrichResult = await safelyEnrichLineItemsWithCatalogue(
     parsed.line_items,
-    { enabled: materialMatchingEnabledFromEnv() },
+    { enabled: materialMatchingEnabledFromEnv(), asAdmin },
   );
   parsed.line_items = enrichResult.items;
 
