@@ -4,6 +4,10 @@ import {
   FileText,
   Calculator,
   Stack,
+  Camera,
+  Ruler,
+  Books,
+  QrCode,
   ArrowUpRight,
 } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
@@ -30,7 +34,31 @@ const FEATURES = [
     slug: "materials-labour",
     icon: Stack,
     title: "Keep it all together.",
-    body: "Your clients, material rates, quotes and invoices in one place, ready for the next job.",
+    body: "Your clients, material rates, quotes, invoices and job calendar in one place, ready for the next job.",
+  },
+  {
+    slug: "supplier-scan",
+    icon: Camera,
+    title: "Scan the supplier's quote.",
+    body: "Photograph a quote or invoice from ITM, PlaceMakers or Mitre 10 — up to six pages at once — and the prices land in your materials library. CSV import too.",
+  },
+  {
+    slug: "qr-requests",
+    icon: QrCode,
+    title: "Your QR code. Their request.",
+    body: "Print your code on the van, the site fence or a card. Clients scan it, describe the job and add photos. It lands in the app as a draft quote, written up and waiting for you.",
+  },
+  {
+    slug: "t2qcal",
+    icon: Ruler,
+    title: "Measure it. Draw it. Quote it.",
+    body: "T2QCAL's 95 calculators draw the job as you type. The camera reads pitch, fall, height and lengths from a photo, and the quantities go straight into a draft quote at your markup and GST.",
+  },
+  {
+    slug: "the-books",
+    icon: Books,
+    title: "The books, on the job.",
+    body: "NZS 3604, the Building Code clauses and the GIB, MiTek, James Hardie and Pryda manuals sit under every calculator. Keep them on the phone and open them with no signal.",
   },
 ];
 export function Features() {

@@ -5,6 +5,7 @@ import { getCachedAuthUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { AppHeader } from "../_components/AppHeader";
 import { GenerateRequestButton } from "./_components/GenerateRequestButton";
+import { DismissRequestButton } from "./_components/DismissRequestButton";
 
 export const metadata: Metadata = { title: "Quote requests" };
 export const dynamic = "force-dynamic";
@@ -22,20 +23,30 @@ const STATUS_LABEL: Record<string, string> = {
   dismissed: "Dismissed",
 };
 
-export default async function RequestsPage() {
+export default async function RequestsPage({ searchParams }: { searchParams: Promise<{ show?: string }> }) {
   const { user } = await getCachedAuthUser();
   if (!user) redirect("/login");
+  const { show } = await searchParams;
+  const showDismissed = show === "dismissed";
 
   const supabase = await createClient();
-  const { data: requests } = await supabase
+  let query = supabase
     .from("quote_requests")
     .select(
-      "id, quote_id, client_name, client_email, client_phone, site_address, description, status, error_message, created_at",
+      "id, quote_id, client_name, client_email, client_phone, site_address, description, status, error_message, created_at, seen_at",
     )
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(50);
+  query = showDismissed ? query.eq("status", "dismissed") : query.neq("status", "dismissed");
+  const { data: requests } = await query;
 
   const rows = requests ?? [];
+  // Opening the list is "seeing" it: new rows get their seen_at stamped.
+  const unseen = rows.filter((r) => !r.seen_at).map((r) => r.id);
+  if (unseen.length > 0) {
+    await supabase.from("quote_requests").update({ seen_at: new Date().toISOString() }).in("id", unseen).eq("user_id", user.id);
+  }
 
   // The truth about a draft is the quote itself: if it has line items the
   // request is ready no matter what the request row recorded (the tradie may
@@ -66,23 +77,29 @@ export default async function RequestsPage() {
           </p>
         </div>
 
+        <p className="mb-4 text-xs">
+          {showDismissed
+            ? <Link href="/app/requests" className="text-brand underline-offset-4 hover:underline">Back to open requests</Link>
+            : <Link href="/app/requests?show=dismissed" className="text-ink-400 underline-offset-4 hover:underline" data-testid="requests-show-dismissed">Show dismissed requests</Link>}
+        </p>
+
         {rows.length === 0 ? (
           <section className="t2q-card-pro p-5 sm:p-6">
             <p className="text-sm text-ink-300">
-              Nothing yet. Turn on your request link in{" "}
+              {showDismissed ? "No dismissed requests." : <>Nothing yet. Turn on your request link in{" "}
               <Link href="/app/settings" className="text-brand underline-offset-4 hover:underline">
                 Settings
               </Link>{" "}
-              and share it with clients.
+              and share it with clients.</>}
             </p>
           </section>
         ) : (
           <ul className="space-y-4" data-testid="request-list">
             {rows.map((r) => (
-              <li key={r.id} className="t2q-card-pro p-5 sm:p-6">
+              <li key={r.id} className="t2q-card-pro p-5 sm:p-6" data-unseen={!r.seen_at}>
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
-                    <h2 className="font-display text-lg uppercase tracking-tight">{r.client_name}</h2>
+                    <h2 className="font-display text-lg uppercase tracking-tight">{!r.seen_at ? <span className="mr-2 inline-block h-2 w-2 rounded-full bg-hivis align-middle" aria-label="New" /> : null}{r.client_name}</h2>
                     <p className="text-xs text-ink-400">
                       {[r.client_phone, r.client_email, r.site_address].filter(Boolean).join(" · ") || "No contact details"}
                     </p>
@@ -110,7 +127,8 @@ export default async function RequestsPage() {
                       timeZone: "Pacific/Auckland",
                     }).format(new Date(r.created_at))}
                   </span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <DismissRequestButton id={r.id} dismissed={r.status === "dismissed"} />
                     {r.quote_id &&
                     !quoteState.get(r.quote_id)?.hasLines &&
                     (r.status === "generation_failed" ||

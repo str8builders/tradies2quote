@@ -180,6 +180,15 @@ export async function POST(
           quoteId: created.quoteId,
           photos,
         });
+        if (stored.length < photos.length) {
+          // Never silent: the tradie sees on the request that photos are missing.
+          const lost = photos.length - stored.length;
+          await admin
+            .from("quote_requests")
+            .update({ error_message: `${lost} of ${photos.length} client photo${photos.length === 1 ? "" : "s"} could not be attached. Ask the client to resend.` })
+            .eq("id", created.requestId)
+            .eq("user_id", tradie.id);
+        }
         await describePhotosIntoTranscript({
           admin,
           tradieUserId: tradie.id,

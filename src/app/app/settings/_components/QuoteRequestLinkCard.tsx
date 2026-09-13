@@ -2,10 +2,11 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { ArrowSquareOut, Copy, LinkSimple } from "@phosphor-icons/react";
+import { ArrowSquareOut, ArrowsClockwise, Copy, LinkSimple, Printer } from "@phosphor-icons/react";
 import {
   disableQuoteRequestLink,
   enableQuoteRequestLink,
+  rotateQuoteRequestLink,
 } from "../request-link-actions";
 
 export function QuoteRequestLinkCard({
@@ -45,6 +46,7 @@ export function QuoteRequestLinkCard({
 
   return (
     <section
+      id="request-link"
       data-testid="settings-request-link"
       aria-label="Quote request link"
       className="t2q-card-pro p-5 sm:p-6"
@@ -91,26 +93,45 @@ export function QuoteRequestLinkCard({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
             {/* eslint-disable-next-line @next/next/no-img-element -- authenticated SVG route, no optimiser */}
             <img
-              src={`/api/account/request-qr?slug=${encodeURIComponent(slug ?? "")}`}
+              src={`/api/account/request-qr?v=${encodeURIComponent(slug ?? "")}`}
               alt="QR code for your request link"
               width={144}
               height={144}
               className="h-36 w-36 rounded-sm border border-ink-700 bg-white p-1"
             />
             <div className="text-sm text-ink-300">
-              <p>Print the QR for the van, site signs or your counter. It opens the same page.</p>
-              <a
-                href="/api/account/request-qr?download=1"
-                className="mt-2 inline-block text-brand underline-offset-4 hover:underline"
-              >
-                Download QR (SVG)
-              </a>
+              <p>Put the QR on the van, site fence, business cards or your counter. Anyone who scans it lands on your request page.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Link href="/print/request-poster" className="t2q-btn-primary-pro" data-testid="request-poster-link">
+                  <Printer size={16} weight="bold" />
+                  Print poster
+                </Link>
+                <a href="/api/account/request-qr?download=1&format=png&size=1024" className="t2q-btn-ghost-pro" data-testid="request-qr-png">
+                  Download PNG
+                </a>
+                <a href="/api/account/request-qr?download=1" className="t2q-btn-ghost-pro" data-testid="request-qr-svg">
+                  Download SVG
+                </a>
+              </div>
+              <p className="mt-2 text-xs text-ink-500">PNG for social posts and email. SVG for the sign writer, it prints sharp at any size.</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Link href="/app/requests" className="text-sm text-brand underline-offset-4 hover:underline">
               See requests
             </Link>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 text-sm text-ink-400 underline-offset-4 hover:underline"
+              onClick={() => {
+                if (window.confirm("Reset your link? Old QR codes and links will stop working — reprint anything you have shared.")) run(rotateQuoteRequestLink);
+              }}
+              disabled={pending}
+              data-testid="request-link-reset"
+            >
+              <ArrowsClockwise size={14} weight="bold" />
+              Reset link
+            </button>
             <button
               type="button"
               className="text-sm text-ink-400 underline-offset-4 hover:underline"

@@ -223,6 +223,7 @@ async function DashboardData({
   const { count: openRequestCount } = await supabase
     .from("quote_requests")
     .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
     .in("status", ["new", "generated", "generation_failed"]);
 
   // Aggregate this user's own quote stats. Pure JS so no extra Postgres

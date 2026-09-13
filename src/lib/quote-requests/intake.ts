@@ -1,3 +1,4 @@
+import { samePhone } from "./phone";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { captureError } from "@/lib/observability";
@@ -157,15 +158,15 @@ export async function createQuoteRequest(opts: {
     clientId = data?.id ?? null;
   }
   if (!clientId && input.phone) {
+    // Format-insensitive: "021 555 1234" and "+64 21 555 1234" are one client.
     const { data } = await admin
       .from("clients")
-      .select("id")
+      .select("id, phone")
       .eq("user_id", tradieUserId)
-      .eq("phone", input.phone)
+      .not("phone", "is", null)
       .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    clientId = data?.id ?? null;
+      .limit(500);
+    clientId = (data ?? []).find((c) => samePhone(c.phone, input.phone))?.id ?? null;
   }
   if (!clientId) {
     const { data, error } = await admin

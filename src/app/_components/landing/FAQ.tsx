@@ -27,6 +27,21 @@ const FAQS = [
     a: "Yes. Tradies2Quote runs in your phone's browser and can be added to your home screen. You can also sign in from a computer. T2QCAL is a separate web app for construction calculators. Open each app from this website and add each to your home screen; both use your Tradies2Quote account.",
   },
   {
+    slug: "qr-code",
+    q: "How does the QR code work?",
+    a: "Turn on your request link in Settings and you get a QR code and a short link. Print the poster or put the code on your van, site signs or business cards. A client scans it with their phone camera, describes the job in their own words and can add a few photos. It arrives in your app as a request with a draft quote already written up, and you get a notification. You check the numbers and send it — nothing goes to the client until you do.",
+  },
+  {
+    slug: "supplier-quote",
+    q: "Can it read a supplier's quote?",
+    a: "Yes. Photograph the quote or invoice, or pick the photos from your phone — every page of a long one. Tradies2Quote reads the lines so you can check each one, then adds the prices to your materials library or turns them straight into a quote with the same numbers. You can also import a CSV.",
+  },
+  {
+    slug: "offline",
+    q: "Does it work with no signal?",
+    a: "T2QCAL does. Any calculator you have opened works offline, and the standards and manuals you keep on the phone open without reception. Saving to your account and sending a quantity to a quote need a connection, and so does Tradies2Quote itself.",
+  },
+  {
     slug: "replaces-jms",
     q: "Does it replace my entire business system?",
     a: "Tradies2Quote focuses on quotes, invoices, clients and your material rates, with lightweight scheduling. Keep using the tools you need for accounting and wider job management.",

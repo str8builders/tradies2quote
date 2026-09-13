@@ -81,6 +81,7 @@ export default async function QuotesPage({
   const { count: openRequestCount } = await supabase
     .from("quote_requests")
     .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
     .in("status", ["new", "generated", "generation_failed"]);
 
   const { data: rows } = await query

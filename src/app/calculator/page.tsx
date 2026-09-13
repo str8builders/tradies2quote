@@ -20,12 +20,12 @@ import { isNativeShellRequest } from "@/lib/native-shell";
 export const metadata: Metadata = {
   title: "T2QCAL — the calculator that quotes",
   description:
-    "A construction calculator for iPhone that signs in with your Tradies2Quote account. 94 calculators with live measured drawings, 74 trade manuals that read offline, and quantities that cross straight into a draft quote at your own markup and GST.",
+    "Construction calculators that sign in with your Tradies2Quote account. 95 calculators with live measured drawings, camera measuring for pitch, height and lengths, 76 trade manuals and standards that read offline, and quantities that cross straight into a draft quote at your own markup and GST.",
   alternates: { canonical: "/calculator" },
   openGraph: {
     title: "T2QCAL — the calculator that quotes",
     description:
-      "94 construction calculators, 74 trade manuals offline, and quantities that go straight into a Tradies2Quote draft. One account, both apps.",
+      "95 construction calculators, camera measuring, 76 trade manuals offline, and quantities that go straight into a Tradies2Quote draft. One account, both apps.",
     url: "/calculator",
   },
 };
@@ -44,10 +44,11 @@ export const metadata: Metadata = {
  * and the landing's own link to here is withheld server-side.
  */
 
+// Counted from src/t2qcal/lib/native-catalog.json (the live web catalogue). Sums to 95.
 const TRADES = [
-  { name: "Materials & quantities", count: 13 },
-  { name: "Concrete & masonry", count: 11 },
-  { name: "Roof & rafters", count: 10 },
+  { name: "Materials & quantities", count: 14 },
+  { name: "Concrete & masonry", count: 12 },
+  { name: "Roof & rafters", count: 11 },
   { name: "Centers & spacing", count: 10 },
   { name: "Convert & measure", count: 10 },
   { name: "Decks & fencing", count: 8 },
@@ -55,11 +56,9 @@ const TRADES = [
   { name: "Printable templates", count: 8 },
   { name: "General geometry", count: 8 },
   { name: "Stairs & balustrades", count: 6 },
-  { name: "Drainage & spouting", count: 2 },
 ];
 
-// Counted from T2QCAL/Models/Resources.swift, by publisher, exactly as the
-// app attributes them. Sums to 74.
+// Counted from src/t2qcal/lib/native-catalog.json resources, by publisher. Sums to 76.
 const PUBLISHERS = [
   { name: "MiTek NZ", count: 25 },
   { name: "James Hardie NZ", count: 14 },
@@ -69,7 +68,8 @@ const PUBLISHERS = [
   { name: "CHH Woodproducts", count: 3 },
   { name: "Concrete NZ", count: 3 },
   { name: "WorkSafe NZ", count: 3 },
-  { name: "Firth", count: 1 },
+  { name: "Firth", count: 2 },
+  { name: "Resene", count: 1 },
   { name: "MBIE Building CodeHub", count: 1 },
   { name: "MBIE, Standards NZ & BRANZ", count: 1 },
   { name: "NZ Metal Roofing Manufacturers", count: 1 },
@@ -156,10 +156,12 @@ export default async function CalculatorPage() {
                 <span className="text-brand">that quotes.</span>
               </h1>
               <p className="mt-6 max-w-lg text-lg leading-relaxed text-ink-200">
-                Ninety-four construction calculators for iPhone, each drawing the
-                job as you type it. It signs in with your Tradies2Quote account,
-                so a quantity worked out standing in the trench goes onto your
-                quote list before you&apos;ve got back to the ute.
+                Ninety-five construction calculators, each drawing the job as
+                you type it, and a Measure tab that turns the phone&apos;s camera
+                into a level, a clinometer and a photo tape. It signs in with
+                your Tradies2Quote account, so a quantity worked out standing in
+                the trench goes onto your quote list before you&apos;ve got back
+                to the ute.
               </p>
               <p className="mt-4 max-w-lg leading-relaxed text-ink-300">
                 The manuals you&apos;d otherwise be googling — GIB, MiTek, James
@@ -264,12 +266,12 @@ export default async function CalculatorPage() {
           </div>
         </section>
 
-        {/* ── 94 calculators ──────────────────────────────────────────── */}
+        {/* ── 95 calculators ──────────────────────────────────────────── */}
         <section className="border-b border-ink-600 bg-ink-900 py-16 md:py-24">
           <div className="mx-auto max-w-5xl px-5">
             <Header
               label="// the tools"
-              lead="94 calculators."
+              lead="95 calculators."
               accent="Every one draws."
             />
             <p className="mt-5 max-w-2xl text-lg leading-relaxed text-ink-200">
@@ -296,8 +298,8 @@ export default async function CalculatorPage() {
             </ul>
 
             <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-400">
-              Metric and imperial throughout · 92 of the 94 produce something you
-              can put on a quote
+              Metric and imperial throughout · quantities cross into a quote
+              draft with the working attached
             </p>
           </div>
         </section>
@@ -308,7 +310,7 @@ export default async function CalculatorPage() {
             <div>
               <Header
                 label="// the shelf"
-                lead="74 manuals."
+                lead="76 manuals."
                 accent="No signal needed."
               />
               <p className="mt-5 text-lg leading-relaxed text-ink-200">
@@ -359,6 +361,37 @@ export default async function CalculatorPage() {
           </div>
         </section>
 
+        {/* ── Measure ─────────────────────────────────────────────────── */}
+        <section className="border-b border-ink-600 bg-ink-800 py-16 md:py-24">
+          <div className="mx-auto max-w-5xl px-5">
+            <Header
+              label="// measure"
+              lead="Point the phone."
+              accent="Read the number."
+            />
+            <p className="mt-5 max-w-2xl text-lg leading-relaxed text-ink-200">
+              The Measure tab turns the phone&apos;s camera and tilt sensors into
+              site tools. Nothing is uploaded — it all runs on the phone, and it
+              works offline once opened.
+            </p>
+            <ul className="mt-10 grid gap-4 sm:grid-cols-3" data-testid="calculator-measure">
+              {[
+                { name: "Level & pitch", body: "Sight along a roof line for its pitch, or lay the phone on a member for tilt, grade and 1:n fall. Sends the angle straight to the rafter calculator." },
+                { name: "Height & distance", body: "Aim at the base, then the top: the distance to a wall or pole and its height, from where you stand." },
+                { name: "Measure a photo", body: "Tap something of known size in the shot — a 90 mm stud, an A4 sheet — then read any other span in the same plane." },
+              ].map(({ name, body }) => (
+                <li key={name} className="rounded-sm border border-ink-600 bg-ink-900/70 px-5 py-5">
+                  <h3 className="font-display text-lg uppercase tracking-tight text-white">{name}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-ink-300">{body}</p>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-400">
+              A check, not a survey · take the tape for the cut
+            </p>
+          </div>
+        </section>
+
         {/* ── What the book says ──────────────────────────────────────── */}
         <section className="border-b border-ink-600 bg-ink-900 py-16 md:py-24">
           <div className="mx-auto grid max-w-5xl gap-12 px-5 md:grid-cols-[0.9fr_1.1fr] md:items-center">
@@ -375,8 +408,9 @@ export default async function CalculatorPage() {
                 accent="and the clause behind it."
               />
               <p className="mt-5 text-lg leading-relaxed text-ink-200">
-                76 of the 94 calculators carry a link to the rule that governs
-                them, and it opens the manual{" "}
+                Every calculator carries the standards and manuals that govern
+                it — NZS 3604 and B1 first, then the clause and the manufacturer
+                sheet for that job — and it opens the manual{" "}
                 <em>at the right search term</em> — not the front cover, and not
                 a search box on a website.
               </p>
