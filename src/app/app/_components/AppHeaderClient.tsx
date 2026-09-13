@@ -3,23 +3,12 @@
 import "../premium.css";
 
 import { useEffect, useRef, useState } from "react";
-import dynamic from "next/dynamic";
+import { AccountHub } from "./AccountHub";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { isWeatherImpactEnabled } from "@/lib/weather-impact/feature-flag";
 import { SPRING_SNAPPY } from "./motion";
-
-/**
- * Wave 17 — perf — see MobileAppMenuClient.tsx for the rationale.
- * Same `AccountHub` is used here (desktop dropdown variant via the
- * `mode="panel"` prop). Splitting it into its own chunk that's only
- * fetched when the avatar trigger is clicked.
- */
-const AccountHub = dynamic(
-  () => import("./AccountHub").then((m) => m.AccountHub),
-  { ssr: false, loading: () => null },
-);
 
 /**
  * Client part of the shared `/app/*` header.
@@ -98,7 +87,7 @@ export function AppHeaderClient({
       setHubOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setHubOpen(false);
+      if (e.key === "Escape") { setHubOpen(false); triggerRef.current?.focus({ preventScroll: true }); }
     };
     document.addEventListener("mousedown", onDocClick);
     document.addEventListener("keydown", onKey);
@@ -189,20 +178,18 @@ export function AppHeaderClient({
             })}
           </nav>
 
-          {/* Avatar trigger. On desktop it pops a hub panel; on mobile
-              it's a safety-net link to /app/settings (the mobile bottom
-              nav owns the primary avatar action). */}
+          {/* Eager menu content keeps first-open geometry stable. */}
           <div className="relative">
             <button
               ref={triggerRef}
               type="button"
               data-testid="app-header-avatar"
               data-tour="account-menu"
-              aria-haspopup="menu"
+              aria-haspopup="dialog"
               aria-expanded={hubOpen}
               aria-label="Account hub"
               onClick={() => setHubOpen((v) => !v)}
-              className="t2q-avatar-online inline-flex h-9 items-center justify-center rounded-full border border-ink-700 bg-ink-900/80 px-0.5 transition-colors hover:border-brand"
+              className="t2q-avatar-online t2q-profile-trigger"
             >
               {avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -211,12 +198,12 @@ export function AppHeaderClient({
                   alt=""
                   width={32}
                   height={32}
-                  className="h-8 w-8 rounded-full object-cover"
+                  className="t2q-profile-photo"
                 />
               ) : (
                 <span
                   aria-hidden="true"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-brand text-ink-900 font-display text-sm leading-none"
+                  className="t2q-profile-initial"
                 >
                   {initial}
                 </span>

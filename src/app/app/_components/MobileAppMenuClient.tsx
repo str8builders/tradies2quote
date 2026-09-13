@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import dynamic from "next/dynamic";
+import { useRef, useState } from "react";
+import { AccountHub } from "./AccountHub";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
-import { SPRING_SNAPPY, SPRING_SOFT } from "./motion";
+import { SPRING_SNAPPY } from "./motion";
 import type { Icon } from "@phosphor-icons/react";
 import {
   House,
@@ -14,25 +14,7 @@ import {
   Plus,
   Receipt,
   Stack,
-  UserCircle,
 } from "@phosphor-icons/react";
-
-/**
- * Wave 17 — perf — `AccountHub` is the heaviest client component
- * dependency of the mobile nav (~520 lines + 11 icons + server-action
- * client glue). Eagerly importing it bloated every /app/* page's
- * initial bundle, even though the sheet only opens when the user taps
- * the "Me" tile. Dynamic-importing with `ssr: false` splits it into
- * its own chunk that's only fetched on first tap. After the first
- * fetch, the chunk is browser-cached for the rest of the session, so
- * subsequent opens feel instant. `loading: () => null` keeps the
- * sheet's first-open transition clean — the backdrop already fades
- * in, and the body fills the moment the chunk lands.
- */
-const AccountHub = dynamic(
-  () => import("./AccountHub").then((m) => m.AccountHub),
-  { ssr: false, loading: () => null },
-);
 
 /**
  * Client part of the mobile navigation.
@@ -85,7 +67,14 @@ export function MobileAppMenuClient({ isOwner, userEmail, avatarUrl }: Props) {
   // scrolling). Fully reverted + scroll position restored on close — the
   // document remains the shell's single scroll owner (see
   // docs/mobile-shell-contract.md; this is not the banned general lock).
-  useBodyScrollLock(sheetOpen);
+  const releaseScrollLock = useBodyScrollLock(sheetOpen);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const closeSheet = () => {
+    releaseScrollLock();
+    setSheetOpen(false);
+    triggerRef.current?.focus({ preventScroll: true });
+  };
+  const initial = (userEmail ?? "?").trim().charAt(0).toUpperCase() || "?";
   const newQuoteActive = pathname === "/app/quotes/new";
 
   // Wave 45 — the active-tab pill is a SEPARATE background element that
@@ -130,12 +119,14 @@ export function MobileAppMenuClient({ isOwner, userEmail, avatarUrl }: Props) {
           this stays top-right for profile, settings, clients, and sign out. */}
       <button
         type="button"
+        ref={triggerRef}
         data-testid="app-account-avatar"
         data-tour="account-menu"
         aria-label="Account menu"
+        aria-haspopup="dialog"
         aria-expanded={sheetOpen}
         onClick={() => setSheetOpen(true)}
-        className="t2q-account-avatar sm:hidden"
+        className="t2q-account-avatar t2q-profile-trigger sm:hidden"
       >
         {avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -144,10 +135,10 @@ export function MobileAppMenuClient({ isOwner, userEmail, avatarUrl }: Props) {
             alt=""
             width={40}
             height={40}
-            className="h-full w-full object-cover"
+            className="t2q-profile-photo"
           />
         ) : (
-          <UserCircle size={32} weight="fill" className="text-brand" aria-hidden="true" />
+          <span aria-hidden="true" className="t2q-profile-initial">{initial}</span>
         )}
       </button>
 
@@ -183,16 +174,14 @@ export function MobileAppMenuClient({ isOwner, userEmail, avatarUrl }: Props) {
             exit={{ opacity: 0 }}
             transition={{ duration: reduce ? 0.1 : 0.2 }}
             className="fixed inset-0 z-50 flex items-end bg-black/60 backdrop-blur-sm sm:hidden"
-            onClick={() => setSheetOpen(false)}
+            onClick={closeSheet}
           >
-            {/* iOS-style sheet: rises on a soft spring, drops on exit.
-                Backdrop and panel animate independently so the blur
-                fades while the sheet is still travelling. */}
+            {/* A short, non-overshooting entrance keeps the profile steady. */}
             <motion.div
               initial={reduce ? { y: 0 } : { y: "100%" }}
               animate={{ y: 0 }}
               exit={reduce ? { opacity: 0 } : { y: "100%" }}
-              transition={reduce ? { duration: 0.1 } : SPRING_SOFT}
+              transition={{ duration: reduce ? 0 : 0.22, ease: [0.22, 1, 0.36, 1] }}
               onClick={(e) => e.stopPropagation()}
               className="w-full"
             >
@@ -201,7 +190,7 @@ export function MobileAppMenuClient({ isOwner, userEmail, avatarUrl }: Props) {
                 isOwner={isOwner}
                 userEmail={userEmail}
                 avatarUrl={avatarUrl}
-                onClose={() => setSheetOpen(false)}
+                onClose={closeSheet}
               />
             </motion.div>
           </motion.div>

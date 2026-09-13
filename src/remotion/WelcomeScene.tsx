@@ -4,13 +4,13 @@ import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } fr
 export const WELCOME_FRAMES = 126;
 export const WELCOME_FPS = 30;
 /** A frame-driven 3D quote assembling from a site note. */
-export function WelcomeScene() {
+export function WelcomeScene({ onReady }: { onReady?: () => void }) {
   const frame = useCurrentFrame();
   const { width, height, fps } = useVideoConfig();
   const enter = spring({ frame, fps, config: { damping: 22, stiffness: 95 } });
   const turn = interpolate(frame, [0, 70, 126], [-0.65, 0.15, 0.22], { extrapolateRight: "clamp" });
-  return <AbsoluteFill style={{ background: "transparent" }}>
-    <ThreeCanvas width={width} height={height} camera={{ position: [0, 0, 7.8], fov: 37 }} gl={{ alpha: true, antialias: true }} dpr={1.5}>
+  return <AbsoluteFill data-testid="welcome-scene" data-frame={frame} style={{ background: "transparent" }}>
+    <ThreeCanvas onCreated={onReady} width={width} height={height} camera={{ position: [0, 0, 7.8], fov: 37 }} gl={{ alpha: true, antialias: true }} dpr={1.5}>
       <ambientLight intensity={1.5} />
       <directionalLight position={[-3, 5, 6]} intensity={4} color="#fff2dc" />
       <pointLight position={[4, 1, 3]} intensity={40} color="#ff641a" />

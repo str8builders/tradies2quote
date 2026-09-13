@@ -107,4 +107,16 @@ describe("applyBodyScrollLock — scoped modal scroll lock", () => {
     release();
     expect(calls[0]).toMatchObject({ x: 0, y: 0 });
   });
+  it("an immediate navigation release cannot later reset the destination scroll", () => {
+    const doc = makeDoc();
+    const { win, calls, bind } = makeWin(742);
+    bind(doc);
+    const release = applyBodyScrollLock(doc, win);
+    release(); // account link, before Next handles its hash
+    win.scrollTo(0, 160); // destination profile section
+    release(); // passive effect cleanup after navigation
+    expect(calls.map((call) => call.y)).toEqual([742, 160]);
+    expect(doc.body.style.position).toBe("");
+  });
+
 });

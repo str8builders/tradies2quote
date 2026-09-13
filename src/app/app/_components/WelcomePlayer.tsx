@@ -1,17 +1,47 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Player, type PlayerRef } from "@remotion/player";
 import { WelcomeScene, WELCOME_FPS, WELCOME_FRAMES } from "@/remotion/WelcomeScene";
+import { createWelcomePlayback } from "@/lib/welcome-playback";
+import { WelcomePoster } from "./WelcomePoster";
+
 export default function WelcomePlayer({ onComplete }: { onComplete: () => void }) {
-  const player = useRef<PlayerRef>(null);
+  const player = useRef<PlayerRef | null>(null);
+  const playback = useRef<ReturnType<typeof createWelcomePlayback> | null>(null);
+  const canvasReady = useRef(false);
+  const ready = useCallback(() => {
+    canvasReady.current = true;
+    if (player.current) playback.current?.ready(document.hidden);
+  }, []);
+  const ended = useCallback(() => { playback.current?.finish(); onComplete(); }, [onComplete]);
+  // Remotion may replace its imperative handle while playing. Keep one
+  // controller per mount; replacing a ref must never pause/reset the intro.
+  const attachPlayer = useCallback((current: PlayerRef | null) => {
+    player.current?.removeEventListener("ended", ended);
+    player.current = current;
+    current?.addEventListener("ended", ended);
+    if (current && canvasReady.current) playback.current?.ready(document.hidden);
+  }, [ended]);
   useEffect(() => {
-    const current = player.current;
-    current?.addEventListener("ended", onComplete);
-    return () => current?.removeEventListener("ended", onComplete);
-  }, [onComplete]);
-  return <Player ref={player} component={WelcomeScene} durationInFrames={WELCOME_FRAMES} fps={WELCOME_FPS}
+    const controller = createWelcomePlayback({
+      play: () => player.current?.play(),
+      pause: () => player.current?.pause(),
+      seekTo: (frame) => player.current?.seekTo(frame),
+    });
+    playback.current = controller;
+    if (canvasReady.current && player.current) controller.ready(document.hidden);
+    const visibility = () => controller.visibility(document.hidden);
+    document.addEventListener("visibilitychange", visibility);
+    return () => {
+      controller.dispose();
+      playback.current = null;
+      document.removeEventListener("visibilitychange", visibility);
+    };
+  }, []);
+  return <Player ref={attachPlayer} component={WelcomeScene} inputProps={{ onReady: ready }}
+    durationInFrames={WELCOME_FRAMES} fps={WELCOME_FPS}
     compositionWidth={720} compositionHeight={520} style={{ width: "100%", aspectRatio: "720 / 520" }}
-    autoPlay controls={false} clickToPlay={false} doubleClickToFullscreen={false}
+    autoPlay={false} initiallyMuted numberOfSharedAudioTags={0} moveToBeginningWhenEnded={false} controls={false} clickToPlay={false} doubleClickToFullscreen={false}
     spaceKeyToPlayOrPause={false} showVolumeControls={false} acknowledgeRemotionLicense
-    errorFallback={() => <div className="grid h-full place-items-center text-7xl font-bold text-brand">T2Q</div>} />;
+    errorFallback={() => <WelcomePoster />} />;
 }
