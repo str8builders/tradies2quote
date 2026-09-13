@@ -4,6 +4,7 @@ import "../premium.css";
 
 import { useEffect, useRef, useState } from "react";
 import { AccountHub } from "./AccountHub";
+import { AccountButton } from "./AccountButton";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
@@ -67,7 +68,6 @@ export function AppHeaderClient({
   const pathname = usePathname() ?? "";
   const reduce = useReducedMotion();
   const visibleTabs = TABS.filter((t) => isTabVisible(t, isOwner));
-  const initial = (userEmail ?? "?").trim().charAt(0).toUpperCase() || "?";
 
   // Avatar dropdown state — desktop only. Close on outside-click and
   // on route change (which fires a usePathname update).
@@ -108,6 +108,7 @@ export function AppHeaderClient({
   return (
     <header
       data-testid="app-header"
+      data-app-section={pathname.split("/")[2] || "dashboard"}
       data-is-owner={isOwner ? "true" : "false"}
       // Wave 15.2/43 — hidden on mobile. Phones use fixed round controls
       // for navigation and account access, keeping the dashboard viewport
@@ -180,35 +181,16 @@ export function AppHeaderClient({
 
           {/* Eager menu content keeps first-open geometry stable. */}
           <div className="relative">
-            <button
+            <AccountButton
               ref={triggerRef}
-              type="button"
+              userEmail={userEmail}
+              avatarUrl={avatarUrl}
               data-testid="app-header-avatar"
               data-tour="account-menu"
-              aria-haspopup="dialog"
               aria-expanded={hubOpen}
-              aria-label="Account hub"
               onClick={() => setHubOpen((v) => !v)}
-              className="t2q-avatar-online t2q-profile-trigger"
-            >
-              {avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={avatarUrl}
-                  alt=""
-                  width={32}
-                  height={32}
-                  className="t2q-profile-photo"
-                />
-              ) : (
-                <span
-                  aria-hidden="true"
-                  className="t2q-profile-initial"
-                >
-                  {initial}
-                </span>
-              )}
-            </button>
+              className="t2q-avatar-online"
+            />
 
             {hubOpen ? (
               <div

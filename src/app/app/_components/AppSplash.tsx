@@ -6,7 +6,7 @@ const WelcomePlayer = dynamic(() => import("./WelcomePlayer"), { ssr: false, loa
 const SKIP_WINDOW_MS = 6 * 3600 * 1000;
 
 /** A skippable welcome: the user owns entry, including on slow connections. */
-export default function AppSplash({ storageKey = "t2q-welcome-v3", tagline = "Less paperwork. More time on the tools." }: {
+export default function AppSplash({ storageKey = "t2q-welcome-v4", tagline = "Less paperwork. More time on the tools." }: {
   storageKey?: string; tagline?: string;
 } = {}) {
   const [mounted, setMounted] = useState(true);
@@ -29,7 +29,7 @@ export default function AppSplash({ storageKey = "t2q-welcome-v3", tagline = "Le
       } catch { /* Keep a skippable welcome. */ }
       if (seen) { close(); return; }
       dialogRef.current?.showModal();
-      setPlay(!window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+      setPlay(true);
     }, 0);
     return () => clearTimeout(start);
   }, [close, storageKey]);
@@ -44,7 +44,6 @@ export default function AppSplash({ storageKey = "t2q-welcome-v3", tagline = "Le
       <h1 id="welcome-heading" className="text-3xl font-semibold tracking-tight sm:text-5xl">Welcome to<br />Tradies<span className="text-brand">2</span>Quote.</h1>
       <p className="mt-4 max-w-xs text-sm leading-relaxed text-[#b8bdb7]">{tagline}</p>
       <button onClick={close} autoFocus className="t2q-btn-primary-pro mt-7 px-7">Enter app <span aria-hidden="true">→</span></button>
-      {!play && <button onClick={() => setPlay(true)} className="mt-2 min-h-11 px-4 text-xs text-[#c9b6a9]">Play welcome animation</button>}
     </div>
   </dialog>;
 }

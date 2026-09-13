@@ -82,10 +82,10 @@ const SECTIONS: ReadonlyArray<Section> = [
         label: "Open Settings",
         body: (
           <>
-            Tap the orange{" "}
-            <strong className="text-white">Me</strong> circle bottom-right of
-            the app, then{" "}
-            <strong className="text-white">Settings</strong>.
+            Tap the avatar labelled{" "}
+            <strong className="text-white">Settings</strong> at the top-right of
+            the app, then choose{" "}
+            <strong className="text-white">Business settings</strong>.
           </>
         ),
       },
@@ -742,7 +742,7 @@ export default async function GuidePage() {
           <ArrowLeft weight="bold" className="h-3.5 w-3.5" />
           Back to settings
         </Link>
-        <div className="mb-10">
+        <div className="t2q-page-intro mb-10">
           <div className="t2q-section-label-pro mb-3">{"// the manual"}</div>
           <h1 className="font-display text-3xl uppercase tracking-tight sm:text-4xl">
             How to use <span className="text-brand">T2Q.</span>
@@ -910,4 +910,3 @@ function SectionBlock({
     </section>
   );
 }
-

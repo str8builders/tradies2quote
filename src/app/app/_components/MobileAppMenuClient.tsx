@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { AccountHub } from "./AccountHub";
+import { AccountButton } from "./AccountButton";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -74,7 +75,6 @@ export function MobileAppMenuClient({ isOwner, userEmail, avatarUrl }: Props) {
     setSheetOpen(false);
     triggerRef.current?.focus({ preventScroll: true });
   };
-  const initial = (userEmail ?? "?").trim().charAt(0).toUpperCase() || "?";
   const newQuoteActive = pathname === "/app/quotes/new";
 
   // Wave 45 — the active-tab pill is a SEPARATE background element that
@@ -117,33 +117,20 @@ export function MobileAppMenuClient({ isOwner, userEmail, avatarUrl }: Props) {
     <>
       {/* Mobile account shortcut. Navigation lives in the bottom tab bar;
           this stays top-right for profile, settings, clients, and sign out. */}
-      <button
-        type="button"
+      <AccountButton
         ref={triggerRef}
+        userEmail={userEmail}
+        avatarUrl={avatarUrl}
         data-testid="app-account-avatar"
         data-tour="account-menu"
-        aria-label="Account menu"
-        aria-haspopup="dialog"
         aria-expanded={sheetOpen}
         onClick={() => setSheetOpen(true)}
-        className="t2q-account-avatar t2q-profile-trigger sm:hidden"
-      >
-        {avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={avatarUrl}
-            alt=""
-            width={40}
-            height={40}
-            className="t2q-profile-photo"
-          />
-        ) : (
-          <span aria-hidden="true" className="t2q-profile-initial">{initial}</span>
-        )}
-      </button>
+        className="t2q-account-avatar sm:hidden"
+      />
 
       <nav
         data-testid="app-bottom-nav"
+        data-app-section={pathname.split("/")[2] || "dashboard"}
         data-tour="mobile-navigation"
         aria-label="App navigation"
         className="t2q-bottomnav-bar sm:hidden"

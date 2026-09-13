@@ -329,3 +329,118 @@ html:has([data-shell="app"]) { scroll-behavior: auto; }
 .t2q-profile-initial-badge { background: linear-gradient(140deg, #514332, #293c34); border: 1px solid #d9bb875c; color: #ffe1b7; }
 
 [data-shell="app"] :is(#profile, #business, #defaults, #payment_instructions) { scroll-margin-top: 88px; }
+
+/* The dashboard palette continues through each workspace. Status colours stay
+   semantic; section colour is decoration, never the only indication of state. */
+[data-shell="app"] {
+  --t2q-section-rgb: 222 163 105;
+  --t2q-section-light: #f2c99f;
+  --t2q-section-secondary: 91 167 146;
+}
+[data-shell="app"]:has([data-app-section="materials"]),
+[data-shell="app"]:has([data-app-section="suppliers"]),
+[data-shell="app"]:has([data-app-section="weather"]),
+[data-shell="app"]:has([data-app-section="team"]) {
+  --t2q-section-rgb: 106 194 167;
+  --t2q-section-light: #b3e4d1;
+  --t2q-section-secondary: 108 150 190;
+}
+[data-shell="app"]:has([data-app-section="invoices"]),
+[data-shell="app"]:has([data-app-section="clients"]),
+[data-shell="app"]:has([data-app-section="agents"]),
+[data-shell="app"]:has([data-app-section="debug"]) {
+  --t2q-section-rgb: 119 172 217;
+  --t2q-section-light: #bddcf5;
+  --t2q-section-secondary: 95 176 149;
+}
+[data-shell="app"] :is(.t2q-card, .t2q-card-pro, .t2q-premium-card),
+[data-shell="app"] :is(section, article, li, div).rounded-sm.bg-ink-800 {
+  background: radial-gradient(ellipse at 0% 0%, rgb(var(--t2q-section-rgb) / 0.18), transparent 70%),
+    linear-gradient(145deg, #202a2a, #171e22);
+  border-color: rgb(var(--t2q-section-rgb) / 0.25);
+  box-shadow: inset 0 1px 0 #ffffff08, 0 12px 34px -26px #000b;
+}
+[data-shell="app"] .t2q-card-pro-hover:hover {
+  border-color: rgb(var(--t2q-section-rgb) / 0.52);
+  box-shadow: inset 0 1px 0 #ffffff0d, 0 12px 34px -24px rgb(var(--t2q-section-rgb) / 0.22);
+}
+[data-shell="app"] .t2q-page-intro {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  padding: clamp(24px, 3.5vw, 36px);
+  margin-bottom: 28px;
+  border: 1px solid rgb(var(--t2q-section-rgb) / 0.32);
+  border-radius: 24px;
+  background: radial-gradient(ellipse at 100% 0%, rgb(var(--t2q-section-secondary) / 0.24), transparent 66%),
+    linear-gradient(115deg, rgb(var(--t2q-section-rgb) / 0.18), #192928);
+  box-shadow: inset 0 1px 0 #ffffff0b, 0 20px 50px -38px rgb(var(--t2q-section-rgb) / 0.45);
+}
+[data-shell="app"] .t2q-page-intro::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 270px;
+  height: 270px;
+  right: -100px;
+  top: -160px;
+  border: 1px solid rgb(var(--t2q-section-rgb) / 0.2);
+  border-radius: 50%;
+  box-shadow: 0 0 0 28px rgb(var(--t2q-section-rgb) / 0.035), 0 0 0 56px rgb(var(--t2q-section-rgb) / 0.025);
+  pointer-events: none;
+}
+[data-shell="app"] .t2q-page-intro h1 { font-size: clamp(28px, 3.7vw, 40px); line-height: 1.2; }
+[data-shell="app"] .t2q-page-intro p { color: #d0d9d4; line-height: 1.65; }
+[data-shell="app"] .t2q-section-label-pro { color: var(--t2q-section-light); }
+[data-shell="app"] .t2q-page-intro .t2q-section-label-pro { color: var(--t2q-section-light); }
+[data-shell="app"] .t2q-btn-ghost-pro { border-color: rgb(var(--t2q-section-rgb) / 0.3); background: rgb(var(--t2q-section-rgb) / 0.07); }
+[data-shell="app"] .t2q-btn-ghost-pro:hover { background: rgb(var(--t2q-section-rgb) / 0.14); }
+[data-shell="app"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+[data-shell="app"] select,
+[data-shell="app"] textarea {
+  border-color: rgb(var(--t2q-section-rgb) / 0.3);
+  background-color: #152121;
+}
+[data-shell="app"] :is(input, textarea)::placeholder { color: #94a8a4; opacity: 1; }
+[data-shell="app"] :is(input, select, textarea)[aria-invalid="true"] { border-color: #f28f88; }
+[data-shell="app"] [role="tablist"] { background: #182826; border-color: rgb(var(--t2q-section-rgb) / 0.27); }
+[data-shell="app"] [role="tab"][aria-selected="false"] { color: #c0d1ca; }
+[data-shell="app"] [role="tab"][aria-selected="false"]:hover { background: rgb(var(--t2q-section-rgb) / 0.1); }
+[data-shell="app"] table thead { background: rgb(var(--t2q-section-rgb) / 0.1); color: var(--t2q-section-light); }
+[data-shell="app"] table tbody tr:hover { background: rgb(var(--t2q-section-rgb) / 0.05); }
+[data-shell="app"] [data-testid="upgrade-plan-solo"] { --t2q-section-rgb: 222 163 105; }
+[data-shell="app"] [data-testid="upgrade-plan-crew"] { --t2q-section-rgb: 106 194 167; }
+[data-shell="app"] [data-testid="upgrade-plan-builder"] { --t2q-section-rgb: 119 172 217; }
+
+/* The picture remains personal; the visible name and gear reveal Settings. */
+[data-shell="app"] .t2q-settings-trigger {
+  width: auto;
+  min-width: 128px;
+  height: 48px;
+  padding: 5px 12px 5px 6px;
+  gap: 9px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border-color: #eabd839c;
+  background: linear-gradient(115deg, #55412b, #263c35);
+}
+[data-shell="app"] [data-testid="app-header-avatar"] { position: relative; }
+.t2q-settings-portrait { position: relative; display: block; width: 34px; height: 34px; flex: 0 0 34px; border-radius: 50%; background: #ead4b41a; border: 1px solid #efc9934a; }
+.t2q-settings-portrait .t2q-profile-initial { font-size: 15px; }
+.t2q-settings-label { font-size: 12px; font-weight: 700; color: #ffe4c2; letter-spacing: 0; }
+.t2q-settings-gear { display: grid; place-items: center; position: absolute; right: -3px; bottom: -2px; width: 17px; height: 17px; border: 2px solid #384033; border-radius: 50%; background: #ffc17e; color: #30251c; }
+.t2q-settings-caret { flex: 0 0 auto; color: #e9c694; transition: transform 160ms; }
+[aria-expanded="true"] > .t2q-settings-caret { transform: rotate(180deg); }
+@media (min-width: 640px) and (max-width: 1050px) {
+  [data-shell="app"] [data-testid="app-header-context"] { display: none; }
+  [data-shell="app"] .t2q-nav-tab { padding-inline: 6px; font-size: 11px; }
+  [data-shell="app"] .t2q-settings-trigger { min-width: 115px; gap: 6px; padding-right: 9px; }
+}
+@media (max-width: 639px) {
+  [data-shell="app"] .t2q-page-intro { padding: 25px 20px; border-radius: 21px; }
+  [data-shell="app"] .t2q-settings-trigger { min-width: 124px; height: 46px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .t2q-settings-caret { transition: none; }
+}
