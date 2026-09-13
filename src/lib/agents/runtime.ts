@@ -136,8 +136,20 @@ export function buildRequestBody(args: {
     messages: args.messages,
   };
   if (args.includeTemperature) body.temperature = 0;
+  // Sonnet 5 / Opus reason adaptively INSIDE max_tokens. A small cap at the
+  // default effort can be consumed entirely by reasoning, leaving no room
+  // for the tool call (seen live: 748 of 768 tokens spent thinking). For
+  // tight caps, ask for low effort so the answer fits. Haiku 4.5 does not
+  // accept the effort knob and does not think unless asked, so it is
+  // excluded.
+  if (args.maxTokens <= SMALL_CAP_TOKENS && !/haiku/i.test(args.model)) {
+    body.output_config = { effort: "low" };
+  }
   return body;
 }
+
+/** Caps at or below this get `effort: "low"` so reasoning can't starve the answer. */
+export const SMALL_CAP_TOKENS = 1024;
 
 interface AnthropicResponsePayload {
   content?: Array<{

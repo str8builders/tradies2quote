@@ -181,3 +181,29 @@ describe("runStructuredAgent", () => {
     ).rejects.toThrow(/ANTHROPIC_API_KEY/);
   });
 });
+
+describe("small-cap effort guard", () => {
+  const small = {
+    system: "SYSTEM",
+    messages: [
+      { role: "user" as const, content: [{ type: "text" as const, text: "hi" }] },
+    ],
+    tool: TOOL,
+    cacheSystem: false,
+    includeTemperature: false,
+  };
+
+  it("asks for low effort when a thinking model has a tight cap", () => {
+    const body = buildRequestBody({ ...small, model: "claude-sonnet-5", maxTokens: 400 });
+    expect(body.output_config).toEqual({ effort: "low" });
+  });
+
+  it("leaves effort alone for roomy caps and for Haiku", () => {
+    expect(
+      buildRequestBody({ ...small, model: "claude-sonnet-5", maxTokens: 4096 }).output_config,
+    ).toBeUndefined();
+    expect(
+      buildRequestBody({ ...small, model: "claude-haiku-4-5", maxTokens: 400 }).output_config,
+    ).toBeUndefined();
+  });
+});
