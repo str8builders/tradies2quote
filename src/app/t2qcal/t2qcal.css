@@ -497,11 +497,13 @@
   --t2q-radius:20px; --t2q-radius-sm:12px; --t2q-shadow:inset 0 1px 0 #ffffff05,0 10px 32px -18px #0009;
   color:var(--t2q-text);
   font-family:var(--font-plus-jakarta),var(--font-inter),T2QSans,Arial,sans-serif;
-  /* The shared site wallpaper (glow + grid, no WebGL here) shows through.
-     The background is deliberately not attached to the viewport: iOS Safari
-     paints that wrong and it stalls scrolling; the wallpaper is already a
-     fixed layer of its own. */
-  background:transparent;
+  /* Same charcoal ground as the app shell, drawn on the element itself.
+     Deliberately NOT background-attachment:fixed — iOS Safari paints that
+     wrong and it stalls scrolling. The gradient scrolls with the page. */
+  background:
+    radial-gradient(900px 520px at 100% 0,rgba(255,95,21,.16),transparent 62%),
+    radial-gradient(600px 380px at 0 100%,rgba(255,234,0,.05),transparent 60%),
+    linear-gradient(170deg,#141718 0%,#0f1112 45%,#0d0e0e 100%);
   background-attachment:scroll;
   -webkit-font-smoothing:antialiased;
 }

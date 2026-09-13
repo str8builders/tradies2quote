@@ -38,10 +38,6 @@ export function LiveWallpaper() {
   const pathname = usePathname();
   const documentRoute =
     pathname.startsWith("/quote/") || pathname.endsWith("/pdf");
-  // T2QCAL keeps the CSS glow/grid for continuity with the app, but not the
-  // animated WebGL mesh: its cards sit on top of the wallpaper and a live
-  // canvas underneath made scrolling stutter on phones.
-  const calculatorRoute = pathname === "/t2qcal" || pathname.startsWith("/t2qcal/");
 
   useEffect(() => {
     document.documentElement.dataset.motion = paused ? "paused" : "playing";
@@ -49,7 +45,7 @@ export function LiveWallpaper() {
 
   useEffect(() => {
     const el = canvas.current;
-    if (!el || paused || documentRoute || calculatorRoute) return;
+    if (!el || paused || documentRoute) return;
     let cancelled = false;
     let dispose: (() => void) | undefined;
     // Keep Three.js out of the initial page payload and reduced-motion visits.
@@ -188,7 +184,7 @@ export function LiveWallpaper() {
       cancelled = true;
       dispose?.();
     };
-  }, [paused, documentRoute, calculatorRoute]);
+  }, [paused, documentRoute]);
 
   function toggle() {
     requestedPause = !paused;
@@ -209,7 +205,7 @@ export function LiveWallpaper() {
       >
         <div className="studio-wallpaper-glow" />
         <div className="studio-wallpaper-grid" />
-        {!calculatorRoute && <canvas ref={canvas} />}
+        <canvas ref={canvas} />
         <div className="studio-wallpaper-vignette" />
       </div>
       <button
