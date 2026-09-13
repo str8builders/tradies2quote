@@ -12,7 +12,7 @@ describe('native T2QCAL stair geometry compatibility',()=>{
  });
 });
 
-import {validateSnapshot} from './calculation-record';
+import {validateSnapshot,computeSnapshot} from './calculation-record';
 const legacy={version:1,slug:'straight-stairs',unit:'metric',values:{totalRise:2800,idealRise:175,run:250,width:1000,floorThickness:260,headroom:2000}};
 it('upgrades old saved stair inputs without mutating the saved source',()=>{
  const upgraded=validateSnapshot(legacy);
@@ -21,10 +21,11 @@ it('upgrades old saved stair inputs without mutating the saved source',()=>{
  const imperial={...legacy,unit:'imperial',values:Object.fromEntries(Object.entries(legacy.values).map(([k,v])=>[k,v/25.4]))};
  expect(validateSnapshot(imperial).values.treadThickness).toBeCloseTo(40/25.4,10);
 });
-it('rejects a tread as thick as the rise and a board without a remaining throat',()=>{
- expect(()=>validateSnapshot({...legacy,values:{...legacy.values,treadThickness:175,stringerWidth:300}})).toThrow('Treads must');
+it('reports a tread as thick as the rise and a board without a remaining throat the way the native app does',()=>{
+ const check=(values:Record<string,number>)=>computeSnapshot(validateSnapshot({...legacy,values})).results;
+ expect(check({...legacy.values,treadThickness:175,stringerWidth:300}).map(r=>r.label)).toEqual(['Check stair dimensions']);
  const geometry=calculateStairs(2800,175,250,260,2000);
- expect(()=>validateSnapshot({...legacy,values:{...legacy.values,treadThickness:40,stringerWidth:geometry.notchDepth}})).toThrow('stringer wider');
+ expect(check({...legacy.values,treadThickness:40,stringerWidth:geometry.notchDepth})[0].value).toContain('stringer wider');
 });
 import {stairNotchPath} from './calculations';
 it('draws exact rise/run notch lengths and square cuts for 2–60 risers',()=>{

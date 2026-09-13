@@ -2,7 +2,7 @@ import {describe,it,expect} from 'vitest';
 import {tools} from './tools';
 import {getVerifiedDefinition} from './verified-calculators';
 import {initialCalculatorValues} from './calculator-inputs';
-import {validateSnapshot,type CalculationSnapshot} from './calculation-record';
+import {validateSnapshot,computeSnapshot,type CalculationSnapshot} from './calculation-record';
 import {calculateStairs,calculateConcrete} from './calculations';
 import {materialSuggestion,validateHandoff,handoffQuote} from './quote-handoff';
 const custom:Record<string,Record<string,number|string>>={
@@ -16,9 +16,9 @@ const custom:Record<string,Record<string,number|string>>={
 function slab():CalculationSnapshot{return {version:1,slug:'concrete-slab',unit:'metric',values:{...custom['concrete-slab']}};}
 describe('calculator directory and private snapshots',()=>{
  for(const tool of tools) for(const unit of ['metric','imperial'] as const) it(`${tool.slug} ${unit} has valid default working`,()=>{
-   let values=custom[tool.slug]??initialCalculatorValues(getVerifiedDefinition(tool.slug).fields,unit);
-   if(tool.slug==="straight-stairs"&&unit==="imperial")values=Object.fromEntries(Object.entries(values).map(([key,value])=>[key,Number(value)/25.4]));
-   // Custom values here exercise the schema, not a unit-switch interaction.
+   // Custom (legacy-keyed, metric) values exercise the upgrade path; imperial uses the native defaults.
+   let values:Record<string,number|string>=unit==="metric"&&custom[tool.slug]?custom[tool.slug]:initialCalculatorValues(getVerifiedDefinition(tool.slug).fields,unit);
+   if(tool.slug==="straight-stairs"&&unit==="imperial")values=Object.fromEntries(Object.entries(custom[tool.slug]).map(([key,value])=>[key,Number(value)/25.4]));
    const record={version:1,slug:tool.slug,unit,values};
    expect(validateSnapshot(record)).toMatchObject({slug:tool.slug,unit});
  });
@@ -26,9 +26,12 @@ describe('calculator directory and private snapshots',()=>{
    expect(()=>validateSnapshot({...slab(),values:{...slab().values,width:Infinity}})).toThrow();
    expect(()=>validateSnapshot({...slab(),values:{...slab().values,user_id:'someone'}})).toThrow();
  });
- it('rejects impossible notches and excessive allocations',()=>{
-   expect(()=>validateSnapshot({version:1,slug:'common-rafter',unit:'metric',values:{...custom['common-rafter'],seat:500}})).toThrow();
-   expect(()=>validateSnapshot({version:1,slug:'equal-spacing',unit:'metric',values:{span:1e6,width:0,target:.001}})).toThrow();
+ it('rejects out-of-range inputs and reports impossible layouts the way the native app does',()=>{
+   expect(()=>validateSnapshot({version:1,slug:'common-rafter',unit:'metric',values:{...custom['common-rafter'],seat:5000}})).toThrow('seat is outside');
+   expect(()=>validateSnapshot({version:1,slug:'equal-spacing',unit:'metric',values:{span:2e6,width:45,target:450}})).toThrow('span is outside');
+   // Native accepts these and answers with a single "check" row instead of failing.
+   const impossible=validateSnapshot({version:1,slug:'equal-spacing',unit:'metric',values:{span:1e6,width:0,target:.001}});
+   expect(computeSnapshot(impossible).results.map(r=>r.label)).toEqual(['Check spacing dimensions']);
  });
 });
 describe('independent quantity checks',()=>{
@@ -50,7 +53,7 @@ describe('independent quantity checks',()=>{
    const input=validateHandoff({snapshot:slab(),mode:'calculated',description:'Concrete',quantity:9999,unit:'fake',unitPrice:200,clientName:'Test',total:1});
    const q=handoffQuote(input,{currency:'NZD',tax_label:'GST',tax_rate:15,default_markup_pct:20},'proof');
    expect(q.line_items[0].quantity).toBeCloseTo(2.64,12);expect(q.line_items[0].unit).toBe('m³');expect(q.materials_subtotal).toBe(528);expect(q.total).toBe(728.64);
-   expect(JSON.parse(q.line_items[0].t2qcal_provenance_note!)).toEqual(slab());
+   expect(JSON.parse(q.line_items[0].t2qcal_provenance_note!)).toEqual(validateSnapshot(slab()));
  });
  it('geometry without material output requires an explicit user quantity',()=>{
    const snapshot:CalculationSnapshot={version:1,slug:'pitch-angle',unit:'metric',values:{rise:1000,run:3000}};

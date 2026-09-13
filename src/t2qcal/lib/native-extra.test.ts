@@ -11,8 +11,8 @@ describe("Swift-generated native calculator references",()=>{
  for(const [key,value] of Object.entries(row.expected))expect(actual?.[key as keyof typeof actual]).toBeCloseTo(value!,8);
  expect(()=>validateSnapshot({version:1,slug:row.slug,unit,values})).not.toThrow();
  });
- it("rejects an impossible ring and excessive drain station count",()=>{
- for(const [slug,override] of [["paving-ring",{diameter:300}],["pipe-fall",{run:1e6,marks:.01}]] as const){const d=getVerifiedDefinition(slug);expect(d.compute({...initialCalculatorValues(d.fields,"metric"),...override},"metric").errors?.length).toBeGreaterThan(0);}
+ it("reports an impossible ring and excessive drain station count the way the native app does",()=>{
+ for(const [slug,override] of [["paving-ring",{diameter:300}],["pipe-fall",{run:1e6,marks:.01}]] as const){const d=getVerifiedDefinition(slug),o=d.compute({...initialCalculatorValues(d.fields,"metric"),...override},"metric");expect(o.errors).toBeUndefined();expect(o.results.map(r=>[r.label,r.primary])).toEqual([["Check inputs",true]]);expect(o.diagramValues?.invalid).toBe(1);}
  });
  it("keeps exact capacity multiples from creating phantom downpipes",()=>{const d=getVerifiedDefinition("spouting-downpipes"),v=initialCalculatorValues(d.fields,"metric");expect(d.compute(v,"metric").diagramValues?.outlets).toBe(1);expect(d.compute({...v,capacity:.5},"metric").diagramValues?.outlets).toBe(5);});
 });

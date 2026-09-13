@@ -115,7 +115,7 @@ export function VerifiedCalculator({ tool }: { tool: ToolEntry }) {
         <div className="diagram-toolbar">
           <label className="native-drawing-picker">Drawing<select aria-label="Drawing view" value={sheet} onChange={e=>setSheet(Number(e.target.value))}>{sheets.map((item,index)=><option key={item.label} value={index}>{item.label}</option>)}</select></label>
         </div>
-        {output.errors?.length ? <div className="verification-note" role="alert">Correct the highlighted inputs to generate this drawing.</div> : <TechnicalCanvas draw={draw} label={`${definition.title} ${activeSheet.label} technical diagram`} height={350} />}
+        {output.errors?.length || output.diagramValues?.invalid === 1 ? <div className="verification-note" role="alert">Correct the highlighted inputs to generate this drawing.</div> : <TechnicalCanvas draw={draw} label={`${definition.title} ${activeSheet.label} technical diagram`} height={350} />}
         <div className="drawing-legend"><span><i className="legend-cut" />Geometry &amp; dimensions</span><span><i className="legend-setout" />Running set-out</span><span><i className="legend-adjust" />Adjusted value</span><span><i className="legend-angle" />Angle</span><span>Measured dimensions govern</span></div>
       </section>
     </div>

@@ -1,24 +1,22 @@
-import {validateSnapshot,type CalculationSnapshot} from './calculation-record';
-import {calculateConcrete,calculateRafter,calculateTileFit} from './calculations';
+import {validateSnapshot,computeSnapshot,type CalculationSnapshot} from './calculation-record';
 import {getTool} from './tools';
+import {getVerifiedDefinition} from './verified-calculators';
 import {computeQuoteTotals,round2,clampMarkupPct,clampTaxRate} from '@/lib/quote-defaults';
 import type {QuoteData,QuoteLineItem} from '@/lib/quote-types';
 export type MaterialSuggestion={key:string;description:string;quantity:number;unit:string;basis:string};
+/**
+ * The quantity the calculator itself offers for a quote line — the native
+ * app's handoff for this tool (first material handoff the native app includes
+ * by default). Tools with no native handoff offer manual entry only.
+ */
 export function materialSuggestion(s:CalculationSnapshot):MaterialSuggestion|null {
-  const v=s.values as Record<string,number>,metric=s.unit==='metric';
-  if(s.slug==='concrete-slab'){
-    const g=calculateConcrete(v.length,v.width,v.thickness,v.waste,metric);
-    return{key:'concrete-order',description:'Concrete for slab',quantity:metric?g.orderVolume:g.orderVolume/27,unit:metric?'m³':'yd³',basis:`Slab volume including ${v.waste}% allowance, applied once. Confirm supplier order increment.`};
-  }
-  if(s.slug==='common-rafter'){
-    const g=calculateRafter(v.run,v.angle,v.overhang,v.depth,v.seat,v.wallHeight);
-    return{key:'rafter-length',description:`Rafter timber ${v.depth} × ${v.thickness} ${metric?'mm':'in'}`,quantity:g.totalLength/(metric?1000:12),unit:metric?'m':'ft',basis:'Net length for one rafter including overhang. Stock rounding, end trimming and multiple rafters are not included.'};
-  }
-  if(s.slug==='tile-layout'){
-    const g=calculateTileFit(v.floor,v.tile,v.joint);
-    return{key:'tile-count',description:'Tiles for entered rows',quantity:Math.ceil(g.count*v.rowsInput*(1+v.waste/100)),unit:'each',basis:`${g.count} tiles per row × ${v.rowsInput} rows with ${v.waste}% allowance, rounded up once. Cut pieces counted as whole tiles; reuse is not assumed.`};
-  }
-  return null;
+  const out=computeSnapshot(s);
+  if(out.errors?.length)return null;
+  const handoffs=out.handoffs??[];
+  const h=handoffs.find(x=>x.role==='material'&&x.includeByDefault)??handoffs.find(x=>x.role==='material');
+  if(!h||!Number.isFinite(h.quantity)||h.quantity<=0)return null;
+  const basis=[h.formula,...(h.assumptions??[])].filter((t):t is string=>typeof t==='string'&&t.trim().length>0).join(' ');
+  return{key:h.key,description:h.label,quantity:h.quantity,unit:h.unit,basis:basis||'Quantity from the calculator geometry, applied once. Confirm on site before ordering.'};
 }
 export type HandoffInput={snapshot:CalculationSnapshot;mode:'calculated'|'manual';description:string;quantity?:number;unit?:string;unitPrice:number;clientName:string};
 export function validateHandoff(raw:unknown):HandoffInput {
@@ -44,7 +42,7 @@ export function handoffQuote(input:HandoffInput,profile:{currency:string;tax_lab
     t2qcal_source_key:input.mode==='calculated'?suggestion!.key:'user-material',t2qcal_basis_fingerprint:fingerprint,
     t2qcal_assumptions:[input.mode==='calculated'?suggestion!.basis:'Material quantity entered by the user; geometry results do not determine this quantity.'],
     t2qcal_provenance_note:JSON.stringify(s),
-    t2qcal_calculator_snapshot:{toolSlug:s.slug,toolName:tool.name,inputs:Object.entries(s.values).filter((entry):entry is [string,number]=>typeof entry[1]==='number').map(([key,value])=>({key,label:key,value,unit:'',displayLabel:`${key}: ${value} (${s.unit} calculator)`}))},
+    t2qcal_calculator_snapshot:{toolSlug:s.slug,toolName:tool.name,inputs:Object.entries(s.values).filter((entry):entry is [string,number]=>typeof entry[1]==='number').map(([key,value])=>({key,label:getVerifiedDefinition(s.slug).fields.find(f=>f.key===key)?.label??key,value,unit:'',displayLabel:`${getVerifiedDefinition(s.slug).fields.find(f=>f.key===key)?.label??key}: ${value} (${s.unit} calculator)`}))},
   };
   const markup_pct=clampMarkupPct(profile.default_markup_pct),tax_rate=clampTaxRate(profile.tax_rate);
   return{client:{name:input.clientName,address:null,email:null,phone:null},job_summary:`${tool.name} material estimate`,line_items:[line],...computeQuoteTotals([line],markup_pct,tax_rate),markup_pct,tax_rate,tax_label:profile.tax_label,currency:profile.currency,terms:'',notes:[]};
