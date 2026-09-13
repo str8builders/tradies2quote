@@ -124,7 +124,9 @@ export async function describePhotosIntoTranscript(opts: {
   const transcript = (quote?.voice_transcript ?? "").trim();
   const { error } = await admin
     .from("quotes")
-    .update({ voice_transcript: `${transcript}\n\nWhat the client's photos show:\n${notes}` })
+    .update({
+      voice_transcript: `${transcript}\n\nWhat the client's photos show (AI-read from the photos — confirm on site before pricing):\n${notes}`,
+    })
     .eq("id", quoteId)
     .eq("user_id", tradieUserId);
   if (error) captureError(error, { route: "quote-requests/photo-transcript" });

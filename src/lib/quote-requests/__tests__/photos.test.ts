@@ -116,7 +116,7 @@ describe("describePhotosIntoTranscript", () => {
       describe: async () => result,
     });
     expect(notes).toContain("Client photo 1:");
-    expect(transcript()).toContain("Client says: build a deck.\n\nWhat the client's photos show:\nClient photo 1:");
+    expect(transcript()).toContain("Client says: build a deck.\n\nWhat the client's photos show (AI-read from the photos — confirm on site before pricing):\nClient photo 1:");
   });
 
   it("does nothing without photos", async () => {
