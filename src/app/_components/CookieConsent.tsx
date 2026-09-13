@@ -83,6 +83,7 @@ export function CookieConsent() {
           role="dialog"
           aria-label="Cookie consent"
           className="fixed bottom-[88px] left-4 right-4 z-50 sm:bottom-6 sm:left-6 sm:right-auto sm:max-w-md"
+          style={pathname?.startsWith("/t2qcal") ? { bottom: "calc(env(safe-area-inset-bottom, 0px) + 96px)" } : undefined}
         >
           <div className="t2q-card-pro flex flex-col gap-3 p-4 shadow-[0_16px_40px_-16px_rgba(0,0,0,0.7)] sm:p-5">
             <div className="flex items-start gap-3">

@@ -391,7 +391,7 @@
 @media(max-width:800px){.t2qcal-app .calculator-page{padding-top:16px}.t2qcal-app .calculator-breadcrumb{margin-bottom:16px}.t2qcal-app .calculator-title-row{gap:16px;padding-bottom:16px}.t2qcal-app .calculator-title-row h1{font-size:28px}.t2qcal-app .calculator-title-row p{font-size:14px}.t2qcal-app .webapp-bar{gap:8px;font-size:14px}}
 
 /* Web rendering of the existing SwiftUI Theme, ToolListView and RootView. */
-.t2qcal-app {background:radial-gradient(ellipse at top right,#ff5f154d,transparent 68%),radial-gradient(ellipse at bottom left,#ffea0014,transparent 60%),linear-gradient(150deg,#1c130c 0%,#140f0c 26%,#0c0a09 68%,#070707);background-attachment:fixed;font-family:T2QSans,Arial,sans-serif;padding-bottom:calc(110px + env(safe-area-inset-bottom));}
+.t2qcal-app {background:radial-gradient(ellipse at top right,#ff5f154d,transparent 68%),radial-gradient(ellipse at bottom left,#ffea0014,transparent 60%),linear-gradient(150deg,#1c130c 0%,#140f0c 26%,#0c0a09 68%,#070707);background-attachment:scroll;font-family:T2QSans,Arial,sans-serif;padding-bottom:calc(110px + env(safe-area-inset-bottom));}
 .t2qcal-app .native-header{height:calc(64px + env(safe-area-inset-top));padding:env(safe-area-inset-top) 20px 0;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:40;background:#0a0a0a80;backdrop-filter:blur(20px);gap:12px;}
 .t2qcal-app .native-header-spacer{width:88px;}
 .t2qcal-app .native-wordmark{display:flex;align-items:center;gap:3px;white-space:nowrap;}
@@ -455,7 +455,7 @@
 .t2qcal-app .native-header-actions button.native-round svg{background:#ff5f15;color:#1a0c03;border-radius:50%;padding:3px;width:29px;height:29px;}
 .t2qcal-app .native-group .native-row+.native-row{border-top:0;position:relative;}
 .t2qcal-app .native-group .native-row+.native-row::before{content:"";position:absolute;top:0;left:62px;right:16px;height:1px;background:#ffffff14;}
-.t2qcal-app{background:radial-gradient(circle at top right,#ff5f1526,transparent 600px),radial-gradient(circle at bottom left,#ffea000c,transparent 500px),linear-gradient(150deg,#1c130c,#140f0c 26%,#0c0a09 68%,#070707);background-attachment:fixed;}
+.t2qcal-app{background:radial-gradient(circle at top right,#ff5f1526,transparent 600px),radial-gradient(circle at bottom left,#ffea000c,transparent 500px),linear-gradient(150deg,#1c130c,#140f0c 26%,#0c0a09 68%,#070707);background-attachment:scroll;}
 .t2qcal-app .native-page{padding-top:20px;}
 .t2qcal-app .native-hero{background-image:linear-gradient(#ffffff06 1px,transparent 1px),linear-gradient(90deg,#ffffff06 1px,transparent 1px),linear-gradient(120deg,#0a0a0a,#2b1206);}
 .t2qcal-app .native-drawing-picker{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;font:14px T2QSans,Arial,sans-serif;color:#a8a8a8;}
@@ -489,16 +489,20 @@
    feedback, safe-area aware. Technical drawings stay white worksheets.
    ========================================================================== */
 .t2qcal-app{
-  --t2q-ink:#070707; --t2q-ink-2:#0e0d0c; --t2q-glass:rgba(255,255,255,.045); --t2q-glass-2:rgba(255,255,255,.07);
-  --t2q-line:rgba(255,255,255,.09); --t2q-line-2:rgba(255,255,255,.16); --t2q-text:#f4f3ef; --t2q-muted:#a7a49d; --t2q-dim:#6f6c66;
-  --t2q-brand:#ff5f15; --t2q-brand-2:#ff8b55; --t2q-hivis:#ffea00; --t2q-good:#7bd88f;
-  --t2q-radius:18px; --t2q-radius-sm:12px; --t2q-shadow:0 18px 50px -20px rgba(0,0,0,.8),0 1px 0 rgba(255,255,255,.04) inset;
+  /* Palette shared with the Tradies2Quote app shell (premium.css): charcoal
+     surfaces, brand orange, hi-vis yellow, the same off-white text. */
+  --t2q-ink:#0d0e0e; --t2q-ink-2:#141718; --t2q-card:linear-gradient(150deg,#1c2021,#141718); --t2q-glass:rgba(28,32,33,.92); --t2q-glass-2:rgba(38,43,44,.96);
+  --t2q-line:#ffffff12; --t2q-line-2:#ffffff22; --t2q-text:#f4f3ef; --t2q-muted:#b1b8ba; --t2q-dim:#7d8487;
+  --t2q-brand:#ff5f15; --t2q-brand-2:#ffa06d; --t2q-hivis:#ffea00; --t2q-good:#7bd88f;
+  --t2q-radius:20px; --t2q-radius-sm:12px; --t2q-shadow:inset 0 1px 0 #ffffff05,0 10px 32px -18px #0009;
   color:var(--t2q-text);
-  background:
-    radial-gradient(900px 520px at 100% -10%,rgba(255,95,21,.22),transparent 60%),
-    radial-gradient(700px 420px at -10% 100%,rgba(255,234,0,.07),transparent 60%),
-    linear-gradient(160deg,#171009 0%,#100d0b 30%,#0b0a09 65%,#070707 100%);
-  background-attachment:fixed;
+  font-family:var(--font-plus-jakarta),var(--font-inter),T2QSans,Arial,sans-serif;
+  /* The shared site wallpaper (glow + grid, no WebGL here) shows through.
+     The background is deliberately not attached to the viewport: iOS Safari
+     paints that wrong and it stalls scrolling; the wallpaper is already a
+     fixed layer of its own. */
+  background:transparent;
+  background-attachment:scroll;
   -webkit-font-smoothing:antialiased;
 }
 @media(prefers-reduced-motion:no-preference){
@@ -509,7 +513,7 @@
 }
 
 /* Header ------------------------------------------------------------------ */
-.t2qcal-app .native-navigation-header{background:rgba(7,7,7,.72);backdrop-filter:blur(22px) saturate(140%);-webkit-backdrop-filter:blur(22px) saturate(140%);border-bottom:1px solid var(--t2q-line);}
+.t2qcal-app .native-navigation-header{background:rgba(13,15,16,.94);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-bottom:1px solid #ffffff0f;}
 .t2qcal-app .native-app-return{color:var(--t2q-muted);font:600 12px/1 T2QMono,monospace;letter-spacing:.08em;text-transform:uppercase;}
 .t2qcal-app .native-app-return:hover{color:var(--t2q-hivis);}
 .t2qcal-app .native-wordmark b{color:var(--t2q-hivis);text-shadow:0 0 18px rgba(255,234,0,.25);}
@@ -523,7 +527,7 @@
 
 /* Hero & sections ---------------------------------------------------------- */
 .t2qcal-app .native-hero{position:relative;overflow:hidden;padding:24px 22px 22px;border:1px solid var(--t2q-line-2);border-radius:var(--t2q-radius);box-shadow:var(--t2q-shadow);
-  background:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px),radial-gradient(420px 220px at 90% 0%,rgba(255,95,21,.35),transparent 70%),linear-gradient(125deg,#141110,#241108 70%,#2b1206);background-size:28px 28px,28px 28px,100% 100%,100% 100%;}
+  background:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px),radial-gradient(420px 220px at 90% 0%,rgba(255,95,21,.35),transparent 70%),linear-gradient(150deg,#1c2021,#141718 60%,#221410);background-size:28px 28px,28px 28px,100% 100%,100% 100%;}
 .t2qcal-app .native-hero::after{content:"";position:absolute;inset:auto -30% -60% auto;width:70%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,rgba(255,234,0,.12),transparent 60%);pointer-events:none;}
 .t2qcal-app .native-eyebrow{font:11px/1 T2QMono,monospace;letter-spacing:.22em;color:var(--t2q-brand-2);margin-bottom:12px;}
 .t2qcal-app .native-hero h1{font:30px/1.02 T2QDisplay,Arial,sans-serif;letter-spacing:-.02em;text-transform:uppercase;}
@@ -536,9 +540,10 @@
 .t2qcal-app .native-link-button:disabled{color:var(--t2q-dim);cursor:default;}
 
 /* Glass groups & rows ------------------------------------------------------- */
-.t2qcal-app .native-group{background:var(--t2q-glass);border:1px solid var(--t2q-line);border-radius:var(--t2q-radius);box-shadow:var(--t2q-shadow);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
+.t2qcal-app .native-group{background:var(--t2q-card);border:1px solid var(--t2q-line);border-radius:var(--t2q-radius);box-shadow:var(--t2q-shadow);}
 .t2qcal-app .native-row{padding:15px 16px;min-height:72px;border:0;cursor:pointer;font:inherit;color:var(--t2q-text);}
-.t2qcal-app .native-row strong{font-weight:600;letter-spacing:-.01em;}
+.t2qcal-app .native-row strong{font-weight:600;letter-spacing:-.02em;}
+.t2qcal-app .native-page{animation-duration:.3s;}
 .t2qcal-app .native-row small{color:var(--t2q-muted);}
 .t2qcal-app a.native-row:hover,.t2qcal-app button.native-row:hover{background:var(--t2q-glass-2);}
 .t2qcal-app .native-group .native-row+.native-row::before{background:var(--t2q-line);}
@@ -568,12 +573,12 @@
 .t2qcal-app .native-status-row{display:flex;flex-wrap:wrap;gap:8px;margin:14px 2px 0;}
 
 /* Tab bar ------------------------------------------------------------------ */
-.t2qcal-app .native-tabbar{background:rgba(14,13,12,.82);border:1px solid var(--t2q-line-2);box-shadow:0 20px 50px -16px rgba(0,0,0,.9),0 1px 0 rgba(255,255,255,.06) inset;backdrop-filter:blur(26px) saturate(150%);-webkit-backdrop-filter:blur(26px) saturate(150%);}
+.t2qcal-app .native-tabbar{background:rgba(13,15,16,.94);border:1px solid #ffffff1a;box-shadow:0 20px 50px -16px rgba(0,0,0,.9),0 1px 0 #ffffff08 inset;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);}
 .t2qcal-app .native-tabbar a{font:600 10.5px T2QSans,Arial,sans-serif;letter-spacing:.02em;color:var(--t2q-muted);}
-.t2qcal-app .native-tabbar a[aria-current=page]{background:linear-gradient(180deg,rgba(255,95,21,.22),rgba(255,95,21,.08));color:var(--t2q-brand-2);box-shadow:0 0 0 1px rgba(255,95,21,.28) inset,0 8px 20px -12px rgba(255,95,21,.8);}
+.t2qcal-app .native-tabbar a[aria-current=page]{background:#ffffff08;color:#ffa06d;box-shadow:0 0 0 1px #ffffff10 inset;}
 
 /* Settings sheet, sign-in, forms ------------------------------------------- */
-.t2qcal-app .native-settings{background:linear-gradient(170deg,#141210,#0c0b0a);border:1px solid var(--t2q-line-2);box-shadow:0 40px 90px -30px rgba(0,0,0,.95);}
+.t2qcal-app .native-settings{background:linear-gradient(170deg,#1c2021,#0f1112);border:1px solid var(--t2q-line-2);box-shadow:0 40px 90px -30px rgba(0,0,0,.95);}
 .t2qcal-app .native-sheet-heading h2{font:22px T2QDisplay,Arial,sans-serif;text-transform:uppercase;letter-spacing:-.01em;}
 .t2qcal-app .native-account{cursor:default;}
 .t2qcal-app .native-account>svg:first-child{color:var(--t2q-good);flex:none;}
@@ -617,7 +622,7 @@
 .t2qcal-app .measure-horizon-glow{stroke:rgba(255,234,0,.35);stroke-width:8;vector-effect:non-scaling-stroke;}
 .t2qcal-app .measure-ring{fill:none;stroke:var(--t2q-brand);stroke-width:1.5;vector-effect:non-scaling-stroke;}
 .t2qcal-app .measure-dot{fill:var(--t2q-brand);}
-.t2qcal-app .measure-readout{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;padding:10px 20px;border-radius:16px;background:rgba(7,7,7,.7);border:1px solid var(--t2q-line-2);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
+.t2qcal-app .measure-readout{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;padding:10px 20px;border-radius:16px;background:rgba(13,15,16,.86);border:1px solid var(--t2q-line-2);}
 .t2qcal-app .measure-readout strong{font:44px/1 T2QDisplay,Arial,sans-serif;letter-spacing:-.02em;color:var(--t2q-hivis);font-variant-numeric:tabular-nums;}
 .t2qcal-app .measure-readout span{font:11px T2QMono,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--t2q-muted);margin-top:6px;}
 .t2qcal-app .measure-heading{position:absolute;top:12px;right:12px;display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border-radius:999px;background:rgba(7,7,7,.65);border:1px solid var(--t2q-line);font:12px T2QMono,monospace;color:var(--t2q-text);}
@@ -652,7 +657,7 @@
 .t2qcal-app .calculator-page{padding-inline:16px;}
 .t2qcal-app .native-calculator-intro .unit-toggle{background:var(--t2q-glass);border:1px solid var(--t2q-line);border-radius:12px;}
 .t2qcal-app .native-calculator-intro .unit-toggle button.active{background:linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,.07));color:var(--t2q-text);}
-.t2qcal-app .input-panel,.t2qcal-app .results-section,.t2qcal-app .markout-section,.t2qcal-app .converter-card,.t2qcal-app .save-working,.t2qcal-app .tool-card,.t2qcal-app .category-card,.t2qcal-app .install-instructions{background:var(--t2q-glass);border:1px solid var(--t2q-line);border-radius:var(--t2q-radius);box-shadow:var(--t2q-shadow);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
+.t2qcal-app .input-panel,.t2qcal-app .results-section,.t2qcal-app .markout-section,.t2qcal-app .converter-card,.t2qcal-app .save-working,.t2qcal-app .tool-card,.t2qcal-app .category-card,.t2qcal-app .install-instructions{background:var(--t2q-card);border:1px solid var(--t2q-line);border-radius:var(--t2q-radius);box-shadow:var(--t2q-shadow);}
 .t2qcal-app .calc-section-head h2,.t2qcal-app .save-working h2,.t2qcal-app .page-intro h1,.t2qcal-app .empty-state h2{font-family:T2QDisplay,Arial,sans-serif;text-transform:uppercase;letter-spacing:-.01em;font-weight:400;}
 .t2qcal-app .calc-section-head>span,.t2qcal-app .eyebrow,.t2qcal-app .calculator-kicker{color:var(--t2q-brand-2);font:11px T2QMono,monospace;letter-spacing:.2em;text-transform:uppercase;}
 .t2qcal-app .field-label{color:var(--t2q-muted);}

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useReducedMotion } from "framer-motion";
 import { MIN_ENTRY_MS, createWelcomeDeadline, entryComplete, entryTapeProgress } from "@/lib/welcome-playback";
+import { previousPathname, shouldPlayWelcome } from "@/lib/route-history";
 import { WelcomePoster } from "./WelcomePoster";
 import { AppLoadingTape } from "./AppLoadingTape";
 const WelcomePlayer = dynamic(() => import("./WelcomePlayer"), { ssr: false, loading: () => <WelcomePoster /> });
@@ -31,13 +32,13 @@ export default function AppSplash({ storageKey = "t2q-welcome-v5", tagline = "Le
   const finished = useCallback(() => setIntroDone(true), []);
   useEffect(() => {
     const start = setTimeout(() => {
-      let seen = false;
-      try {
-        const lastSeen = Number(sessionStorage.getItem(storageKey));
-        const elapsed = Date.now() - lastSeen;
-        seen = lastSeen > 0 && elapsed >= 0 && elapsed < SKIP_WINDOW_MS;
-      } catch { /* Entry also works without browser storage. */ }
-      if (seen) { close(); return; }
+      // Entry-only: play after sign-in or on a cold start (unless seen within
+      // the window), never when coming back from T2QCAL or another page —
+      // a replayed modal hid the bottom nav and froze scrolling.
+      let lastSeen = 0;
+      try { lastSeen = Number(sessionStorage.getItem(storageKey)) || 0; } catch { /* Entry also works without browser storage. */ }
+      const play = shouldPlayWelcome({ previous: previousPathname(), lastSeen, now: Date.now(), skipWindowMs: SKIP_WINDOW_MS });
+      if (!play) { close(); return; }
       dialogRef.current?.showModal();
       setPlay(true);
     }, 0);

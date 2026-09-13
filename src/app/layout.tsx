@@ -15,6 +15,7 @@ import { FloatingInstallButton } from "./_components/FloatingInstallButton";
 import { SignupBeacon } from "./_components/SignupBeacon";
 import { CookieConsent } from "./_components/CookieConsent";
 import { GlobalErrorListeners } from "./_components/GlobalErrorListeners";
+import { RouteTracker } from "./_components/RouteTracker";
 
 const archivoblack = Archivo_Black({
   variable: "--font-archivo-black",
@@ -198,6 +199,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-ink-900 text-white antialiased">
         <TradiesOnly><LiveWallpaper /></TradiesOnly>
         <div className="studio-content">{children}</div>
+        <RouteTracker />
         {/* Wave 12.3 — floating Install-App CTA. Renders nothing when
             the app is already installed or the browser can't install,
             so safe to mount globally. */}
