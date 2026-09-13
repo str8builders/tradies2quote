@@ -468,3 +468,6 @@
 .t2qcal-app .drawing-help{background:#111;color:#a8a8a8;font:11px/1.5 T2QSans,Arial,sans-serif;}
 .t2qcal-app .drawing-help summary{cursor:pointer;min-height:30px;}
 .t2qcal-app .diagram-toolbar{background:#111;border-color:#ffffff14;}
+
+.t2qcal-app .install-choice-options { display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; }
+.t2qcal-app .install-choice-options .button { display:inline-flex; align-items:center; text-decoration:none; }

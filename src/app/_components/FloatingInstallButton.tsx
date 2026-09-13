@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { DownloadSimple, X } from "@phosphor-icons/react";
 import { isNativeIOSApp } from "@/lib/native-app";
+import { InstallAppChooser } from "./InstallAppChooser";
 import {
   isIOSUserAgent,
   isStandalone,
@@ -67,6 +68,7 @@ export function FloatingInstallButton() {
 
   const [state, setState] = useState<State>({ mode: "hidden" });
   const [showIOSSheet, setShowIOSSheet] = useState(false);
+  const [showChooser, setShowChooser] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
@@ -115,7 +117,10 @@ export function FloatingInstallButton() {
     };
   }, []);
 
-  const onClick = useCallback(async () => {
+  const onClick = useCallback(() => setShowChooser(true), []);
+
+  const installTradies2Quote = useCallback(async () => {
+    setShowChooser(false);
     if (state.mode === "prompt") {
       try {
         await state.promptEvent.prompt();
@@ -177,6 +182,14 @@ export function FloatingInstallButton() {
           </button>
         ) : null}
       </div>
+
+      {showChooser ? (
+        <InstallAppChooser
+          current="tradies2quote"
+          onInstallCurrent={() => void installTradies2Quote()}
+          onClose={() => setShowChooser(false)}
+        />
+      ) : null}
 
       {/* iOS Add-to-Home-Screen tooltip (3-step). Native iOS Safari
           doesn't expose `beforeinstallprompt` so this is the only way

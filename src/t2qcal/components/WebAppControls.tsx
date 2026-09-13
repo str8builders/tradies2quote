@@ -8,6 +8,7 @@ export function WebAppControls() {
   const [prompt, setPrompt] = useState<InstallEvent | null>(null);
   const [installed, setInstalled] = useState(false);
   const [instructions, setInstructions] = useState(false);
+  const [choosing, setChoosing] = useState(false);
   const [offlineReady,setOfflineReady]=useState(false);
   const [message, setMessage] = useState("");
   useEffect(() => {
@@ -26,7 +27,11 @@ export function WebAppControls() {
     }).catch(async()=>{const existing=await navigator.serviceWorker.getRegistration("/t2qcal/calculators").catch(()=>undefined);if(!cancelled){if(existing?.active&&existing.scope.endsWith("/t2qcal/"))setOfflineReady(true);else setMessage("Offline setup is unavailable in this browser. You can still use T2QCAL online.");}});
     return()=>{cancelled=true;};
   },[]);
-  async function install() {
+  // The Install tap asks which app first: T2QCAL installs from this page,
+  // Tradies2Quote from its own install page (separate manifest and icon).
+  function install() { setChoosing(value=>!value); setInstructions(false); }
+  async function installT2QCAL() {
+    setChoosing(false);
     if (!prompt) { setInstructions(value=>!value); return; }
     try { await prompt.prompt(); const choice=await prompt.userChoice; if(choice.outcome!=="accepted")setMessage("You can install T2QCAL later from your browser menu."); }
     catch {setInstructions(true);}
@@ -36,6 +41,7 @@ export function WebAppControls() {
     <span>{offlineReady?"Offline support ready":"T2QCAL · Web app"}</span>
     {!(installed||standalone) && <button type="button" className="directory-button" onClick={install}>Install T2QCAL</button>}
     {(installed||standalone) && <span>Installed web app</span>}
+    {choosing && <div className="install-instructions install-choice" role="group" aria-label="Choose an app to install"><strong>Which app do you want on your Home Screen?</strong><p>Each one installs as its own icon. You can add both.</p><div className="install-choice-options"><button type="button" className="button primary" onClick={()=>void installT2QCAL()}>T2QCAL · calculators (this app)</button><a className="button" href="/install">Tradies2Quote · quotes &amp; invoices</a></div></div>}
     {instructions && <div className="install-instructions"><strong>Add T2QCAL to your phone</strong><p>On iPhone or iPad, open this page in Safari, tap Share, then Add to Home Screen. On Android or desktop, choose Install app or Add to Home Screen in your browser menu.</p><p>Tradies2Quote and T2QCAL have separate Home Screen icons. Open each calculator once online to make it available offline. Save on this device works without an account. Account saves and quote transfer require internet.</p><button onClick={()=>setInstructions(false)}>Close instructions</button></div>}
     {message && <p role="status">{message}</p>}
   </section>;

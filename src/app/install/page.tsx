@@ -83,6 +83,14 @@ export default async function InstallPage() {
 
         <InstallGuide />
 
+        <p className="mt-8 border border-ink-700 bg-ink-950 p-4 text-center text-sm text-ink-300">
+          Want the construction calculators too?{" "}
+          <Link href="/t2qcal/install" className="text-brand hover:underline">
+            Install T2QCAL as its own app
+          </Link>
+          . Two icons, one account.
+        </p>
+
         <p className="mt-8 text-center text-sm text-ink-400">
           Stuck? Email{" "}
           <a

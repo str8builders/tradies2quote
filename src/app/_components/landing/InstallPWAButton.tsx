@@ -8,6 +8,7 @@ import {
   ShareNetwork,
 } from "@phosphor-icons/react";
 import { isNativeIOSApp } from "@/lib/native-app";
+import { InstallAppChooser } from "../InstallAppChooser";
 
 const emptySubscribe = () => () => {};
 
@@ -62,6 +63,9 @@ export default function InstallPWAButton({
   );
   const [installed, setInstalled] = useState(false);
   const [showIosHelp, setShowIosHelp] = useState(false);
+  // Install taps go through the "which app?" chooser first: Tradies2Quote
+  // installs from here, T2QCAL from its own install page.
+  const [showChooser, setShowChooser] = useState(false);
   const [platform, setPlatform] = useState<"desktop" | "ios" | "android">(
     "desktop",
   );
@@ -103,7 +107,12 @@ export default function InstallPWAButton({
     };
   }, []);
 
-  async function handleClick() {
+  function handleClick() {
+    setShowChooser(true);
+  }
+
+  async function installTradies2Quote() {
+    setShowChooser(false);
     if (deferredPrompt) {
       try {
         await deferredPrompt.prompt();
@@ -155,6 +164,13 @@ export default function InstallPWAButton({
           </>
         )}
       </button>
+      {showChooser && (
+        <InstallAppChooser
+          current="tradies2quote"
+          onInstallCurrent={() => void installTradies2Quote()}
+          onClose={() => setShowChooser(false)}
+        />
+      )}
       {showIosHelp && (
         <IosHelp platform={platform} onClose={() => setShowIosHelp(false)} />
       )}

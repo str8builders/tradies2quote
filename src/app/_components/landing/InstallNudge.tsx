@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { isNativeIOSApp } from "@/lib/native-app";
+import { InstallAppChooser } from "../InstallAppChooser";
 import {
   X,
   DeviceMobile,
@@ -63,6 +64,7 @@ export default function InstallNudge() {
   );
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
+  const [chooser, setChooser] = useState(false);
 
   useEffect(() => {
     const ua = navigator.userAgent || "";
@@ -116,7 +118,12 @@ export default function InstallNudge() {
     setOpen(false);
   }
 
-  async function installNow() {
+  function installNow() {
+    setChooser(true);
+  }
+
+  async function installTradies2Quote() {
+    setChooser(false);
     if (deferredPrompt) {
       try {
         await deferredPrompt.prompt();
@@ -137,6 +144,14 @@ export default function InstallNudge() {
   }
 
   return (
+    <>
+    {chooser && (
+      <InstallAppChooser
+        current="tradies2quote"
+        onInstallCurrent={() => void installTradies2Quote()}
+        onClose={() => setChooser(false)}
+      />
+    )}
     <AnimatePresence>
       {open && (
         <motion.div
@@ -225,6 +240,7 @@ export default function InstallNudge() {
         </motion.div>
       )}
     </AnimatePresence>
+    </>
   );
 }
 
