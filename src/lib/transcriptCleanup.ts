@@ -602,6 +602,11 @@ const callHostedSummary: AnthropicCallable = async ({ apiKey, system, user, mode
       body: JSON.stringify({
         model,
         max_tokens: maxTokens,
+        // Current Claude models think adaptively inside max_tokens. At the
+        // default effort the reasoning alone ate a 768-token cap and every
+        // summary came back truncated; low effort is plenty for a fixed
+        // JSON shape and keeps the answer inside the budget.
+        output_config: { effort: "low" },
         system,
         messages: [{ role: "user", content: user }],
       }),
@@ -649,8 +654,9 @@ export async function buildSummary(
       system: SUMMARY_SYSTEM_PROMPT,
       user: cleanedTranscript,
       model,
-      // The summary shape is compact; this keeps local CPU inference bounded.
-      maxTokens: 768,
+      // The summary shape is compact (~300 tokens). Local CPU inference stays
+      // bounded at 768; the hosted model gets headroom for its reasoning.
+      maxTokens: local ? 768 : 2048,
     });
   } catch {
     return null;
