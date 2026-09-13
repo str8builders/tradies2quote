@@ -5,6 +5,7 @@ import "../premium.css";
 import { useEffect, useRef, useState } from "react";
 import { AccountHub } from "./AccountHub";
 import { AccountButton } from "./AccountButton";
+import { T2QCALIcon } from "./T2QCALIcon";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
@@ -46,7 +47,7 @@ const TABS = [
   { href: "/app/clients", label: "Clients", ownerOnly: false },
   // T2QCAL lives on the same site (manifest scope "/"), so it opens inside
   // the installed Tradies2Quote app rather than as a separate install.
-  { href: "/t2qcal/calculators", label: "Calculators", ownerOnly: false },
+  { href: "/t2qcal/calculators", label: "T2QCAL", ownerOnly: false },
 ] as const;
 
 /** Tabs whose feature is flag-parked vanish from the strip entirely — a
@@ -160,7 +161,7 @@ export function AppHeaderClient({
                 <Link
                   key={tab.href}
                   href={tab.href}
-                  className="t2q-nav-tab"
+                  className={`t2q-nav-tab${tab.href === "/t2qcal/calculators" ? " t2q-cal-nav" : ""}`}
                   aria-current={active ? "page" : undefined}
                   data-testid={`app-header-tab-${tab.label.toLowerCase()}`}
                 >
@@ -176,6 +177,7 @@ export function AppHeaderClient({
                       style={{ boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.04)" }}
                     />
                   ) : null}
+                  {tab.href === "/t2qcal/calculators" && <T2QCALIcon size={24} />}
                   <span className="relative">{tab.label}</span>
                 </Link>
               );

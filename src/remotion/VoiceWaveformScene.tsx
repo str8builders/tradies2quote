@@ -4,8 +4,8 @@ export type VoiceWaveformState = "idle" | "recording" | "processing" | "error";
 export const WAVEFORM_FRAMES = 120;
 export const WAVEFORM_FPS = 30;
 
-/** Decorative recording-state motion, not a measurement of microphone volume. */
-export function WaveformLines({ frame = 0, state = "idle" }: { frame?: number; state?: VoiceWaveformState }) {
+/** Recording uses measured microphone level; other states use gentle decorative motion. */
+export function WaveformLines({ frame = 0, state = "idle", audioLevel = null }: { frame?: number; state?: VoiceWaveformState; audioLevel?: number | null }) {
   const phase = frame / WAVEFORM_FRAMES * Math.PI * 2;
   return <svg viewBox="0 0 720 180" width="100%" height="100%" fill="none" aria-hidden="true" focusable="false">
     {Array.from({ length: 37 }, (_, i) => {
@@ -13,7 +13,9 @@ export function WaveformLines({ frame = 0, state = "idle" }: { frame?: number; s
       const base = marker ? 17 : 55 + (i * 37 % 75);
       const wave = Math.sin(phase * (state === "recording" ? 3 : 1) + i * 0.8);
       const amplitude = state === "recording" ? 0.3 : state === "processing" ? 0.5 : 0.08;
-      const height = state === "error" ? base * 0.55 : base * (1 + amplitude * wave);
+      const measured = state === "recording" && audioLevel !== null;
+      const height = measured ? 8 + base * Math.max(0, Math.min(1, audioLevel!))
+        : state === "error" ? base * 0.55 : base * (1 + amplitude * wave);
       return <line key={i} x1={36 + i * 18} x2={36 + i * 18} y1={90 - height / 2} y2={90 + height / 2}
         stroke={marker ? "#ffe500" : "#ff651b"} strokeWidth={8} strokeLinecap="round" opacity={state === "error" ? 0.55 : 1} />;
     })}

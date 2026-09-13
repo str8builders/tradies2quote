@@ -338,9 +338,9 @@ export default async function QuotePreviewPage({
         // pb-24 (mobile): the fixed StickyActionBar covers ~3.5rem above the
         // island nav — page-tail cards (Review tools, invoice draft) need
         // their own clearance beyond the shell's global 5.8rem nav padding.
-        className="mx-auto max-w-3xl px-4 pt-10 pb-24 sm:px-6 sm:py-14"
+        className="t2q-review-page mx-auto max-w-3xl px-4 pt-6 pb-24 sm:px-6 sm:pt-8 sm:pb-10"
       >
-        <div className="mb-8">
+        <div className="mb-5">
           <Link href="/app/quotes" className="t2q-btn-back mb-4">
             <ArrowLeft weight="bold" className="h-3.5 w-3.5" />
             Back to quotes
@@ -359,26 +359,12 @@ export default async function QuotePreviewPage({
             <HeaderStatusPill status={(quote.status ?? "draft") as QuoteStatus} />
           </div>
           <p className="mt-3 text-sm text-ink-300 sm:text-base">
-            Tweak any line, fix the client name, edit the terms — your changes save when you hit save.
+            Check the total, open any section to edit, then save and send.
           </p>
         </div>
 
         {quoteData ? (
           <>
-            {/* Wave 13 — lifecycle card at the top of the page.
-                Wave 14 — also fed voiceTranscript + invoiceExists so
-                the orchestrator can suggest Voice Cleanup on draft
-                and Invoice on completed (when no invoice yet). */}
-            <LifecycleCard
-              quoteId={quote.id}
-              status={(quote.status ?? "draft") as QuoteStatus}
-              quoteData={quoteData}
-              expiresAt={quote.expires_at ?? null}
-              isOwner={isOwnerEmail(user.email)}
-              voiceTranscript={quote.voice_transcript ?? null}
-              invoiceExists={existingInvoice !== null}
-            />
-
             {/* Wave 36 — the passive review-page clarifications banner
                 was removed. Replaced by an interactive modal that fires
                 during the new-quote flow (before generation), surfacing
@@ -399,10 +385,7 @@ export default async function QuotePreviewPage({
               </p>
             ) : null}
 
-            {/* Wave 13.1 — the editor is the primary work surface and
-                now sits second so it's above the fold once the user
-                scrolls past the lifecycle status. Everything below is
-                a review tool tucked behind collapsibles. */}
+            {/* The total and editor lead; lifecycle and review tools follow. */}
             <QuoteEditor
               quoteId={quote.id}
               createdAt={quote.created_at}
@@ -416,6 +399,18 @@ export default async function QuotePreviewPage({
               }
               smsEnabled={smsConfigured()}
             />
+
+            <CollapsibleSection id="quote-job-status" title="Job status & next steps">
+            <LifecycleCard
+              quoteId={quote.id}
+              status={(quote.status ?? "draft") as QuoteStatus}
+              quoteData={quoteData}
+              expiresAt={quote.expires_at ?? null}
+              isOwner={isOwnerEmail(user.email)}
+              voiceTranscript={quote.voice_transcript ?? null}
+              invoiceExists={existingInvoice !== null}
+            />
+            </CollapsibleSection>
 
             {/* Wave 14 — Invoice draft card. Self-hides unless the
                 quote is `completed`. The card's id="agent-invoice"

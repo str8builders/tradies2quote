@@ -471,3 +471,13 @@
 
 .t2qcal-app .install-choice-options { display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; }
 .t2qcal-app .install-choice-options .button { display:inline-flex; align-items:center; text-decoration:none; }
+
+/* The companion route always offers a clear way back to the quoting app. */
+.t2qcal-app .native-navigation-header { position: sticky; top: 0; z-index: 40; padding-top: env(safe-area-inset-top); background: #0a0a0af0; backdrop-filter: blur(20px); border-bottom: 1px solid #ffffff12; }
+.t2qcal-app .native-app-return-row { max-width: 1040px; margin: auto; padding: 2px 20px 0; }
+.t2qcal-app .native-app-return { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 6px; font-size: 12px; font-weight: 600; color: #ffd39b; }
+.t2qcal-app .native-app-return:hover { color: #ffea00; }
+.t2qcal-app .native-app-return:focus-visible { outline: 2px solid #ffb673; outline-offset: 2px; border-radius: 6px; }
+.t2qcal-app .native-navigation-header .native-header { position: static; height: 58px; padding-top: 0; background: transparent; backdrop-filter: none; }
+.t2qcal-app .native-screen-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media print { .t2qcal-app .native-navigation-header { display: none !important; } }

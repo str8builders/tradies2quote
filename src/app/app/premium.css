@@ -272,9 +272,10 @@ body:has([data-shell="app"]) .studio-wallpaper {
   content: "";
   position: absolute;
   inset: -5px;
-  border: 1px solid #dda76c75;
+  border: 2px solid #75e7acb8;
   border-radius: inherit;
-  opacity: 0.3;
+  opacity: 0.65;
+  box-shadow: 0 0 14px #58d8974d, inset 0 0 7px #58d89726;
   pointer-events: none;
   animation: t2q-profile-breathe 4.8s ease-in-out infinite;
 }
@@ -284,7 +285,7 @@ body:has([data-shell="app"]) .studio-wallpaper {
 [data-shell="app"] .t2q-profile-trigger:active { transform: none; }
 .t2q-profile-photo { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
 .t2q-profile-initial { display: grid; width: 100%; height: 100%; place-items: center; border-radius: 50%; font-size: 17px; font-weight: 600; line-height: 1; }
-@keyframes t2q-profile-breathe { 0%, 100% { opacity: 0.25; transform: scale(0.97); } 50% { opacity: 0.7; transform: scale(1.06); } }
+@keyframes t2q-profile-breathe { 0%, 100% { opacity: 0.5; transform: scale(1); } 50% { opacity: 0.9; transform: scale(1.035); } }
 html[data-motion="paused"] [data-shell="app"] .t2q-profile-trigger::before { animation: none; }
 
 /* Consistent dimensions avoid the account panel resizing after first open. */
@@ -437,10 +438,85 @@ html:has([data-shell="app"]) { scroll-behavior: auto; }
   [data-shell="app"] .t2q-nav-tab { padding-inline: 6px; font-size: 11px; }
   [data-shell="app"] .t2q-settings-trigger { min-width: 115px; gap: 6px; padding-right: 9px; }
 }
+/* Give the tablet tab labels their own row so the logo and Settings stay clear. */
+@media (min-width: 640px) and (max-width: 800px) {
+  [data-shell="app"] [data-testid="app-header"] > div { position: relative; height: 112px; padding-bottom: 48px; }
+  [data-shell="app"] [data-testid="app-header-tabs"] { position: absolute; left: 24px; right: 24px; bottom: 4px; justify-content: space-between; }
+}
 @media (max-width: 639px) {
   [data-shell="app"] .t2q-page-intro { padding: 25px 20px; border-radius: 21px; }
   [data-shell="app"] .t2q-settings-trigger { min-width: 124px; height: 46px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .t2q-settings-caret { transition: none; }
+}
+
+/* Functional waiting feedback remains distinct from the decorative wallpaper. */
+.t2q-generation-progress { width: min(100%, 400px); }
+.t2q-generation-steps { display: flex; justify-content: space-between; gap: 8px; margin-top: 14px; font-size: 11px; color: #81928c; }
+.t2q-generation-steps li { display: flex; align-items: center; gap: 4px; }
+.t2q-generation-steps [aria-current="step"] { color: #ffd0a0; font-weight: 700; }
+.t2q-generation-steps [data-done="true"] { color: #9fe1bb; }
+
+/* Clear icon silhouettes and labels keep the five familiar destinations. */
+[data-shell="app"] .t2q-bottomnav-bar { background: linear-gradient(125deg, #1d2c27f5, #16201ff5 65%, #24291ff5); border-color: #a5c8b333; box-shadow: 0 14px 36px #0009, inset 0 1px 0 #d4e7d414; }
+[data-shell="app"] .t2q-bottomnav-tab { color: #b6c9c0; gap: 4px; font-weight: 600; }
+[data-shell="app"] .t2q-bottomnav-tab:hover { background: #bbdbc30d; color: #ecf4ec; }
+[data-shell="app"] .t2q-bottomnav-active { border: 1px solid #8ec6a94a; background: linear-gradient(145deg, #385344, #273b33); box-shadow: inset 0 1px 0 #ffffff12; }
+[data-shell="app"] .t2q-bottomnav-tab[aria-current="page"],
+[data-shell="app"] .t2q-bottomnav-tab[aria-current="page"] .t2q-bottomnav-icon { color: #ffd6a8; }
+[data-shell="app"] .t2q-bottomnav-plus { flex-direction: column; gap: 0; background: linear-gradient(150deg, #ffcc91, #ff9454); box-shadow: 0 5px 20px #ff9c5333, inset 0 1px 0 #fff5; }
+.t2q-bottomnav-new-label { font-size: 9px; line-height: 11px; font-weight: 750; }
+
+/* The total and actions lead; details stay one tap away without discarding edits. */
+/* A transformed entrance wrapper traps fixed children against the long page.
+   Keep review actions attached to the viewport, including during first paint. */
+.t2q-page-enter:has(.t2q-review-page) { animation: none; transform: none; }
+.t2q-review-total-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+.t2q-review-section { border: 1px solid #8da99040; border-radius: 17px; background: linear-gradient(120deg, #25362c, #1d2929); }
+.t2q-review-section > summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 74px; padding: 15px 18px; cursor: pointer; list-style: none; }
+.t2q-review-section > summary::-webkit-details-marker, .t2q-price-breakdown > summary::-webkit-details-marker { display: none; }
+.t2q-review-section > summary > svg { flex-shrink: 0; color: #a8d9b8; }
+.t2q-review-section[open] > summary > svg { transform: rotate(180deg); }
+.t2q-review-section-title { display: block; color: #f0f4ec; font-size: 16px; font-weight: 650; }
+.t2q-review-section-summary { display: block; margin-top: 4px; color: #adbcaf; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.t2q-review-section-body { padding: 0 8px 8px; }
+.t2q-review-section-body > .t2q-card-pro { box-shadow: none; }
+.t2q-price-breakdown { margin-top: 16px; border-top: 1px solid #c5d6c52b; }
+.t2q-price-breakdown > summary { display: flex; justify-content: space-between; align-items: center; min-height: 44px; padding-top: 6px; font-size: 13px; font-weight: 600; color: #ffd2aa; cursor: pointer; list-style: none; }
+.t2q-price-breakdown > summary > span { font-size: 22px; font-weight: 400; }
+.t2q-price-breakdown[open] > summary > span { transform: rotate(45deg); }
+.t2q-review-page [data-testid="save-status"] { font-family: inherit; font-size: 12px; text-transform: none; letter-spacing: 0; }
+.t2q-review-page [data-testid="save-status"]:empty { display: none; }
+@media (prefers-reduced-motion: reduce) {
+}
+
+/* A single branded companion shortcut keeps the phone's five-tab navigation clear. */
+.t2q-cal-icon { flex-shrink: 0; border-radius: 12px; border: 1px solid #f5d28338; background: #0a0a0a; }
+.t2q-cal-shortcut { display: flex; align-items: center; gap: 14px; min-height: 88px; margin-bottom: 24px; padding: 16px 18px; border: 1px solid #d7b36b4d; border-radius: 18px; background: radial-gradient(ellipse at 0 50%, #bf8b2e22, transparent 70%), linear-gradient(115deg, #29332b, #1c2927); box-shadow: inset 0 1px 0 #fff1, 0 8px 24px #0002; }
+.t2q-cal-shortcut:hover { border-color: #efc87a99; background-color: #2d382e; }
+.t2q-cal-shortcut:focus-visible { outline: 2px solid #ffdd85; outline-offset: 4px; }
+.t2q-cal-shortcut-copy { display: grid; gap: 5px; flex: 1; min-width: 0; }
+.t2q-cal-shortcut-copy strong { font-size: 17px; letter-spacing: -.02em; color: #fff3d7; }
+.t2q-cal-shortcut-copy strong > span:first-child { color: #ffdf67; }
+.t2q-cal-shortcut-copy .t2q-cal-shortcut-category { margin-left: 8px; font-size: 13px; font-weight: 500; letter-spacing: 0; color: #d7dece; }
+.t2q-cal-shortcut-copy > span { color: #b9c7bc; font-size: 12px; line-height: 1.5; }
+.t2q-cal-shortcut-open { display: inline-flex; align-items: center; gap: 8px; color: #ffdb8e; font-size: 12px; font-weight: 600; }
+[data-shell="app"] .t2q-cal-nav { display: inline-flex; align-items: center; gap: 6px; color: #ffdd93; }
+.t2q-cal-nav .t2q-cal-icon { border-radius: 6px; }
+.t2q-loading-tape { width: 100%; max-width: 360px; margin-inline: auto; }
+.t2q-loading-tape > div > div > div:first-child { width: 100% !important; max-width: 100% !important; border-radius: 5px; }
+.t2q-loading-tape[data-complete="true"] .t2q-tape-sheen { animation: none; }
+.t2q-welcome-loading { width: min(100%, 320px); margin-top: 28px; }
+@media (max-width: 479px) {
+  .t2q-cal-shortcut { gap: 12px; padding: 14px; }
+  .t2q-cal-shortcut-copy .t2q-cal-shortcut-category { display: block; margin: 2px 0 0; font-size: 12px; }
+  .t2q-cal-shortcut-open { font-size: 0; gap: 0; }
+}
+@media (max-height: 680px) {
+  .t2q-welcome-art { width: min(360px, 100%, 38vh); }
+  .t2q-welcome-loading { margin-top: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .t2q-loading-tape * { animation: none !important; transition: none !important; }
 }

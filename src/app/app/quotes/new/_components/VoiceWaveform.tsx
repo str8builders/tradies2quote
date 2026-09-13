@@ -4,15 +4,16 @@ import { Player, type PlayerRef } from "@remotion/player";
 import { useMotionPaused } from "@/app/_components/LiveWallpaper";
 import { VoiceWaveformScene, WaveformLines, WAVEFORM_FPS, WAVEFORM_FRAMES, type VoiceWaveformState } from "@/remotion/VoiceWaveformScene";
 
-export function VoiceWaveform({ state }: { state: VoiceWaveformState }) {
+export function VoiceWaveform({ state, audioLevel = null }: { state: VoiceWaveformState; audioLevel?: number | null }) {
   const paused = useMotionPaused();
   const player = useRef<PlayerRef>(null);
   useEffect(() => {
     if (paused || state === "error") player.current?.pause();
     else player.current?.play();
   }, [paused, state]);
-  return <span className="t2q-job-waveform" aria-hidden="true" data-state={state}>
-    {paused || state === "error" ? <WaveformLines state={state} /> : <Player ref={player}
+  const measured = state === "recording" && audioLevel !== null;
+  return <span className="t2q-job-waveform" aria-hidden="true" data-state={state} data-live-level={measured}>
+    {measured ? <WaveformLines state={state} audioLevel={audioLevel} /> : paused || state === "error" ? <WaveformLines state={state} /> : <Player ref={player}
       component={VoiceWaveformScene} inputProps={{ state }} durationInFrames={WAVEFORM_FRAMES} fps={WAVEFORM_FPS}
       compositionWidth={720} compositionHeight={180} style={{ width: "100%", aspectRatio: "4 / 1" }}
       autoPlay loop initiallyMuted numberOfSharedAudioTags={0} controls={false} clickToPlay={false} doubleClickToFullscreen={false}

@@ -10,11 +10,11 @@ import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { SPRING_SNAPPY } from "./motion";
 import type { Icon } from "@phosphor-icons/react";
 import {
-  House,
-  ListBullets,
+  HouseLine,
+  FileText,
   Plus,
   Receipt,
-  Stack,
+  Package,
 } from "@phosphor-icons/react";
 
 /**
@@ -48,10 +48,10 @@ const TABS: ReadonlyArray<{
   icon: Icon;
   testId: string;
 }> = [
-  { href: "/app", label: "Home", icon: House, testId: "home" },
-  { href: "/app/quotes", label: "Quotes", icon: ListBullets, testId: "quotes" },
+  { href: "/app", label: "Home", icon: HouseLine, testId: "home" },
+  { href: "/app/quotes", label: "Quotes", icon: FileText, testId: "quotes" },
   { href: "/app/invoices", label: "Invoices", icon: Receipt, testId: "invoices" },
-  { href: "/app/materials", label: "Materials", icon: Stack, testId: "materials" },
+  { href: "/app/materials", label: "Materials", icon: Package, testId: "materials" },
 ];
 
 function isActive(href: string, pathname: string) {
@@ -86,7 +86,7 @@ export function MobileAppMenuClient({ isOwner, userEmail, avatarUrl }: Props) {
       layoutId="t2q-bottomnav-pill"
       aria-hidden="true"
       transition={reduce ? { duration: 0 } : SPRING_SNAPPY}
-      className="absolute inset-0 rounded-[0.85rem] border border-[#FFD4B8] bg-[var(--t2q-app-orange-soft,#FFF1EA)] shadow-[inset_0_-2px_0_#FF5F15]"
+      className="t2q-bottomnav-active absolute inset-0 rounded-[0.85rem]"
     />
   );
 
@@ -104,8 +104,8 @@ export function MobileAppMenuClient({ isOwner, userEmail, avatarUrl }: Props) {
         {active ? pill : null}
         <IconCmp
           className="t2q-bottomnav-icon relative"
-          size={23}
-          weight={active ? "fill" : "regular"}
+          size={24}
+          weight={active ? "fill" : "duotone"}
           aria-hidden="true"
         />
         <span className="relative">{label}</span>
@@ -147,7 +147,8 @@ export function MobileAppMenuClient({ isOwner, userEmail, avatarUrl }: Props) {
           data-testid="app-bottom-nav-new-quote"
           className="t2q-bottomnav-plus"
         >
-          <Plus size={26} weight="bold" aria-hidden="true" />
+          <Plus size={23} weight="bold" aria-hidden="true" />
+          <span className="t2q-bottomnav-new-label" aria-hidden="true">New</span>
         </Link>
         {TABS.slice(2).map(renderTab)}
       </nav>
