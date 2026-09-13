@@ -1,11 +1,14 @@
 "use client";
 import { useCallback, useEffect, useRef } from "react";
-import { Player, type PlayerRef } from "@remotion/player";
+import { Player, type PlayerRef, type CallbackListener } from "@remotion/player";
 import { WelcomeScene, WELCOME_FPS, WELCOME_FRAMES } from "@/remotion/WelcomeScene";
 import { createWelcomePlayback } from "@/lib/welcome-playback";
 import { WelcomePoster } from "./WelcomePoster";
 
-export default function WelcomePlayer({ onComplete }: { onComplete: () => void }) {
+export default function WelcomePlayer({ onComplete, onProgress }: {
+  onComplete: () => void;
+  onProgress: (progress: number) => void;
+}) {
   const player = useRef<PlayerRef | null>(null);
   const playback = useRef<ReturnType<typeof createWelcomePlayback> | null>(null);
   const canvasReady = useRef(false);
@@ -14,14 +17,19 @@ export default function WelcomePlayer({ onComplete }: { onComplete: () => void }
     if (player.current) playback.current?.ready(document.hidden);
   }, []);
   const ended = useCallback(() => { playback.current?.finish(); onComplete(); }, [onComplete]);
+  const frameUpdated = useCallback<CallbackListener<"frameupdate">>((event) => {
+    onProgress(event.detail.frame / (WELCOME_FRAMES - 1));
+  }, [onProgress]);
   // Remotion may replace its imperative handle while playing. Keep one
   // controller per mount; replacing a ref must never pause/reset the intro.
   const attachPlayer = useCallback((current: PlayerRef | null) => {
     player.current?.removeEventListener("ended", ended);
+    player.current?.removeEventListener("frameupdate", frameUpdated);
     player.current = current;
     current?.addEventListener("ended", ended);
+    current?.addEventListener("frameupdate", frameUpdated);
     if (current && canvasReady.current) playback.current?.ready(document.hidden);
-  }, [ended]);
+  }, [ended, frameUpdated]);
   useEffect(() => {
     const controller = createWelcomePlayback({
       play: () => player.current?.play(),

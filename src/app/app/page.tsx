@@ -5,7 +5,6 @@ import { redirect } from "next/navigation";
 import {
   ArrowRight,
   Bug,
-  Calculator,
   CalendarBlank,
   ChatCircleText,
   Stack,
@@ -32,6 +31,7 @@ import { ScheduleCalendar } from "./_components/ScheduleCalendar";
 import { WeekOutlook } from "./_components/WeekOutlook";
 import { getWeekOutlook } from "@/lib/weather-impact/outlook";
 import { SiteConditions } from "./_components/SiteConditions";
+import { T2QCALIcon } from "./_components/T2QCALIcon";
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -118,6 +118,16 @@ export default async function DashboardPage() {
             </Link>
           </div>
         </div>
+
+        <Link href="/t2qcal/calculators" data-testid="dashboard-calculators-card"
+          className="t2q-cal-shortcut" aria-label="Open T2QCAL site calculators">
+          <T2QCALIcon />
+          <span className="t2q-cal-shortcut-copy">
+            <strong>T2Q<span>CAL</span> <span className="t2q-cal-shortcut-category">Site calculators</span></strong>
+            <span>Measure it. Work it out. Add it to your quote.</span>
+          </span>
+          <span className="t2q-cal-shortcut-open">Open <ArrowRight size={18} weight="bold" aria-hidden="true" /></span>
+        </Link>
 
         <Suspense fallback={<DashboardSkeleton />}>
           <DashboardData userId={user.id} isOwner={isOwner} />
@@ -400,36 +410,6 @@ async function DashboardData({
         </Link>
         </StaggerIn>
       ) : null}
-
-      {/* T2QCAL is the companion calculator app on the same site; it opens
-          inside the installed Tradies2Quote app, no second install needed. */}
-      <StaggerIn index={0}>
-      <Link
-        href="/t2qcal/calculators"
-        data-testid="dashboard-calculators-card"
-        className="t2q-card-pro t2q-card-pro-hover mb-5 flex items-start gap-3 p-4 sm:items-center sm:p-5"
-      >
-        <span
-          aria-hidden="true"
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-brand/30 bg-brand/10 text-brand"
-        >
-          <Calculator size={18} weight="bold" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="font-display text-sm uppercase tracking-tight text-white">
-            Site calculators (T2QCAL)
-          </p>
-          <p className="mt-0.5 text-xs text-ink-300 sm:text-sm">
-            Rafters, stairs, concrete, spacing and more, with drawings. Send a material line straight into a quote.
-          </p>
-        </div>
-        <span className="hidden items-center gap-1 font-mono text-[10px] uppercase tracking-[0.25em] text-brand sm:inline-flex">
-          Open calculators
-          <ArrowRight size={12} weight="bold" />
-        </span>
-        <ArrowRight size={18} weight="bold" className="shrink-0 text-brand sm:hidden" aria-hidden="true" />
-      </Link>
-      </StaggerIn>
 
       {/* Xero-style KPI strip — four headline numbers at the top of the
           dashboard: this month's quoted total, replies awaiting, locked-in

@@ -10,6 +10,8 @@ describe("quote progress truthfulness", () => {
     expect(html).not.toContain('aria-valuenow=');
     expect(html).toContain('aria-valuetext="Writing your quote"');
     expect(html).toContain('aria-current="step">Writing quote');
+    expect(html).toContain("t2q-tape-needle");
+    expect(html).not.toContain("mm / 100mm");
   });
   it("reports completion only after the caller receives success", () => {
     const html = renderToStaticMarkup(createElement(QuoteGenerationProgress, { complete: true }));

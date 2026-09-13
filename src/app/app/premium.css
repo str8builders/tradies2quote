@@ -453,14 +453,6 @@ html:has([data-shell="app"]) { scroll-behavior: auto; }
 
 /* Functional waiting feedback remains distinct from the decorative wallpaper. */
 .t2q-generation-progress { width: min(100%, 400px); }
-.t2q-generation-icon { display: grid; place-items: center; width: 66px; height: 66px; margin: 0 auto 26px; border: 1px solid #f4b67d55; border-radius: 20px; background: linear-gradient(140deg, #60482e, #263b34); color: #ffc892; box-shadow: inset 0 1px 0 #fff2; }
-.t2q-generation-track { position: relative; overflow: hidden; height: 12px; border: 1px solid #91bb9a40; border-radius: 999px; background: #0b1916; }
-.t2q-generation-fill { position: absolute; inset: 0; width: 100%; background: linear-gradient(90deg, #b18347, #ffa761 45%, #8ed3af); opacity: 0.24; }
-.t2q-generation-sheen { position: absolute; inset: 0 auto 0 -45%; width: 45%; border-radius: inherit; background: linear-gradient(90deg, transparent, #ffc089 35%, #a9efc9 75%, transparent); animation: t2q-quote-progress 1.7s ease-in-out infinite; }
-@keyframes t2q-quote-progress { from { transform: translateX(0); } to { transform: translateX(330%); } }
-.t2q-generation-progress[data-complete="true"] .t2q-generation-fill { opacity: 1; background: #78cfa4; }
-.t2q-generation-progress[data-complete="true"] .t2q-generation-sheen { display: none; }
-.t2q-generation-progress[data-complete="true"] .t2q-generation-icon { color: #b4f1d1; border-color: #6fce9a80; }
 .t2q-generation-steps { display: flex; justify-content: space-between; gap: 8px; margin-top: 14px; font-size: 11px; color: #81928c; }
 .t2q-generation-steps li { display: flex; align-items: center; gap: 4px; }
 .t2q-generation-steps [aria-current="step"] { color: #ffd0a0; font-weight: 700; }
@@ -497,5 +489,34 @@ html:has([data-shell="app"]) { scroll-behavior: auto; }
 .t2q-review-page [data-testid="save-status"] { font-family: inherit; font-size: 12px; text-transform: none; letter-spacing: 0; }
 .t2q-review-page [data-testid="save-status"]:empty { display: none; }
 @media (prefers-reduced-motion: reduce) {
-  .t2q-generation-sheen { animation: none; left: 25%; }
+}
+
+/* A single branded companion shortcut keeps the phone's five-tab navigation clear. */
+.t2q-cal-icon { flex-shrink: 0; border-radius: 12px; border: 1px solid #f5d28338; background: #0a0a0a; }
+.t2q-cal-shortcut { display: flex; align-items: center; gap: 14px; min-height: 88px; margin-bottom: 24px; padding: 16px 18px; border: 1px solid #d7b36b4d; border-radius: 18px; background: radial-gradient(ellipse at 0 50%, #bf8b2e22, transparent 70%), linear-gradient(115deg, #29332b, #1c2927); box-shadow: inset 0 1px 0 #fff1, 0 8px 24px #0002; }
+.t2q-cal-shortcut:hover { border-color: #efc87a99; background-color: #2d382e; }
+.t2q-cal-shortcut:focus-visible { outline: 2px solid #ffdd85; outline-offset: 4px; }
+.t2q-cal-shortcut-copy { display: grid; gap: 5px; flex: 1; min-width: 0; }
+.t2q-cal-shortcut-copy strong { font-size: 17px; letter-spacing: -.02em; color: #fff3d7; }
+.t2q-cal-shortcut-copy strong > span:first-child { color: #ffdf67; }
+.t2q-cal-shortcut-copy .t2q-cal-shortcut-category { margin-left: 8px; font-size: 13px; font-weight: 500; letter-spacing: 0; color: #d7dece; }
+.t2q-cal-shortcut-copy > span { color: #b9c7bc; font-size: 12px; line-height: 1.5; }
+.t2q-cal-shortcut-open { display: inline-flex; align-items: center; gap: 8px; color: #ffdb8e; font-size: 12px; font-weight: 600; }
+[data-shell="app"] .t2q-cal-nav { display: inline-flex; align-items: center; gap: 6px; color: #ffdd93; }
+.t2q-cal-nav .t2q-cal-icon { border-radius: 6px; }
+.t2q-loading-tape { width: 100%; max-width: 360px; margin-inline: auto; }
+.t2q-loading-tape > div > div > div:first-child { width: 100% !important; max-width: 100% !important; border-radius: 5px; }
+.t2q-loading-tape[data-complete="true"] .t2q-tape-sheen { animation: none; }
+.t2q-welcome-loading { width: min(100%, 320px); margin-top: 28px; }
+@media (max-width: 479px) {
+  .t2q-cal-shortcut { gap: 12px; padding: 14px; }
+  .t2q-cal-shortcut-copy .t2q-cal-shortcut-category { display: block; margin: 2px 0 0; font-size: 12px; }
+  .t2q-cal-shortcut-open { font-size: 0; gap: 0; }
+}
+@media (max-height: 680px) {
+  .t2q-welcome-art { width: min(360px, 100%, 38vh); }
+  .t2q-welcome-loading { margin-top: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .t2q-loading-tape * { animation: none !important; transition: none !important; }
 }
