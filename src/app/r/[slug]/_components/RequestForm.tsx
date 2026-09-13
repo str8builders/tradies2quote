@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle, PaperPlaneTilt } from "@phosphor-icons/react";
+import { Camera, CheckCircle, PaperPlaneTilt, X } from "@phosphor-icons/react";
 
 const INPUT =
   "mt-1 block w-full rounded-sm border border-ink-600 bg-ink-900 px-3 py-2 text-sm text-white outline-none focus:border-brand";
 const LABEL = "font-mono text-xs uppercase tracking-[0.2em] text-ink-400";
 const MIN_DESCRIPTION = 20;
+const MAX_PHOTOS = 3;
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 
 export function RequestForm({ slug, business }: { slug: string; business: string }) {
   const [name, setName] = useState("");
@@ -22,6 +24,31 @@ export function RequestForm({ slug, business }: { slug: string; business: string
   const [answers, setAnswers] = useState<string[]>([]);
   const [askedFor, setAskedFor] = useState<string>("");
   const [asking, setAsking] = useState(false);
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [photoNote, setPhotoNote] = useState("");
+
+  function addPhotos(list: FileList | null) {
+    if (!list) return;
+    const next = [...photos];
+    let note = "";
+    for (const file of Array.from(list)) {
+      if (next.length >= MAX_PHOTOS) {
+        note = `Up to ${MAX_PHOTOS} photos.`;
+        break;
+      }
+      if (!/^image\/(jpeg|png|webp)$/i.test(file.type)) {
+        note = "Use JPEG, PNG or WebP photos.";
+        continue;
+      }
+      if (file.size > MAX_PHOTO_BYTES) {
+        note = "Each photo must be under 10 MB.";
+        continue;
+      }
+      next.push(file);
+    }
+    setPhotos(next);
+    setPhotoNote(note);
+  }
 
   async function loadQuestions() {
     const text = description.trim();
@@ -71,19 +98,29 @@ export function RequestForm({ slug, business }: { slug: string; business: string
     setState("sending");
     setError("");
     try {
-      const res = await fetch(`/api/requests/${encodeURIComponent(slug)}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          name,
-          phone,
-          email,
-          address,
-          description: descriptionWithAnswers(),
-          website,
-        }),
-        signal: AbortSignal.timeout(30_000),
-      });
+      const fields = {
+        name,
+        phone,
+        email,
+        address,
+        description: descriptionWithAnswers(),
+        website,
+      };
+      let init: RequestInit;
+      if (photos.length > 0) {
+        const form = new FormData();
+        for (const [k, v] of Object.entries(fields)) form.set(k, v);
+        for (const file of photos) form.append("photos", file, file.name);
+        init = { method: "POST", body: form, signal: AbortSignal.timeout(120_000) };
+      } else {
+        init = {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(fields),
+          signal: AbortSignal.timeout(30_000),
+        };
+      }
+      const res = await fetch(`/api/requests/${encodeURIComponent(slug)}`, init);
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
         setError(data.error || "Something went wrong. Please try again.");
@@ -233,6 +270,51 @@ export function RequestForm({ slug, business }: { slug: string; business: string
         </div>
       </div>
 
+      <div>
+        <span className={LABEL}>Photos (optional)</span>
+        <p className="mt-1 text-xs text-ink-500">
+          A photo of the job helps {business} quote it right. Up to {MAX_PHOTOS}.
+        </p>
+        {photos.length > 0 ? (
+          <ul className="mt-2 space-y-1" data-testid="request-photo-list">
+            {photos.map((file, i) => (
+              <li
+                key={`${file.name}-${i}`}
+                className="flex items-center justify-between gap-2 rounded-sm border border-ink-700 bg-ink-800 px-3 py-2 text-sm text-ink-200"
+              >
+                <span className="truncate">{file.name}</span>
+                <button
+                  type="button"
+                  aria-label={`Remove ${file.name}`}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center text-ink-400 hover:text-white"
+                  onClick={() => setPhotos((prev) => prev.filter((_, j) => j !== i))}
+                >
+                  <X size={16} weight="bold" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {photos.length < MAX_PHOTOS ? (
+          <label className="mt-2 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-sm border border-ink-600 px-3 text-sm text-ink-200 hover:border-brand">
+            <Camera size={18} weight="bold" className="text-brand" />
+            Add a photo
+            <input
+              type="file"
+              data-testid="request-photos"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              className="sr-only"
+              onChange={(e) => {
+                addPhotos(e.target.files);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        ) : null}
+        {photoNote ? <p className="mt-1 text-xs text-hivis">{photoNote}</p> : null}
+      </div>
+
       {/* Honeypot: off-screen, tab-skipped, autocomplete off. Bots fill it, people don't. */}
       <div aria-hidden="true" className="absolute -left-[9999px] top-0 h-0 w-0 overflow-hidden">
         <label htmlFor="rq-website">Website</label>
@@ -265,7 +347,11 @@ export function RequestForm({ slug, business }: { slug: string; business: string
         disabled={!canSubmit}
       >
         <PaperPlaneTilt size={18} weight="bold" />
-        {state === "sending" ? "Sending…" : `Send to ${business}`}
+        {state === "sending"
+          ? photos.length > 0
+            ? "Sending photos…"
+            : "Sending…"
+          : `Send to ${business}`}
       </button>
     </form>
   );

@@ -88,6 +88,25 @@ export function QuoteRequestLinkCard({
               Open
             </a>
           </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+            {/* eslint-disable-next-line @next/next/no-img-element -- authenticated SVG route, no optimiser */}
+            <img
+              src={`/api/account/request-qr?slug=${encodeURIComponent(slug ?? "")}`}
+              alt="QR code for your request link"
+              width={144}
+              height={144}
+              className="h-36 w-36 rounded-sm border border-ink-700 bg-white p-1"
+            />
+            <div className="text-sm text-ink-300">
+              <p>Print the QR for the van, site signs or your counter. It opens the same page.</p>
+              <a
+                href="/api/account/request-qr?download=1"
+                className="mt-2 inline-block text-brand underline-offset-4 hover:underline"
+              >
+                Download QR (SVG)
+              </a>
+            </div>
+          </div>
           <div className="flex flex-wrap items-center gap-3">
             <Link href="/app/requests" className="text-sm text-brand underline-offset-4 hover:underline">
               See requests

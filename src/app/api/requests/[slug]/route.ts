@@ -14,6 +14,13 @@ import {
   runRequestGeneration,
   validateRequestInput,
 } from "@/lib/quote-requests/intake";
+import {
+  MAX_PHOTO_BYTES,
+  MAX_REQUEST_PHOTOS,
+  describePhotosIntoTranscript,
+  storeRequestPhotos,
+  type IncomingPhoto,
+} from "@/lib/quote-requests/photos";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +29,41 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 const MAX_BODY_BYTES = 64 * 1024;
+const MAX_MULTIPART_BYTES = MAX_REQUEST_PHOTOS * MAX_PHOTO_BYTES + 256 * 1024;
+
+/**
+ * The form posts JSON when there are no photos and multipart when there
+ * are. Both shapes normalise to the same fields; photos ride alongside.
+ */
+async function readSubmission(
+  request: NextRequest,
+): Promise<{ fields: unknown; photos: IncomingPhoto[] } | null> {
+  const type = request.headers.get("content-type") ?? "";
+  if (type.startsWith("multipart/form-data")) {
+    if (Number(request.headers.get("content-length")) > MAX_MULTIPART_BYTES) return null;
+    const form = await request.formData();
+    const text = (key: string) => {
+      const v = form.get(key);
+      return typeof v === "string" ? v : "";
+    };
+    const fields = {
+      name: text("name"),
+      phone: text("phone"),
+      email: text("email"),
+      address: text("address"),
+      description: text("description"),
+      website: text("website"),
+    };
+    const photos: IncomingPhoto[] = [];
+    for (const entry of form.getAll("photos").slice(0, MAX_REQUEST_PHOTOS)) {
+      if (!(entry instanceof File) || entry.size === 0 || entry.size > MAX_PHOTO_BYTES) continue;
+      photos.push({ bytes: new Uint8Array(await entry.arrayBuffer()), name: entry.name });
+    }
+    return { fields, photos };
+  }
+  if (Number(request.headers.get("content-length")) > MAX_BODY_BYTES) return null;
+  return { fields: await request.json(), photos: [] };
+}
 
 function clientIp(request: NextRequest): string | null {
   const forwarded = request.headers.get("x-forwarded-for");
@@ -53,21 +95,21 @@ export async function POST(
   if (isLinkPreviewBot(request.headers.get("user-agent"))) {
     return NextResponse.json({ error: "Not available." }, { status: 403 });
   }
-  if (Number(request.headers.get("content-length")) > MAX_BODY_BYTES) {
-    return NextResponse.json({ error: "That request is too large." }, { status: 413 });
-  }
 
   const ip = clientIp(request) ?? "unknown";
   const ipQuota = consumeDailyQuota(`quote-request:${ip}`, REQUEST_LIMITS.perIpPerDay);
   if (!ipQuota.ok) return tooManyRequestsResponse(ipQuota.resetAt);
 
-  let raw: unknown;
+  let submission: { fields: unknown; photos: IncomingPhoto[] } | null;
   try {
-    raw = await request.json();
+    submission = await readSubmission(request);
   } catch {
     return NextResponse.json({ error: "Please fill in the form and try again." }, { status: 400 });
   }
-  const validated = validateRequestInput(raw);
+  if (!submission) {
+    return NextResponse.json({ error: "That request is too large." }, { status: 413 });
+  }
+  const validated = validateRequestInput(submission.fields);
   if (!validated.ok) {
     return NextResponse.json({ error: validated.error }, { status: 400 });
   }
@@ -120,12 +162,33 @@ export async function POST(
 
   const base = appUrl(request);
   const clientName = input.name;
+  const photos = submission.photos;
 
   deferred(async () => {
     try {
       await notifyTradieOfRequest({ admin, tradie, input, created, appUrl: base });
     } catch (e) {
       captureError(e, { route: "quote-requests/notify" });
+    }
+    // Client photos: store them on the draft, then let the vision agent
+    // describe them into the transcript before the quote is generated.
+    if (photos.length > 0) {
+      try {
+        const stored = await storeRequestPhotos({
+          admin,
+          tradieUserId: tradie.id,
+          quoteId: created.quoteId,
+          photos,
+        });
+        await describePhotosIntoTranscript({
+          admin,
+          tradieUserId: tradie.id,
+          quoteId: created.quoteId,
+          photos: stored,
+        });
+      } catch (e) {
+        captureError(e, { route: "quote-requests/photos" });
+      }
     }
     // Generation only while the tradie's account can create quotes; an
     // expired trial still receives the request and can generate later.

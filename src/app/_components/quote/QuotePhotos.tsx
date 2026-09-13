@@ -28,7 +28,7 @@ export function QuotePhotos({ quoteId, token }: { quoteId?: string; token?: stri
   if (token && !photos.length && !error) return null;
   return <section className="t2q-card-pro p-5 sm:p-6" aria-label="Quote photos">
     <div className="flex items-center gap-2"><Camera size={20} className="text-brand" /><h2 className="text-lg font-semibold">Job photos</h2></div>
-    {!token && <p className="mt-2 text-sm text-ink-300">{enabled ? "Attach up to 8 photos before sending. Clients can view them on the quote link. Photos are locked once sent." : "Photo attachments are included with Crew and Builder."}</p>}
+    {!token && <p className="mt-2 text-sm text-ink-300">{enabled ? "Attach up to 8 photos before sending. Clients can view them on the quote link. Photos are locked once sent." : photos.length > 0 ? "Photos the client sent with their request. Adding your own photos is included with Crew and Builder." : "Photo attachments are included with Crew and Builder."}</p>}
     {error && <p role="alert" className="mt-3 text-sm text-red-300">{error}</p>}
     <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">{photos.map((photo) => <figure key={photo.id} className="min-w-0 overflow-hidden rounded-xl border border-ink-700">
       <a href={`${endpoint}?photo=${photo.id}`} target="_blank" rel="noreferrer"><img src={`${endpoint}?photo=${photo.id}`} alt={photo.name} loading="lazy" className="aspect-[4/3] w-full object-cover" /></a>
