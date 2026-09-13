@@ -24,14 +24,16 @@ outside your category's module(s).
 ```ts
 definitions["concrete-slab"] = {
   title, note,                    // tool.name, tool.summary from the catalog
-  diagram, sheets, showsAssembly, // from reference.tools[slug]: diagram; sheets = drawingSheets minus any *3d entry; showsAssembly
-  fields,                         // from reference.tools[slug].fields — key, label, default, kind, min, max, options (if any), visibleWhen (if visibleWhen.key set)
+  diagram, sheets, showsAssembly, // from meta[slug]: diagram; sheets minus any *3d entry; showsAssembly
+  fields,                         // from meta[slug].fields — key, label, default, kind, min, max, options?, visibleWhen?
   compute(values, unit) { ... }   // returns { results, marks, diagramValues, handoffs, cuts }
 };
 ```
 
-`kind` strings in the fixture are exactly the web `FieldKind` names. Build `fields` from
-the fixture at module load (import the JSON) rather than retyping them.
+`kind` strings are exactly the web `FieldKind` names. Build `fields`, `diagram`, `sheets`,
+`showsAssembly`, `title` (name) and `note` (summary) from `native/meta.json` at module
+load (import that small JSON, keyed by slug). Never import the 1 MB reference fixture
+from a module — it is test-only.
 
 `values` arrive in the display unit (inches for imperial lengths), exactly what the
 native compute closure receives (`v`), and `unit === "metric"` is the Swift `metric` flag.
