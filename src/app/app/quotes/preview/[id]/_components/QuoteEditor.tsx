@@ -53,7 +53,7 @@ import { PhotoPlanPanel } from "./PhotoPlanPanel";
 import { SendQuoteButton } from "./SendQuoteButton";
 import { MaterialsListButton } from "./MaterialsListButton";
 import { hasT2QCALWorking, T2QCALWorking } from "./T2QCALWorking";
-import { MobileCollapsibleCard } from "./MobileCollapsibleCard";
+import { QuoteReviewSection } from "./QuoteReviewSection";
 import { CsiGroupedView } from "./CsiGroupedView";
 import { QuotePhotos } from "@/app/_components/quote/QuotePhotos";
 import { SavedClientPicker, TermsTemplatePicker } from "./SavedQuoteDetails";
@@ -543,8 +543,116 @@ export function QuoteEditor({
     // Tail clearance now lives on the page <main> (pb-24 mobile) so cards
     // rendered AFTER the editor (Review tools, invoice draft) clear the
     // fixed StickyActionBar too — pb here only cleared the editor's own tail.
-    <div className="space-y-6">
-      <QuotePhotos quoteId={quoteId} />
+    <div className="t2q-compact-review space-y-3">
+      <section data-testid="quote-totals" className="t2q-card-pro t2q-review-total-card p-5 sm:p-6">
+        <div className="t2q-review-total-heading">
+          <div>
+            <p className="text-xs font-semibold text-[#a9d8c0]">Quote total</p>
+            <p data-testid="quote-total" className="mt-1 text-4xl font-semibold tracking-tight tabular-nums">{formatCurrency(totals.total, currency)}</p>
+            <p className="mt-1 text-xs text-ink-300">{currency}{taxRate > 0 ? ` · includes ${taxLabel}` : ""}</p>
+          </div>
+          <div className="text-sm text-ink-200">
+            <p className="font-semibold">{clientPlaceholder ? "Add your client below" : client.name}</p>
+            <p className="mt-1 text-xs text-ink-400">{items.length} line{items.length === 1 ? "" : "s"} · {number}</p>
+          </div>
+        </div>
+        {initialData.job_summary && <p className="mt-4 text-sm leading-relaxed text-ink-300">{initialData.job_summary}</p>}
+        {materialMissingPrices > 0 && <p className="mt-3 text-sm text-hivis">{materialMissingPrices} material price{materialMissingPrices === 1 ? "" : "s"} still needed. This total is incomplete.</p>}
+        <details className="t2q-price-breakdown">
+          <summary>Price breakdown <span aria-hidden="true">+</span></summary>
+          <div className="pt-3">
+        <TotalsRow
+          label="Materials subtotal"
+          value={formatCurrency(materialsOnlySubtotal, currency)}
+        />
+        {/* $0 materials with unpriced lines used to render as a bare
+            "$0.00" (and Markup $0.00) with no explanation — read as a
+            broken calculator. The quantities are real; the PRICES are
+            deliberately yours to set. Say so right where the $0 shows. */}
+        {unpricedMaterials.length > 0 && (
+          <p
+            data-testid="quote-totals-unpriced-note"
+            className="mb-2 rounded-sm border border-hivis/30 bg-hivis/10 px-2.5 py-1.5 text-xs text-hivis"
+          >
+            {unpricedMaterials.length} material line
+            {unpricedMaterials.length === 1 ? "" : "s"} counted but not
+            priced yet — they add $0 (and $0 markup) until you set your
+            prices in Materials below.
+          </p>
+        )}
+        {otherIndices.length > 0 && (
+          <TotalsRow
+            label="Other subtotal"
+            value={formatCurrency(otherSubtotal, currency)}
+          />
+        )}
+        <TotalsRow
+          label={`Markup (${markupPct}%)`}
+          value={formatCurrency(totals.markup_amount, currency)}
+        />
+        <TotalsRow
+          label="Labour subtotal"
+          value={formatCurrency(totals.labour_subtotal, currency)}
+        />
+        <TotalsRow
+          label={taxRate > 0 ? `Subtotal (excl. ${taxLabel})` : "Subtotal"}
+          value={formatCurrency(totals.subtotal_before_tax, currency)}
+          divider
+        />
+        <TotalsRow
+          label={`${taxLabel} (${taxRate}%)`}
+          value={formatCurrency(totals.tax_amount, currency)}
+        />
+
+          </div>
+        </details>
+        {/* Launch honesty — quantities/prices are a draft estimate. Keeps the
+            promise safe without dampening confidence. */}
+        <p className="mt-3 text-[11px] leading-snug text-ink-400">
+          Draft estimate. Review quantities and check material counts against
+          your supplier quote before sending.
+        </p>
+      </section>
+
+      {/* Save-status feedback strip — small inline pill above the
+          sticky bar so the operator still sees "saved" / errors /
+          materials-learned without the old large bottom row. */}
+      <div
+        data-testid="save-status"
+        aria-live="polite"
+        className="font-mono text-xs uppercase tracking-[0.2em]"
+      >
+        {status === "saving" && <span className="text-ink-400">Saving…</span>}
+        {status === "saved" && (
+          <span className="text-brand">
+            {materialsLearned > 0
+              ? `// saved · ${materialsLearned} material${materialsLearned === 1 ? "" : "s"} added to your library`
+              : "// saved"}
+          </span>
+        )}
+        {status === "error" && (
+          <span className="text-red-400">{errorMessage || "Save failed"}</span>
+        )}
+        {status === "idle" && (
+          <span className="text-ink-500">
+            {isAccepted
+              ? "// quote is accepted — edits are read-only"
+              : "// edits are not saved until you click save"}
+          </span>
+        )}
+      </div>
+
+      <StickyActionBar
+        quoteId={quoteId}
+        status={quoteStatus}
+        isPending={isPending}
+        onSave={handleSave}
+        onSaveBeforeSend={saveBeforeSend}
+        smsEnabled={smsEnabled}
+      />
+      <QuoteReviewSection sectionId="client" title="Client & job details"
+        summary={clientPlaceholder ? "Add the client name and contact details" : [client.name, client.email || "Email needed"].join(" · ")}
+        defaultOpen={clientPlaceholder || !client.email}>
       <section className="t2q-card-pro p-5 sm:p-6">
         <SavedClientPicker onSelect={setClient} disabled={isAccepted} />
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -630,6 +738,8 @@ export function QuoteEditor({
         )}
       </section>
 
+      </QuoteReviewSection>
+
       {notes.length > 0 && (
         <section
           data-testid="quote-notes"
@@ -651,24 +761,12 @@ export function QuoteEditor({
         </section>
       )}
 
-      <TakeoffPanel
-        onRecalculate={handleTakeoffResult}
-        initialInputs={initialData.takeoff_inputs}
-        isAccepted={isAccepted}
-      />
-
-      <PhotoPlanPanel
-        onAddItems={handlePhotoPlanItems}
-        onAddNotes={handlePhotoPlanNotes}
-        isAccepted={isAccepted}
-      />
-
-      {/* Wave 19.10 — Materials section: mobile-collapsible behind a
-          summary line, always-expanded on md+. */}
-      <MobileCollapsibleCard
+      {/* Keep line items compact until needed; missing prices start open. */}
+      <QuoteReviewSection
         sectionId="materials"
         title="Materials"
         summary={materialsSummary}
+        defaultOpen={materialMissingPrices > 0}
       >
         <ItemsSection
           title="Materials"
@@ -692,9 +790,9 @@ export function QuoteEditor({
             jobSummary={initialData.job_summary}
           />
         </div>
-      </MobileCollapsibleCard>
+      </QuoteReviewSection>
 
-      <MobileCollapsibleCard
+      <QuoteReviewSection
         sectionId="labour"
         title="Labour"
         summary={labourSummary}
@@ -712,9 +810,10 @@ export function QuoteEditor({
           addLabel="Add labour"
           disabled={isAccepted}
         />
-      </MobileCollapsibleCard>
+      </QuoteReviewSection>
 
       {otherIndices.length > 0 && (
+        <QuoteReviewSection sectionId="other" title="Other costs" summary={`${otherIndices.length} items · ${formatCurrency(otherSubtotal, currency)}`}>
         <ItemsSection
           title="Other"
           accent="ink"
@@ -728,28 +827,8 @@ export function QuoteEditor({
           addLabel="Add line"
           disabled={isAccepted}
         />
+        </QuoteReviewSection>
       )}
-
-      {/* CSI grouped view — READ-ONLY presentation lens over the same line
-          items. Collapsed by default so the standard editable view stays the
-          conservative default. Never edits, recalculates, or reprices. */}
-      <section data-testid="csi-grouped-card" className="t2q-card-pro p-5 sm:p-6">
-        <details>
-          <summary className="flex cursor-pointer list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
-            <p className="t2q-section-label-pro">{"// csi grouped view"}</p>
-            <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.15em] text-ink-400">
-              read-only · tap to expand
-            </span>
-          </summary>
-          <p className="mt-2 text-xs text-ink-400">
-            Same lines, grouped into CSI / MasterFormat trade divisions. An
-            organizational view — your editable quote above is unchanged.
-          </p>
-          <div className="mt-4">
-            <CsiGroupedView items={items} />
-          </div>
-        </details>
-      </section>
 
       {reconciliation && (
         <section
@@ -1168,66 +1247,10 @@ export function QuoteEditor({
         </section>
       )}
 
-      <section data-testid="quote-totals" className="t2q-card-pro p-5 sm:p-6">
-        <TotalsRow
-          label="Materials subtotal"
-          value={formatCurrency(materialsOnlySubtotal, currency)}
-        />
-        {/* $0 materials with unpriced lines used to render as a bare
-            "$0.00" (and Markup $0.00) with no explanation — read as a
-            broken calculator. The quantities are real; the PRICES are
-            deliberately yours to set. Say so right where the $0 shows. */}
-        {unpricedMaterials.length > 0 && (
-          <p
-            data-testid="quote-totals-unpriced-note"
-            className="mb-2 rounded-sm border border-hivis/30 bg-hivis/10 px-2.5 py-1.5 text-xs text-hivis"
-          >
-            {unpricedMaterials.length} material line
-            {unpricedMaterials.length === 1 ? "" : "s"} counted but not
-            priced yet — they add $0 (and $0 markup) until you set your
-            prices on the lines above.
-          </p>
-        )}
-        {otherIndices.length > 0 && (
-          <TotalsRow
-            label="Other subtotal"
-            value={formatCurrency(otherSubtotal, currency)}
-          />
-        )}
-        <TotalsRow
-          label={`Markup (${markupPct}%)`}
-          value={formatCurrency(totals.markup_amount, currency)}
-        />
-        <TotalsRow
-          label="Labour subtotal"
-          value={formatCurrency(totals.labour_subtotal, currency)}
-        />
-        <TotalsRow
-          label={taxRate > 0 ? `Subtotal (excl. ${taxLabel})` : "Subtotal"}
-          value={formatCurrency(totals.subtotal_before_tax, currency)}
-          divider
-        />
-        <TotalsRow
-          label={`${taxLabel} (${taxRate}%)`}
-          value={formatCurrency(totals.tax_amount, currency)}
-        />
-        <TotalsRow
-          label={taxRate > 0 ? `Total (incl. ${taxLabel})` : "Total"}
-          value={formatCurrency(totals.total, currency)}
-          emphasis
-          testId="quote-total"
-        />
-        {/* Launch honesty — quantities/prices are a draft estimate. Keeps the
-            promise safe without dampening confidence. */}
-        <p className="mt-3 text-[11px] leading-snug text-ink-400">
-          Draft estimate. Review quantities and check material counts against
-          your supplier quote before sending.
-        </p>
-      </section>
 
       {/* Wave 19.10 — Terms: mobile-collapsible behind a clause-count
           summary, always-expanded on md+. */}
-      <MobileCollapsibleCard
+      <QuoteReviewSection
         sectionId="terms"
         title="Terms"
         summary={termsSummary}
@@ -1247,7 +1270,44 @@ export function QuoteEditor({
             className="mt-3 block w-full resize-y rounded-sm border border-ink-600 bg-ink-900 px-3 py-2 text-sm text-ink-200 outline-none focus:border-brand disabled:cursor-not-allowed disabled:opacity-60"
           />
         </section>
-      </MobileCollapsibleCard>
+      </QuoteReviewSection>
+
+      <QuoteReviewSection sectionId="tools" title="Measurements & photos" summary="Optional tools for adding to this quote">
+        <QuotePhotos quoteId={quoteId} />
+      <TakeoffPanel
+        onRecalculate={handleTakeoffResult}
+        initialInputs={initialData.takeoff_inputs}
+        isAccepted={isAccepted}
+      />
+
+      <PhotoPlanPanel
+        onAddItems={handlePhotoPlanItems}
+        onAddNotes={handlePhotoPlanNotes}
+        isAccepted={isAccepted}
+      />
+
+      {/* CSI grouped view — READ-ONLY presentation lens over the same line
+          items. Collapsed by default so the standard editable view stays the
+          conservative default. Never edits, recalculates, or reprices. */}
+      <section data-testid="csi-grouped-card" className="t2q-card-pro p-5 sm:p-6">
+        <details>
+          <summary className="flex cursor-pointer list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
+            <p className="t2q-section-label-pro">{"// csi grouped view"}</p>
+            <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.15em] text-ink-400">
+              read-only · tap to expand
+            </span>
+          </summary>
+          <p className="mt-2 text-xs text-ink-400">
+            Same lines, grouped into CSI / MasterFormat trade divisions. An
+            organizational view — your editable quote above is unchanged.
+          </p>
+          <div className="mt-4">
+            <CsiGroupedView items={items} />
+          </div>
+        </details>
+      </section>
+
+      </QuoteReviewSection>
 
       {/* SendQuoteButton keeps the inline link / PDF / copy affordances
           for sent / viewed / accepted states — but its Send trigger
@@ -1261,42 +1321,7 @@ export function QuoteEditor({
         hideSendButton
       />
 
-      {/* Save-status feedback strip — small inline pill above the
-          sticky bar so the operator still sees "saved" / errors /
-          materials-learned without the old large bottom row. */}
-      <div
-        data-testid="save-status"
-        aria-live="polite"
-        className="font-mono text-xs uppercase tracking-[0.2em]"
-      >
-        {status === "saving" && <span className="text-ink-400">Saving…</span>}
-        {status === "saved" && (
-          <span className="text-brand">
-            {materialsLearned > 0
-              ? `// saved · ${materialsLearned} material${materialsLearned === 1 ? "" : "s"} added to your library`
-              : "// saved"}
-          </span>
-        )}
-        {status === "error" && (
-          <span className="text-red-400">{errorMessage || "Save failed"}</span>
-        )}
-        {status === "idle" && (
-          <span className="text-ink-500">
-            {isAccepted
-              ? "// quote is accepted — edits are read-only"
-              : "// edits are not saved until you click save"}
-          </span>
-        )}
-      </div>
 
-      <StickyActionBar
-        quoteId={quoteId}
-        status={quoteStatus}
-        isPending={isPending}
-        onSave={handleSave}
-        onSaveBeforeSend={saveBeforeSend}
-        smsEnabled={smsEnabled}
-      />
     </div>
   );
 }

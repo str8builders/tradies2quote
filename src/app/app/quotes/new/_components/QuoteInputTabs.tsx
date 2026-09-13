@@ -12,6 +12,7 @@ import { ScanPanel } from "./ScanPanel";
 import { AiConsentModal } from "./AiConsentModal";
 import { TapeMeasureProgress } from "@/app/app/_components/TapeMeasureProgress";
 import { splitTranscript, hasHighlights } from "@/lib/highlightDimensions";
+import { startMicrophoneMeter } from "@/lib/microphone-level";
 
 type Tab = "voice" | "type" | "scan";
 type VoiceState = "idle" | "recording" | "processing" | "error";
@@ -179,6 +180,8 @@ function VoicePanel({
   const [state, setState] = useState<VoiceState>("idle");
   const [seconds, setSeconds] = useState<number>(0);
   const [error, setError] = useState<string>("");
+  const [audioLevel, setAudioLevel] = useState<number | null>(null);
+  const stopMeterRef = useRef<(() => void) | null>(null);
 
   const activeRef = useRef(true);
   const requestingRef = useRef(false);
@@ -198,6 +201,8 @@ function VoicePanel({
   }, []);
 
   function cleanup() {
+    stopMeterRef.current?.();
+    stopMeterRef.current = null;
     uploadRef.current?.abort();
     const recorder = recorderRef.current;
     if (recorder) {
@@ -254,6 +259,8 @@ function VoicePanel({
       if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
     };
     recorder.onstop = () => {
+      stopMeterRef.current?.();
+      stopMeterRef.current = null;
       const type = recorder.mimeType || "audio/webm";
       const blob = new Blob(chunksRef.current, { type });
       streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -263,7 +270,18 @@ function VoicePanel({
 
     streamRef.current = stream;
     recorderRef.current = recorder;
-    recorder.start();
+    try {
+      recorder.start();
+    } catch {
+      cleanup();
+      setState("error");
+      setError("Recording couldn't start. Try again or type the job details.");
+      return;
+    }
+    setAudioLevel(null);
+    stopMeterRef.current = startMicrophoneMeter(stream, (level) => {
+      if (activeRef.current) setAudioLevel(level);
+    });
     setSeconds(0);
     setState("recording");
 
@@ -278,6 +296,8 @@ function VoicePanel({
   }
 
   function stopRecording() {
+    stopMeterRef.current?.();
+    stopMeterRef.current = null;
     if (tickRef.current) clearInterval(tickRef.current);
     if (stopTimeoutRef.current) clearTimeout(stopTimeoutRef.current);
     tickRef.current = null;
@@ -355,6 +375,7 @@ function VoicePanel({
           </div>
           <RecordButton
             state={state}
+            audioLevel={audioLevel}
             onStart={startRecording}
             onStop={stopRecording}
           />
@@ -394,10 +415,12 @@ function VoicePanel({
 
 function RecordButton({
   state,
+  audioLevel,
   onStart,
   onStop,
 }: {
   state: VoiceState;
+  audioLevel: number | null;
   onStart: () => void;
   onStop: () => void;
 }) {
@@ -416,7 +439,7 @@ function RecordButton({
       disabled={disabled}
       className="t2q-record-control"
     >
-      <VoiceWaveform state={state} />
+      <VoiceWaveform state={state} audioLevel={audioLevel} />
       <span className="t2q-record-label">{recording ? "Stop recording" : processing ? "Preparing your transcript" : "Start recording"}</span>
     </button>
   );

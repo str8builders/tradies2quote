@@ -3,25 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { TapeMeasureProgress } from "@/app/app/_components/TapeMeasureProgress";
-
-/**
- * Elapsed-time-aware status copy. Generation has no real progress signal,
- * so honesty = tell the tradie what stage we're LIKELY in for the time
- * that has actually passed. This deployment uses a private, CPU-only local
- * model. It is slower than a hosted AI API, so substantial quotes can take
- * several minutes while keeping the job text on this server.
- */
-const STAGES: ReadonlyArray<{ fromS: number; text: string }> = [
-  { fromS: 0, text: "Reading your description…" },
-  { fromS: 20, text: "Itemising materials, labour and GST…" },
-  { fromS: 60, text: "Calculating quantities from your measurements…" },
-  { fromS: 120, text: "Pricing lines from your materials library…" },
-  {
-    fromS: 180,
-    text: "Still working on the private local AI — larger quotes can take 5–15 minutes.",
-  },
-];
+import { QuoteGenerationProgress } from "./QuoteGenerationProgress";
 
 function fmtElapsed(s: number): string {
   const m = Math.floor(s / 60);
@@ -34,6 +16,7 @@ export function QuoteGenerator({ id }: { id: string }) {
   const [error, setError] = useState<string>("");
   const [pending, setPending] = useState<boolean>(true);
   const [elapsedS, setElapsedS] = useState<number>(0);
+  const [complete, setComplete] = useState(false);
   const startedRef = useRef<boolean>(false);
 
   useEffect(() => {
@@ -43,25 +26,24 @@ export function QuoteGenerator({ id }: { id: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 1 Hz elapsed clock — drives the stage copy and the visible timer so
-  // the wait always shows movement even while the tape needle holds.
+  // The elapsed clock remains useful when motion is reduced.
   useEffect(() => {
-    if (!pending) return;
+    if (!pending || complete) return;
     const t = setInterval(() => setElapsedS((s) => s + 1), 1000);
     return () => clearInterval(t);
-  }, [pending]);
+  }, [pending, complete]);
 
   async function generate() {
     setError("");
+    setElapsedS(0);
+    setComplete(false);
     setPending(true);
     try {
       const res = await fetch("/api/quotes/generate", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ id }),
-        // The private Qwen model is CPU-only and serialises requests through
-        // one slot. Keep the connection open long enough for a queued,
-        // substantial quote while still bounding a genuinely stalled call.
+        // Preserve the request bound for queued or substantial quotes.
         signal: AbortSignal.timeout(30 * 60 * 1000),
       });
       if (res.status === 409) {
@@ -69,11 +51,12 @@ export function QuoteGenerator({ id }: { id: string }) {
         return;
       }
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(data.error || `Generation failed (${res.status}).`);
+        const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+        setError(data.message || data.error || `Generation failed (${res.status}).`);
         setPending(false);
         return;
       }
+      setComplete(true);
       router.refresh();
     } catch {
       setError("Network error. Check your connection and try again.");
@@ -84,30 +67,24 @@ export function QuoteGenerator({ id }: { id: string }) {
   return (
     <section
       data-testid="quote-generator"
-      className="t2q-card-pro flex min-h-[420px] flex-col items-center justify-center p-8 text-center"
+      className="t2q-card-pro flex min-h-[340px] flex-col items-center justify-center p-6 text-center sm:p-8"
     >
       {pending ? (
         <>
-          {/* Live measuring-tape gauge — the SAME loader as the splash,
-              scan and import screens. estimateMs is calibrated to the SLOW
-              (takeoff) path so the needle keeps visibly creeping for the
-              whole realistic wait instead of racing to 92% in 14s and then
-              freezing for a minute (the old behaviour read as a hang). */}
-          <TapeMeasureProgress
-            label="// generating quote"
-            estimateMs={10 * 60 * 1000}
-          />
-          <h2 className="mt-8 font-display text-2xl uppercase tracking-tight sm:text-3xl">
-            Generating your <span className="text-brand">quote</span>…
+          <QuoteGenerationProgress complete={complete} />
+          <h2 className="mt-6 text-2xl font-semibold tracking-tight sm:text-3xl">
+            {complete ? "Your quote is ready." : "Writing your quote…"}
           </h2>
           <p
             aria-live="polite"
             className="mt-3 max-w-sm text-sm text-ink-300 sm:text-base"
           >
-            {STAGES.filter((st) => elapsedS >= st.fromS).at(-1)!.text}
+            {complete ? "Opening your review." : elapsedS >= 60
+              ? "Still working. Your job details are saved."
+              : "Turning your job details into materials, labour and a total for you to check."}
           </p>
-          <p className="mt-6 font-mono text-xs uppercase tracking-[0.2em] text-ink-500">
-            {`// ${fmtElapsed(elapsedS)} elapsed · private local AI · larger jobs may take 5–15 min`}
+          <p className="mt-4 text-xs tabular-nums text-ink-400">
+            {`${fmtElapsed(elapsedS)} elapsed`}
           </p>
         </>
       ) : (
@@ -119,14 +96,10 @@ export function QuoteGenerator({ id }: { id: string }) {
             Generation failed
           </p>
           <p className="mt-3 max-w-md text-sm text-ink-300">{error}</p>
-          <p className="mt-3 max-w-md font-mono text-[10px] uppercase tracking-[0.2em] text-ink-400">
-            {"// your draft was kept. you can retry, edit the lines manually, or come back later."}
+          <p className="mt-3 max-w-md text-sm text-ink-400">
+            Your draft is saved. Try again, or return to it later from Quotes.
           </p>
-          {/* Wave 11 — three clear exits instead of one. The draft row
-              is already saved server-side at this point (createDraftQuote
-              ran before redirecting here), so "Edit manually" jumps
-              straight into the editor with whatever skeleton state
-              exists, and "Back to dashboard" is always safe. */}
+          {/* A failed generation has no line items to edit yet. */}
           <div className="mt-6 flex flex-col items-center gap-2 sm:flex-row sm:justify-center sm:gap-3">
             <button
               type="button"
@@ -138,14 +111,6 @@ export function QuoteGenerator({ id }: { id: string }) {
               className="t2q-btn-primary-pro inline-flex h-11 items-center justify-center px-5"
             >
               Try again
-            </button>
-            <button
-              type="button"
-              data-testid="quote-generator-manual"
-              onClick={() => router.refresh()}
-              className="t2q-btn-ghost-pro inline-flex h-11 items-center justify-center px-5"
-            >
-              Edit manually
             </button>
             <Link
               href="/app"
