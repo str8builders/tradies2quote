@@ -35,6 +35,11 @@ export const AUTH_ROUTE = /^\/(login|signup|auth|forgot-password|reset-password)
  *     replaying a 6.5 s modal on the way back from T2QCAL hid the bottom nav,
  *     froze scrolling behind the dialog and read as a glitch.
  */
+/** The route half of the decision: a fresh document, or arriving from a sign-in page. */
+export function routeAllowsWelcome(from: string | null): boolean {
+  return from === null || AUTH_ROUTE.test(from);
+}
+
 export function shouldPlayWelcome({ previous: from, lastSeen, now, skipWindowMs }: {
   previous: string | null; lastSeen: number; now: number; skipWindowMs: number;
 }): boolean {

@@ -22,7 +22,7 @@ const MONO = 'var(--font-ibm-plex-mono), "IBM Plex Mono", ui-monospace, monospac
  *   52–100 the wordmark writes out beside the mark and a tape rules under it
  *   92–150 the tagline settles in; the whole mark floats gently
  */
-export function LogoAssembly({ frame, fps }: { frame: number; fps: number }) {
+export function LogoAssembly({ frame, fps, calm = false }: { frame: number; fps: number; calm?: boolean }) {
   const s = (from: number, config: { damping: number; stiffness: number }) => spring({ frame: frame - from, fps, config });
   const tile = s(0, { damping: 14, stiffness: 110 });
   const two = s(10, { damping: 11, stiffness: 150 });
@@ -31,12 +31,12 @@ export function LogoAssembly({ frame, fps }: { frame: number; fps: number }) {
   const bind = s(40, { damping: 12, stiffness: 220 });
   const ring = interpolate(frame, [42, 74], [0, 1], clamp);
   const ringOpacity = interpolate(frame, [41, 44, 74], [0, 1, 0], clamp);
-  const flash = interpolate(frame, [40, 45, 64], [0, 0.85, 0], clamp);
+  const flash = calm ? 0 : interpolate(frame, [40, 45, 64], [0, 0.85, 0], clamp);
   const words = [s(52, { damping: 18, stiffness: 95 }), s(58, { damping: 18, stiffness: 95 }), s(64, { damping: 18, stiffness: 95 })];
   const tape = interpolate(frame, [66, 104], [0, 1], clamp);
   const tag = interpolate(frame, [96, 118], [0, 1], clamp);
   const settled = interpolate(frame, [84, 116], [0, 1], clamp);
-  const float = Math.sin(frame / 20) * 3 * settled;
+  const float = calm ? 0 : Math.sin(frame / 20) * 3 * settled;
   const snap = 1 + 0.07 * Math.sin(Math.min(1, Math.max(0, bind)) * Math.PI);
   const tileScale = (0.88 + 0.12 * Math.min(1, tile)) * snap;
   return <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: u(26), overflow: "hidden", fontFamily: DISPLAY, transform: `translateY(${float}px)` }}>
@@ -68,12 +68,12 @@ export function LogoAssembly({ frame, fps }: { frame: number; fps: number }) {
 }
 
 /** Frame-driven welcome: the T2Q mark assembling before the app opens. */
-export function WelcomeScene({ onReady }: { onReady?: () => void }) {
+export function WelcomeScene({ onReady, calm = false }: { onReady?: () => void; calm?: boolean }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   // No canvas to wait for: the scene is ready as soon as it mounts.
   useEffect(() => { onReady?.(); }, [onReady]);
   return <AbsoluteFill data-testid="welcome-scene" data-frame={frame} style={{ background: "transparent", containerType: "inline-size" }}>
-    <LogoAssembly frame={frame} fps={fps} />
+    <LogoAssembly frame={frame} fps={fps} calm={calm} />
   </AbsoluteFill>;
 }

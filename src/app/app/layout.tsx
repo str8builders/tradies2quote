@@ -1,5 +1,7 @@
 import { SideMeasureTape } from "../_components/app/SideMeasureTape";
 import AppSplash from "./_components/AppSplash";
+import { cookies } from "next/headers";
+import { WELCOME_SEEN_COOKIE } from "@/lib/welcome-cookie";
 import { MobileAppMenu } from "./_components/MobileAppMenu";
 import { OnboardingTourGate } from "./_components/OnboardingTourGate";
 import { TopProgressBar } from "./_components/TopProgressBar";
@@ -49,11 +51,13 @@ import { BetaNoticeBanner } from "./_components/BetaNoticeBanner";
  * Auth still happens in `src/proxy.ts` and as defense-in-depth at the
  * top of each `/app/*` page's server component.
  */
-export default function AppLayout({
+export default async function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Server-side half of the welcome decision (see src/lib/welcome-cookie.ts).
+  const welcomeSeen = Boolean((await cookies()).get(WELCOME_SEEN_COOKIE)?.value);
   return (
     // Dark shell — the app now runs the website's native ink + brand
     // palette (the `[data-theme="light"]` override sheet in globals.css
@@ -73,7 +77,7 @@ export default function AppLayout({
       />
       {/* The welcome owns its duration and versioned session key so the
           full composition can play before the dashboard is revealed. */}
-      <AppSplash />
+      <AppSplash serverOpen={!welcomeSeen} />
       <SideMeasureTape />
       {/* App content scroll region. Canonical mobile shell (see globals.css
           `@media (max-width: 639px)`): the page is normal document flow; the

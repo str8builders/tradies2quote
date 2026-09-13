@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { safeNextPath } from "@/lib/safe-redirect";
 import { consumeFixedWindow } from "@/lib/rate-limit";
+import { cookies } from "next/headers";
+import { WELCOME_SEEN_COOKIE } from "@/lib/welcome-cookie";
 
 export async function loginAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
@@ -21,6 +23,9 @@ export async function loginAction(formData: FormData) {
     redirect(`/login?error=${encodeURIComponent(error.message)}&next=${encodeURIComponent(next)}`);
   }
 
+  // A fresh sign-in is an entry: forget any earlier "seen" marker so /app's
+  // first HTML is already covered by the welcome (no dashboard flash).
+  (await cookies()).set(WELCOME_SEEN_COOKIE, "", { maxAge: 0, path: "/" });
   redirect(safeNextPath(next));
 }
 

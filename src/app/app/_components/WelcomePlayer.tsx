@@ -5,9 +5,13 @@ import { WelcomeScene, WELCOME_FPS, WELCOME_FRAMES } from "@/remotion/WelcomeSce
 import { createWelcomePlayback } from "@/lib/welcome-playback";
 import { WelcomePoster } from "./WelcomePoster";
 
-export default function WelcomePlayer({ onComplete, onProgress }: {
+export default function WelcomePlayer({ onComplete, onProgress, onReady, calm = false }: {
   onComplete: () => void;
   onProgress: (progress: number) => void;
+  /** The scene is mounted and about to play. */
+  onReady?: () => void;
+  /** Reduced motion: same assembly and timing, without the flash and float. */
+  calm?: boolean;
 }) {
   const player = useRef<PlayerRef | null>(null);
   const playback = useRef<ReturnType<typeof createWelcomePlayback> | null>(null);
@@ -15,7 +19,8 @@ export default function WelcomePlayer({ onComplete, onProgress }: {
   const ready = useCallback(() => {
     canvasReady.current = true;
     if (player.current) playback.current?.ready(document.hidden);
-  }, []);
+    onReady?.();
+  }, [onReady]);
   const ended = useCallback(() => { playback.current?.finish(); onComplete(); }, [onComplete]);
   const frameUpdated = useCallback<CallbackListener<"frameupdate">>((event) => {
     onProgress(event.detail.frame / (WELCOME_FRAMES - 1));
@@ -46,7 +51,7 @@ export default function WelcomePlayer({ onComplete, onProgress }: {
       document.removeEventListener("visibilitychange", visibility);
     };
   }, []);
-  return <Player ref={attachPlayer} component={WelcomeScene} inputProps={{ onReady: ready }}
+  return <Player ref={attachPlayer} component={WelcomeScene} inputProps={{ onReady: ready, calm }}
     durationInFrames={WELCOME_FRAMES} fps={WELCOME_FPS}
     compositionWidth={720} compositionHeight={520} style={{ width: "100%", aspectRatio: "720 / 520" }}
     autoPlay={false} initiallyMuted numberOfSharedAudioTags={0} moveToBeginningWhenEnded={false} controls={false} clickToPlay={false} doubleClickToFullscreen={false}
