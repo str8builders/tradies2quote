@@ -74,7 +74,7 @@ export function DemoReel() {
             </h2>
           </div>
           <p>
-            A 20-second look at the workflow.
+            A 30-second look at the workflow, on real app screens.
             <br />
             Illustrative job, real possibilities.
           </p>
@@ -94,7 +94,7 @@ export function DemoReel() {
                 <br />
                 from start to send.
               </strong>
-              <p>Capture → Draft → Review → Send</p>
+              <p>Talk → Draft → Check → Send → Invoice</p>
               <button
                 className="studio-button"
                 type="button"

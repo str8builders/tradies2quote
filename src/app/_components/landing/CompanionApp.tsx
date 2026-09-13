@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight, Calculator, Receipt } from "@phosphor-icons/react/dist/ssr";
 
@@ -10,14 +11,20 @@ export function CompanionApp() {
         <h2 className="mt-4 font-display text-3xl uppercase text-white sm:text-5xl">Choose your app.</h2>
         <p className="mt-5 max-w-2xl text-lg text-ink-300">Install Tradies2Quote, T2QCAL, or both. Each opens as its own app on your Home Screen.</p>
         <div className="mt-8 grid gap-6 md:grid-cols-2">
-          <article className="flex flex-col rounded-2xl border border-ink-700 bg-ink-900 p-6 sm:p-8">
+          <article className="studio-app-card flex flex-col rounded-2xl border border-ink-700 bg-ink-900 p-6 sm:p-8">
+            <div className="studio-app-shot" aria-hidden="true">
+              <Image src="/screens/screen-2.jpg" alt="" width={360} height={780} sizes="200px" />
+            </div>
             <Receipt size={36} className="text-brand" aria-hidden />
             <h3 className="mt-5 font-display text-2xl text-white">Tradies2Quote</h3>
             <p className="mt-3 flex-1 text-ink-300">Create and manage your quotes, invoices, clients and material prices.</p>
             <Link href="/app" className="studio-button studio-button-secondary mt-7">Open &amp; install Tradies2Quote <ArrowUpRight size={20} /></Link>
             <p className="mt-3 text-sm text-ink-400">Sign in, then use Install or Add to Home Screen.</p>
           </article>
-          <article className="flex flex-col rounded-2xl border border-brand/50 bg-ink-900 p-6 sm:p-8">
+          <article className="studio-app-card flex flex-col rounded-2xl border border-brand/50 bg-ink-900 p-6 sm:p-8">
+            <div className="studio-app-shot" aria-hidden="true">
+              <Image src="/screens/t2qcal-drawing.jpg" alt="" width={360} height={780} sizes="200px" />
+            </div>
             <Calculator size={36} className="text-brand" aria-hidden />
             <h3 className="mt-5 font-display text-2xl text-white">T2QCAL</h3>
             <p className="mt-3 flex-1 text-ink-300">Your separate construction calculator app, with measurements, drawings and saved working.</p>
