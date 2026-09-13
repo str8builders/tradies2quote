@@ -13,6 +13,6 @@ export const config = {
     // re-emit fresh auth cookies, racing with the route handler's
     // explicit cookie expiry writes. Excluding it guarantees the only
     // Set-Cookie headers on the response come from the route handler.
-    "/((?!_next/static|_next/image|favicon.ico|auth/signout|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|auth/signout|t2qcal/signout|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

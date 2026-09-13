@@ -147,8 +147,7 @@ const TARGETS = {
   pipeline:
     '[data-testid="dashboard-stage-tiles"], [data-testid="dashboard-pipeline-empty"]',
   calendar: '[data-testid="dashboard-calendar"]',
-  recent:
-    '[data-testid="quotes-list-client"], [data-testid="dashboard-empty"]',
+  recent: '[data-testid="dashboard-view-quotes"]',
   navigation:
     '[data-testid="app-header-tabs"], [data-testid="app-bottom-nav"]',
   materials:
@@ -418,11 +417,10 @@ export function OnboardingTour({ onFinished }: OnboardingTourProps) {
           },
         },
         edgeAwareStep(recent, {
-          title: "Recent quotes",
-          description: recent.matches('[data-testid="dashboard-empty"]')
-            ? "Your first quote will appear here once you create it."
-            : "Open any recent quote here to review, edit, send, or create its PDF.",
-          side: "top",
+          title: "Your quotes",
+          description:
+            "Every quote lives in the Quotes tab. Open it to review, edit, send, or create the PDF for any job.",
+          side: "bottom",
           align: "center",
         }),
       );

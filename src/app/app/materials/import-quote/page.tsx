@@ -45,9 +45,10 @@ export default async function ImportQuotePage() {
           </h1>
           <p className="mt-3 text-sm text-ink-300 sm:text-base">
             Snap a photo of a quote or invoice from ITM, PlaceMakers, Mitre 10
-            or similar. We&apos;ll read the line items so you can check them, then
-            turn them straight into a quote — same numbers — or add the prices to
-            your library.
+            or similar, or pick photos already on your phone — every page of a
+            long quote in one go. We&apos;ll read the line items so you can check
+            them, then turn them straight into a quote — same numbers — or add the
+            prices to your library.
           </p>
           <p className="mt-2 text-xs text-ink-400">
             The scan reads the prices — you confirm every line before anything

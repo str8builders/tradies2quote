@@ -252,7 +252,7 @@ export function ImportClient() {
         <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-sm border-2 border-dashed border-ink-700 bg-ink-900 p-8 text-center transition-colors hover:border-brand">
           <Upload size={28} weight="bold" className="text-ink-400" />
           <span className="mt-3 font-display text-sm uppercase tracking-tight">
-            {fileName ? fileName : "Choose a CSV file"}
+            {fileName ? fileName : "Choose a CSV from your phone or computer"}
           </span>
           <span className="mt-1 font-mono text-xs uppercase tracking-[0.2em] text-ink-500">
             {fileName ? "// click to change" : "// max 2 MB"}
@@ -260,7 +260,7 @@ export function ImportClient() {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".csv,text/csv"
+            accept=".csv,.txt,text/csv,text/plain,text/comma-separated-values,application/vnd.ms-excel"
             data-testid="csv-file-input"
             onChange={(e) => {
               const f = e.target.files?.[0];

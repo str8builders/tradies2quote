@@ -28,7 +28,7 @@ export function QuoteTransfer({snapshot}:{snapshot:CalculationSnapshot}){
     }catch(e){setMessage(e instanceof Error?e.message:'Unable to confirm this draft. Retry the same transfer.');}
     finally{setBusy(false);}
   }
-  function signIn(){try{sessionStorage.setItem(`t2qcal.pending.${snapshot.slug}`,JSON.stringify({snapshot,name:'Saved working'}));window.location.assign(`/login?next=${encodeURIComponent(`/t2qcal/calculator/${snapshot.slug}?resume=1`)}`);}catch{setMessage('Save a copy of the inputs before signing in; this browser could not keep them.');}}
+  function signIn(){try{sessionStorage.setItem(`t2qcal.pending.${snapshot.slug}`,JSON.stringify({snapshot,name:'Saved working'}));window.location.assign(`/t2qcal/signin?next=${encodeURIComponent(`/t2qcal/calculator/${snapshot.slug}?resume=1`)}`);}catch{setMessage('Save a copy of the inputs before signing in; this browser could not keep them.');}}
   return <section className="save-working" aria-label="Create quote from calculation"><h2>Use in Tradies2Quote</h2><p>Create a private draft using your business currency, markup and tax settings. Review it before sending to a customer.</p>
     {suggestion&&<label><input type="checkbox" checked={manual} onChange={e=>{setManual(e.target.checked);setPrice({raw:'',basis:snapshot.unit});}} disabled={busy||!!draft}/> Enter a different material quantity</label>}
     {calculated?<p><strong>{suggestion!.quantity.toLocaleString(undefined,{maximumFractionDigits:6})} {suggestion!.unit}</strong> · {suggestion!.basis}</p>:<p>Enter the material quantity for this job. The calculator working will be attached for reference.</p>}

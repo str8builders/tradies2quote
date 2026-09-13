@@ -23,3 +23,6 @@ it("preloads the native identity and fonts before claiming offline support",asyn
  let completion:Promise<void>|undefined;install!({waitUntil:p=>{completion=p;}});await completion;
  expect(addAll.mock.calls[0][0]).toEqual(expect.arrayContaining(["/t2qcal/native-icon.png","/t2qcal/native-mark.png","/t2qcal/fonts/ArchivoBlack-Regular.woff2","/t2qcal/fonts/IBMPlexSans.woff2","/t2qcal/fonts/IBMPlexMono-Regular.woff2"]));
 });
+it("opens a kept reference document from the shelf with no network",async()=>{const w=worker();w.entries.set("https://example.com/t2qcal/resources/file/gib-site-guide",new Response("%PDF-kept"));expect(await(await w.navigate("/t2qcal/resources/file/gib-site-guide")!).text()).toBe("%PDF-kept");expect(w.fetch).not.toHaveBeenCalled();});
+it("explains when a document was never kept and the network is gone",async()=>{const w=worker();const response=await w.navigate("/t2qcal/resources/file/mitek-residential")!;expect(response.status).toBe(503);expect(await response.text()).toContain("Keep offline");});
+it("never wipes the kept-document shelf when the page cache is replaced",()=>{expect(source).toMatch(/key\.startsWith\("t2qcal-web-"\)/);expect(source).toContain('"t2qcal-docs-v1"');});

@@ -43,6 +43,9 @@ export default async function MaterialsPage() {
           <p className="mt-3 text-sm text-ink-300 sm:text-base">
             Save your common materials with prices. Quotes will use these instead of T2Q estimates.
           </p>
+          <p className="mt-2 text-xs text-ink-400">
+            Add them one at a time, import a CSV, or scan supplier quotes from your camera or the photos on your phone.
+          </p>
         </div>
 
         <CaptureSuccessBanner />
@@ -171,7 +174,7 @@ async function MaterialsBody({ userId }: { userId: string }) {
             className="t2q-btn-ghost-pro"
           >
             <Camera size={18} weight="bold" />
-            Scan quote
+            Scan photos
           </Link>
           <Link
             href="/app/materials/import"

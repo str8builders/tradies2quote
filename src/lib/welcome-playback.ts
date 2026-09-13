@@ -51,3 +51,22 @@ export function createWelcomePlayback(player: WelcomePlayerControls) {
     dispose() { disposed = true; player.pause(); },
   };
 }
+
+/**
+ * Minimum time the entry tape takes to fill on a first visit. The intro video
+ * is only 4.2 s and used to close 350 ms after its last frame, which read as
+ * a flash; the tape now follows the slower of the video and this clock.
+ */
+export const MIN_ENTRY_MS = 6500;
+
+/** What the tape shows: never ahead of the video, never faster than the clock; once the intro ends, the clock alone. */
+export function entryTapeProgress({ video, clock, introDone, reduce }: { video: number; clock: number; introDone: boolean; reduce: boolean }) {
+  const v = Math.max(0, Math.min(1, video)), c = Math.max(0, Math.min(1, clock));
+  if (reduce) return v;
+  return introDone ? c : Math.min(v, c);
+}
+
+/** Entry is complete only when the intro has finished AND the minimum time has passed (reduced motion skips the wait). */
+export function entryComplete({ introDone, clock, reduce }: { introDone: boolean; clock: number; reduce: boolean }) {
+  return introDone && (reduce || clock >= 1);
+}

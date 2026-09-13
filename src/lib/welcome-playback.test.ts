@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createWelcomeDeadline, createWelcomePlayback } from "./welcome-playback";
+import { MIN_ENTRY_MS, createWelcomeDeadline, createWelcomePlayback, entryComplete, entryTapeProgress } from "./welcome-playback";
 
 function setup() {
   const player = { play: vi.fn(), pause: vi.fn(), seekTo: vi.fn() };
@@ -83,5 +83,23 @@ describe("automatic welcome fallback", () => {
     deadline.visibility(false);
     vi.advanceTimersByTime(60000);
     expect(complete).not.toHaveBeenCalled();
+  });
+});
+
+describe("entry tape timing", () => {
+  it("takes at least the minimum entry time even when the intro finishes early", () => {
+    expect(MIN_ENTRY_MS).toBeGreaterThanOrEqual(6000);
+    // Video done at 4.2 s of a 6.5 s clock: the tape sits at the clock, not at 100 %.
+    expect(entryTapeProgress({ video: 1, clock: 4200 / MIN_ENTRY_MS, introDone: true, reduce: false })).toBeCloseTo(0.646, 3);
+    expect(entryComplete({ introDone: true, clock: 4200 / MIN_ENTRY_MS, reduce: false })).toBe(false);
+    expect(entryComplete({ introDone: true, clock: 1, reduce: false })).toBe(true);
+  });
+  it("never runs ahead of a slow intro", () => {
+    expect(entryTapeProgress({ video: 0.2, clock: 0.9, introDone: false, reduce: false })).toBe(0.2);
+    expect(entryComplete({ introDone: false, clock: 1, reduce: false })).toBe(false);
+  });
+  it("keeps reduced motion short", () => {
+    expect(entryTapeProgress({ video: 0.5, clock: 0, introDone: false, reduce: true })).toBe(0.5);
+    expect(entryComplete({ introDone: true, clock: 0, reduce: true })).toBe(true);
   });
 });

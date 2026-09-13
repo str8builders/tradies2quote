@@ -16,17 +16,13 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedAuthUser } from "@/lib/supabase/auth";
-import { formatCurrency, quoteNumber } from "@/lib/quote-defaults";
+import { formatCurrency } from "@/lib/quote-defaults";
 import type { QuoteData, QuoteStatus } from "@/lib/quote-types";
 import { isOwnerEmail } from "@/lib/owner";
 import { STAGE_LABELS } from "@/lib/lifecycle/stages";
 import { AppHeader } from "./_components/AppHeader";
 import { DashboardSkeleton } from "./_components/DashboardSkeleton";
 import { StaggerIn } from "./_components/StaggerIn";
-import {
-  QuotesListClient,
-  type QuoteListRow,
-} from "./_components/QuotesListClient";
 import { ScheduleCalendar } from "./_components/ScheduleCalendar";
 import { WeekOutlook } from "./_components/WeekOutlook";
 import { getWeekOutlook } from "@/lib/weather-impact/outlook";
@@ -44,18 +40,17 @@ export const dynamic = "force-dynamic";
  *
  * Wave 10 — lean overview that:
  *   - Welcomes the user by name.
- *   - Shows the 5 most recent ACTIVE quotes (archived + deleted filtered
+ *   - No quote list here: every quote (archived + deleted filtered
  *     out server-side).
  *   - Provides one-click access to the full management hub at
  *     `/app/quotes` for search + filter + archive + soft-delete.
  *   - Keeps the existing "New quote" and "Materials" jump buttons.
  *
- * The recent-quotes block re-uses `<QuotesListClient />` so the same row
- * affordances (status pill, archived badge, ⋯ menu) are available here
- * too, without duplicating markup. Search + filter UI is hidden on the
- * dashboard by passing `isHub={false}`.
+ * Quotes are NOT listed here any more (owner request, 2026-09-13): the
+ * dashboard is the work board, and every quote lives in the Quotes tab
+ * (`/app/quotes`), which already carries search, filters, archive and
+ * delete. The hero keeps a "Quotes" jump button so the tab is one tap away.
  */
-const DASHBOARD_RECENT_LIMIT = 5;
 
 export default async function DashboardPage() {
   // Wave 17 — perf — auth runs in the page so we can paint the static
@@ -167,23 +162,12 @@ async function DashboardData({
   // so it can scan all the user's non-deleted rows for accurate counts
   // and totals without bloating the recent-list payload.
   const [
-    { data: quotes },
     { data: statsRows },
     { data: profile },
     { count: materialsCount },
     { data: upcomingRows },
     { data: noteRows },
   ] = await Promise.all([
-      supabase
-        .from("quotes")
-        .select(
-          "id, status, total_amount, currency, quote_data, created_at, archived_at",
-        )
-        .eq("user_id", userId)
-        .is("deleted_at", null)
-        .is("archived_at", null)
-        .order("created_at", { ascending: false })
-        .limit(DASHBOARD_RECENT_LIMIT),
       supabase
         .from("quotes")
         .select("status, total_amount, currency, created_at")
@@ -246,25 +230,6 @@ async function DashboardData({
   // Wave 13 — extended to count every lifecycle stage so the dashboard
   // tiles surface the orchestrator's view of the pipeline.
   const stats = computeLifecycleStats(statsRows ?? []);
-
-  const recent: QuoteListRow[] = (quotes ?? []).map((q) => {
-    const qd = q.quote_data as QuoteData | null;
-    const jobSummary =
-      (qd?.job_summary as string | undefined) ??
-      (qd?.line_items?.[0]?.description as string | undefined) ??
-      "";
-    return {
-      id: q.id,
-      status: (q.status ?? "draft") as QuoteStatus,
-      total: Number(q.total_amount) || 0,
-      currency: (q.currency as string) ?? "NZD",
-      clientName: qd?.client?.name ?? "—",
-      jobSummary,
-      number: quoteNumber(q.id, q.created_at),
-      created_at: q.created_at,
-      archived_at: q.archived_at,
-    };
-  });
 
   const statsCurrency = stats.currency;
 
@@ -610,14 +575,6 @@ async function DashboardData({
       </details>
       </StaggerIn>
 
-      <StaggerIn index={3} className="flex items-center justify-between gap-3">
-        <p
-          data-testid="dashboard-recent-label"
-          className="t2q-section-label-pro"
-        >
-          {`// ${recent.length} recent quote${recent.length === 1 ? "" : "s"}`}
-        </p>
-      </StaggerIn>
 
       {/* Wave 13 — Agents card is now owner-only. Was visible to
           every tradie in Wave 10.4; now hidden from non-owners so
@@ -700,48 +657,6 @@ async function DashboardData({
           />
         </Link>
         </StaggerIn>
-      ) : null}
-
-      <StaggerIn index={4}>
-      <section className="mt-5">
-        {recent.length === 0 ? (
-          <div
-            data-testid="dashboard-empty"
-            className="t2q-card-pro flex flex-col items-center gap-3 p-10 text-center"
-          >
-            <p className="font-display text-lg uppercase tracking-tight text-white">
-              No quotes yet.
-            </p>
-            <p className="max-w-sm text-sm text-ink-300">
-              Your first quote takes about 60 seconds — talk through the job
-              and we&apos;ll turn it into a branded PDF.
-            </p>
-            <Link
-              href="/app/quotes/new"
-              data-testid="dashboard-empty-cta"
-              className="t2q-btn-primary-pro mt-2"
-            >
-              <Plus size={18} weight="bold" />
-              Start your first quote
-            </Link>
-          </div>
-        ) : (
-          <QuotesListClient rows={recent} />
-        )}
-      </section>
-      </StaggerIn>
-
-      {recent.length > 0 ? (
-        <div className="mt-5 flex justify-end">
-          <Link
-            href="/app/quotes"
-            data-testid="dashboard-all-quotes"
-            className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.25em] text-ink-300 hover:text-brand"
-          >
-            All quotes
-            <ArrowRight size={12} weight="bold" />
-          </Link>
-        </div>
       ) : null}
 
       {/* Wave 14.5 — mobile tail-nav (Clients/Settings/Debug links)

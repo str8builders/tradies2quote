@@ -36,7 +36,7 @@ export function SaveCalculation({snapshot,title}:{snapshot:CalculationSnapshot;t
     finally{setBusy(false);}
   }
   function signIn(){
-    try{sessionStorage.setItem(`t2qcal.pending.${snapshot.slug}`,JSON.stringify({snapshot,name}));window.location.assign(`/login?next=${encodeURIComponent(`/t2qcal/calculator/${snapshot.slug}?resume=1`)}`);}
+    try{sessionStorage.setItem(`t2qcal.pending.${snapshot.slug}`,JSON.stringify({snapshot,name}));window.location.assign(`/t2qcal/signin?next=${encodeURIComponent(`/t2qcal/calculator/${snapshot.slug}?resume=1`)}`);}
     catch{setMessage("Your browser could not keep these inputs for sign-in. Copy or print them before signing in.");}
   }
   return <section className="save-working" aria-label="Save calculation"><div><h2>Save your working</h2><p>Save on this device without signing in, or save to your account online to reopen on another device.</p></div>

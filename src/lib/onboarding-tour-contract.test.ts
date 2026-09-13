@@ -71,7 +71,7 @@ describe("first-run coachmark contract", () => {
       "dashboard-pipeline-empty",
       "dashboard-calendar",
       "quotes-list-client",
-      "dashboard-empty",
+      "dashboard-view-quotes",
     ]) {
       expect(dashboardSurface).toContain(`data-testid="${testId}"`);
     }

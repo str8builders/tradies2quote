@@ -20,6 +20,7 @@ import { validateSupplierQuote } from "@/lib/materials/quoteValidation";
 import { formatCurrency, round2 } from "@/lib/quote-defaults";
 import { TapeMeasureProgress } from "@/app/app/_components/TapeMeasureProgress";
 import { prepareScanImage } from "@/lib/scanImage";
+import { mergeExtractions, photoSetLabel } from "@/lib/materials/mergeExtractions";
 import {
   MAX_SCAN_UPLOAD_BYTES,
   detectImageMime,
@@ -86,17 +87,25 @@ type ExtractResponse = {
   attempts?: number;
 };
 
+/** Photos per scan. Each one is a separate vision call, so keep it modest. */
+export const MAX_SCAN_PHOTOS = 6;
+
 export function QuoteImportClient({ currency }: { currency: string }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const libraryRef = useRef<HTMLInputElement>(null);
-  const chosenFileRef = useRef<File | null>(null);
+  // Every chosen photo, in the order added. A multi-page quote is scanned
+  // page by page and the results merged (see mergeExtractions).
+  const filesRef = useRef<File[]>([]);
   const [phase, setPhase] = useState<Phase>("idle");
   const [fileName, setFileName] = useState<string>("");
-  // Object-URL for a visible thumbnail of the imported photo. Kept in a
-  // ref too so we can revoke the previous URL on replace / unmount.
-  const [previewUrl, setPreviewUrl] = useState<string>("");
-  const previewUrlRef = useRef<string>("");
+  // Object-URLs for the thumbnails, one per photo. Kept in a ref too so
+  // we can revoke stale URLs on remove / replace / unmount.
+  const [previews, setPreviews] = useState<string[]>([]);
+  const previewsRef = useRef<string[]>([]);
+  const previewUrl = previews[0] ?? "";
+  const [zoomIndex, setZoomIndex] = useState<number>(0);
+  const [scanProgress, setScanProgress] = useState<{ index: number; total: number } | null>(null);
   // Full-screen view of the scan so the tradie can compare each line to the
   // original photo while reviewing.
   const [zoomOpen, setZoomOpen] = useState<boolean>(false);
@@ -130,14 +139,30 @@ export function QuoteImportClient({ currency }: { currency: string }) {
   // Revoke the last object-URL when the component unmounts.
   useEffect(() => {
     return () => {
-      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+      for (const url of previewsRef.current) URL.revokeObjectURL(url);
     };
   }, []);
 
-  function setPreview(url: string) {
-    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
-    previewUrlRef.current = url;
-    setPreviewUrl(url);
+  function setPreviewList(urls: string[]) {
+    for (const url of previewsRef.current) if (!urls.includes(url)) URL.revokeObjectURL(url);
+    previewsRef.current = urls;
+    setPreviews(urls);
+  }
+
+  function clearPhotos() {
+    filesRef.current = [];
+    setPreviewList([]);
+    setFileName("");
+    setZoomIndex(0);
+    if (fileRef.current) fileRef.current.value = "";
+    if (libraryRef.current) libraryRef.current.value = "";
+  }
+
+  function removePhoto(index: number) {
+    filesRef.current = filesRef.current.filter((_, i) => i !== index);
+    setPreviewList(previewsRef.current.filter((_, i) => i !== index));
+    setFileName(photoSetLabel(filesRef.current));
+    setZoomIndex(0);
   }
 
   function pickFile() {
@@ -149,89 +174,109 @@ export function QuoteImportClient({ currency }: { currency: string }) {
   }
 
   function onFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (!f) return;
+    // Either input (camera capture or photo library, possibly several at
+    // once) funnels here and APPENDS to the set, so a tradie can snap page
+    // one, then page two, then add a price tag from their camera roll.
+    const picked = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (picked.length === 0) return;
     setError("");
-    const sourceSizeError = scanUploadSizeError(f);
-    if (sourceSizeError) {
-      setError(sourceSizeError);
-      setFileName("");
-      setPreview("");
-      chosenFileRef.current = null;
+    const room = MAX_SCAN_PHOTOS - filesRef.current.length;
+    if (room <= 0) {
+      setError(`You can scan up to ${MAX_SCAN_PHOTOS} photos at once. Remove one to add another.`);
       return;
     }
-    if (!isSupportedScanInput(f)) {
-      setError(
-        "Unsupported image type. Use JPEG, PNG, WebP, GIF or iPhone HEIC.",
-      );
-      setFileName("");
-      setPreview("");
-      chosenFileRef.current = null;
-      return;
+    const accepted: File[] = [];
+    const problems: string[] = [];
+    for (const f of picked.slice(0, room)) {
+      const sourceSizeError = scanUploadSizeError(f);
+      if (sourceSizeError) {
+        problems.push(`${f.name}: ${sourceSizeError}`);
+        continue;
+      }
+      if (!isSupportedScanInput(f)) {
+        problems.push(`${f.name}: unsupported image type. Use JPEG, PNG, WebP, GIF or iPhone HEIC.`);
+        continue;
+      }
+      accepted.push(f);
     }
-    // Either input (camera capture or photo library) funnels here, so we
-    // stash the chosen File rather than reading back off a single input.
-    chosenFileRef.current = f;
-    setFileName(f.name);
-    setPreview(URL.createObjectURL(f));
+    if (picked.length > room) {
+      problems.push(`Only the first ${room} added — a scan holds up to ${MAX_SCAN_PHOTOS} photos.`);
+    }
+    filesRef.current = [...filesRef.current, ...accepted];
+    setPreviewList([...previewsRef.current, ...accepted.map((f) => URL.createObjectURL(f))]);
+    setFileName(photoSetLabel(filesRef.current));
+    if (problems.length > 0) setError(problems.join(" "));
   }
 
   async function scan() {
-    const raw = chosenFileRef.current;
-    if (!raw) {
-      setError("Choose a photo of the quote first.");
+    const raws = filesRef.current;
+    if (raws.length === 0) {
+      setError("Take a photo of the quote, or choose one from your phone, first.");
       return;
     }
     setError("");
     setPhase("extracting");
+    setScanProgress({ index: 1, total: raws.length });
     try {
-      // Convert iPhone HEIC → JPEG and downscale big photos so the upload
-      // clears Vercel's ~4.5 MB request-body limit (otherwise it 413s).
-      let f = raw;
-      try {
-        f = await prepareScanImage(raw);
-      } catch {
-        setError(
-          'Couldn’t read that photo. Upload a JPEG, or switch your iPhone Camera to "Most Compatible".',
-        );
-        setPhase("error");
-        return;
+      const pages: ExtractResponse[] = [];
+      const preparedFiles: File[] = [];
+      const preparedUrls: string[] = [];
+      for (let i = 0; i < raws.length; i++) {
+        const raw = raws[i];
+        const which = raws.length > 1 ? `Photo ${i + 1} of ${raws.length}: ` : "";
+        setScanProgress({ index: i + 1, total: raws.length });
+        // Convert iPhone HEIC → JPEG and downscale big photos so the upload
+        // clears the ~4.5 MB request-body limit (otherwise it 413s).
+        let f = raw;
+        try {
+          f = await prepareScanImage(raw);
+        } catch {
+          setError(
+            `${which}couldn’t read that photo. Upload a JPEG, or switch your iPhone Camera to "Most Compatible".`,
+          );
+          setPhase("error");
+          return;
+        }
+        if (f.size > MAX_SCAN_UPLOAD_BYTES) {
+          setError(
+            `${which}image is ${(f.size / 1024 / 1024).toFixed(1)} MB after compression. Try cropping or taking a closer photo.`,
+          );
+          setPhase("error");
+          return;
+        }
+        if (!isPreparedScanMime(detectImageMime(f))) {
+          setError(
+            `${which}unsupported image type after preparation. Use JPEG, PNG, WebP or GIF.`,
+          );
+          setPhase("error");
+          return;
+        }
+        preparedFiles.push(f);
+        preparedUrls.push(f === raw ? previewsRef.current[i] : URL.createObjectURL(f));
+        const fd = new FormData();
+        fd.append("image", f);
+        const res = await fetch("/api/materials/extract-quote", {
+          method: "POST",
+          body: fd,
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as {
+            error?: string;
+            message?: string;
+          };
+          setError(`${which}${data.message ?? data.error ?? "Could not scan that quote."}`);
+          setPhase("error");
+          return;
+        }
+        pages.push((await res.json()) as ExtractResponse);
       }
-      if (f.size > MAX_SCAN_UPLOAD_BYTES) {
-        setError(
-          `Image is ${(f.size / 1024 / 1024).toFixed(1)} MB after compression. Try cropping or taking a closer photo.`,
-        );
-        setPhase("error");
-        return;
-      }
-      if (!isPreparedScanMime(detectImageMime(f))) {
-        setError(
-          "Unsupported image type after preparation. Use JPEG, PNG, WebP or GIF.",
-        );
-        setPhase("error");
-        return;
-      }
-      if (f !== raw) {
-        chosenFileRef.current = f;
-        setFileName(f.name);
-        setPreview(URL.createObjectURL(f));
-      }
-      const fd = new FormData();
-      fd.append("image", f);
-      const res = await fetch("/api/materials/extract-quote", {
-        method: "POST",
-        body: fd,
-      });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as {
-          error?: string;
-          message?: string;
-        };
-        setError(data.message ?? data.error ?? "Could not scan that quote.");
-        setPhase("error");
-        return;
-      }
-      const data = (await res.json()) as ExtractResponse;
+      // Keep the prepared (JPEG, downscaled) versions so the review zoom
+      // shows exactly what the reader saw.
+      filesRef.current = preparedFiles;
+      setPreviewList(preparedUrls);
+      setFileName(photoSetLabel(preparedFiles));
+      const data = mergeExtractions(pages) as ExtractResponse;
       setSupplier(data.supplier ?? "");
       setGstInclusive(data.gst_inclusive === true);
       setNotes(data.notes ?? []);
@@ -272,6 +317,8 @@ export function QuoteImportClient({ currency }: { currency: string }) {
     } catch {
       setError("Network error. Please try again.");
       setPhase("error");
+    } finally {
+      setScanProgress(null);
     }
   }
 
@@ -450,9 +497,7 @@ export function QuoteImportClient({ currency }: { currency: string }) {
               setSupplier("");
               setNotes([]);
               setExtraction(null);
-              chosenFileRef.current = null;
-              if (fileRef.current) fileRef.current.value = "";
-              if (libraryRef.current) libraryRef.current.value = "";
+              clearPhotos();
               setPhase("idle");
             }}
             className="t2q-btn-ghost-pro inline-flex h-11 px-5"
@@ -482,6 +527,7 @@ export function QuoteImportClient({ currency }: { currency: string }) {
         ref={libraryRef}
         type="file"
         accept="image/*,.heic,.heif"
+        multiple
         className="sr-only"
         onChange={onFileChosen}
         data-testid="quote-import-file-library"
@@ -491,8 +537,12 @@ export function QuoteImportClient({ currency }: { currency: string }) {
       {(phase === "idle" || phase === "extracting" || phase === "error") && (
         <div className="t2q-card-pro p-5 sm:p-6">
           <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-brand">
-            {"// step 1 — photo"}
+            {"// step 1 — photos"}
           </div>
+          <p className="mt-2 text-sm text-ink-300">
+            Take a photo now, or pick photos already on your phone. Add every page
+            of a long quote — up to {MAX_SCAN_PHOTOS} photos are read together.
+          </p>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <button
               type="button"
@@ -501,7 +551,7 @@ export function QuoteImportClient({ currency }: { currency: string }) {
               className="t2q-btn-ghost-pro inline-flex h-11 px-5 disabled:opacity-50"
             >
               <Camera size={18} weight="bold" />
-              {fileName ? "Retake photo" : "Take photo"}
+              {previews.length > 0 ? "Add a photo" : "Take photo"}
             </button>
             <button
               type="button"
@@ -511,35 +561,56 @@ export function QuoteImportClient({ currency }: { currency: string }) {
               data-testid="quote-import-library-btn"
             >
               <ImageIcon size={18} weight="bold" />
-              Import photo
+              {previews.length > 0 ? "Add from Photos" : "Choose from Photos"}
             </button>
           </div>
-          {previewUrl && (
+          {previews.length > 0 && (
             <div
               data-testid="quote-import-preview"
-              className="mt-4 flex items-center gap-3 rounded-lg border border-ink-800 bg-ink-900/70 p-3"
+              className="mt-4 rounded-lg border border-ink-800 bg-ink-900/70 p-3"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={previewUrl}
-                alt="Imported supplier quote"
-                className="h-20 w-20 shrink-0 rounded-md border border-[#E0DFD7] object-cover"
-              />
-              <div className="min-w-0">
-                <p className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-emerald-600">
+              <div className="flex items-center justify-between gap-3">
+                <p className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-emerald-500">
                   <CheckCircle size={14} weight="fill" />
-                  Photo imported
+                  {previews.length === 1 ? "Photo ready" : `${previews.length} photos ready`}
                 </p>
-                <p
-                  className="mt-1 truncate text-sm text-ink-700"
-                  data-testid="quote-import-filename"
+                <button
+                  type="button"
+                  onClick={clearPhotos}
+                  disabled={phase === "extracting"}
+                  className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-400 hover:text-red-300 disabled:opacity-50"
+                  data-testid="quote-import-clear"
                 >
-                  {fileName}
-                </p>
-                <p className="mt-0.5 text-xs text-ink-500">
-                  Tap “Scan quote” to read the lines.
-                </p>
+                  Clear all
+                </button>
               </div>
+              <ul className="mt-3 flex flex-wrap gap-2" aria-label="Photos to scan">
+                {previews.map((url, i) => (
+                  <li key={url} className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={url}
+                      alt={`Photo ${i + 1} of ${previews.length}`}
+                      className="h-20 w-20 rounded-md border border-[#E0DFD7] object-cover"
+                    />
+                    <span className="absolute bottom-1 left-1 rounded-sm bg-black/70 px-1 font-mono text-[10px] text-white">
+                      {i + 1}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={`Remove photo ${i + 1}`}
+                      onClick={() => removePhoto(i)}
+                      disabled={phase === "extracting"}
+                      className="absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full border border-ink-700 bg-ink-950 text-ink-200 hover:text-red-300 disabled:opacity-50"
+                    >
+                      <X size={12} weight="bold" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 truncate text-xs text-ink-500" data-testid="quote-import-filename">
+                {fileName} · tap “Scan” to read the lines.
+              </p>
             </div>
           )}
           <div className="mt-4">
@@ -550,12 +621,21 @@ export function QuoteImportClient({ currency }: { currency: string }) {
               data-testid="quote-import-scan"
               className="t2q-btn-primary-pro inline-flex h-11 px-5 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {phase === "extracting" ? "Reading quote…" : "Scan quote"}
+              {phase === "extracting"
+                ? scanProgress && scanProgress.total > 1
+                  ? `Reading photo ${scanProgress.index} of ${scanProgress.total}…`
+                  : "Reading quote…"
+                : previews.length > 1
+                  ? `Scan ${previews.length} photos`
+                  : "Scan quote"}
             </button>
           </div>
           {phase === "extracting" && (
             <div className="mt-4 flex justify-center">
-              <TapeMeasureProgress estimateMs={18000} label="// reading quote" />
+              <TapeMeasureProgress
+                estimateMs={18000 * Math.max(1, previews.length)}
+                label={scanProgress && scanProgress.total > 1 ? `// photo ${scanProgress.index} of ${scanProgress.total}` : "// reading quote"}
+              />
             </div>
           )}
         </div>
@@ -964,7 +1044,7 @@ export function QuoteImportClient({ currency }: { currency: string }) {
 
       {/* Full-screen scan viewer — lets the tradie zoom the original photo to
           verify any flagged line against the source. */}
-      {zoomOpen && previewUrl && (
+      {zoomOpen && previews.length > 0 && (
         <div
           data-testid="quote-import-scan-zoom"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
@@ -980,11 +1060,37 @@ export function QuoteImportClient({ currency }: { currency: string }) {
           </button>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={previewUrl}
-            alt="Scanned supplier quote"
+            src={previews[Math.min(zoomIndex, previews.length - 1)]}
+            alt={`Scanned supplier quote, photo ${Math.min(zoomIndex, previews.length - 1) + 1} of ${previews.length}`}
             onClick={(e) => e.stopPropagation()}
             className="max-h-full max-w-full rounded-lg object-contain"
           />
+          {previews.length > 1 && (
+            <div
+              className="absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-full bg-black/70 px-3 py-1.5 text-white"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                aria-label="Previous photo"
+                onClick={() => setZoomIndex((i) => (i - 1 + previews.length) % previews.length)}
+                className="grid h-9 w-9 place-items-center rounded-full hover:bg-white/15"
+              >
+                ‹
+              </button>
+              <span className="font-mono text-xs">
+                {Math.min(zoomIndex, previews.length - 1) + 1} / {previews.length}
+              </span>
+              <button
+                type="button"
+                aria-label="Next photo"
+                onClick={() => setZoomIndex((i) => (i + 1) % previews.length)}
+                className="grid h-9 w-9 place-items-center rounded-full hover:bg-white/15"
+              >
+                ›
+              </button>
+            </div>
+          )}
         </div>
       )}
     </section>

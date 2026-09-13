@@ -1,5 +1,8 @@
 /* T2QCAL's public calculator cache. Never cache accounts, APIs or saved URLs. */
-const CACHE = "t2qcal-web-20260909-native-stairs-4";
+const CACHE = "t2qcal-web-20260913-premium-measure-1";
+/* The tradie's own shelf of kept reference PDFs. Never versioned away with the page cache. */
+const DOCS = "t2qcal-docs-v1";
+const DOC_PREFIX = "/t2qcal/resources/file/";
 const HOME = "/t2qcal/calculators";
 const OFFLINE = "/t2qcal/offline.html";
 const publicPage = url => !url.search && (url.pathname === "/t2qcal" || [HOME,"/t2qcal/device","/t2qcal/install","/t2qcal/jobs","/t2qcal/measure","/t2qcal/resources"].includes(url.pathname) || /^\/t2qcal\/calculator\/[a-z0-9-]+$/.test(url.pathname));
@@ -34,6 +37,16 @@ self.addEventListener("message",event=>{
 self.addEventListener("fetch",event=>{
   const request=event.request,url=new URL(request.url);
   if(request.method!=="GET"||url.origin!==self.location.origin)return;
+  // Kept reference documents answer from the shelf first, so they open with no signal.
+  if(url.pathname.startsWith(DOC_PREFIX)){
+    event.respondWith((async()=>{
+      const shelf=await caches.open(DOCS),kept=await shelf.match(url.href);
+      if(kept)return kept;
+      try{return await fetch(request);}
+      catch{return new Response("This document is not kept on this phone. Connect once and choose Keep offline.",{status:503,headers:{"Content-Type":"text/plain"}});}
+    })());
+    return;
+  }
   // RSC, APIs and all account-specific navigation remain network-only.
   if(request.mode==="navigate"&&publicPage(url)){
     event.respondWith((async()=>{
