@@ -37,6 +37,8 @@ export type VerifiedDefinition = {
   sheets?: { label: string; diagram: DiagramKind }[];
   /** False for tools with no assembly to show — converters, constructions, templates. */
   showsAssembly?: boolean;
+  /** The 3D model kind when it differs from the default mapping for `diagram` (native `Tool.assembly`). */
+  assembly?: DiagramKind;
   fields: CalculatorField[];
   compute: (values: Record<string, number>, unit: VerifiedUnit) => CalculatorOutput;
 };

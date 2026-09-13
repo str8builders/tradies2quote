@@ -57,7 +57,7 @@ export function VerifiedCalculator({ tool }: { tool: ToolEntry }) {
     // a converter or a construction has nothing to stand up in three dimensions,
     // so those tools carry measured sheets only rather than a stand-in solid
     ...(definition.showsAssembly === false ? []
-      : [{ label: "3D assembly", diagram: calculatorModelKind(tool.slug, definition.diagram) }]),
+      : [{ label: "3D assembly", diagram: definition.assembly ?? calculatorModelKind(tool.slug, definition.diagram) }]),
   ];
   const activeSheet = sheets[Math.min(sheet, sheets.length - 1)];
   const diagramValues = { ...values, ...(output.diagramValues || {}) };
