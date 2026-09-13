@@ -224,6 +224,12 @@ async function DashboardData({
       profile.business_name.trim().length === 0);
   const libraryEmpty = (materialsCount ?? 0) === 0;
 
+  // Client requests from the public request link that still sit as drafts.
+  const { count: openRequestCount } = await supabase
+    .from("quote_requests")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["new", "generated", "generation_failed"]);
+
   // Aggregate this user's own quote stats. Pure JS so no extra Postgres
   // RPC needed, and the query already RLS-scopes by user_id.
   // Wave 13 — extended to count every lifecycle stage so the dashboard
@@ -286,6 +292,37 @@ async function DashboardData({
 
   return (
     <>
+      {/* Client requests waiting from the public "Request a quote" link. */}
+      {openRequestCount ? (
+        <StaggerIn index={0}>
+        <Link
+          href="/app/requests"
+          data-testid="dashboard-requests-banner"
+          className="t2q-card-pro t2q-card-pro-hover mb-5 flex items-start gap-3 p-4 sm:items-center sm:p-5"
+        >
+          <span
+            aria-hidden="true"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-brand/30 bg-brand/10 text-brand"
+          >
+            <ChatCircleText size={18} weight="bold" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="font-display text-sm uppercase tracking-tight text-white">
+              {openRequestCount} client request{openRequestCount === 1 ? "" : "s"} waiting.
+            </p>
+            <p className="mt-0.5 text-xs text-ink-300 sm:text-sm">
+              Sent through your request link. Each one is a draft ready for you to check and send.
+            </p>
+          </div>
+          <span className="hidden items-center gap-1 font-mono text-[10px] uppercase tracking-[0.25em] text-brand sm:inline-flex">
+            Open requests
+            <ArrowRight size={12} weight="bold" />
+          </span>
+          <ArrowRight size={18} weight="bold" className="shrink-0 text-brand sm:hidden" aria-hidden="true" />
+        </Link>
+        </StaggerIn>
+      ) : null}
+
       {/* Complete business identity before exporting or sending a quote. */}
       {businessNameMissing ? (
         <StaggerIn index={0}>

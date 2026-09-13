@@ -4,9 +4,16 @@ import { redirect } from "next/navigation";
 import { getCachedAuthUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { AppHeader } from "../_components/AppHeader";
+import { GenerateRequestButton } from "./_components/GenerateRequestButton";
 
 export const metadata: Metadata = { title: "Quote requests" };
 export const dynamic = "force-dynamic";
+
+const STALE_MS = 5 * 60 * 1000;
+/** A "new" request older than this never finished generating — offer recovery. */
+function isStale(createdAt: string): boolean {
+  return Date.now() - new Date(createdAt).getTime() > STALE_MS;
+}
 
 const STATUS_LABEL: Record<string, string> = {
   new: "Draft being prepared",
@@ -29,6 +36,20 @@ export default async function RequestsPage() {
     .limit(50);
 
   const rows = requests ?? [];
+
+  // The truth about a draft is the quote itself: if it has line items the
+  // request is ready no matter what the request row recorded (the tradie may
+  // have generated from the draft after an automatic run failed).
+  const quoteIds = rows.map((r) => r.quote_id).filter((id): id is string => Boolean(id));
+  const { data: quoteRows } = quoteIds.length
+    ? await supabase.from("quotes").select("id, quote_data, status").in("id", quoteIds)
+    : { data: [] as Array<{ id: string; quote_data: unknown; status: string }> };
+  const quoteState = new Map(
+    (quoteRows ?? []).map((q) => {
+      const data = q.quote_data as { line_items?: unknown } | null;
+      return [q.id, { hasLines: Array.isArray(data?.line_items), status: q.status }];
+    }),
+  );
 
   return (
     <div className="min-h-screen text-white">
@@ -67,7 +88,14 @@ export default async function RequestsPage() {
                     </p>
                   </div>
                   <span className="rounded-sm border border-ink-600 px-2 py-1 font-mono text-[11px] uppercase tracking-[0.15em] text-ink-300">
-                    {STATUS_LABEL[r.status] ?? r.status}
+                    {(() => {
+                      const q = r.quote_id ? quoteState.get(r.quote_id) : undefined;
+                      if (q?.hasLines) return q.status === "draft" ? "Draft ready to review" : `Quote ${q.status}`;
+                      if (r.status === "new" && isStale(r.created_at)) {
+                        return "Needs you to generate";
+                      }
+                      return STATUS_LABEL[r.status] ?? r.status;
+                    })()}
                   </span>
                 </div>
                 <p className="mt-3 whitespace-pre-wrap text-sm text-ink-200">{r.description}</p>
@@ -82,11 +110,19 @@ export default async function RequestsPage() {
                       timeZone: "Pacific/Auckland",
                     }).format(new Date(r.created_at))}
                   </span>
-                  {r.quote_id ? (
-                    <Link href={`/app/quotes/preview/${r.quote_id}`} className="t2q-btn-primary-pro">
-                      Open draft quote
-                    </Link>
-                  ) : null}
+                  <div className="flex items-center gap-2">
+                    {r.quote_id &&
+                    !quoteState.get(r.quote_id)?.hasLines &&
+                    (r.status === "generation_failed" ||
+                      (r.status === "new" && isStale(r.created_at))) ? (
+                      <GenerateRequestButton quoteId={r.quote_id} />
+                    ) : null}
+                    {r.quote_id ? (
+                      <Link href={`/app/quotes/preview/${r.quote_id}`} className="t2q-btn-primary-pro">
+                        Open draft quote
+                      </Link>
+                    ) : null}
+                  </div>
                 </div>
               </li>
             ))}
