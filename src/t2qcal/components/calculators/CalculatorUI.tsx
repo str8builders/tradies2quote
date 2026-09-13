@@ -2,6 +2,7 @@
 
 import { QuoteTransfer } from "./QuoteTransfer";
 import { SaveCalculation } from "./SaveCalculation";
+import { CalculatorResources } from "./CalculatorResources";
 import { validateSnapshot, type CalculationSnapshot } from "@/t2qcal/lib/calculation-record";
 import { createContext, useContext, useCallback, useEffect, useRef, useState } from "react";
 import type { ToolEntry } from "@/t2qcal/lib/tools";
@@ -48,6 +49,7 @@ export function CalculatorFrame({ tool, children, unit, onUnitChange, values }: 
         <b>Verify before cutting.</b>
         <span>These results describe geometry only. Confirm stock sizes, tolerances, code and engineering requirements for the actual build.</span>
       </section>
+      <CalculatorResources tool={tool}/>
     </main>
   );
 }

@@ -308,12 +308,7 @@ html:has([data-shell="app"]) { scroll-behavior: auto; }
 /* The intro retains a useful first paint, even without WebGL or motion. */
 .t2q-welcome-content { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100%; padding: 20px 24px 36px; text-align: center; background: radial-gradient(ellipse at 50% 30%, #68442b80, transparent 63%), radial-gradient(ellipse at 100% 100%, #27554840, transparent 55%); }
 .t2q-welcome-art { width: min(460px, 100%, 58vh); aspect-ratio: 720 / 520; }
-.t2q-welcome-poster { width: 100%; height: 100%; aspect-ratio: 720 / 520; display: grid; place-items: center; }
-.t2q-welcome-paper { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; width: 49%; padding: 7% 6%; border: 1px solid #e7ba8738; border-radius: 12px; text-align: left; background: linear-gradient(140deg, #353a32, #222825); transform: rotate(-7deg); box-shadow: -10px 10px 0 #92552d36, 0 20px 40px #0004; }
-.t2q-welcome-paper-label { font-size: clamp(6px, 1.5vw, 9px); letter-spacing: 0.1em; color: #ffbb88; }
-.t2q-welcome-paper-title { font-size: clamp(14px, 3vw, 24px); line-height: 1.15; font-weight: 600; color: #fff0dc; }
-.t2q-welcome-paper-line { display: block; height: 3px; border-radius: 4px; background: #e8d5bd48; }
-.t2q-welcome-paper-total { margin-top: 4px; padding: 7px 9px; width: 100%; border-radius: 4px; background: #ff8b4b; color: #28180b; font-size: clamp(7px, 1.8vw, 10px); font-weight: 700; }
+.t2q-welcome-poster { position: relative; width: 100%; aspect-ratio: 720 / 520; container-type: inline-size; }
 @media (max-width: 639px) {
   [data-shell="app"] [data-testid="dashboard-hero"] { padding: 27px 22px; }
   .t2q-work-metric { padding: 17px; }

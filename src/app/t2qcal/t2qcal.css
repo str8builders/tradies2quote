@@ -690,3 +690,22 @@
 .t2qcal-app .webapp-bar{color:var(--t2q-muted);}
 .t2qcal-app .install-choice-options .button{min-height:44px;}
 @media print{.t2qcal-app{background:#fff!important;color:#000;}.t2qcal-app .input-panel,.t2qcal-app .results-section,.t2qcal-app .markout-section{background:#fff;border-color:#bbb;box-shadow:none;backdrop-filter:none;}}
+
+/* Full-screen shell: in-flow top line + floating avatar (no fixed header bar). */
+.t2qcal-app .native-topline{max-width:720px;margin:auto;display:flex;align-items:center;gap:10px;min-height:52px;padding:calc(env(safe-area-inset-top,0px) + 12px) 78px 0 16px;}
+.t2qcal-app .native-topline .native-screen-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:700 17px/1.2 var(--font-plus-jakarta),T2QSans,Arial,sans-serif;letter-spacing:-.01em;}
+.t2qcal-app .native-topline .native-wordmark{flex:1;}
+.t2qcal-app .native-topline .native-wordmark img{height:20px;}
+.t2qcal-app .native-topline+.native-page,.t2qcal-app .native-topline+.calculator-page,.t2qcal-app .native-topline+.directory-page{padding-top:10px;}
+.t2qcal-app .native-round-solid{width:44px;min-width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:var(--t2q-card);border:1px solid var(--t2q-line-2);color:var(--t2q-text);}
+.t2qcal-app .native-avatar{position:fixed;top:calc(env(safe-area-inset-top,0px) + .5rem);right:.75rem;z-index:40;width:2.875rem;height:2.875rem;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:9999px;background:#fff;color:#1b1f2a;cursor:pointer;box-shadow:0 0 0 2px #fff,0 0 0 4px #22c55e,0 0 12px 1px rgba(34,197,94,.55),0 4px 14px -4px rgba(0,0,0,.25);}
+.t2qcal-app .native-avatar[data-signed-in=false]{background:#141718;color:#ffa06d;box-shadow:0 0 0 1px #ffffff1f,0 4px 12px #0004;}
+.t2qcal-app .native-avatar:active{transform:scale(.95);}
+@media(min-width:800px){.t2qcal-app .native-topline{max-width:1000px;padding-inline:24px 84px;}.t2qcal-app .native-avatar{right:max(.75rem,calc((100% - 1000px)/2 + .75rem));}}
+/* No outline around the calculator: panels sit on the ground with shadow only. */
+.t2qcal-app .input-panel,.t2qcal-app .results-section,.t2qcal-app .markout-section,.t2qcal-app .converter-card,.t2qcal-app .diagram-panel,.t2qcal-app .detailed-diagram-panel{border:0;}
+.t2qcal-app .calculator-page .native-group{border-color:#ffffff0a;}
+.t2qcal-app .calculator-resources{margin-top:28px;}
+.t2qcal-app .calculator-resources .native-section-label{margin-top:0;}
+.t2qcal-app .calculator-resources-lead{margin:0 6px 10px;}
+@media print{.t2qcal-app .native-topline,.t2qcal-app .native-avatar,.t2qcal-app .calculator-resources{display:none!important;}}
