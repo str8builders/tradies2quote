@@ -17,6 +17,47 @@ export function RequestForm({ slug, business }: { slug: string; business: string
   const [website, setWebsite] = useState(""); // honeypot — humans never see it
   const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
   const [error, setError] = useState<string>("");
+  // Optional clarifying questions, fetched once the description is written.
+  const [questions, setQuestions] = useState<string[]>([]);
+  const [answers, setAnswers] = useState<string[]>([]);
+  const [askedFor, setAskedFor] = useState<string>("");
+  const [asking, setAsking] = useState(false);
+
+  async function loadQuestions() {
+    const text = description.trim();
+    if (text.length < MIN_DESCRIPTION || text === askedFor || asking) return;
+    setAskedFor(text);
+    setAsking(true);
+    try {
+      const res = await fetch(`/api/requests/${encodeURIComponent(slug)}/questions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ description: text }),
+        signal: AbortSignal.timeout(20_000),
+      });
+      const data = (await res.json().catch(() => ({}))) as { questions?: unknown };
+      const list = Array.isArray(data.questions)
+        ? data.questions.filter((q): q is string => typeof q === "string").slice(0, 3)
+        : [];
+      setQuestions(list);
+      setAnswers(list.map(() => ""));
+    } catch {
+      setQuestions([]);
+      setAnswers([]);
+    } finally {
+      setAsking(false);
+    }
+  }
+
+  function descriptionWithAnswers(): string {
+    const answered = questions
+      .map((q, i) => ({ q, a: answers[i]?.trim() ?? "" }))
+      .filter((x) => x.a.length > 0);
+    if (answered.length === 0) return description;
+    return `${description.trim()}\n\nAnswers to follow-up questions:\n${answered
+      .map((x) => `- ${x.q} ${x.a}`)
+      .join("\n")}`;
+  }
 
   const canSubmit =
     state === "idle" &&
@@ -33,7 +74,14 @@ export function RequestForm({ slug, business }: { slug: string; business: string
       const res = await fetch(`/api/requests/${encodeURIComponent(slug)}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name, phone, email, address, description, website }),
+        body: JSON.stringify({
+          name,
+          phone,
+          email,
+          address,
+          description: descriptionWithAnswers(),
+          website,
+        }),
         signal: AbortSignal.timeout(30_000),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -80,6 +128,7 @@ export function RequestForm({ slug, business }: { slug: string; business: string
           className={`${INPUT} min-h-36`}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
+          onBlur={() => void loadQuestions()}
           maxLength={3000}
           placeholder="e.g. Replace about 12 metres of old timber fence along the driveway, 1.8 high, and take the old one away."
           required
@@ -91,6 +140,36 @@ export function RequestForm({ slug, business }: { slug: string; business: string
             : ""}
         </p>
       </div>
+
+      {asking ? (
+        <p className="text-xs text-ink-500" aria-live="polite">
+          Checking whether anything else would help…
+        </p>
+      ) : null}
+      {questions.length > 0 ? (
+        <fieldset
+          data-testid="request-questions"
+          className="space-y-3 rounded-sm border border-ink-700 bg-ink-800 p-3"
+        >
+          <legend className={LABEL}>A couple of quick questions (optional)</legend>
+          {questions.map((q, i) => (
+            <div key={q}>
+              <label className="text-sm text-ink-200" htmlFor={`rq-q-${i}`}>
+                {q}
+              </label>
+              <input
+                id={`rq-q-${i}`}
+                className={INPUT}
+                value={answers[i] ?? ""}
+                onChange={(e) =>
+                  setAnswers((prev) => prev.map((a, j) => (j === i ? e.target.value : a)))
+                }
+                maxLength={200}
+              />
+            </div>
+          ))}
+        </fieldset>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>

@@ -76,6 +76,13 @@ export default async function QuotesPage({
     query = query.eq("status", stageFilter);
   }
 
+  // Requests from the public "Request a quote" link that still sit as
+  // drafts — surfaced here until the tradie deals with them.
+  const { count: openRequestCount } = await supabase
+    .from("quote_requests")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["new", "generated", "generation_failed"]);
+
   const { data: rows } = await query
     .order("created_at", { ascending: false })
     .limit(PAGE_FETCH_LIMIT);
@@ -114,6 +121,22 @@ export default async function QuotesPage({
             chased lives here.
           </p>
         </div>
+
+        {openRequestCount ? (
+          <Link
+            href="/app/requests"
+            data-testid="open-requests-banner"
+            className="t2q-card-pro t2q-card-pro-hover mb-5 flex items-center justify-between gap-3 p-4"
+          >
+            <span className="text-sm text-ink-100">
+              <span className="font-display uppercase tracking-tight text-brand">
+                {openRequestCount} client request{openRequestCount === 1 ? "" : "s"}
+              </span>{" "}
+              waiting from your request link.
+            </span>
+            <span className="font-mono text-xs uppercase tracking-[0.2em] text-ink-300">View</span>
+          </Link>
+        ) : null}
 
         {/* Wave 13 — stage filter pill, only visible when the page is
             entered via `?stage=`. Lets the owner clear the filter and
