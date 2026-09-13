@@ -1,6 +1,6 @@
 "use client";
 
-import { VoiceSignal } from "@/app/_components/VoiceSignal";
+import { VoiceWaveform } from "./VoiceWaveform";
 import { useEffect, useRef, useState } from "react";
 import { createDraftQuote } from "../actions";
 import type { Clarification } from "@/lib/clarifications";
@@ -33,7 +33,7 @@ function pickMimeType(): string | undefined {
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
     .toString()
-    .padStart(1, "0");
+    .padStart(2, "0");
   const s = Math.floor(seconds % 60)
     .toString()
     .padStart(2, "0");
@@ -349,17 +349,15 @@ function VoicePanel({
         />
       ) : (
         <div className="flex flex-col items-center text-center">
+          <div className="flex w-full items-center justify-between gap-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#ff9a62]">Your site note</p>
+            <p className="font-mono text-lg tabular-nums text-ink-300" aria-label="Recording time">{formatTime(seconds)}</p>
+          </div>
           <RecordButton
             state={state}
             onStart={startRecording}
             onStop={stopRecording}
           />
-          <div className="mt-5 text-3xl font-semibold tabular-nums tracking-tight text-white">
-            {formatTime(seconds)}
-            <span className="ml-2 text-sm text-ink-400">
-              / {formatTime(MAX_SECONDS)}
-            </span>
-          </div>
           {state === "processing" && (
             <div className="mt-5 flex w-full justify-center">
               <TapeMeasureProgress label="// transcribing" estimateMs={9000} />
@@ -370,7 +368,7 @@ function VoicePanel({
             aria-live="polite"
             className="mt-2 min-h-5 text-sm text-ink-300"
           >
-            {state === "idle" && "Tap the microphone to start. Up to 3 minutes."}
+            {state === "idle" && "Tap the waveform to start. Up to 3 minutes."}
             {state === "recording" && "Recording — tap again to stop."}
             {state === "processing" && "Transcribing…"}
             {state === "error" && (
@@ -413,12 +411,13 @@ function RecordButton({
       type="button"
       data-testid="record-button"
       aria-pressed={recording}
-      aria-label={recording ? "Stop recording" : "Start recording"}
+      aria-label={recording ? "Stop recording" : processing ? "Transcribing recording" : "Start recording"}
       onClick={onClick}
       disabled={disabled}
-      className="rounded-[32px] border border-transparent p-3 transition-colors hover:border-brand/30 hover:bg-brand/5 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand disabled:cursor-wait disabled:opacity-60"
+      className="t2q-record-control"
     >
-      <VoiceSignal state={state} />
+      <VoiceWaveform state={state} />
+      <span className="t2q-record-label">{recording ? "Stop recording" : processing ? "Preparing your transcript" : "Start recording"}</span>
     </button>
   );
 }

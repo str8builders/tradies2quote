@@ -5,6 +5,9 @@ import { redirect } from "next/navigation";
 import {
   ArrowRight,
   Bug,
+  CalendarBlank,
+  ChatCircleText,
+  Stack,
   Gauge,
   Plus,
   Robot,
@@ -81,20 +84,20 @@ export default async function DashboardPage() {
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
         <div
           data-testid="dashboard-hero"
-          className="mb-7 flex flex-col gap-5 sm:mb-8 sm:flex-row sm:items-end sm:justify-between"
+          className="mb-7 flex flex-col gap-6 sm:mb-8"
         >
           <div className="min-w-0">
-            <div className="t2q-section-label-pro mb-2.5">Dashboard</div>
+            <div className="t2q-dashboard-eyebrow mb-4"><span aria-hidden="true" />Your working day, organised</div>
             <h1 className="font-display text-[2rem] leading-[1.05] uppercase tracking-tight sm:text-[2.5rem]">
-              Welcome, <span className="text-brand">{username}.</span>
+              Welcome back,<br /><span className="t2q-dashboard-name">{username}.</span>
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-300 sm:text-base">
-              A clear view of your quotes, clients, and upcoming work.
+              From the first site note to the next job. Keep it all moving here.
             </p>
           </div>
           <div
             data-testid="dashboard-actions"
-            className="flex flex-col gap-2 sm:flex-row sm:items-center"
+            className="relative flex flex-col gap-3 sm:flex-row sm:items-center"
           >
             <Link
               href="/app/quotes"
@@ -176,8 +179,7 @@ async function DashboardData({
         .eq("user_id", userId)
         .is("deleted_at", null),
       // Wave 36 — fetch just enough of the profile to detect a missing
-      // business name. The banner below tells the operator their quote
-      // PDFs will go out branded "Your business" until they fill it in.
+      // business name. A business name is required before quote delivery.
       // No row exists yet for fresh signups (the upsert in
       // settings/actions creates one on first save), so `.maybeSingle()`
       // → null is the common case.
@@ -284,14 +286,7 @@ async function DashboardData({
 
   return (
     <>
-      {/* Wave 36 — first-run nudge. Quote PDFs and the customer email's
-          `from` line both read "Your business" until `business_name` is
-          filled in on Settings. A fresh signup has no `profiles` row at
-          all (lazy-created on first Settings save), so this banner
-          fires for every new account until they fill it in. Owner-only
-          gating would be wrong here — every tradie sending their first
-          quote benefits from the nudge. Quiet brand styling (not a
-          full alert) since this is friction-removal, not an error. */}
+      {/* Complete business identity before exporting or sending a quote. */}
       {businessNameMissing ? (
         <StaggerIn index={0}>
         <Link
@@ -310,9 +305,7 @@ async function DashboardData({
               Set your business name first.
             </p>
             <p className="mt-0.5 text-xs text-ink-300 sm:text-sm">
-              Quote PDFs and emails will read{" "}
-              <span className="text-ink-100">&quot;Your business&quot;</span>{" "}
-              until this is filled in.
+              Add your trading name to download PDFs and send quotes with your business details.
             </p>
           </div>
           <span className="hidden items-center gap-1 font-mono text-[10px] uppercase tracking-[0.25em] text-brand sm:inline-flex">
@@ -387,7 +380,7 @@ async function DashboardData({
         <div className="t2q-card-pro p-5 sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="t2q-section-label-pro">{"// today"}</p>
+              <p className="t2q-section-label-pro">Your work at a glance</p>
               <h2 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
                 Today
               </h2>
@@ -413,11 +406,15 @@ async function DashboardData({
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             <WorkBoardMetric
               label="Next job"
+              tone="teal"
+              icon={<CalendarBlank size={19} weight="duotone" />}
               value={nextScheduledJob ? formatShortDate(nextScheduledJob.date) : "Not scheduled"}
               detail={nextScheduledJob?.clientName ?? "Add a job date from a quote"}
             />
             <WorkBoardMetric
               label="Follow-ups"
+              tone="amber"
+              icon={<ChatCircleText size={19} weight="duotone" />}
               value={String(stats.byStage.sent + stats.byStage.viewed)}
               detail={
                 stats.byStage.viewed > 0
@@ -427,6 +424,8 @@ async function DashboardData({
             />
             <WorkBoardMetric
               label="Material library"
+              tone="blue"
+              icon={<Stack size={19} weight="duotone" />}
               value={libraryEmpty ? "Needs setup" : `${materialsCount ?? 0} items`}
               detail={libraryEmpty ? "Add common materials" : "Real prices ready for quotes"}
             />
@@ -443,7 +442,7 @@ async function DashboardData({
           data-tour="dashboard-more-toggle"
           className="t2q-section-label-pro cursor-pointer select-none list-none"
         >
-          {"// pipeline, metrics & calendar"}
+          <span>Pipeline, metrics & calendar</span><span aria-hidden="true" className="t2q-dashboard-expand">+</span>
         </summary>
         <div className="mt-4 space-y-7">
       {stats.totalQuotes > 0 && (
@@ -875,24 +874,18 @@ function SecondaryStat({
   );
 }
 
-function WorkBoardMetric({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: string;
-  detail: string;
+function WorkBoardMetric({ label, value, detail, tone, icon }: {
+  label: string; value: string; detail: string;
+  tone: "teal" | "amber" | "blue"; icon: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
-        {label}
-      </p>
-      <p className="mt-2 text-lg font-semibold leading-tight text-white">
-        {value}
-      </p>
-      <p className="mt-1 text-xs leading-relaxed text-ink-400">{detail}</p>
+    <div className="t2q-work-metric" data-tone={tone}>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-semibold tracking-wide">{label}</p>
+        <span className="t2q-work-metric-icon" aria-hidden="true">{icon}</span>
+      </div>
+      <p className="mt-4 text-xl font-semibold leading-tight text-white">{value}</p>
+      <p className="mt-2 text-xs leading-relaxed text-[#b7c3c2]">{detail}</p>
     </div>
   );
 }
