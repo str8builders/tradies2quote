@@ -20,6 +20,12 @@ export type Database = {
         Update: { deleted_at?: string | null }
         Relationships: []
       }
+      quote_requests: {
+        Row: { id: string; user_id: string; quote_id: string | null; client_id: string | null; client_name: string; client_email: string | null; client_phone: string | null; site_address: string | null; description: string; status: string; error_message: string | null; source_ip: string | null; user_agent: string | null; created_at: string; generated_at: string | null; seen_at: string | null }
+        Insert: { id?: string; user_id: string; quote_id?: string | null; client_id?: string | null; client_name: string; client_email?: string | null; client_phone?: string | null; site_address?: string | null; description: string; status?: string; error_message?: string | null; source_ip?: string | null; user_agent?: string | null; created_at?: string; generated_at?: string | null; seen_at?: string | null }
+        Update: { quote_id?: string | null; client_id?: string | null; status?: string; error_message?: string | null; generated_at?: string | null; seen_at?: string | null }
+        Relationships: []
+      }
 
       agent_events: {
         Row: {
@@ -1002,6 +1008,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          request_slug: string | null
           address: string | null
           avatar_url: string | null
           ai_consent_at: string | null
@@ -1024,6 +1031,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          request_slug?: string | null
           address?: string | null
           avatar_url?: string | null
           ai_consent_at?: string | null
@@ -1046,6 +1054,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          request_slug?: string | null
           address?: string | null
           avatar_url?: string | null
           ai_consent_at?: string | null

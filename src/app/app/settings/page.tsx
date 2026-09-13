@@ -26,6 +26,7 @@ import { reviewsEnabled, followupsEnabled } from "@/lib/engagement";
 import { EngagementSettings } from "./_components/EngagementSettings";
 import { paymentsEnabled, getConnectStatus, refreshConnectStatus } from "@/lib/payments";
 import { PaymentsSettings } from "./_components/PaymentsSettings";
+import { QuoteRequestLinkCard } from "./_components/QuoteRequestLinkCard";
 import { ReplayTourButton } from "./_components/ReplayTourButton";
 import { DeleteAccountSection } from "./_components/DeleteAccountSection";
 
@@ -69,7 +70,7 @@ export default async function SettingsPage({
     supabase
       .from("profiles")
       .select(
-        "business_name, email, phone, address, gst_number, payment_instructions, country, currency, tax_label, tax_rate, default_labour_rate, default_markup_pct, logo_url, ai_consent_at",
+        "business_name, email, phone, address, gst_number, payment_instructions, country, currency, tax_label, tax_rate, default_labour_rate, default_markup_pct, logo_url, ai_consent_at, request_slug",
       )
       .eq("id", user.id)
       .maybeSingle(),
@@ -263,6 +264,16 @@ export default async function SettingsPage({
         </div>
 
         <SettingsForm initial={initial} />
+
+        {/* Public "Request a quote" link — clients describe a job, it lands
+            as a draft quote on this account. Off until the tradie turns it on. */}
+        <div className="mt-8">
+          <QuoteRequestLinkCard
+            initialSlug={profile?.request_slug ?? null}
+            appUrl={process.env.NEXT_PUBLIC_APP_URL ?? "https://tradies2quote.com"}
+            hasBusinessName={Boolean(profile?.business_name?.trim())}
+          />
+        </div>
 
         {reviewsOn || followupsOn ? (
           <EngagementSettings
