@@ -3,23 +3,13 @@
 import "../premium.css";
 
 import { useEffect, useRef, useState } from "react";
-import dynamic from "next/dynamic";
+import { AccountHub } from "./AccountHub";
+import { AccountButton } from "./AccountButton";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { isWeatherImpactEnabled } from "@/lib/weather-impact/feature-flag";
 import { SPRING_SNAPPY } from "./motion";
-
-/**
- * Wave 17 — perf — see MobileAppMenuClient.tsx for the rationale.
- * Same `AccountHub` is used here (desktop dropdown variant via the
- * `mode="panel"` prop). Splitting it into its own chunk that's only
- * fetched when the avatar trigger is clicked.
- */
-const AccountHub = dynamic(
-  () => import("./AccountHub").then((m) => m.AccountHub),
-  { ssr: false, loading: () => null },
-);
 
 /**
  * Client part of the shared `/app/*` header.
@@ -78,7 +68,6 @@ export function AppHeaderClient({
   const pathname = usePathname() ?? "";
   const reduce = useReducedMotion();
   const visibleTabs = TABS.filter((t) => isTabVisible(t, isOwner));
-  const initial = (userEmail ?? "?").trim().charAt(0).toUpperCase() || "?";
 
   // Avatar dropdown state — desktop only. Close on outside-click and
   // on route change (which fires a usePathname update).
@@ -98,7 +87,7 @@ export function AppHeaderClient({
       setHubOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setHubOpen(false);
+      if (e.key === "Escape") { setHubOpen(false); triggerRef.current?.focus({ preventScroll: true }); }
     };
     document.addEventListener("mousedown", onDocClick);
     document.addEventListener("keydown", onKey);
@@ -119,6 +108,7 @@ export function AppHeaderClient({
   return (
     <header
       data-testid="app-header"
+      data-app-section={pathname.split("/")[2] || "dashboard"}
       data-is-owner={isOwner ? "true" : "false"}
       // Wave 15.2/43 — hidden on mobile. Phones use fixed round controls
       // for navigation and account access, keeping the dashboard viewport
@@ -189,39 +179,18 @@ export function AppHeaderClient({
             })}
           </nav>
 
-          {/* Avatar trigger. On desktop it pops a hub panel; on mobile
-              it's a safety-net link to /app/settings (the mobile bottom
-              nav owns the primary avatar action). */}
+          {/* Eager menu content keeps first-open geometry stable. */}
           <div className="relative">
-            <button
+            <AccountButton
               ref={triggerRef}
-              type="button"
+              userEmail={userEmail}
+              avatarUrl={avatarUrl}
               data-testid="app-header-avatar"
               data-tour="account-menu"
-              aria-haspopup="menu"
               aria-expanded={hubOpen}
-              aria-label="Account hub"
               onClick={() => setHubOpen((v) => !v)}
-              className="t2q-avatar-online inline-flex h-9 items-center justify-center rounded-full border border-ink-700 bg-ink-900/80 px-0.5 transition-colors hover:border-brand"
-            >
-              {avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={avatarUrl}
-                  alt=""
-                  width={32}
-                  height={32}
-                  className="h-8 w-8 rounded-full object-cover"
-                />
-              ) : (
-                <span
-                  aria-hidden="true"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-brand text-ink-900 font-display text-sm leading-none"
-                >
-                  {initial}
-                </span>
-              )}
-            </button>
+              className="t2q-avatar-online"
+            />
 
             {hubOpen ? (
               <div

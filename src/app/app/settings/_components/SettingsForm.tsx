@@ -69,11 +69,12 @@ export function SettingsForm({ initial }: Props) {
   return (
     <form
       action={formAction}
+      id="profile"
       data-testid="settings-form"
       className="space-y-8"
       noValidate
     >
-      <Section title="Business details">
+      <Section id="business" title="Business details">
         <Field id="business_name" label="Business name">
           <input
             id="business_name"
@@ -158,7 +159,7 @@ export function SettingsForm({ initial }: Props) {
         </Field>
       </Section>
 
-      <Section title="Quote defaults">
+      <Section id="defaults" title="Quote defaults">
         <Field id="currency" label="Currency">
           <select
             id="currency"
@@ -261,14 +262,16 @@ export function SettingsForm({ initial }: Props) {
 
 /** Wraps a labelled section group. */
 function Section({
+  id,
   title,
   children,
 }: {
+  id: string;
   title: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="t2q-card-pro p-5 sm:p-7">
+    <section id={id} className="t2q-card-pro p-5 sm:p-7">
       <h2 className="font-display text-lg uppercase tracking-tight text-white sm:text-xl">
         {title}
       </h2>

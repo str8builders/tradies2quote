@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -110,9 +110,9 @@ const PRIMARY_ITEMS: ReadonlyArray<HubLink> = [
   },
   {
     href: "/app/settings",
-    hash: "invoice-defaults",
-    label: "Invoice defaults",
-    caption: "Due date, terms",
+    hash: "payment_instructions",
+    label: "Payment details",
+    caption: "Bank account & payment instructions",
     Icon: Receipt,
   },
   {
@@ -182,6 +182,32 @@ export function AccountHub({
   mode,
   onClose,
 }: AccountHubProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  useEffect(() => { closeRef.current = onClose; }, [onClose]);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const closeButton = dialog.querySelector<HTMLButtonElement>('[aria-label="Close account hub"]');
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeButton?.focus({ preventScroll: true });
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closeRef.current(); }
+      if (event.key !== "Tab" || mode !== "sheet") return;
+      const controls = Array.from(dialog.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), [tabindex="0"]'))
+        .filter((element) => element.getClientRects().length > 0);
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus({ preventScroll: true }); }
+      if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus({ preventScroll: true }); }
+    };
+    dialog.addEventListener("keydown", keydown);
+    return () => {
+      dialog.removeEventListener("keydown", keydown);
+      // Do not steal focus from a destination page after link navigation.
+      if (document.activeElement === document.body || dialog.contains(document.activeElement)) previousFocus?.focus({ preventScroll: true });
+    };
+  }, [mode]);
   const initial =
     (userEmail ?? "?").trim().charAt(0).toUpperCase() || "?";
   // Flag-parked features vanish from the hub — a visible row must never
@@ -193,27 +219,14 @@ export function AccountHub({
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
+      aria-modal={mode === "sheet" ? true : undefined}
       aria-labelledby="account-hub-heading"
       data-testid="account-hub"
       data-mode={mode}
       data-is-owner={isOwner ? "true" : "false"}
-      className={
-        // Sheet: full-width, sticks to bottom; rounded only on top.
-        // Panel: fixed width ~320px, rounded all around, lives in the
-        // desktop header dropdown wrapper.
-        mode === "sheet"
-          ? // `max-h` + `overflow-y-auto` make the sheet body scroll on
-            // its own when the content is taller than the screen (it is —
-            // Account / Profile / Business / Quote defaults / Invoice
-            // defaults / Clients all stack here). `overscroll-contain`
-            // stops scroll-chaining into the page behind, so dragging
-            // past the top/bottom doesn't get stuck against the global
-            // `overscroll-behavior: none`. Uses `dvh` so iOS Safari's
-            // URL-bar movement doesn't clip the last field.
-            "w-full max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-2xl border-t border-ink-700 bg-ink-950 p-5 pb-[calc(env(safe-area-inset-bottom,0)+1.25rem)]"
-          : "w-[20rem] rounded-md border border-ink-700 bg-ink-950 p-4 shadow-2xl"
-      }
+      className="t2q-account-hub"
     >
       <header className="mb-4 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
@@ -229,7 +242,7 @@ export function AccountHub({
             >
               Account
             </p>
-            <p className="truncate font-mono text-[10px] uppercase tracking-[0.18em] text-ink-300">
+            <p className="truncate text-xs text-ink-300">
               {userEmail ?? "—"}
             </p>
           </div>
@@ -238,7 +251,7 @@ export function AccountHub({
           type="button"
           onClick={onClose}
           aria-label="Close account hub"
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-ink-700 text-ink-300 hover:border-brand hover:text-brand"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 text-ink-300 hover:border-brand hover:text-brand"
         >
           <X size={14} weight="bold" />
         </button>
@@ -320,7 +333,7 @@ function HubLinkRow({
   // new tab and don't blow up Next's client-side router.
   const isExternal = /^https?:\/\//.test(href);
   const cls =
-    "flex items-center gap-3 rounded-sm border border-ink-700 bg-ink-900/60 px-4 py-3 hover:border-brand hover:bg-brand/5";
+    "t2q-account-link";
   const content = (
     <>
       <Icon
@@ -329,11 +342,9 @@ function HubLinkRow({
         className="text-brand"
         aria-hidden="true"
       />
-      <span className="font-display text-sm uppercase tracking-tight text-white">
-        {label}
-      </span>
-      <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.18em] text-ink-300">
-        {caption}
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-white">{label}</span>
+        <span className="mt-0.5 block text-xs leading-relaxed text-ink-300">{caption}</span>
       </span>
     </>
   );
@@ -416,7 +427,7 @@ function AccountAvatar({
     <span
       aria-hidden="true"
       style={{ width: size, height: size }}
-      className="inline-flex shrink-0 items-center justify-center rounded-full bg-brand font-display text-base text-ink-900"
+      className="t2q-profile-initial t2q-profile-initial-badge shrink-0"
     >
       {initial}
     </span>
@@ -511,11 +522,9 @@ function AvatarUploadField({
       <div className="flex items-center gap-3">
         <AccountAvatar avatarUrl={avatarUrl} initial={initial} size={44} />
         <div className="min-w-0 flex-1">
-          <p className="font-display text-xs uppercase tracking-tight text-white">
-            Avatar photo
-          </p>
-          <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-300">
-            {avatarUrl ? "// active" : "// using initials fallback"}
+          <p className="text-xs font-semibold text-white">Profile photo</p>
+          <p className="mt-1 text-xs leading-relaxed text-ink-300">
+            {avatarUrl ? "Your personal touch" : "Make it yours"}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -573,8 +582,8 @@ function AvatarUploadField({
           {error}
         </p>
       ) : (
-        <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-ink-400">
-          {"// jpg / png / webp / heic · any phone photo · auto-compressed"}
+        <p className="text-xs leading-relaxed text-ink-300">
+          JPG, PNG, WebP or HEIC. We’ll size your photo to fit.
         </p>
       )}
     </div>

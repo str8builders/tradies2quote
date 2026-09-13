@@ -16,7 +16,7 @@
 // unit-testable in node without jsdom; the hook is a thin React wrapper.
 // ─────────────────────────────────────────────────────────────────────────
 
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 type BodyStyleSlice = {
   position: string;
@@ -86,13 +86,22 @@ export function applyBodyScrollLock(
  * open). Reverts and restores the scroll position when `active` flips
  * false or the component unmounts.
  */
-export function useBodyScrollLock(active: boolean): void {
+export function useBodyScrollLock(active: boolean): () => void {
+  const releaseRef = useRef<(() => void) | null>(null);
+  // Links release synchronously, before Next scrolls to the destination hash.
+  // The later effect cleanup must not restore the old page over that position.
+  const releaseNow = useCallback(() => {
+    releaseRef.current?.();
+    releaseRef.current = null;
+  }, []);
   useEffect(() => {
     if (!active || typeof document === "undefined") return;
     const release = applyBodyScrollLock(
       document as unknown as LockableDocument,
       window as unknown as LockableWindow,
     );
-    return release;
-  }, [active]);
+    releaseRef.current = release;
+    return releaseNow;
+  }, [active, releaseNow]);
+  return releaseNow;
 }

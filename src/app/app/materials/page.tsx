@@ -35,7 +35,7 @@ export default async function MaterialsPage() {
       <AppHeader context="Materials" />
 
       <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
-        <div className="mb-4">
+        <div className="t2q-page-intro mb-4">
           <div className="t2q-section-label-pro mb-3">{"// your library"}</div>
           <h1 className="font-display text-3xl uppercase tracking-tight sm:text-4xl">
             Materials <span className="text-brand">library.</span>

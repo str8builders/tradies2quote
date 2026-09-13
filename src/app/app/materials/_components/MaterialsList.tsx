@@ -50,7 +50,7 @@ export function MaterialsList({ materials, currency }: Props) {
       {filtered.length === 0 ? (
         <p
           data-testid="materials-empty"
-          className="mt-8 rounded-sm border border-dashed border-ink-700 bg-ink-800 p-8 text-center font-mono text-xs uppercase tracking-[0.2em] text-ink-400"
+          className="t2q-card-pro mt-8 border-dashed p-8 text-center font-mono text-xs uppercase tracking-[0.2em] text-ink-400"
         >
           {materials.length === 0
             ? "// no materials yet — add one or import a csv"
@@ -62,7 +62,7 @@ export function MaterialsList({ materials, currency }: Props) {
             <li
               key={m.id}
               data-testid={`material-${m.id}`}
-              className="rounded-sm border border-ink-700 bg-ink-800 p-3 transition-colors hover:border-brand"
+              className="t2q-card-pro t2q-card-pro-hover p-4 transition-colors"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">

@@ -207,7 +207,7 @@ export default async function SettingsPage({
       <AppHeader context="Settings" />
 
       <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
-        <div className="mb-10">
+        <div className="t2q-page-intro mb-10">
           <div className="t2q-section-label-pro mb-3">{"// your tools"}</div>
           <h1 className="font-display text-3xl uppercase tracking-tight sm:text-4xl">
             Settings.
