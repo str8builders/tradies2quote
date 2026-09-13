@@ -7,6 +7,7 @@ import {
   Pulse,
   Briefcase,
   Bug,
+  Calculator,
   Camera,
   ChatCircleDots,
   CloudSun,
@@ -134,6 +135,14 @@ const PRIMARY_ITEMS: ReadonlyArray<HubLink> = [
     label: "Clients",
     caption: "Saved contacts",
     Icon: UsersThree,
+  },
+  {
+    // T2QCAL opens inside the installed app (same site scope); this is the
+    // mobile entry point since the bottom bar has no room for a fifth tab.
+    href: "/t2qcal/calculators",
+    label: "Calculators (T2QCAL)",
+    caption: "Rafters, stairs, concrete, spacing and 90 more",
+    Icon: Calculator,
   },
   {
     href: "/app/beta",

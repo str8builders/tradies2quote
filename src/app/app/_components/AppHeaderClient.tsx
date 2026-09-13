@@ -44,6 +44,9 @@ const TABS = [
   // Wave 13: Agents tab is owner-only.
   { href: "/app/agents", label: "Agents", ownerOnly: true },
   { href: "/app/clients", label: "Clients", ownerOnly: false },
+  // T2QCAL lives on the same site (manifest scope "/"), so it opens inside
+  // the installed Tradies2Quote app rather than as a separate install.
+  { href: "/t2qcal/calculators", label: "Calculators", ownerOnly: false },
 ] as const;
 
 /** Tabs whose feature is flag-parked vanish from the strip entirely — a
