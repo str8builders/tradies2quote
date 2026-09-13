@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNZTime, formatWeekdayShort } from "@/lib/format-date";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -605,9 +606,7 @@ function DailyForecastCard({ day, isToday }: { day: WeatherDailyForecast; isToda
 }
 
 function formatDayLabel(isoDate: string) {
-  const date = new Date(`${isoDate}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return isoDate;
-  return date.toLocaleDateString("en-NZ", { weekday: "short" });
+  return formatWeekdayShort(isoDate);
 }
 
 function formatTemp(value: number | null) {
@@ -675,10 +674,6 @@ function getCurrentPosition(): Promise<GeolocationPosition> {
 }
 
 function formatObserved(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("en-NZ", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  const label = formatNZTime(value);
+  return label === "—" ? value : label;
 }

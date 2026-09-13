@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNZShortDate } from "@/lib/format-date";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useMounted } from "@/lib/use-mounted";
@@ -369,13 +370,8 @@ function statusPill(status: InvoiceStatus): string {
 // Stable, timezone-pinned absolute date — deterministic across server (UTC) and
 // the visitor's browser, so it's safe to render during SSR + first paint.
 function nzShortDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("en-NZ", {
-    day: "numeric",
-    month: "short",
-    timeZone: "Pacific/Auckland",
-  });
+  // Engine-independent: Intl month names differ between Node and WebKit.
+  return formatNZShortDate(iso);
 }
 
 function formatDueLabel(iso: string | null, mounted: boolean): string {

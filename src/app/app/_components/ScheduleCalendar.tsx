@@ -12,6 +12,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { formatCurrency } from "@/lib/quote-defaults";
+import { formatLongDayDate, formatMonthYear } from "@/lib/format-date";
 import {
   addCalendarNote,
   deleteCalendarNote,
@@ -51,21 +52,9 @@ function pad(n: number): string {
 function key(y: number, m: number, d: number): string {
   return `${y}-${pad(m + 1)}-${pad(d)}`;
 }
-function monthLabel(y: number, m: number): string {
-  return new Intl.DateTimeFormat("en-NZ", {
-    month: "long",
-    year: "numeric",
-  }).format(new Date(y, m, 1));
-}
-function longDate(dateKey: string): string {
-  const d = new Date(`${dateKey}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return dateKey;
-  return new Intl.DateTimeFormat("en-NZ", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  }).format(d);
-}
+// Spelled without Intl so the server and the phone hydrate the same text.
+const monthLabel = formatMonthYear;
+const longDate = formatLongDayDate;
 
 export interface CalendarDayWeather {
   status: "safe" | "caution" | "unsafe";

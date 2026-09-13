@@ -42,14 +42,25 @@ const CURRENCY_LOCALE: Record<string, string> = {
   CAD: "en-CA",
 };
 
+const CURRENCY_SYMBOL: Record<string, string> = { NZD: "$", AUD: "$", USD: "$", CAD: "$", GBP: "£", EUR: "€" };
+
+/**
+ * Currency label rendered identically on the server and in every browser.
+ * Intl currency output differs between ICU builds (symbol, spacing), which
+ * made client components trip React hydration error #418; the digits and
+ * grouping are the only Intl part every engine agrees on, so the symbol is
+ * spelled here. Unknown codes keep the Intl fallback.
+ */
 export function formatCurrency(amount: number, currency: string, maximumFractionDigits = 2): string {
-  const locale = CURRENCY_LOCALE[currency] ?? "en-NZ";
-  return new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits,
-  }).format(Number.isFinite(amount) ? amount : 0);
+  const safe = Number.isFinite(amount) ? amount : 0;
+  const symbol = CURRENCY_SYMBOL[currency];
+  if (!symbol) {
+    const locale = CURRENCY_LOCALE[currency] ?? "en-NZ";
+    return new Intl.NumberFormat(locale, { style: "currency", currency, minimumFractionDigits: 2, maximumFractionDigits }).format(safe);
+  }
+  const digits = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: Math.max(2, maximumFractionDigits) }).format(Math.abs(safe));
+  const negative = safe < 0 && digits !== new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: Math.max(2, maximumFractionDigits) }).format(0);
+  return `${negative ? "-" : ""}${symbol}${digits}`;
 }
 
 export function quoteNumber(id: string, createdAt: string | Date): string {

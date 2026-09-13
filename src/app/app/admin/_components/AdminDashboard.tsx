@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNZShortDate } from "@/lib/format-date";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMounted } from "@/lib/use-mounted";
 import {
@@ -43,13 +44,8 @@ function money(amount: number, currency: string): string {
 // Stable, timezone-pinned absolute date — deterministic across server (UTC) and
 // the visitor's browser, so it's safe to render during SSR + first paint.
 function nzShortDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("en-NZ", {
-    day: "numeric",
-    month: "short",
-    timeZone: "Pacific/Auckland",
-  });
+  // Engine-independent: Intl month names differ between Node and WebKit.
+  return formatNZShortDate(iso);
 }
 
 function relTime(iso: string, mounted: boolean): string {
