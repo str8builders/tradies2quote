@@ -13,10 +13,13 @@ export function QuoteRequestLinkCard({
   initialSlug,
   appUrl,
   hasBusinessName,
+  hasLogo = false,
 }: {
   initialSlug: string | null;
   appUrl: string;
   hasBusinessName: boolean;
+  /** A business logo is set: it goes on the poster and in the middle of the PNG code. */
+  hasLogo?: boolean;
 }) {
   const [slug, setSlug] = useState<string | null>(initialSlug);
   const [error, setError] = useState("");
@@ -106,14 +109,15 @@ export function QuoteRequestLinkCard({
                   <Printer size={16} weight="bold" />
                   Print poster
                 </Link>
-                <a href="/api/account/request-qr?download=1&format=png&size=1024" className="t2q-btn-ghost-pro" data-testid="request-qr-png">
-                  Download PNG
+                <a href={`/api/account/request-qr?download=1&format=png&size=1024${hasLogo ? "&logo=1" : ""}`} className="t2q-btn-ghost-pro" data-testid="request-qr-png">
+                  Download PNG{hasLogo ? " with logo" : ""}
                 </a>
                 <a href="/api/account/request-qr?download=1" className="t2q-btn-ghost-pro" data-testid="request-qr-svg">
                   Download SVG
                 </a>
               </div>
-              <p className="mt-2 text-xs text-ink-500">PNG for social posts and email. SVG for the sign writer, it prints sharp at any size.</p>
+              <p className="mt-2 text-xs text-ink-500">PNG for social posts and email. SVG for the sign writer, it prints sharp at any size.{hasLogo ? " Your logo sits in the middle of the poster code and the PNG." : ""}</p>
+              {!hasLogo ? <p className="mt-1 text-xs text-hivis">Add your business logo above and it goes on the poster and in the middle of the code.</p> : null}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">

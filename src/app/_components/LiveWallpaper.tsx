@@ -38,6 +38,10 @@ export function LiveWallpaper() {
   const pathname = usePathname();
   const documentRoute =
     pathname.startsWith("/quote/") || pathname.endsWith("/pdf");
+  // Inside the app (and on print sheets) the wallpaper sits at 18 % behind
+  // real work; a live 30 fps mesh there only cost battery and scroll
+  // smoothness on phones. The CSS glow and grid still render.
+  const stillRoute = pathname === "/app" || pathname.startsWith("/app/") || pathname.startsWith("/print/");
 
   useEffect(() => {
     document.documentElement.dataset.motion = paused ? "paused" : "playing";
@@ -45,7 +49,7 @@ export function LiveWallpaper() {
 
   useEffect(() => {
     const el = canvas.current;
-    if (!el || paused || documentRoute) return;
+    if (!el || paused || documentRoute || stillRoute) return;
     let cancelled = false;
     let dispose: (() => void) | undefined;
     // Keep Three.js out of the initial page payload and reduced-motion visits.
@@ -184,7 +188,7 @@ export function LiveWallpaper() {
       cancelled = true;
       dispose?.();
     };
-  }, [paused, documentRoute]);
+  }, [paused, documentRoute, stillRoute]);
 
   function toggle() {
     requestedPause = !paused;
@@ -205,7 +209,7 @@ export function LiveWallpaper() {
       >
         <div className="studio-wallpaper-glow" />
         <div className="studio-wallpaper-grid" />
-        <canvas ref={canvas} />
+        {!stillRoute && <canvas ref={canvas} />}
         <div className="studio-wallpaper-vignette" />
       </div>
       <button

@@ -83,11 +83,14 @@ export default function AppSplash({ serverOpen = true, tagline = "Less paperwork
     let frame = 0;
     let last: number | null = null;
     let elapsed = 0;
+    let shownStep = -1;
     const tick = (now: number) => {
       if (last !== null) elapsed += Math.min(now - last, 250);
       last = now;
       const next = Math.min(1, elapsed / MIN_ENTRY_MS);
-      setClock(next);
+      // ~1 % steps: the tape moves smoothly without re-rendering every frame.
+      const step = Math.floor(next * 100);
+      if (step !== shownStep) { shownStep = step; setClock(next); }
       if (next < 1) frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);

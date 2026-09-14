@@ -272,6 +272,7 @@ export default async function SettingsPage({
             initialSlug={profile?.request_slug ?? null}
             appUrl={process.env.NEXT_PUBLIC_APP_URL ?? "https://tradies2quote.com"}
             hasBusinessName={Boolean(profile?.business_name?.trim())}
+            hasLogo={Boolean(profile?.logo_url && /^https:\/\//i.test(profile.logo_url))}
           />
         </div>
 

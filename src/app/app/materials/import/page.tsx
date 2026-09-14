@@ -40,6 +40,18 @@ export default async function ImportMaterialsPage() {
           <p className="mt-3 text-sm text-ink-300 sm:text-base">
             Drop in a CSV from your spreadsheet. We&apos;ll match existing items by name and update prices, or add new ones.
           </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2" data-testid="materials-import-choice">
+            <div className="rounded-lg border border-brand/50 bg-brand/10 p-4">
+              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-brand">{"// this page"}</div>
+              <p className="mt-1 text-sm font-semibold text-white">Upload a CSV</p>
+              <p className="mt-1 text-xs text-ink-300">From your spreadsheet or a supplier export. Pick the file from your phone or computer below.</p>
+            </div>
+            <Link href="/app/materials/import-quote" className="rounded-lg border border-ink-700 bg-ink-900/70 p-4 transition hover:border-brand" data-testid="materials-import-photos-link">
+              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-brand">{"// or from photos"}</div>
+              <p className="mt-1 text-sm font-semibold text-white">Scan photos instead</p>
+              <p className="mt-1 text-xs text-ink-300">Photograph a supplier quote or invoice, or pick photos already on your phone — up to six at once. We read the lines and prices.</p>
+            </Link>
+          </div>
         </div>
 
         <ImportClient />

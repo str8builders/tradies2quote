@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {usePathname} from "next/navigation";
 import {MagnifyingGlass,User,ArrowLeft,X,SignOut,UserCircle,ArrowSquareOut} from "@phosphor-icons/react";
 import catalog from "@/t2qcal/lib/native-catalog.json";
@@ -77,7 +78,7 @@ export function NativeShell(){
   return <>
     <div className="native-topline" data-testid="t2qcal-topline">
       {tool?<><a className="native-round native-round-solid" href="/t2qcal/calculators" aria-label="Back to calculators" data-testid="t2qcal-back-to-calculators"><ArrowLeft size={22} weight="bold"/></a><strong className="native-screen-title">{tool.name}</strong></>
-      :<><a className="native-wordmark" href="/t2qcal/calculators" aria-label="T2QCAL home">{/* Exact asset from the native app. */}<Image src="/t2qcal/native-mark.png" alt="T2Q" width={997} height={421} style={{width:"auto",height:19}} unoptimized/><b>CAL</b></a>{directory&&<a className="native-round native-round-solid native-topline-search" href="/t2qcal/calculators#search" aria-label="Search calculators"><MagnifyingGlass size={20} weight="bold"/></a>}</>}
+      :<>{!ownApp&&<Link href="/app" className="native-pill native-back-app" data-testid="t2qcal-back-to-app-button" aria-label="Back to Tradies2Quote"><ArrowLeft size={16} weight="bold"/>App</Link>}<a className="native-wordmark" href="/t2qcal/calculators" aria-label="T2QCAL home">{/* Exact asset from the native app. */}<Image src="/t2qcal/native-mark.png" alt="T2Q" width={997} height={421} style={{width:"auto",height:19}} unoptimized/><b>CAL</b></a>{directory&&<a className="native-round native-round-solid native-topline-search" href="/t2qcal/calculators#search" aria-label="Search calculators"><MagnifyingGlass size={20} weight="bold"/></a>}</>}
     </div>
     <button type="button" className="native-avatar" onClick={()=>dialog.current?.showModal()} aria-label={account?`Account: ${account.name??account.email??"signed in"}`:"Settings and sign in"} data-signed-in={account?"true":"false"} data-testid="t2qcal-account-button">
       {/* Same portrait as the quoting app: the profile photo, else the email initial. */}

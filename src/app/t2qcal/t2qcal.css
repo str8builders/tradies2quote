@@ -715,3 +715,8 @@
 .t2qcal-app .native-avatar-photo{width:100%;height:100%;object-fit:cover;display:block;}
 .t2qcal-app .native-avatar-initial{font:700 18px/1 var(--font-plus-jakarta),T2QSans,Arial,sans-serif;color:#1b1f2a;}
 .t2qcal-app .native-account-photo{width:26px;height:26px;border-radius:50%;object-fit:cover;flex:none;}
+
+.t2qcal-app .measure-3d{margin-top:12px;border-radius:var(--t2q-radius);overflow:hidden;background:#0b0c0c;border:1px solid var(--t2q-line);min-height:220px;touch-action:none;}
+.t2qcal-app .measure-3d canvas{display:block;width:100%;height:auto;}
+/* Back to the quoting app: a proper button, top left, unless this IS the standalone T2QCAL app. */
+.t2qcal-app .native-back-app{gap:6px;padding:0 12px 0 8px;min-height:40px;}
