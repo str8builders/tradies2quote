@@ -23,6 +23,8 @@ export function HeightTool(){
   const started=orientation.state==="ready";
   const h=Number(cameraHeight);
   const distance=base===null?null:distanceFromBase(h,base);
+  // Live tape: while the crosshair is on the ground, how far away that spot is.
+  const groundTape=r&&r.elevation<-0.5?distanceFromBase(h,r.elevation):null;
   const height=distance===null||top===null?null:heightFromTop(h,distance,top);
   async function begin(){const ok=await orientation.request();if(ok)await startCamera();}
   function markBase(){if(!r)return;setError("");const d=distanceFromBase(h,r.elevation);if(d===null){setError("Aim at the BASE of the object — the crosshair has to be looking down at where it meets the ground.");return;}setBase(r.elevation);setTop(null);}
@@ -36,11 +38,12 @@ export function HeightTool(){
       {!started&&<SensorGate state={orientation.state} cameraState={cameraState} cameraMessage={cameraMessage} onStart={begin}/>}
       {started&&<svg className="measure-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><line x1="50" y1="0" x2="50" y2="100" className="measure-axis"/><line x1="0" y1="50" x2="100" y2="50" className="measure-axis"/><circle cx="50" cy="50" r="6" className="measure-ring"/><circle cx="50" cy="50" r="0.8" className="measure-dot"/></svg>}
       {started&&<WaitingForSensor reading={r}/>}
-      {started&&<div className="measure-readout" role="status" aria-live="polite"><strong data-testid="measure-height-angle">{r?formatDegrees(r.elevation):"—"}</strong><span>{step===1?"aim at the base, then tap Mark base":step===2?"now aim at the top, then tap Mark top":"done — reset to measure again"}</span></div>}
+      {started&&<div className="measure-readout" role="status" aria-live="polite"><strong data-testid="measure-height-angle">{r?formatDegrees(r.elevation):"—"}</strong><span>{groundTape!==null&&step<3?`ground ${formatMm(groundTape*1000)} away · `:""}{step===1?"aim at the base, then tap Mark base":step===2?"now aim at the top, then tap Mark top":"done — reset to measure again"}</span></div>}
     </div>
     {started&&<>
       <label className="native-field measure-inline-field"><span>Camera height above ground</span><span className="native-input"><input inputMode="decimal" value={cameraHeight} onChange={e=>setCameraHeight(e.target.value)} aria-label="Camera height in metres"/><b>m</b></span></label>
       <div className="measure-grid">
+        <Stat label="Live ground tape" value={groundTape===null?"—":formatMm(groundTape*1000)} hint="to the spot under the crosshair" testId="measure-ground-tape"/>
         <Stat label="Base angle" value={base===null?"—":formatDegrees(base)} hint="below level"/>
         <Stat label="Distance" value={distance===null?"—":formatMm(distance*1000)} hint="to the base" testId="measure-height-distance"/>
         <Stat label="Top angle" value={top===null?"—":formatDegrees(top)} hint="above level"/>

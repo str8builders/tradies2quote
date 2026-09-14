@@ -44,6 +44,8 @@ export interface MoneySection {
   balancePending: number | null;
   recentPayments: RecentPayment[];
   error: string | null;
+  /** Per-call problems (a key missing one permission) — the rest still shows. */
+  warnings: string[];
 }
 
 export interface ExpiringTrial {
@@ -219,11 +221,24 @@ async function buildMoney(): Promise<MoneySection> {
     balancePending: null,
     recentPayments: [],
     error: null,
+    warnings: [],
   };
 
   const stripe = tryStripe();
   if (!stripe) return base;
   base.stripeConfigured = true;
+
+  // A restricted key with one permission missing used to blank the whole
+  // panel with Stripe's raw error. Each call now fails on its own, and a
+  // permission error says exactly which box to tick in the Stripe dashboard.
+  const explain = (what: string, permission: string, err: unknown): string => {
+    const message = err instanceof Error ? err.message : String(err);
+    const code = (err as { code?: string } | null)?.code;
+    if (code === "permission_denied" || /required permissions/i.test(message)) {
+      return `${what}: the Stripe key on the server can't read this. In Stripe → Developers → API keys, edit the restricted key, enable ${permission}, then update STRIPE_SECRET_KEY on the server and restart.`;
+    }
+    return `${what}: ${message}`;
+  };
 
   try {
     const subs = await stripe.subscriptions.list({ status: "all", limit: 100 });
@@ -245,7 +260,11 @@ async function buildMoney(): Promise<MoneySection> {
     }
     base.mrr = mrrCents / 100;
     base.currency = currency.toUpperCase();
+  } catch (err) {
+    base.warnings.push(explain("Subscriptions", "Subscriptions: Read", err));
+  }
 
+  try {
     const balance = await stripe.balance.retrieve();
     const pick = (rows: { amount: number; currency: string }[]) => {
       if (!rows.length) return null;
@@ -255,7 +274,11 @@ async function buildMoney(): Promise<MoneySection> {
     };
     base.balanceAvailable = pick(balance.available);
     base.balancePending = pick(balance.pending);
+  } catch (err) {
+    base.warnings.push(explain("Balance", "Balance: Read", err));
+  }
 
+  try {
     const charges = await stripe.charges.list({ limit: 5 });
     base.recentPayments = charges.data.map((c) => ({
       amount: c.amount / 100,
@@ -264,14 +287,13 @@ async function buildMoney(): Promise<MoneySection> {
       created: new Date(c.created * 1000).toISOString(),
       status: c.status,
     }));
-
-    return base;
   } catch (err) {
-    return {
-      ...base,
-      error: err instanceof Error ? err.message : "Stripe fetch failed.",
-    };
+    base.warnings.push(explain("Recent payments", "Charges: Read", err));
   }
+
+  // Only a total outage (every call failed) is an error; anything else is a warning beside real numbers.
+  if (base.warnings.length === 3) return { ...base, error: base.warnings[0] };
+  return base;
 }
 
 /** Build the whole overview. All three sections run in parallel. */

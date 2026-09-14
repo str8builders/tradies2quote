@@ -6,7 +6,13 @@ import {MagnifyingGlass,User,ArrowLeft,X,SignOut,UserCircle,ArrowSquareOut} from
 import catalog from "@/t2qcal/lib/native-catalog.json";
 import {WebAppControls} from "./WebAppControls";
 
-type Account={email:string|null;name:string|null};
+type Account={email:string|null;name:string|null;avatar?:string|null;initial?:string};
+
+/** The tradie's own uploaded portrait (public storage URL) — no optimiser needed. */
+function Photo({src,className}:{src:string;className:string}){
+  // eslint-disable-next-line @next/next/no-img-element -- the tradie's own uploaded photo
+  return <img src={src} alt="" className={className}/>;
+}
 
 /**
  * T2QCAL shares the Tradies2Quote session, so the shell asks the server
@@ -73,10 +79,13 @@ export function NativeShell(){
       {tool?<><a className="native-round native-round-solid" href="/t2qcal/calculators" aria-label="Back to calculators" data-testid="t2qcal-back-to-calculators"><ArrowLeft size={22} weight="bold"/></a><strong className="native-screen-title">{tool.name}</strong></>
       :<><a className="native-wordmark" href="/t2qcal/calculators" aria-label="T2QCAL home">{/* Exact asset from the native app. */}<Image src="/t2qcal/native-mark.png" alt="T2Q" width={997} height={421} style={{width:"auto",height:19}} unoptimized/><b>CAL</b></a>{directory&&<a className="native-round native-round-solid native-topline-search" href="/t2qcal/calculators#search" aria-label="Search calculators"><MagnifyingGlass size={20} weight="bold"/></a>}</>}
     </div>
-    <button type="button" className="native-avatar" onClick={()=>dialog.current?.showModal()} aria-label={account?`Account: ${account.name??account.email??"signed in"}`:"Settings and sign in"} data-signed-in={account?"true":"false"} data-testid="t2qcal-account-button"><User size={22} weight={account?"fill":"bold"}/></button>
+    <button type="button" className="native-avatar" onClick={()=>dialog.current?.showModal()} aria-label={account?`Account: ${account.name??account.email??"signed in"}`:"Settings and sign in"} data-signed-in={account?"true":"false"} data-testid="t2qcal-account-button">
+      {/* Same portrait as the quoting app: the profile photo, else the email initial. */}
+      {account?.avatar?<Photo src={account.avatar} className="native-avatar-photo"/>:account?<span className="native-avatar-initial" aria-hidden="true">{account.initial??"?"}</span>:<User size={22} weight="bold"/>}
+    </button>
     <dialog ref={dialog} aria-label="Settings" className="native-settings"><div className="native-sheet-heading"><h2>Settings</h2><button onClick={()=>dialog.current?.close()} aria-label="Close settings"><X size={24}/></button></div>
       <div className="native-group" data-testid="t2qcal-account-state" data-state={account===undefined?"loading":account?"signed-in":"signed-out"}>
-        {account?<div className="native-row native-account"><UserCircle size={26} weight="fill"/><span><strong>{account.name??"Signed in"}</strong><small>{account.email??"Your Tradies2Quote account"} · saves and quote drafts go to this account.</small></span><form action="/t2qcal/signout" method="post"><button type="submit" className="native-pill" aria-label="Sign out"><SignOut size={16} weight="bold"/>Sign out</button></form></div>
+        {account?<div className="native-row native-account">{account.avatar?<Photo src={account.avatar} className="native-account-photo"/>:<UserCircle size={26} weight="fill"/>}<span><strong>{account.name??"Signed in"}</strong><small>{account.email??"Your Tradies2Quote account"} · saves and quote drafts go to this account.</small></span><form action="/t2qcal/signout" method="post"><button type="submit" className="native-pill" aria-label="Sign out"><SignOut size={16} weight="bold"/>Sign out</button></form></div>
         :<a className="native-row" href={signInHref} data-testid="t2qcal-sign-in-link"><User size={26}/><span><strong>{account===undefined?"Checking your account…":"Sign in with Tradies2Quote"}</strong><small>Same login as the quoting app. Save working across devices and send quantities to a quote.</small></span></a>}
         {ownApp?<a className="native-row" href="/app" target="_blank" rel="noopener" data-testid="t2qcal-back-to-app"><ArrowSquareOut size={26}/><span><strong>Open Tradies2Quote</strong><small>Quotes, invoices, clients and materials — opens in your browser or the Tradies2Quote app.</small></span></a>
         :<a className="native-row" href="/app" data-testid="t2qcal-back-to-app"><ArrowLeft size={26}/><span><strong>Back to Tradies2Quote</strong><small>Quotes, invoices, clients and materials.</small></span></a>}

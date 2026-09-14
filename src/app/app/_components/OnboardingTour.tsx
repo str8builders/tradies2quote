@@ -215,17 +215,9 @@ export function OnboardingTour({ onFinished }: OnboardingTourProps) {
     let tourStarted = false;
     let suppressDestroyCallback = false;
     let driverObj: ReturnType<typeof driver> | null = null;
-    let dashboardMore: HTMLDetailsElement | null = null;
-    let dashboardMoreStateCaptured = false;
-    let dashboardMoreWasOpen = false;
-
-    const restoreDashboardMore = () => {
-      if (!dashboardMoreStateCaptured) return;
-      const current = dashboardMore?.isConnected
-        ? dashboardMore
-        : document.querySelector<HTMLDetailsElement>(TARGETS.dashboardMore);
-      if (current) current.open = dashboardMoreWasOpen;
-    };
+    // The pipeline/calendar section is always open now, so there is no
+    // collapsed state to reveal or restore.
+    const restoreDashboardMore = () => {};
 
     /** User close, Escape, overlay-close, and Done are intentional exits. */
     const completeTour = () => {
@@ -283,9 +275,7 @@ export function OnboardingTour({ onFinished }: OnboardingTourProps) {
     const buildSteps = (): DriveStep[] | null => {
       const newQuote = firstVisible(TARGETS.newQuote);
       const today = firstVisible(TARGETS.today);
-      const more = document.querySelector<HTMLDetailsElement>(
-        TARGETS.dashboardMore,
-      );
+      const more = document.querySelector<HTMLElement>(TARGETS.dashboardMore);
       const moreToggle = firstVisible(TARGETS.dashboardMoreToggle);
       const pipeline = document.querySelector<HTMLElement>(TARGETS.pipeline);
       const calendar = document.querySelector<HTMLElement>(TARGETS.calendar);
@@ -309,30 +299,14 @@ export function OnboardingTour({ onFinished }: OnboardingTourProps) {
         return null;
       }
 
-      dashboardMore = more;
-      if (!dashboardMoreStateCaptured) {
-        dashboardMoreStateCaptured = true;
-        dashboardMoreWasOpen = more.open;
-      }
-
       const revealMoreTarget = (
         selector: string,
         fallback: HTMLElement,
       ): (() => Element) => {
-        return () => {
-          const current = dashboardMore?.isConnected
-            ? dashboardMore
-            : document.querySelector<HTMLDetailsElement>(TARGETS.dashboardMore);
-          if (current) {
-            dashboardMore = current;
-            current.open = true;
-          }
-          return (
-            firstVisible(selector) ??
-            document.querySelector<HTMLElement>(selector) ??
-            fallback
-          );
-        };
+        return () =>
+          firstVisible(selector) ??
+          document.querySelector<HTMLElement>(selector) ??
+          fallback;
       };
 
       const steps: DriveStep[] = [
@@ -391,7 +365,7 @@ export function OnboardingTour({ onFinished }: OnboardingTourProps) {
         edgeAwareStep(moreToggle, {
           title: "Pipeline, metrics, and calendar",
           description:
-            "Open this section for your quote stages and schedule. We will open it for the next two steps, then restore how you had it.",
+            "Your quote stages, headline numbers and the job calendar live here, always in view.",
           side: "top",
           align: "center",
         }),

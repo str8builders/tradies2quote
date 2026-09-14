@@ -28,6 +28,8 @@ import { WeekOutlook } from "./_components/WeekOutlook";
 import { getWeekOutlook } from "@/lib/weather-impact/outlook";
 import { SiteConditions } from "./_components/SiteConditions";
 import { T2QCALIcon } from "./_components/T2QCALIcon";
+import { RequestCodeCard } from "./_components/RequestCodeCard";
+import { LocalWeather } from "./_components/LocalWeather";
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -180,7 +182,7 @@ async function DashboardData({
       // → null is the common case.
       supabase
         .from("profiles")
-        .select("business_name, address")
+        .select("business_name, address, request_slug")
         .eq("id", userId)
         .maybeSingle(),
       // Wave 41 — count of the tradie's own materials. Drives the
@@ -390,6 +392,8 @@ async function DashboardData({
           the month calendar are demoted into the collapsible panel below so the
           home leads with what needs attention now. */}
       <StaggerIn index={1}>
+      <RequestCodeCard slug={(profile?.request_slug as string | null) ?? null} />
+
       <section data-testid="dashboard-today" aria-label="Today" className="mb-7">
         <div className="t2q-card-pro p-5 sm:p-6">
           <div className="flex items-start justify-between gap-4">
@@ -416,6 +420,9 @@ async function DashboardData({
             address={(profile?.address as string | null) ?? null}
             todayISO={todayISO}
           />
+
+          {/* Where the phone actually is: forecast + safe/caution/unsafe for every trade. */}
+          <LocalWeather todayISO={todayISO} />
 
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             <WorkBoardMetric
@@ -450,14 +457,16 @@ async function DashboardData({
 
       {/* ── Demoted: pipeline, headline metrics & calendar (collapsed) ─────── */}
       <StaggerIn index={2}>
-      <details data-testid="dashboard-more" className="mb-7">
-        <summary
+      <section data-testid="dashboard-more" aria-label="Pipeline, metrics and calendar" className="mb-7">
+        {/* Always open (owner request 2026-09-14): the pipeline and calendar
+            are the work board, not an optional extra behind a toggle. */}
+        <h2
           data-testid="dashboard-more-toggle"
           data-tour="dashboard-more-toggle"
-          className="t2q-section-label-pro cursor-pointer select-none list-none"
+          className="t2q-section-label-pro"
         >
-          <span>Pipeline, metrics & calendar</span><span aria-hidden="true" className="t2q-dashboard-expand">+</span>
-        </summary>
+          <span>Pipeline, metrics & calendar</span>
+        </h2>
         <div className="mt-4 space-y-7">
       {stats.totalQuotes > 0 && (
         <section
@@ -573,7 +582,7 @@ async function DashboardData({
             weather={calendarWeather}
           />
         </div>
-      </details>
+      </section>
       </StaggerIn>
 
 

@@ -1,5 +1,6 @@
 import {createClient} from "@/lib/supabase/server";
 import {privateHeaders} from "@/lib/t2qcal-api";
+import {getCachedAvatarUrl} from "@/lib/supabase/profile";
 
 /**
  * Who is signed in, for the T2QCAL shell. T2QCAL shares the Tradies2Quote
@@ -14,5 +15,7 @@ export async function GET(){
   if(!user)return Response.json({account:null},{headers:privateHeaders});
   const {data:profile}=await db.from("profiles").select("business_name").eq("id",user.id).maybeSingle();
   const business=typeof profile?.business_name==="string"&&profile.business_name.trim()?profile.business_name.trim():null;
-  return Response.json({account:{email:user.email??null,name:business}},{headers:privateHeaders});
+  const avatar=await getCachedAvatarUrl(user.id);
+  const initial=(user.email??"?").trim().charAt(0).toUpperCase()||"?";
+  return Response.json({account:{email:user.email??null,name:business,avatar:avatar&&/^https:\/\//i.test(avatar)?avatar:null,initial}},{headers:privateHeaders});
 }

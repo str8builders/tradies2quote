@@ -13,6 +13,7 @@ import {
   CloudSun,
   GearSix,
   Lifebuoy,
+  QrCode,
   Receipt,
   Robot,
   SignOut,
@@ -115,6 +116,13 @@ const PRIMARY_ITEMS: ReadonlyArray<HubLink> = [
     label: "Payment details",
     caption: "Bank account & payment instructions",
     Icon: Receipt,
+  },
+  {
+    href: "/app/settings",
+    hash: "request-link",
+    label: "QR request code",
+    caption: "Your code and link for clients to request a quote",
+    Icon: QrCode,
   },
   {
     href: "/app/materials",

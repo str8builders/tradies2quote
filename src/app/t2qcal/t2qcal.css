@@ -709,3 +709,9 @@
 .t2qcal-app .calculator-resources .native-section-label{margin-top:0;}
 .t2qcal-app .calculator-resources-lead{margin:0 6px 10px;}
 @media print{.t2qcal-app .native-topline,.t2qcal-app .native-avatar,.t2qcal-app .calculator-resources{display:none!important;}}
+
+/* Avatar contents match the quoting app: photo clipped to the disc, or the email initial. */
+.t2qcal-app .native-avatar{overflow:hidden;}
+.t2qcal-app .native-avatar-photo{width:100%;height:100%;object-fit:cover;display:block;}
+.t2qcal-app .native-avatar-initial{font:700 18px/1 var(--font-plus-jakarta),T2QSans,Arial,sans-serif;color:#1b1f2a;}
+.t2qcal-app .native-account-photo{width:26px;height:26px;border-radius:50%;object-fit:cover;flex:none;}

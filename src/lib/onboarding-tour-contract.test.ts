@@ -47,10 +47,11 @@ describe("first-run coachmark contract", () => {
     expect(completeBody).toContain("markDone()");
   });
 
-  it("reveals collapsed planning targets and restores the user's prior state", () => {
+  it("keeps the pipeline and calendar always open, with no collapse logic left in the tour", () => {
     expect(dashboard).toContain('data-testid="dashboard-more-toggle"');
-    expect(tour).toContain("current.open = true");
-    expect(tour).toContain("current.open = dashboardMoreWasOpen");
+    expect(dashboard).not.toContain('<details data-testid="dashboard-more"');
+    expect(dashboard).toContain('<section data-testid="dashboard-more"');
+    expect(tour).not.toContain("current.open");
   });
 
   it("locks highlighted controls, cleans up Driver, and renders Get started", () => {

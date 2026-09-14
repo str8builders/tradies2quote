@@ -159,6 +159,11 @@ export function AdminDashboard({ initial }: Props) {
           <ErrorNote text={m.error} />
         ) : (
           <>
+            {m.warnings?.length ? (
+              <div className="mb-3 space-y-2">
+                {m.warnings.map((w) => <ErrorNote key={w} text={w} />)}
+              </div>
+            ) : null}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               <Stat
                 label="MRR"

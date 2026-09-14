@@ -1,5 +1,5 @@
 import {describe,expect,it} from "vitest";
-import {angleFromPitch,cameraElevation,cameraRoll,compassPoint,distanceFromBase,fallRatio,formatMm,gradePercent,headingFromEvent,heightFromTop,pitchFromAngle,scaleFromReference,screenUp,smooth,surfaceTilt,upVector} from "./measure";
+import {angleAtVertex,angleFromPitch,cameraElevation,cameraRoll,compassPoint,distanceFromBase,fallRatio,formatArea,formatMm,gradePercent,headingFromEvent,heightFromTop,pitchFromAngle,plumbError,polygonAreaMm2,polygonAreaPx,quadSidesMm,scaleFromReference,screenUp,smooth,surfaceTilt,upVector} from "./measure";
 
 const close=(a:number,b:number,tol=0.05)=>expect(Math.abs(a-b)).toBeLessThanOrEqual(tol);
 
@@ -77,4 +77,27 @@ describe("compass",()=>{
     expect(compassPoint(0)).toBe("N");expect(compassPoint(210)).toBe("SW");expect(compassPoint(359)).toBe("N");
   });
   it("smooths readings",()=>{expect(smooth(null,10)).toBe(10);expect(smooth(0,10,0.5)).toBe(5);});
+});
+
+describe("photo shapes and plumb",()=>{
+  it("measures a traced area and its sides",()=>{
+    const sq=[{x:0,y:0},{x:100,y:0},{x:100,y:50},{x:0,y:50}];
+    expect(polygonAreaPx(sq)).toBe(5000);
+    expect(polygonAreaMm2(sq,2)).toBe(20000);
+    expect(quadSidesMm(sq,2)).toEqual([200,100]);
+    expect(quadSidesMm(sq.slice(0,3),2)).toBeNull();
+    expect(polygonAreaPx(sq.slice(0,2))).toBe(0);
+    expect(formatArea(2_450_000)).toBe("2.45 m²");
+    expect(formatArea(24_500_000)).toBe("24.5 m²");
+    expect(formatArea(929030.4,"imperial")).toBe("10.0 ft²");
+  });
+  it("reads the angle at a vertex",()=>{
+    close(angleAtVertex({x:10,y:0},{x:0,y:0},{x:0,y:10}),90);
+    close(angleAtVertex({x:10,y:0},{x:0,y:0},{x:10,y:-5.773}),30,0.05);
+    expect(angleAtVertex({x:0,y:0},{x:0,y:0},{x:1,y:1})).toBe(0);
+  });
+  it("reads plumb from a phone held flat on a wall",()=>{
+    close(plumbError(90,0),0);
+    close(plumbError(88,0),2);
+  });
 });

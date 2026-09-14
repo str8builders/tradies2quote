@@ -128,3 +128,48 @@ export function compassPoint(heading:number){return COMPASS_POINTS[Math.round(((
 
 /** Simple exponential smoothing so sensor readouts settle instead of flickering. */
 export function smooth(previous:number|null,next:number,factor=0.25){return previous===null?next:previous+(next-previous)*factor;}
+
+/** Deviation of a vertical surface (post, wall, formwork) from plumb, phone held flat against it. */
+export function plumbError(betaDeg:number,gammaDeg:number):number{
+  return 90-surfaceTilt(betaDeg,gammaDeg);
+}
+
+/** Shoelace area in image pixels² (absolute). */
+export function polygonAreaPx(points:Array<{x:number;y:number}>):number{
+  if(points.length<3)return 0;
+  let sum=0;
+  for(let i=0;i<points.length;i++){const a=points[i],b=points[(i+1)%points.length];sum+=a.x*b.y-b.x*a.y;}
+  return Math.abs(sum)/2;
+}
+
+export function polygonAreaMm2(points:Array<{x:number;y:number}>,mmPerPixel:number):number{
+  return polygonAreaPx(points)*mmPerPixel*mmPerPixel;
+}
+
+export function formatArea(mm2:number,unit:"metric"|"imperial"="metric"){
+  if(unit==="imperial"){const ft2=mm2/92903.04;return `${ft2.toFixed(ft2<10?2:1)} ft²`;}
+  const m2=mm2/1e6;
+  return `${m2.toFixed(m2<10?2:1)} m²`;
+}
+
+/** Angle at `vertex` between the rays to `a` and `b`, in degrees (0–180). */
+export function angleAtVertex(a:{x:number;y:number},vertex:{x:number;y:number},b:{x:number;y:number}):number{
+  const ax=a.x-vertex.x,ay=a.y-vertex.y,bx=b.x-vertex.x,by=b.y-vertex.y;
+  const la=Math.hypot(ax,ay),lb=Math.hypot(bx,by);
+  if(la<1e-6||lb<1e-6)return 0;
+  const cos=Math.max(-1,Math.min(1,(ax*bx+ay*by)/(la*lb)));
+  return Math.acos(cos)/DEG;
+}
+
+/**
+ * For a four-point outline, the two side lengths (mm): the average of each
+ * pair of opposite sides, longest first. Lets an area traced on a photo seed
+ * a length × width calculator without pretending a trapezoid is a rectangle
+ * more than it is.
+ */
+export function quadSidesMm(points:Array<{x:number;y:number}>,mmPerPixel:number):[number,number]|null{
+  if(points.length!==4||!(mmPerPixel>0))return null;
+  const side=(i:number)=>pixelDistance(points[i],points[(i+1)%4])*mmPerPixel;
+  const a=(side(0)+side(2))/2,b=(side(1)+side(3))/2;
+  return a>=b?[a,b]:[b,a];
+}

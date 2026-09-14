@@ -1,12 +1,12 @@
 "use client";
 import {useState} from "react";
-import {ArrowRight,Compass,Crosshair,Pause,Play,Target} from "@phosphor-icons/react";
-import {compassPoint,fallRatio,formatDegrees,gradePercent,pitchFromAngle} from "@/t2qcal/lib/measure";
+import {ArrowRight,ArrowsVertical,Compass,Crosshair,Pause,Play,Target} from "@phosphor-icons/react";
+import {compassPoint,fallRatio,formatDegrees,gradePercent,pitchFromAngle,plumbError} from "@/t2qcal/lib/measure";
 import {useCamera,useOrientation} from "./useSensors";
 import {sendToCalculator} from "./sendToCalculator";
 import {SensorGate,Stat,WaitingForSensor} from "./shared";
 
-type Mode="sight"|"surface";
+type Mode="sight"|"surface"|"plumb";
 
 /**
  * Camera level & pitch. Sight mode overlays a horizon on the live camera and
@@ -23,7 +23,7 @@ export function LevelTool(){
   const r=orientation.reading;
   const started=orientation.state==="ready";
   async function begin(){const ok=await orientation.request();if(ok)await startCamera();}
-  const angle=r?(mode==="sight"?r.elevation:r.tilt):null;
+  const angle=r?(mode==="sight"?r.elevation:mode==="plumb"?plumbError(r.beta,r.gamma):r.tilt):null;
   const shownAngle=angle===null?null:Math.abs(angle);
   const pitch=shownAngle===null?null:pitchFromAngle(shownAngle);
   const fall=shownAngle===null?null:fallRatio(shownAngle);
@@ -35,6 +35,7 @@ export function LevelTool(){
     <div className="measure-mode" role="tablist" aria-label="Level mode">
       <button role="tab" aria-selected={mode==="sight"} onClick={()=>setMode("sight")}><Crosshair size={16} weight="bold"/>Sight through camera</button>
       <button role="tab" aria-selected={mode==="surface"} onClick={()=>setMode("surface")}><Target size={16} weight="bold"/>Lay on surface</button>
+      <button role="tab" aria-selected={mode==="plumb"} onClick={()=>setMode("plumb")}><ArrowsVertical size={16} weight="bold"/>Plumb</button>
     </div>
     <div className={`measure-stage${level?" is-level":""}`} data-mode={mode}>
       <video ref={videoRef} className="measure-video" playsInline muted autoPlay hidden={mode!=="sight"||cameraState!=="live"}/>
@@ -44,10 +45,10 @@ export function LevelTool(){
         <line x1="50" y1="0" x2="50" y2="100" className="measure-axis"/><line x1="0" y1="50" x2="100" y2="50" className="measure-axis"/>
         <circle cx="50" cy="50" r="6" className="measure-ring"/><circle cx="50" cy="50" r="0.8" className="measure-dot"/>
       </svg>}
-      {started&&mode==="surface"&&<div className="measure-bubble-field" aria-hidden="true"><div className="measure-bubble-ring"/><div className="measure-bubble" style={{transform:`translate(${bubbleX*42}%,${bubbleY*42}%)`}}/></div>}
+      {started&&mode!=="sight"&&<div className="measure-bubble-field" aria-hidden="true"><div className="measure-bubble-ring"/><div className="measure-bubble" style={{transform:`translate(${bubbleX*42}%,${bubbleY*42}%)`}}/></div>}
       {started&&<div className="measure-readout" role="status" aria-live="polite">
         <strong data-testid="measure-level-angle">{shownAngle===null?"—":formatDegrees(shownAngle)}</strong>
-        <span>{mode==="sight"?(angle!==null&&angle<-0.5?"looking down":angle!==null&&angle>0.5?"looking up":"level"):(level?"level":"tilted")}</span>
+        <span>{mode==="sight"?(angle!==null&&angle<-0.5?"looking down":angle!==null&&angle>0.5?"looking up":"level"):mode==="plumb"?(level?"plumb":"out of plumb"):(level?"level":"tilted")}</span>
       </div>}
       {started&&<WaitingForSensor reading={r}/>}
       {started&&r?.heading!==null&&r?.heading!==undefined&&<span className="measure-heading"><Compass size={14} weight="bold"/>{Math.round(r.heading)}° {compassPoint(r.heading)}</span>}
@@ -67,7 +68,7 @@ export function LevelTool(){
         <button type="button" className="native-pill" onClick={toPitch} disabled={shownAngle===null}>Pitch &amp; angle <ArrowRight size={14} weight="bold"/></button>
       </div>
       {error&&<p role="alert" className="native-form-error">{error}</p>}
-      <p className="native-footnote">{mode==="sight"?"Stand at the eave and sight along the roof line, or line the horizon up with a fascia to check it is level. Zero here on a known-level surface before fine work.":"Lay the phone flat on the member with the screen up. Rotate it along the fall to read drainage grade — 1 : 60 is the usual minimum for 100 mm waste, 1 : 40 for 65 mm."}</p>
+      <p className="native-footnote">{mode==="sight"?"Stand at the eave and sight along the roof line, or line the horizon up with a fascia to check it is level. Zero here on a known-level surface before fine work.":mode==="plumb"?"Hold the phone flat against the post, stud or formwork with the screen facing you. The reading is how far the face leans off vertical; under 0.5° shows as plumb.":"Lay the phone flat on the member with the screen up. Rotate it along the fall to read drainage grade — 1 : 60 is the usual minimum for 100 mm waste, 1 : 40 for 65 mm."}</p>
     </>}
   </section>;
 }
