@@ -28,5 +28,12 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // No code: Supabase sends the reason (expired or already-used link) as
+  // error_description — show it instead of a bare sign-in page.
+  const reason = searchParams.get("error_description") ?? searchParams.get("error");
+  if (reason) {
+    const wantsReset = next.startsWith("/reset-password");
+    return NextResponse.redirect(new URL(`${wantsReset ? "/forgot-password" : "/login"}?error=${encodeURIComponent(reason.slice(0, 200))}`, origin));
+  }
   return NextResponse.redirect(new URL("/login", origin));
 }

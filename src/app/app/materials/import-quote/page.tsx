@@ -20,10 +20,12 @@ export default async function ImportQuotePage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("currency")
+    .select("currency, tax_rate")
     .eq("id", user.id)
     .maybeSingle();
   const currency = profile?.currency ?? NZ_DEFAULTS.currency;
+  // Stored as a percentage (15 = 15 %); the client works in fractions.
+  const taxRate = Number(profile?.tax_rate ?? NZ_DEFAULTS.tax_rate) / 100;
 
   return (
     <div className="min-h-screen text-white">
@@ -57,7 +59,7 @@ export default async function ImportQuotePage() {
           </p>
         </div>
 
-        <QuoteImportClient currency={currency} />
+        <QuoteImportClient currency={currency} taxRate={taxRate} />
       </main>
     </div>
   );

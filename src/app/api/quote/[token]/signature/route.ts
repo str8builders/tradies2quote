@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
+import { consumeFixedWindow, tooManyRequestsResponse } from "@/lib/rate-limit";
+import { requestIp } from "@/lib/request-ip";
 import { downloadSignature } from "@/lib/quote-storage";
 import { classifyPublicQuote } from "@/lib/quote-public-view";
 
@@ -9,10 +11,13 @@ export const dynamic = "force-dynamic";
 type Params = { token: string };
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   ctx: { params: Promise<Params> },
 ) {
   const { token } = await ctx.params;
+  // Public bearer URL: a light per-IP cap so the token cannot be probed at speed.
+  const quota = consumeFixedWindow(`public-quote-get:${requestIp(request)}`, 120, 15 * 60_000);
+  if (!quota.ok) return tooManyRequestsResponse(quota.resetAt);
   const admin = adminClient();
   const { data: quoteRaw, error } = await admin
     .from("quotes")

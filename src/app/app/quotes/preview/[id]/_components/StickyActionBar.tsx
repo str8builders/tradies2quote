@@ -70,6 +70,7 @@ const ERROR_COPY: Record<string, string> = {
   no_line_items: "Add at least one line item before sending.",
   total_zero: "Quote total must be greater than zero.",
   already_accepted: "This quote has already been accepted.",
+  job_underway: "This job is scheduled, underway or completed — it can't be resent. Duplicate the quote for a fresh one.",
   pdf_generation_failed: "Could not generate the PDF.",
   pdf_upload_failed: "Could not save the PDF.",
   email_not_configured: "Email sending isn't available right now — try again shortly.",
@@ -124,6 +125,8 @@ export function StickyActionBar({
   } | null>(null);
 
   const isAccepted = status === "accepted";
+  // Resending a job that is scheduled, underway or done would drag it back to "sent".
+  const isUnderway = status === "scheduled" || status === "in_progress" || status === "completed";
   const isSentOrViewed = status === "sent" || status === "viewed";
   const sendBusy =
     sendState === "saving" ||
@@ -477,7 +480,7 @@ export function StickyActionBar({
               <span className="hidden sm:inline">{isPending ? "…" : " changes"}</span>
             </button>
 
-            {!isAccepted && (
+            {!isAccepted && !isUnderway && (
               <>
                 <button
                   type="button"

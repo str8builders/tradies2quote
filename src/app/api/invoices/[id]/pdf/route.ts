@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { captureError } from "@/lib/observability";
+import { consumeFixedWindow, tooManyRequestsResponse } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { generateInvoicePdf } from "@/lib/invoice-pdf-generator";
 import { loadLogoForPdf } from "@/lib/pdf-logo";
@@ -30,6 +31,8 @@ export async function GET(
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+  const quota = consumeFixedWindow(`pdf-invoice:${user.id}`, 60, 15 * 60_000);
+  if (!quota.ok) return tooManyRequestsResponse(quota.resetAt);
 
   const { data: invoice } = await supabase
     .from("invoices")

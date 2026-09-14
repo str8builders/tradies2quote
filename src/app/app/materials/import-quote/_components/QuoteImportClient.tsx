@@ -90,7 +90,7 @@ type ExtractResponse = {
 /** Photos per scan. Each one is a separate vision call, so keep it modest. */
 export const MAX_SCAN_PHOTOS = 6;
 
-export function QuoteImportClient({ currency }: { currency: string }) {
+export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: string; /** Fraction, e.g. 0.15. The tradie's configured rate, not a fixed GST. */ taxRate?: number }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const libraryRef = useRef<HTMLInputElement>(null);
@@ -222,6 +222,8 @@ export function QuoteImportClient({ currency }: { currency: string }) {
       const pages: ExtractResponse[] = [];
       const preparedFiles: File[] = [];
       const preparedUrls: string[] = [];
+      // On any early exit, drop the object URLs minted for already-prepared photos.
+      const abandonPrepared = () => { for (const url of preparedUrls) if (!previewsRef.current.includes(url)) URL.revokeObjectURL(url); };
       for (let i = 0; i < raws.length; i++) {
         const raw = raws[i];
         const which = raws.length > 1 ? `Photo ${i + 1} of ${raws.length}: ` : "";
@@ -236,6 +238,7 @@ export function QuoteImportClient({ currency }: { currency: string }) {
             `${which}couldn’t read that photo. Upload a JPEG, or switch your iPhone Camera to "Most Compatible".`,
           );
           setPhase("error");
+          abandonPrepared();
           return;
         }
         if (f.size > MAX_SCAN_UPLOAD_BYTES) {
@@ -243,6 +246,7 @@ export function QuoteImportClient({ currency }: { currency: string }) {
             `${which}image is ${(f.size / 1024 / 1024).toFixed(1)} MB after compression. Try cropping or taking a closer photo.`,
           );
           setPhase("error");
+          abandonPrepared();
           return;
         }
         if (!isPreparedScanMime(detectImageMime(f))) {
@@ -250,6 +254,7 @@ export function QuoteImportClient({ currency }: { currency: string }) {
             `${which}unsupported image type after preparation. Use JPEG, PNG, WebP or GIF.`,
           );
           setPhase("error");
+          abandonPrepared();
           return;
         }
         preparedFiles.push(f);
@@ -267,6 +272,7 @@ export function QuoteImportClient({ currency }: { currency: string }) {
           };
           setError(`${which}${data.message ?? data.error ?? "Could not scan that quote."}`);
           setPhase("error");
+          abandonPrepared();
           return;
         }
         pages.push((await res.json()) as ExtractResponse);
@@ -371,7 +377,7 @@ export function QuoteImportClient({ currency }: { currency: string }) {
       total: srcTotal,
       notes: [],
     };
-    const report = validateSupplierQuote(ext, { taxRate: 0.15 });
+    const report = validateSupplierQuote(ext, { taxRate });
     const map = new Map(
       createableV.map((r, i) => [r.id, report.lines[i]] as const),
     );
@@ -400,7 +406,7 @@ export function QuoteImportClient({ currency }: { currency: string }) {
     const payload: SupplierQuoteRow[] = includable.map((r) => ({
       name: r.name.trim(),
       unit: r.unit.trim() || "each",
-      default_unit_price: toExGst(Number(r.price), gstInclusive),
+      default_unit_price: toExGst(Number(r.price), gstInclusive, taxRate),
       sku: r.sku,
       notes: null,
     }));

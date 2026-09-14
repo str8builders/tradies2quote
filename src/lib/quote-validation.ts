@@ -16,6 +16,7 @@ export type SendValidationError =
   | "no_line_items"
   | "total_zero"
   | "already_accepted"
+  | "job_underway"
   // Wave 45 — takeoff safety gate.
   | "takeoff_blocked"
   | "takeoff_unconfirmed";
@@ -389,6 +390,12 @@ export function validateQuoteForSending(args: {
   if (status === "accepted") {
     return { ok: false, error: "already_accepted" };
   }
+  // Audit 2026-09-15: a scheduled, in-progress or completed job must never be
+  // resent — the raw status write in the send routes would drag it back to
+  // "sent" and corrupt the lifecycle trail (and any invoice already raised).
+  if (status === "scheduled" || status === "in_progress" || status === "completed") {
+    return { ok: false, error: "job_underway" };
+  }
   if (!quote_data) {
     return { ok: false, error: "no_line_items" };
   }
@@ -451,6 +458,12 @@ export function validateQuoteForSmsSending(args: {
   const { status, quote_data, acknowledged, description } = args;
   if (status === "accepted") {
     return { ok: false, error: "already_accepted" };
+  }
+  // Audit 2026-09-15: a scheduled, in-progress or completed job must never be
+  // resent — the raw status write in the send routes would drag it back to
+  // "sent" and corrupt the lifecycle trail (and any invoice already raised).
+  if (status === "scheduled" || status === "in_progress" || status === "completed") {
+    return { ok: false, error: "job_underway" };
   }
   if (!quote_data) {
     return { ok: false, error: "no_line_items" };
@@ -527,6 +540,7 @@ export const SEND_ERROR_MESSAGES: Record<SendValidationError, string> = {
   no_line_items: "Add at least one line item before sending.",
   total_zero: "Add at least one line with a quantity before sending.",
   already_accepted: "This quote has already been accepted.",
+  job_underway: "This job is scheduled, underway or completed — it can't be resent. Duplicate the quote if you need a fresh one.",
   takeoff_blocked:
     "Some quantities couldn't be calculated or look wrong. Fix the flagged lines before sending.",
   takeoff_unconfirmed:

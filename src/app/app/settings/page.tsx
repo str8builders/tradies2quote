@@ -26,6 +26,7 @@ import { reviewsEnabled, followupsEnabled } from "@/lib/engagement";
 import { EngagementSettings } from "./_components/EngagementSettings";
 import { paymentsEnabled, getConnectStatus, refreshConnectStatus } from "@/lib/payments";
 import { PaymentsSettings } from "./_components/PaymentsSettings";
+import { getTeamContext } from "@/lib/team";
 import { QuoteRequestLinkCard } from "./_components/QuoteRequestLinkCard";
 import { ReplayTourButton } from "./_components/ReplayTourButton";
 import { DeleteAccountSection } from "./_components/DeleteAccountSection";
@@ -77,7 +78,7 @@ export default async function SettingsPage({
     supabase
       .from("clients")
       .select("id, email, phone")
-      .eq("user_id", user.id),
+      .eq("user_id", (await getTeamContext(user.id)).clientOwnerId),
   ]);
 
   const adminProfile: AdminProfileSnapshot | null = profile

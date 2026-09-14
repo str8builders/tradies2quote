@@ -41,7 +41,16 @@ self.addEventListener("fetch",event=>{
   if(url.pathname.startsWith(DOC_PREFIX)){
     event.respondWith((async()=>{
       const shelf=await caches.open(DOCS),kept=await shelf.match(url.href);
-      if(kept)return kept;
+      if(kept){
+        // PDF viewers ask for byte ranges: serve the slice from the kept copy.
+        const range=/^bytes=(\d*)-(\d*)$/.exec((request.headers&&request.headers.get("range"))||"");
+        if(!range)return kept;
+        const body=await kept.clone().arrayBuffer(),size=body.byteLength;
+        let start=range[1]===""?Math.max(0,size-Number(range[2])):Number(range[1]);
+        let end=range[1]!==""&&range[2]!==""?Math.min(Number(range[2]),size-1):size-1;
+        if(!(start<=end&&start<size))return new Response(null,{status:416,headers:{"Content-Range":`bytes */${size}`}});
+        return new Response(body.slice(start,end+1),{status:206,headers:{"Content-Type":"application/pdf","Content-Range":`bytes ${start}-${end}/${size}`,"Content-Length":String(end-start+1),"Accept-Ranges":"bytes"}});
+      }
       try{return await fetch(request);}
       catch{return new Response("This document is not kept on this phone. Connect once and choose Keep offline.",{status:503,headers:{"Content-Type":"text/plain"}});}
     })());

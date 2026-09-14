@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import sharp from "sharp";
 import { createClient } from "@/lib/supabase/server";
 import { isValidRequestSlug, requestLinkFor } from "@/lib/quote-requests/slug";
+import { consumeFixedWindow, tooManyRequestsResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +26,9 @@ export async function GET(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Image work plus an outbound logo fetch per call: cap it like the other cost-bearing routes.
+  const quota = consumeFixedWindow(`request-qr:${user.id}`, 60, 15 * 60_000);
+  if (!quota.ok) return tooManyRequestsResponse(quota.resetAt);
 
   const { data: profile } = await supabase
     .from("profiles")

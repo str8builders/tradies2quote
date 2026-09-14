@@ -5,6 +5,8 @@ import {
   logAgentRunStart,
   logAgentRunFinish,
 } from "@/lib/agent-monitor/logger";
+import { createClient } from "@/lib/supabase/server";
+import { consumeFixedWindow } from "@/lib/rate-limit";
 
 /**
  * Server-action beacon for the two browser-side agents (Variation,
@@ -26,6 +28,15 @@ export async function logClientAgentRun(input: {
   message: string;
   ok: boolean;
 }): Promise<void> {
+  // Audit 2026-09-15: a server action is a public POST. Only signed-in users
+  // may write monitoring rows (through the service role), and not in a loop.
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  if (!consumeFixedWindow(`agent-beacon:${user.id}`, 60, 15 * 60_000).ok) return;
+  const agentName = String(input.agentName).slice(0, 80);
+  const message = String(input.message).slice(0, 500);
+  input = { agentName, message, ok: input.ok === true };
   const runId = `cli_${Math.random().toString(16).slice(2, 10)}`;
   logAgentRunStart({
     agentName: input.agentName,

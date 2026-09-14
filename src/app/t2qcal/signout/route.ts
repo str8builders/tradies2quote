@@ -16,4 +16,9 @@ export async function POST(req:NextRequest){
   for(const c of store.getAll())if(c.name.startsWith("sb-"))response.cookies.set(c.name,"",{path:"/",maxAge:0,httpOnly:true,sameSite:"lax",secure:process.env.NODE_ENV==="production"});
   return response;
 }
-export async function GET(req:NextRequest){return POST(req);}
+export async function GET(req:NextRequest){
+  // Cross-site GETs must not sign a visitor out; a pasted URL (same-origin/none) still does.
+  const site=req.headers.get("sec-fetch-site");
+  if(site&&site!=="same-origin"&&site!=="none")return NextResponse.redirect(new URL("/t2qcal/calculators",req.url),303);
+  return POST(req);
+}

@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
+import { consumeFixedWindow, tooManyRequestsResponse } from "@/lib/rate-limit";
+import { requestIp } from "@/lib/request-ip";
 import { adminClient } from "@/lib/supabase/admin";
 import { stripeClient } from "@/lib/stripe-client";
 import {
@@ -35,6 +37,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "bad_request" }, { status: 400 });
   }
   if (!token) return NextResponse.json({ error: "missing_token" }, { status: 400 });
+  // Creates Stripe sessions and expires stale ones: cap per token and per caller.
+  const perToken = consumeFixedWindow(`deposit-checkout:${token}`, 6, 15 * 60_000);
+  if (!perToken.ok) return tooManyRequestsResponse(perToken.resetAt);
+  const perIp = consumeFixedWindow(`deposit-checkout-ip:${requestIp(request)}`, 30, 15 * 60_000);
+  if (!perIp.ok) return tooManyRequestsResponse(perIp.resetAt);
 
   try {
     const admin = adminClient();

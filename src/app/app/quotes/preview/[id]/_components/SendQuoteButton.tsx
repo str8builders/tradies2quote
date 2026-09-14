@@ -50,6 +50,7 @@ const ERROR_COPY: Record<string, string> = {
   no_line_items: "Add at least one line item before sending.",
   total_zero: "Quote total must be greater than zero.",
   already_accepted: "This quote has already been accepted.",
+  job_underway: "This job is scheduled, underway or completed — it can't be resent. Duplicate the quote for a fresh one.",
   pdf_generation_failed: "Could not generate the PDF.",
   pdf_upload_failed: "Could not save the PDF.",
   email_not_configured: "Email sending isn't available right now — try again shortly.",

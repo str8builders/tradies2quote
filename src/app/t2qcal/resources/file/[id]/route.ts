@@ -24,7 +24,11 @@ export async function GET(request:Request,context:{params:Promise<{id:string}>})
   const ip=request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()||request.headers.get("x-real-ip")||"local";
   if(!consumeFixedWindow(`t2qcal:document:${ip}`,120,15*60_000).ok)return new Response("Please wait a moment and try again.",{status:429,headers:{"Cache-Control":"no-store"}});
   let upstream:Response;
-  try{upstream=await fetch(resource.pdf,{headers:{Accept:"application/pdf,*/*;q=0.8","User-Agent":"Mozilla/5.0 (compatible; T2QCAL reference library; +https://tradies2quote.com/t2qcal/resources)"},redirect:"follow",cache:"no-store",signal:AbortSignal.timeout(45_000)});}
+  // PDF viewers page through large files with byte ranges: pass a Range straight through.
+  const range=request.headers.get("range");
+  const upstreamHeaders:Record<string,string>={Accept:"application/pdf,*/*;q=0.8","User-Agent":"Mozilla/5.0 (compatible; T2QCAL reference library; +https://tradies2quote.com/t2qcal/resources)"};
+  if(range&&/^bytes=\d*-\d*$/.test(range))upstreamHeaders.Range=range;
+  try{upstream=await fetch(resource.pdf,{headers:upstreamHeaders,redirect:"follow",cache:"no-store",signal:AbortSignal.timeout(45_000)});}
   catch{return new Response("The publisher's site did not respond. Try again when you have a better connection.",{status:504,headers:{"Cache-Control":"no-store"}});}
   const type=(upstream.headers.get("content-type")??"").toLowerCase();
   if(!upstream.ok||!upstream.body||!(type.includes("pdf")||type.includes("octet-stream"))){
@@ -40,8 +44,11 @@ export async function GET(request:Request,context:{params:Promise<{id:string}>})
     "Cache-Control":"public, max-age=86400, stale-while-revalidate=604800",
     "X-Content-Type-Options":"nosniff",
     "X-T2QCAL-Publisher":resource.publisher,
+    "Accept-Ranges":"bytes",
   };
   // The body is streamed decoded; only pass a length the client will actually receive.
   if(length&&!upstream.headers.get("content-encoding"))headers["Content-Length"]=length;
+  const contentRange=upstream.headers.get("content-range");
+  if(upstream.status===206&&contentRange){headers["Content-Range"]=contentRange;return new Response(upstream.body,{status:206,headers});}
   return new Response(upstream.body,{status:200,headers});
 }

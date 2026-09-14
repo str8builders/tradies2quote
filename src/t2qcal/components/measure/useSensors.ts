@@ -67,6 +67,9 @@ export type CameraState="idle"|"starting"|"live"|"denied"|"unsupported"|"error";
 export function useCamera(){
   const videoRef=useRef<HTMLVideoElement>(null);
   const streamRef=useRef<MediaStream|null>(null);
+  // False once the hook has unmounted: a getUserMedia() that resolves after
+  // that is stopped immediately instead of leaving the camera light on.
+  const aliveRef=useRef(true);
   const [state,setState]=useState<CameraState>("idle");
   const [message,setMessage]=useState("");
   const stop=useCallback(()=>{streamRef.current?.getTracks().forEach(t=>t.stop());streamRef.current=null;if(videoRef.current)videoRef.current.srcObject=null;setState(s=>s==="live"||s==="starting"?"idle":s);},[]);
@@ -75,6 +78,7 @@ export function useCamera(){
     setState("starting");setMessage("");
     try{
       const stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1440}}});
+      if(!aliveRef.current){stream.getTracks().forEach(t=>t.stop());return false;}
       streamRef.current=stream;
       const video=videoRef.current;
       if(video){video.srcObject=stream;await video.play().catch(()=>{});}
@@ -88,9 +92,10 @@ export function useCamera(){
     }
   },[]);
   useEffect(()=>{
+    aliveRef.current=true;
     const onHide=()=>{if(document.hidden)stop();};
     document.addEventListener("visibilitychange",onHide);
-    return()=>{document.removeEventListener("visibilitychange",onHide);stop();};
+    return()=>{aliveRef.current=false;document.removeEventListener("visibilitychange",onHide);stop();};
   },[stop]);
   /** Grab the current frame as a JPEG blob for photo measuring. */
   const snapshot=useCallback(async():Promise<Blob|null>=>{

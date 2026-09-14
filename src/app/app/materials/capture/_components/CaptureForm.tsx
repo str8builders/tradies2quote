@@ -60,7 +60,8 @@ export function CaptureForm({
   initialName,
   initialSupplier,
   isPasteFallback,
-}: Props) {
+  taxRate = 0.15,
+}: Props & { /** Fraction, e.g. 0.15 — the tradie's configured rate, not a fixed GST. */ taxRate?: number }) {
   const [url, setUrl] = useState(initialUrl);
   const [name, setName] = useState(initialName);
   const [unit, setUnit] = useState("each");
@@ -90,7 +91,7 @@ export function CaptureForm({
   const isValidPrice = Number.isFinite(priceNum) && priceNum >= 0;
   const finalPrice = isValidPrice
     ? incGst
-      ? Math.round((priceNum / 1.15) * 100) / 100
+      ? Math.round((priceNum / (1 + taxRate)) * 100) / 100
       : Math.round(priceNum * 100) / 100
     : null;
 

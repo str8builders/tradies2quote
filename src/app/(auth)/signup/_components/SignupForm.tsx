@@ -1,4 +1,5 @@
 "use client";
+import { PendingSubmit } from "../../_components/PendingSubmit";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -88,13 +89,9 @@ export function SignupForm({ error, next }: Props) {
       <p className="text-xs text-ink-400">At least 8 characters.</p>
 
       <Magnetic strength={0.18} className="w-full">
-        <button
-          type="submit"
-          className="w-full t2q-btn-primary-pro h-12"
-          data-testid="signup-submit"
-        >
+        <PendingSubmit data-testid="signup-submit" pendingLabel="Creating your account…">
           Start 7-day trial <ArrowRight size={20} weight="bold" />
-        </button>
+        </PendingSubmit>
       </Magnetic>
 
       <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-ink-500">

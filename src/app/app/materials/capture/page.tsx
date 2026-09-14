@@ -48,6 +48,9 @@ export default async function CapturePage({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  // The tradie's own tax rate (stored as a percentage) drives the inc/ex-GST maths.
+  const { data: profile } = await supabase.from("profiles").select("tax_rate").eq("id", user.id).maybeSingle();
+  const taxRate = Number(profile?.tax_rate ?? 15) / 100;
 
   // Some share-sheet integrations stuff the URL into `text` rather than `url`.
   // Prefer the explicit url param; fall back to text when it looks URL-shaped.
@@ -79,6 +82,7 @@ export default async function CapturePage({
         </div>
 
         <CaptureForm
+          taxRate={taxRate}
           initialUrl={sharedUrl}
           initialName={initialName}
           initialSupplier={initialSupplier}

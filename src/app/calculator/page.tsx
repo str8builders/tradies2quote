@@ -16,6 +16,7 @@ import { Footer } from "../_components/landing/Footer";
 import { NativeAppRedirect } from "../_components/landing/NativeAppRedirect";
 import { WaitlistForm } from "../_components/landing/WaitlistForm";
 import { isNativeShellRequest } from "@/lib/native-shell";
+import nativeCatalog from "@/t2qcal/lib/native-catalog.json";
 
 export const metadata: Metadata = {
   title: "T2QCAL — the calculator that quotes",
@@ -342,8 +343,8 @@ export default async function CalculatorPage() {
               <div className="mt-8 grid gap-4 sm:grid-cols-2">
                 <Card
                   icon={WifiSlash}
-                  title="62 download directly"
-                  body="The other 12 sit behind a bot check or a free registration, so the app opens the publisher's page rather than quietly saving an error page."
+                  title={`${nativeCatalog.resources.filter((r) => r.pdf).length} download directly`}
+                  body={`The other ${nativeCatalog.resources.filter((r) => !r.pdf).length} are web pages — mostly Building Code clauses MBIE publishes online only — so the app opens the publisher's page instead of saving a copy.`}
                 />
                 <Card
                   icon={BookOpenText}

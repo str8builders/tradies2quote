@@ -50,6 +50,9 @@ export default function AppSplash({ serverOpen = true, tagline = "Less paperwork
   }, []);
   const finished = useCallback(() => setIntroDone(true), []);
   const sceneReady = useCallback(() => setReady(true), []);
+  // Failure bound: if the player chunk never arrives, `ready` never flips and
+  // the clock never runs — so the deadline must complete everything itself.
+  const deadlineElapsed = useCallback(() => { setReady(true); setClock(1); setIntroDone(true); }, []);
   useEffect(() => {
     const start = setTimeout(() => {
       // Entry-only: play after sign-in or on a cold start (unless seen within
@@ -67,7 +70,7 @@ export default function AppSplash({ serverOpen = true, tagline = "Less paperwork
   }, [close]);
   useEffect(() => {
     if (!play || complete || !mounted) return;
-    const deadline = createWelcomeDeadline(finished, DEADLINE_MS);
+    const deadline = createWelcomeDeadline(deadlineElapsed, DEADLINE_MS);
     const visibility = () => deadline.visibility(document.hidden);
     visibility();
     document.addEventListener("visibilitychange", visibility);
@@ -75,7 +78,7 @@ export default function AppSplash({ serverOpen = true, tagline = "Less paperwork
       deadline.dispose();
       document.removeEventListener("visibilitychange", visibility);
     };
-  }, [play, complete, mounted, finished]);
+  }, [play, complete, mounted, deadlineElapsed]);
   // The entry clock only advances while frames are being painted, so a
   // backgrounded tab neither races ahead nor counts toward the minimum.
   useEffect(() => {

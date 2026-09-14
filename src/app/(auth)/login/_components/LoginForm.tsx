@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { PendingSubmit } from "../../_components/PendingSubmit";
 import { useState } from "react";
 import {
   ArrowRight,
@@ -96,13 +97,9 @@ export function LoginForm({ next, error, message }: Props) {
       />
 
       <Magnetic strength={0.18} className="w-full">
-        <button
-          type="submit"
-          className="w-full t2q-btn-primary-pro h-12"
-          data-testid="login-submit"
-        >
+        <PendingSubmit data-testid="login-submit" pendingLabel="Signing in…">
           Sign in <ArrowRight size={20} weight="bold" />
-        </button>
+        </PendingSubmit>
       </Magnetic>
 
       <div className="flex items-center justify-between text-sm">

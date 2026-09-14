@@ -246,7 +246,8 @@ export async function importMaterials(
         notes: u.row.notes,
         is_ai_estimated: false,
       })
-      .eq("id", u.id);
+      .eq("id", u.id)
+      .eq("user_id", user.id);
     if (error) {
       failed++;
     } else {

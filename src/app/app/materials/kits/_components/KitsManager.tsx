@@ -258,6 +258,7 @@ export function KitsManager({ initialKits, currency }: { initialKits: KitWithIte
                 <button
                   type="button"
                   onClick={() => setDraft(toDraft(kit))}
+                  disabled={pending}
                   aria-label="Edit kit"
                   className="inline-flex h-9 w-9 items-center justify-center rounded-md text-ink-400 hover:text-ink-900"
                 >
@@ -266,6 +267,7 @@ export function KitsManager({ initialKits, currency }: { initialKits: KitWithIte
                 <button
                   type="button"
                   onClick={() => onDelete(kit.id)}
+                  disabled={pending}
                   aria-label="Delete kit"
                   className="inline-flex h-9 w-9 items-center justify-center rounded-md text-ink-400 hover:text-red-500"
                 >

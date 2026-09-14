@@ -103,11 +103,17 @@ export default function InstallNudge() {
       () => setPlatform(isIos ? "ios" : "android"),
       0,
     );
-    const t = setTimeout(() => setOpen(true), 7000);
+    // Never stack on the cookie banner: wait until it has been answered.
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const consentAnswered = () => { try { return window.localStorage.getItem("t2q-cookie-consent") !== null; } catch { return true; } };
+    const openWhenClear = (delay: number) => {
+      t = setTimeout(() => { if (consentAnswered()) setOpen(true); else openWhenClear(3000); }, delay);
+    };
+    openWhenClear(7000);
 
     return () => {
       clearTimeout(platformTimer);
-      clearTimeout(t);
+      if (t) clearTimeout(t);
       window.removeEventListener("beforeinstallprompt", onBefore);
       window.removeEventListener("appinstalled", onInstalled);
     };

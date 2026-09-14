@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
+import { consumeDailyQuota, consumeFixedWindow, tooManyRequestsResponse } from "@/lib/rate-limit";
+
 import { createClient } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { generateQuotePdf } from "@/lib/pdf-generator";
@@ -37,6 +39,11 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+  // Each call sends a real message at provider cost: throttle like the AI routes.
+  const burst = consumeFixedWindow(`send-quote:burst:${user.id}`, 20, 15 * 60_000);
+  if (!burst.ok) return tooManyRequestsResponse(burst.resetAt);
+  const daily = consumeDailyQuota(`send-quote:${user.id}`, 150);
+  if (!daily.ok) return tooManyRequestsResponse(daily.resetAt);
 
   const { data: quote, error: qErr } = await supabase
     .from("quotes")

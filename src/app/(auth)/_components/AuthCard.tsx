@@ -1,3 +1,4 @@
+import { PendingSubmit } from "./PendingSubmit";
 /**
  * Auth-form primitives shared by the simpler `/forgot-password` and
  * `/reset-password` pages. The marquee `/login` and `/signup` pages have
@@ -67,14 +68,7 @@ export function FormField({
 }
 
 export function SubmitButton({ children }: { children: React.ReactNode }) {
-  return (
-    <button
-      type="submit"
-      className="w-full t2q-btn-primary-pro h-12"
-    >
-      {children}
-    </button>
-  );
+  return <PendingSubmit>{children}</PendingSubmit>;
 }
 
 export function FormError({ message }: { message?: string }) {

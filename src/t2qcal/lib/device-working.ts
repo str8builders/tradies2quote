@@ -1,3 +1,4 @@
+import {detachCalculation} from "./device-jobs";
 import {isUUID,validateSnapshot,type CalculationSnapshot} from "./calculation-record";
 export const DEVICE_WORKING_KEY="t2qcal.device-working.v1";
 export type DeviceWorking={id:string;name:string;snapshot:CalculationSnapshot;updated_at:string;revision:0};
@@ -22,6 +23,7 @@ export function saveDeviceWorking(store:Store,entry:DeviceWorking){
 }
 export function removeDeviceWorking(store:Store,id:string){
   store.setItem(DEVICE_WORKING_KEY,JSON.stringify(readDeviceWorking(store).filter(r=>r.id!==id)));
+  detachCalculation(store,id);
 }
 export function importDeviceWorking(store:Store,backup:unknown):number{
   if(!backup||typeof backup!=="object"||!("version" in backup)||backup.version!==1||!("calculations" in backup))throw new Error("Choose a T2QCAL working backup.");

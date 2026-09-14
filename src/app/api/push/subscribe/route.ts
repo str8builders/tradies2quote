@@ -1,3 +1,4 @@
+import { isPushServiceEndpoint } from "@/lib/push-endpoint";
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -67,6 +68,11 @@ export async function POST(request: NextRequest) {
   const p256dh = typeof body.keys?.p256dh === "string" ? body.keys.p256dh : "";
   const auth = typeof body.keys?.auth === "string" ? body.keys.auth : "";
   if (!endpoint || !p256dh || !auth) {
+    return NextResponse.json({ error: "invalid_subscription" }, { status: 400 });
+  }
+  // The server later POSTs to this URL (web-push). Only accept the browsers'
+  // own push services, over https, at sane sizes — never an arbitrary host.
+  if (!isPushServiceEndpoint(endpoint) || p256dh.length > 300 || auth.length > 100 || !/^[A-Za-z0-9_=-]+$/.test(p256dh) || !/^[A-Za-z0-9_=-]+$/.test(auth)) {
     return NextResponse.json({ error: "invalid_subscription" }, { status: 400 });
   }
 

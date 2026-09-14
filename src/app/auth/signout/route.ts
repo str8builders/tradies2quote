@@ -67,5 +67,12 @@ export async function POST(req: NextRequest) {
  * gracefully. The form on the dashboard uses POST.
  */
 export async function GET(req: NextRequest) {
+  // A GET from another site (an <img> or a link on someone else's page) must
+  // not be able to sign a visitor out; only a same-site visit — a pasted URL —
+  // still signs out gracefully.
+  const site = req.headers.get("sec-fetch-site");
+  if (site && site !== "same-origin" && site !== "none") {
+    return NextResponse.redirect(new URL("/login", req.url), 303);
+  }
   return POST(req);
 }

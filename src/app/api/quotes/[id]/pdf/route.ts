@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { captureError } from "@/lib/observability";
+import { consumeFixedWindow, tooManyRequestsResponse } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { generateQuotePdf } from "@/lib/pdf-generator";
 import { loadLogoForPdf } from "@/lib/pdf-logo";
@@ -40,6 +41,8 @@ export async function GET(
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+  const quota = consumeFixedWindow(`pdf-quote:${user.id}`, 60, 15 * 60_000);
+  if (!quota.ok) return tooManyRequestsResponse(quota.resetAt);
 
   const { data: quote } = await supabase
     .from("quotes")

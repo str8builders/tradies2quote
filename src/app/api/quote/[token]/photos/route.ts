@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
+import { consumeFixedWindow, tooManyRequestsResponse } from "@/lib/rate-limit";
+import { requestIp } from "@/lib/request-ip";
 import { classifyPublicQuote } from "@/lib/quote-public-view";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest, ctx: { params: Promise<{ token: string }> }) {
-  const { token } = await ctx.params; const admin = adminClient();
+  const { token } = await ctx.params;
+  const quota = consumeFixedWindow(`public-quote-get:${requestIp(request)}`, 120, 15 * 60_000);
+  if (!quota.ok) return tooManyRequestsResponse(quota.resetAt);
+  const admin = adminClient();
   const result = await admin.from("quotes").select("id,status,expires_at,deleted_at").eq("public_token", token).maybeSingle();
   const quote = result.data;
   if (result.error || !quote || quote.deleted_at || !["live", "accepted"].includes(classifyPublicQuote(quote, new Date()).kind)) return new Response(null, { status: 404 });
