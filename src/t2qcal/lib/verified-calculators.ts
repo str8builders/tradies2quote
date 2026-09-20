@@ -463,6 +463,7 @@ export function expectedVerifiedSlugs() {
 
 /** Validate before allocating set-out arrays or presenting a cutting dimension. */
 export function getVerifiedDefinition(slug: string): VerifiedDefinition {
+  if(slug==="plan-takeoff")return {title:"Plan measurement",note:"Reopen Plan takeoff to change marked points or calibration.",diagram:"rulerin",showsAssembly:false,fields:[{key:"quantity",label:"Measured quantity",default:1,kind:"number",min:0.000001,max:1e9}],compute:values=>({results:[{label:"Measured quantity",value:String(values.quantity)}]})};
   const definition = rawDefinition(slug);
   const isPort = nativePortDefinition(slug) !== null;
   return { ...definition, compute(values, unit) {

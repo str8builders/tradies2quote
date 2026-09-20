@@ -1,8 +1,9 @@
+import {validatePlanSource,planQuantity,type PlanSource} from "./plan-measurement";
 import { getTool } from "./tools";
 import { getVerifiedDefinition, type CalculatorOutput } from "./verified-calculators";
 import { calculatorInputErrors, displayFactor } from "./calculator-inputs";
 
-export type CalculationSnapshot = {version:1;slug:string;unit:"metric"|"imperial";values:Record<string,number|string>};
+export type CalculationSnapshot = {version:1;slug:string;unit:"metric"|"imperial";values:Record<string,number|string>;planSource?:PlanSource};
 export const isUUID=(v:unknown):v is string=>typeof v==="string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 
 /** Legacy web length-converter unit codes; the native converter stores option ids. */
@@ -46,6 +47,13 @@ export function validateSnapshot(input:unknown):CalculationSnapshot {
   const s={...input} as Partial<CalculationSnapshot>;
   if(s.version!==1 || typeof s.slug!=="string" || !getTool(s.slug) || !["metric","imperial"].includes(s.unit??"") || !s.values || typeof s.values!=="object" || Array.isArray(s.values))throw new Error("This calculation format is not supported.");
   const unit=s.unit!,slug=s.slug;
+  const planSource=s.planSource?validatePlanSource(s.planSource):undefined;
+  if(slug==="plan-takeoff"){
+    if(!planSource||unit!=="metric")throw new Error("Open the plan measurement in Plan takeoff.");
+    const {quantity}=planQuantity(planSource);
+    if(Object.keys(s.values).length!==1||s.values.quantity!==quantity)throw new Error("The plan quantity no longer matches its marked points.");
+    return {version:1,slug,unit,values:{quantity},planSource};
+  }
   const upgraded=upgradeSnapshotValues(slug,unit,s.values);
   const fields=getVerifiedDefinition(slug).fields;
   const allowed=new Set(fields.map(f=>f.key));
@@ -53,7 +61,7 @@ export function validateSnapshot(input:unknown):CalculationSnapshot {
   const values=upgraded as Record<string,number>;
   const errors=calculatorInputErrors(fields,values,unit);
   if(errors.length)throw new Error(errors[0]);
-  const snapshot:CalculationSnapshot={version:1,slug,unit,values:Object.fromEntries([...allowed].sort().map(k=>[k,values[k]]))};
+  const snapshot:CalculationSnapshot={version:1,slug,unit,...(planSource?{planSource}:{}),values:Object.fromEntries([...allowed].sort().map(k=>[k,values[k]]))};
   const output=computeSnapshot(snapshot);
   if(output.errors?.length)throw new Error(output.errors[0]);
   return snapshot;
@@ -61,6 +69,7 @@ export function validateSnapshot(input:unknown):CalculationSnapshot {
 
 /** Every calculator, including the eight that used to have bespoke web screens, computes through its definition. */
 export function computeSnapshot(s:CalculationSnapshot):CalculatorOutput {
+  if(s.slug==="plan-takeoff"&&s.planSource){const source=validatePlanSource(s.planSource),result=planQuantity(source);return {results:[{label:source.label,value:`${result.quantity} ${result.unit}`,primary:true}],handoffs:[{key:"plan-measurement",label:source.label,quantity:result.quantity,unit:result.unit,role:"material",includeByDefault:true,formula:"Manual measurement from a calibrated PDF; confirm drawing revision and scale."}]};}
   const values=Object.fromEntries(Object.entries(s.values).filter((e):e is [string,number]=>typeof e[1]==="number"));
   return getVerifiedDefinition(s.slug).compute(values,s.unit);
 }

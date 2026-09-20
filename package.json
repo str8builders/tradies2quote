@@ -15,7 +15,9 @@
     "eval:quote-agent": "RUN_QUOTE_AGENT_EVAL=1 vitest run src/eval/quote-agent-eval.test.ts",
     "eval:corrections": "RUN_CORRECTIONS_EVAL=1 vitest run src/eval/corrections-eval.test.ts",
     "release:check": "node deploy/check-release.mjs",
-    "release:test": "node --test deploy/test-release.mjs"
+    "release:test": "node --test deploy/test-release.mjs",
+    "prebuild": "node scripts/prepare-pdf-assets.mjs",
+    "predev": "node scripts/prepare-pdf-assets.mjs"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.1",

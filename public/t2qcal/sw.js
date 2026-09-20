@@ -1,12 +1,12 @@
 /* T2QCAL's public calculator cache. Never cache accounts, APIs or saved URLs. */
-const CACHE = "t2qcal-web-20260913-premium-measure-1";
+const CACHE = "t2qcal-web-20260920-offline-takeoff-1";
 /* The tradie's own shelf of kept reference PDFs. Never versioned away with the page cache. */
 const DOCS = "t2qcal-docs-v1";
 const DOC_PREFIX = "/t2qcal/resources/file/";
 const HOME = "/t2qcal/calculators";
 const OFFLINE = "/t2qcal/offline.html";
-const publicPage = url => !url.search && (url.pathname === "/t2qcal" || [HOME,"/t2qcal/device","/t2qcal/install","/t2qcal/jobs","/t2qcal/measure","/t2qcal/resources"].includes(url.pathname) || /^\/t2qcal\/calculator\/[a-z0-9-]+$/.test(url.pathname));
-const staticAsset = url => url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/t2qcal/fonts/") || /^\/t2qcal\/(icon-\d+|apple-touch-icon|native-mark|native-icon)\.png$/.test(url.pathname);
+const publicPage = url => !url.search && (url.pathname === "/t2qcal" || [HOME,"/t2qcal/device","/t2qcal/install","/t2qcal/jobs","/t2qcal/measure","/t2qcal/takeoff","/t2qcal/resources"].includes(url.pathname) || /^\/t2qcal\/calculator\/[a-z0-9-]+$/.test(url.pathname));
+const staticAsset = url => url.pathname.startsWith("/vendor/pdfjs/6.3.289/") || url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/t2qcal/fonts/") || /^\/t2qcal\/(icon-\d+|apple-touch-icon|native-mark|native-icon)\.png$/.test(url.pathname);
 async function warmPage(path) {
   const url = new URL(path, self.location.origin);
   if (url.origin !== self.location.origin || !publicPage(url)) return;
@@ -23,7 +23,7 @@ async function warmPage(path) {
 self.addEventListener("install",event=>event.waitUntil((async()=>{
   const cache=await caches.open(CACHE);
   await cache.addAll([OFFLINE,"/t2qcal/native-icon.png","/t2qcal/native-mark.png","/t2qcal/fonts/ArchivoBlack-Regular.woff2","/t2qcal/fonts/IBMPlexSans.woff2","/t2qcal/fonts/IBMPlexMono-Regular.woff2"]);
-  await Promise.all([warmPage(HOME),warmPage("/t2qcal/device"),warmPage("/t2qcal/install"),warmPage("/t2qcal/jobs"),warmPage("/t2qcal/measure"),warmPage("/t2qcal/resources")]);
+  await Promise.all([warmPage(HOME),warmPage("/t2qcal/device"),warmPage("/t2qcal/install"),warmPage("/t2qcal/jobs"),warmPage("/t2qcal/measure"),warmPage("/t2qcal/takeoff"),warmPage("/t2qcal/resources")]);
   await self.skipWaiting();
 })()));
 self.addEventListener("activate",event=>event.waitUntil((async()=>{

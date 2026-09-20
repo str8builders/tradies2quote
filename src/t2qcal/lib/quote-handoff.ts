@@ -1,3 +1,4 @@
+import {planSourceNote} from "./plan-measurement";
 import {validateSnapshot,computeSnapshot,type CalculationSnapshot} from './calculation-record';
 import {getTool} from './tools';
 import {getVerifiedDefinition} from './verified-calculators';
@@ -40,7 +41,7 @@ export function handoffQuote(input:HandoffInput,profile:{currency:string;tax_lab
   const unit=input.mode==='calculated'?suggestion!.unit:input.unit!;
   const line:QuoteLineItem={type:'material',description:input.description,quantity,unit,unit_price:input.unitPrice,line_total:round2(quantity*input.unitPrice),quantity_source:input.mode==='calculated'?'calculator':'user',quantity_confirmed:true,is_calculated_takeoff:input.mode==='calculated',is_missing_price:input.unitPrice===0,is_ai_estimated:false,
     t2qcal_source_key:input.mode==='calculated'?suggestion!.key:'user-material',t2qcal_basis_fingerprint:fingerprint,
-    t2qcal_assumptions:[input.mode==='calculated'?suggestion!.basis:'Material quantity entered by the user; geometry results do not determine this quantity.'],
+    t2qcal_assumptions:[...(s.planSource?[planSourceNote(s.planSource)]:[]),input.mode==='calculated'?suggestion!.basis:'Material quantity entered by the user; geometry results do not determine this quantity.'],
     t2qcal_provenance_note:JSON.stringify(s),
     t2qcal_calculator_snapshot:{toolSlug:s.slug,toolName:tool.name,inputs:Object.entries(s.values).filter((entry):entry is [string,number]=>typeof entry[1]==='number').map(([key,value])=>({key,label:getVerifiedDefinition(s.slug).fields.find(f=>f.key===key)?.label??key,value,unit:'',displayLabel:`${getVerifiedDefinition(s.slug).fields.find(f=>f.key===key)?.label??key}: ${value} (${s.unit} calculator)`}))},
   };

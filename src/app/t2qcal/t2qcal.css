@@ -720,3 +720,15 @@
 .t2qcal-app .measure-3d canvas{display:block;width:100%;height:auto;}
 /* Back to the quoting app: a proper button, top left, unless this IS the standalone T2QCAL app. */
 .t2qcal-app .native-back-app{gap:6px;padding:0 12px 0 8px;min-height:40px;}
+
+/* Local PDF takeoff: keep large drawings inside their own scroll region. */
+.plan-takeoff .save-actions { flex-wrap:wrap; }
+.plan-takeoff input,.plan-takeoff select,.plan-takeoff button,.plan-takeoff summary { min-height:44px; max-width:100%; }
+.plan-takeoff input[type=file] { display:block; width:100%; }
+.plan-takeoff .field-grid label { min-width:0; }
+.plan-takeoff h2,.plan-takeoff p { overflow-wrap:anywhere; }
+.plan-canvas-scroll { width:100%; overflow:auto; max-height:75vh; background:#ddd; border:1px solid #555; }
+.plan-canvas-surface { position:relative; min-width:240px; }
+.plan-canvas-surface canvas { display:block; }
+.plan-canvas-overlay { position:absolute; inset:0; }
+.plan-takeoff .save-working article { padding:12px 0; border-bottom:1px solid #555; }

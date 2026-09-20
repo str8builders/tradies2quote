@@ -6,10 +6,14 @@ page.setDefaultTimeout(90000);
 const errors=[];
 page.on('pageerror',error=>errors.push(error.message));
 await page.addInitScript(()=>localStorage.setItem('t2q-cookie-consent','declined'));
-await page.route('**/api/materials/extract-quote',route=>route.fulfill({json:{supplier:'Fixture Supplier',currency:'NZD',gst_inclusive:false,items:Array.from({length:200},(_,i)=>({name:`Material ${String(i).padStart(3,'0')}`,unit:'each',quantity:2,price:i+1,line_total:2*(i+1),sku:`SKU-${i}`,confidence:i%10===0?0.5:1,raw_text:`Source line ${i}` })),notes:[],extraction_status:'ok'}}));
+let scans=0;
+await page.route('**/api/materials/extract-quote',async route=>{scans++;if(scans===1){await new Promise(resolve=>setTimeout(resolve,2000));try{await route.abort();}catch{}return;}return route.fulfill({json:{supplier:'Fixture Supplier',currency:'NZD',gst_inclusive:false,items:Array.from({length:200},(_,i)=>({name:`Material ${String(i).padStart(3,'0')}`,unit:'each',quantity:2,price:i+1,line_total:2*(i+1),sku:`SKU-${i}`,confidence:i%10===0?0.5:1,raw_text:`Source line ${i}` })),notes:[],extraction_status:'ok'}});});
 try {
   await page.goto('http://127.0.0.1:3128/dev-upgrade',{timeout:120000});
   await page.getByTestId('quote-import-file-library').setInputFiles({name:'supplier.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jX1sAAAAASUVORK5CYII=','base64')});
+  await page.getByTestId('quote-import-scan').click();
+  await page.getByRole('button',{name:'Cancel scan',exact:true}).click();
+  await page.getByTestId('quote-import-error').filter({hasText:'cancelled'}).waitFor();
   await page.getByTestId('quote-import-scan').click();
   await page.getByLabel('Search lines',{exact:true}).waitFor({timeout:30000});
   assert.equal(await page.getByTestId('quote-import-rows').locator(':scope > li').count(),200);
@@ -26,7 +30,7 @@ try {
   assert.equal(await first.getByRole('checkbox').isChecked(),true);
   await page.getByLabel('Search lines',{exact:true}).fill('');
   await page.getByLabel('Needs checking').check();
-  assert.equal(await page.getByTestId('quote-import-rows').locator(':scope > li').count(),20);
+  assert.equal(await page.getByTestId('quote-import-rows').locator(':scope > li').count(),21);
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1);
   assert.equal(overflow,false,'Mobile page must not overflow horizontally');
   assert.deepEqual(errors,[]);

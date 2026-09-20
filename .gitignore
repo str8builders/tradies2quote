@@ -45,3 +45,6 @@ next-env.d.ts
 # local tooling / OS artifacts (not project source)
 .agents/
 .metadata_never_index
+
+# Generated from the pinned PDF.js package before dev/build
+/public/vendor/pdfjs/

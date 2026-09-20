@@ -7,9 +7,9 @@ import {upgradeSnapshotValues,validateSnapshot} from "@/t2qcal/lib/calculation-r
  * sign-in round trip uses), so a measured angle lands in the right field with
  * every other input at its native default.
  */
-export function sendToCalculator(slug:string,values:Record<string,number>,name:string):string|null{
+export function sendToCalculator(slug:string,values:Record<string,number>,name:string,planSource?:import("@/t2qcal/lib/plan-measurement").PlanSource):string|null{
   try{
-    const snapshot=validateSnapshot({version:1,slug,unit:"metric",values:upgradeSnapshotValues(slug,"metric",values)});
+    const snapshot=validateSnapshot({version:1,slug,unit:"metric",...(planSource?{planSource}:{}),values:upgradeSnapshotValues(slug,"metric",values)});
     sessionStorage.setItem(`t2qcal.pending.${slug}`,JSON.stringify({snapshot,name}));
     window.location.assign(`/t2qcal/calculator/${slug}?resume=1`);
     return null;

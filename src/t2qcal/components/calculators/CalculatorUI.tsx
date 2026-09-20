@@ -1,6 +1,8 @@
 "use client";
 
 import { QuoteTransfer } from "./QuoteTransfer";
+import {useCalculationSeed} from "./CalculationSeed";
+import {planSourceNote} from "@/t2qcal/lib/plan-measurement";
 import { SaveCalculation } from "./SaveCalculation";
 import { CalculatorResources } from "./CalculatorResources";
 import { validateSnapshot, type CalculationSnapshot } from "@/t2qcal/lib/calculation-record";
@@ -17,7 +19,8 @@ export const nfmt = (value: number, digits = 1) =>
 
 export function CalculatorFrame({ tool, children, unit, onUnitChange, values }: { values?: Record<string,number|string>; tool: ToolEntry; children: React.ReactNode; unit: UnitSystem; onUnitChange: (unit: UnitSystem) => void }) {
   const [copied, setCopied] = useState(false);
-  const snapshot:CalculationSnapshot={version:1,slug:tool.slug,unit,values:values??{}};
+  const seed=useCalculationSeed();
+  const snapshot:CalculationSnapshot={version:1,slug:tool.slug,unit,values:values??{},...(seed?.snapshot.planSource?{planSource:seed.snapshot.planSource}:{})};
   let invalid="";
   try {validateSnapshot(snapshot);} catch(e){invalid=e instanceof Error?e.message:"Check the calculator inputs.";}
 
@@ -43,6 +46,7 @@ export function CalculatorFrame({ tool, children, unit, onUnitChange, values }: 
       </header>
       {invalid&&<p className="verification-note" role="alert">{invalid}</p>}
       <ValidCalculation.Provider value={!invalid}>{children}</ValidCalculation.Provider>
+      {snapshot.planSource&&<p className="verification-note">{planSourceNote(snapshot.planSource)}</p>}
       <SaveCalculation snapshot={snapshot} title={tool.name}/>
       {!invalid&&<QuoteTransfer snapshot={snapshot}/>}
       <section className="calculator-caution">

@@ -143,6 +143,7 @@ export const availableTools = tools.filter((tool) => tool.available);
 export const popularTools = tools.filter((tool) => tool.popular && tool.available);
 
 export function getTool(slug: string) {
+  if(slug==="plan-takeoff")return {name:"Plan measurement",slug,category:"convert",summary:"Manual measurement from a calibrated PDF plan.",units:"metric" as const,available:true};
   return tools.find((tool) => tool.slug === slug);
 }
 

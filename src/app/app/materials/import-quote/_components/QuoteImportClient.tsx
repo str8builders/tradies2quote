@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import {uploadSupplierPhoto} from "@/lib/materials/scan-upload";
 import { ReviewToolbar, useReviewTable } from "@/components/review-table";
 import { useRouter } from "next/navigation";
 import {
@@ -210,15 +211,22 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
     if (problems.length > 0) setError(problems.join(" "));
   }
 
+  const scanAbort=useRef<AbortController|null>(null);
+  const [uploadPercent,setUploadPercent]=useState(0);
+  useEffect(()=>()=>scanAbort.current?.abort(),[]);
   async function scan() {
+    if(scanAbort.current)return;
     const raws = filesRef.current;
     if (raws.length === 0) {
       setError("Take a photo of the quote, or choose one from your phone, first.");
       return;
     }
+    const controller=new AbortController();scanAbort.current=controller;
+    setUploadPercent(0);
     setError("");
     setPhase("extracting");
     setScanProgress({ index: 1, total: raws.length });
+    const temporaryUrls:string[]=[];
     try {
       const pages: ExtractResponse[] = [];
       const preparedFiles: File[] = [];
@@ -228,6 +236,8 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
       for (let i = 0; i < raws.length; i++) {
         const raw = raws[i];
         const which = raws.length > 1 ? `Photo ${i + 1} of ${raws.length}: ` : "";
+        controller.signal.throwIfAborted();
+        setUploadPercent(0);
         setScanProgress({ index: i + 1, total: raws.length });
         // Convert iPhone HEIC → JPEG and downscale big photos so the upload
         // clears the ~4.5 MB request-body limit (otherwise it 413s).
@@ -258,14 +268,11 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
           abandonPrepared();
           return;
         }
+        controller.signal.throwIfAborted();
         preparedFiles.push(f);
         preparedUrls.push(f === raw ? previewsRef.current[i] : URL.createObjectURL(f));
-        const fd = new FormData();
-        fd.append("image", f);
-        const res = await fetch("/api/materials/extract-quote", {
-          method: "POST",
-          body: fd,
-        });
+        temporaryUrls.push(preparedUrls[preparedUrls.length-1]);
+        const res = await uploadSupplierPhoto(f,controller.signal,setUploadPercent);
         if (!res.ok) {
           const data = (await res.json().catch(() => ({}))) as {
             error?: string;
@@ -322,10 +329,12 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
         })),
       );
       setPhase("review");
-    } catch {
-      setError("Network error. Please try again.");
+    } catch (e) {
+      setError(e instanceof Error?e.message:"Network error. Please try again.");
       setPhase("error");
     } finally {
+      for(const url of temporaryUrls)if(!previewsRef.current.includes(url))URL.revokeObjectURL(url);
+      scanAbort.current=null;
       setScanProgress(null);
     }
   }
@@ -344,8 +353,6 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
     if (!history.length) return;
     setRows(history[history.length - 1]); setHistory(history.slice(0, -1)); setAcknowledged(false);
   }
-  const reviewEntries = useMemo(() => rows.map(r => ({ id: r.id, value: r, label: r.name, search: [r.name, r.sku, r.rawText].join(" "), amount: Number(r.price) || 0, attention: r.lowConfidence || !r.name.trim() || !(Number(r.price) > 0) || !(Number(r.quantity) > 0) })), [rows]);
-  const review = useReviewTable(reviewEntries);
   const [bulk, setBulk] = useState<{ids: string[]; include: boolean} | null>(null);
   function applyBulk() {
     if (!bulk) return;
@@ -400,6 +407,9 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
     );
     return { validation: report, lineCheckById: map };
   }, [rows, supplier, currency, gstInclusive, srcSubtotal, srcGst, srcTotal, taxRate]);
+
+  const reviewEntries = useMemo(() => rows.map(r => ({ id: r.id, value: r, label: r.name, search: [r.name, r.sku, r.rawText].join(" "), amount: Number(r.price) || 0, attention: !!lineCheckById.get(r.id)?.checks.some(check=>check.severity!=="ok") || r.lowConfidence || !r.name.trim() || !(Number(r.price) > 0) || !(Number(r.quantity) > 0) })), [rows,lineCheckById]);
+  const review = useReviewTable(reviewEntries);
 
   // Block quote creation while an error-level mismatch is unacknowledged.
   const blocked = validation.blocking && !acknowledged;
@@ -660,6 +670,7 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
                   : "Scan quote"}
             </button>
           </div>
+          {phase === "extracting" && <div className="mt-3 flex flex-wrap items-center gap-3"><p role="status">{uploadPercent<100?`Uploading photo: ${uploadPercent}%`:"Photo uploaded. Reading line items…"}</p><button className="min-h-11 px-4" onClick={()=>scanAbort.current?.abort()}>Cancel scan</button></div>}
           {phase === "extracting" && (
             <div className="mt-4 flex justify-center">
               <TapeMeasureProgress
