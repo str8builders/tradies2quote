@@ -7,7 +7,9 @@ const JOBS_KEY="t2qcal.device-jobs.v1";
 type State={key:string;value:string};
 export type BackupItem={ownerId:string;id:string;sourceId?:string;operation:string;name:string;snapshot:CalculationSnapshot;revision:number;status:"pending"|"sending"|"conflict"|"error";attempts:number;nextAttempt:number;leaseUntil:number;error:string};
 export type Receipt={ownerId:string;id:string;serverId?:string;name:string;snapshot:CalculationSnapshot;revision:number;updated_at:string};
-export type PlanRecord={id:string;name:string;file:Blob;annotations:string;updatedAt:string};
+// Older plans contain Blob values; new saves use bytes to avoid WebKit's
+// IndexedDB Blob/File preparation failure. Both formats remain readable.
+export type PlanRecord={id:string;name:string;file:Blob|ArrayBuffer;annotations:string;updatedAt:string};
 export class WorkingDB extends Dexie {
   state!:Table<State,string>;
   outbox!:Table<BackupItem,[string,string]>;

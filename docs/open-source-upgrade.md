@@ -35,3 +35,34 @@ Release boundaries: this is an isolated web-app/website branch, not a production
 Production offline regression: a real offline reload exposed an uncached PDF worker. PDF runtime assets now live inside the T2QCAL service-worker scope at `/t2qcal/vendor/pdfjs/6.3.289/`. A generated asset manifest supports explicit viewer preparation; its readiness marker is written only after every asset is cached. Two tests cover partial failure/retry and rejection of paths outside that directory. The production Chrome run then passed reopening a saved PDF and calibrated measurements after a full reload with networking disabled. The UI reports offline plan readiness separately from saving the document.
 
 Final validation after the offline regression fix: 3,139 tests passed, 25 gated skips; full lint, TypeScript, production build and whitespace checks passed. Production takeoff and scoped PDF worker returned 200; the development harness returned 404.
+
+## 20 September 2026 — WebKit and touch release checks
+
+Mobile WebKit found that persisting a PDF as a Blob could fail with IndexedDB's
+"Error preparing Blob/File data" error. New saves store an ArrayBuffer read before
+the write transaction; old Blob records remain readable and convert on their next
+save. Conflict checks and the 20-plan limit stay transactional. A newer edit made
+while a save is pending remains marked unsaved.
+
+Trusted touch tests also found one tap could trigger both Konva `tap` and its
+compatibility `click`, adding two points. The canvas now listens to `pointerclick`
+once for mouse, pen and touch. The public worker cache was versioned to deliver
+the corrected client.
+
+Five storage regressions cover byte preservation without Blob support, legacy
+records, changes in another tab during file reading, failed reads and the plan
+limit. The full suite passes 3,144 tests with 25 existing gated skips. Production
+build, lint and TypeScript checks passed.
+
+`scripts/test-plan-upgrade.mjs` accepts `T2Q_BROWSER=chromium|webkit`,
+`T2Q_BASE_URL`, `T2Q_POINTER=mouse` (touch is default), `T2Q_TEST_OUTPUT_DIR` and
+`T2Q_CHECK_OFFLINE=1`. The two fixture account/quote APIs are stubbed at the page
+boundary because WebKit routing does not reliably intercept them after service
+worker activation. Real authenticated acceptance remains a separate release gate.
+
+Chrome touch and mouse checks pass with browser networking disabled. WebKit touch
+checks pass with a local test origin disconnected from its upstream: the built-in
+offline emulation raised an internal browser error on service-worker navigation.
+The origin test confirms no requests are forwarded while the saved PDF and its
+50 m² measurement reopen after a full reload. This is automated WebKit evidence,
+not a physical iPhone/Safari or installed home-screen app certification.

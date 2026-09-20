@@ -1,5 +1,5 @@
 /* T2QCAL's public calculator cache. Never cache accounts, APIs or saved URLs. */
-const CACHE = "t2qcal-web-20260920-offline-takeoff-2";
+const CACHE = "t2qcal-web-20260920-webkit-plan-storage-3";
 /* The tradie's own shelf of kept reference PDFs. Never versioned away with the page cache. */
 const DOCS = "t2qcal-docs-v1";
 const DOC_PREFIX = "/t2qcal/resources/file/";

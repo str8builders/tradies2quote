@@ -41,7 +41,9 @@ export function PdfCanvas({document,pageNumber,rotation,zoom,points,measurements
         path.forEach(p=>{const [x,y]=convert(p);layer.add(new Konva.Circle({x,y,radius:5,fill:colour,stroke:"#111",strokeWidth:1,listening:false}));});
       };
       measurements.forEach(source=>trace(source,"#d5ff00"));trace({points,kind:"length"},"#ff5f15");
-      stage.on("click tap",()=>{const p=stage.getPointerPosition();if(p){const [x,y]=viewport!.convertToPdfPoint(p.x,p.y);pointHandler.current({x,y});}});
+      // One pointer activation covers mouse, pen and touch. Listening to both
+      // tap and its compatibility click can mark two points for one finger tap.
+      stage.on("pointerclick",()=>{const p=stage.getPointerPosition();if(p){const [x,y]=viewport!.convertToPdfPoint(p.x,p.y);pointHandler.current({x,y});}});
       layer.draw();
     }
     void draw();return()=>{stopped=true;destroy?.();};

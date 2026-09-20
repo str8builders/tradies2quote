@@ -4,6 +4,7 @@ import {Input} from "@/components/ui/input";
 import Uppy from "@uppy/core";
 import type {PDFDocumentProxy} from "pdfjs-dist";
 import {workingDB,type PlanRecord} from "@/t2qcal/lib/local-db";
+import {saveLocalPlan,storedPlanFile} from "@/t2qcal/lib/plan-storage";
 import {planQuantity,pointDistance,validatePlanSource,type PlanCalibration,type PlanPoint,type PlanSource} from "@/t2qcal/lib/plan-measurement";
 import {QuoteTransfer} from "../calculators/QuoteTransfer";
 import {sendToCalculator} from "../measure/sendToCalculator";
@@ -18,7 +19,7 @@ export function PlanTakeoff(){
   const [offlineStatus,setOfflineStatus]=useState("Open this page while connected to prepare offline plan viewing.");
   const [pickerReady,setPickerReady]=useState(false);
   const [busy,setBusy]=useState(false),[progress,setProgress]=useState(""),[error,setError]=useState(""),[notice,setNotice]=useState(""),[selected,setSelected]=useState<PlanSource|null>(null);
-  const uppy=useRef<Uppy|null>(null),reader=useRef<FileReader|null>(null),generation=useRef(0),documentRef=useRef<PDFDocumentProxy|null>(null),expected=useRef<string|null>(null);
+  const uppy=useRef<Uppy|null>(null),reader=useRef<FileReader|null>(null),generation=useRef(0),documentRef=useRef<PDFDocumentProxy|null>(null),expected=useRef<string|null>(null),editVersion=useRef(0);
   const pageMeasurements=annotations.measurements.filter(item=>item.page===page),calibration=annotations.calibrations[String(page)];
   async function refreshLibrary(){setLibrary((await workingDB.plans.toArray()).map(({id,name})=>({id,name})));}
   useEffect(()=>{
@@ -61,7 +62,7 @@ export function PlanTakeoff(){
   }
   function choose(input:File|undefined){if(!input||busy)return;if(dirty&&!window.confirm("Open another plan? Export or save current measurements first; unsaved changes will be discarded."))return;try{uppy.current?.cancelAll();const id=uppy.current?.addFile({name:input.name,type:input.type,data:input});if(id)void open(input,input.name);}catch(e){setError(e instanceof Error?e.message:"Choose a PDF up to 20 MB.");}}
   function cancel(){generation.current++;reader.current?.abort();setBusy(false);setProgress("");setNotice("Opening cancelled. Choose the PDF again to retry.");}
-  function update(next:Annotations){setAnnotations(next);setDirty(true);setError("");setNotice("");}
+  function update(next:Annotations){editVersion.current++;setAnnotations(next);setDirty(true);setError("");setNotice("");}
   function addPoint(point:PlanPoint){const max=["calibrate","length","rectangle"].includes(mode)?2:100;if(points.length>=max){setNotice(`This tool uses ${max} points. Finish or undo before adding another.`);return;}setPoints([...points,point]);setNotice("");}
   function finish(){
     try{
@@ -77,18 +78,13 @@ export function PlanTakeoff(){
   async function save(){
     if(!file)return;setBusy(true);setError("");
     try{
-      const json=JSON.stringify(annotations);
-      await workingDB.transaction("rw",workingDB.plans,async()=>{
-        const prior=await workingDB.plans.get(hash);
-        if((prior?.annotations??null)!==expected.current)throw new Error("This plan changed in another tab. Export your measurements, then reopen the stored plan before merging them.");
-        if(!prior&&await workingDB.plans.count()>=20)throw new Error("This device holds 20 plans. Export and remove an older plan before saving another.");
-        await workingDB.plans.put({id:hash,name:fileName,file,annotations:json,updatedAt:new Date().toISOString()});
-      });
-      expected.current=json;setDirty(false);await refreshLibrary();setNotice("Plan and measurements saved on this device. They are not backed up to your account.");
+      const json=JSON.stringify(annotations),savedVersion=editVersion.current;
+      await saveLocalPlan({id:hash,name:fileName,file,annotations:json,updatedAt:new Date().toISOString()},expected.current);
+      expected.current=json;const editedMeanwhile=editVersion.current!==savedVersion;setDirty(editedMeanwhile);await refreshLibrary();setNotice(editedMeanwhile?"Earlier measurements saved. Save again to include your latest edits.":"Plan and measurements saved on this device. They are not backed up to your account.");
     }catch(e){setError(e instanceof Error?e.message:"Device storage is full or unavailable. Export the PDF and measurements.");}
     finally{setBusy(false);}
   }
-  async function reopen(id:string){if(!id)return;if(dirty&&!window.confirm("Discard unsaved changes and reopen the device copy?"))return;try{const stored=await workingDB.plans.get(id);if(stored)await open(stored.file,stored.name);}catch{setError("The device plan could not be reopened.");}}
+  async function reopen(id:string){if(!id)return;if(dirty&&!window.confirm("Discard unsaved changes and reopen the device copy?"))return;try{const stored=await workingDB.plans.get(id);if(stored)await open(storedPlanFile(stored),stored.name);}catch{setError("The device plan could not be reopened.");}}
   async function restore(input:File|undefined){if(!input||!pdf)return;try{if(input.size>2_000_000)throw new Error("Choose a measurement file smaller than 2 MB.");const data=JSON.parse(await input.text());if(data.fileHash!==hash)throw new Error("This backup belongs to a different PDF. Open its original PDF first.");if(annotations.measurements.length&&!window.confirm("Replace this plan's current measurements with the backup?"))return;update(parseAnnotations(data.annotations,hash,pdf.numPages));setSelected(null);setPoints([]);}catch(e){setError(e instanceof Error?e.message:"This measurement backup could not be restored.");}}
   async function removePlan(){if(!hash||!window.confirm("Remove this plan and its saved measurements from this device? Export both files first. The open working stays available until you leave."))return;try{await workingDB.plans.delete(hash);expected.current=null;setDirty(true);await refreshLibrary();setNotice("Removed the stored plan. The open working is still available to export.");}catch{setError("The plan could not be removed.");}}
   const selectedValue=selected?planQuantity(selected):null;
@@ -100,7 +96,7 @@ export function PlanTakeoff(){
     <PdfCanvas document={pdf} pageNumber={page} rotation={rotation} zoom={zoom} points={points} measurements={pageMeasurements} onPoint={addPoint}/>
     <section className="save-working"><h2>Page {page} measurements</h2>{!pageMeasurements.length&&<p>No completed measurements on this page yet.</p>}{pageMeasurements.map((item,i)=>{const value=planQuantity(item);return <article key={`${i}-${item.label}`}><h3>{item.label}</h3><p>{value.quantity.toLocaleString(undefined,{maximumFractionDigits:4})} {value.unit}</p><button onClick={()=>setSelected(item)}>Use {item.label} in a quote</button></article>;})}<button disabled={!annotations.measurements.length} onClick={()=>{update({...annotations,measurements:annotations.measurements.slice(0,-1)});setSelected(null);}}>Undo last completed measurement</button></section>
     {selected&&selectedValue&&<><p>Selected: {selected.label} · page {selected.page} · {selectedValue.quantity.toFixed(4)} {selectedValue.unit}. The PDF fingerprint, points and calibration travel with the quote working.</p>{selected.kind==="rectangle"&&selected.calibration&&<button className="directory-button" onClick={()=>{const ratio=selected.calibration!.metres/pointDistance(...selected.calibration!.points)*1000;const message=sendToCalculator("concrete-slab",{length:Math.abs(selected.points[1].x-selected.points[0].x)*ratio,width:Math.abs(selected.points[1].y-selected.points[0].y)*ratio},selected.label,selected);if(message)setError(message);}}>Open rectangle in Concrete slab calculator</button>}<QuoteTransfer key={JSON.stringify(selected)} snapshot={{version:1,slug:"plan-takeoff",unit:"metric",values:{quantity:selectedValue.quantity},planSource:selected}}/></>}
-    <section className="save-working"><h2>Keep a backup</h2><p>Keep both the original PDF and measurement JSON. To restore, open that PDF and restore its matching JSON. Device storage can be cleared by the browser.</p><div className="save-actions"><button onClick={()=>file&&download(file,fileName)}>Export original PDF</button><button onClick={()=>download(new Blob([JSON.stringify({version:1,fileHash:hash,annotations},null,2)],{type:"application/json"}),`${fileName}.measurements.json`)}>Export measurements</button><label>Restore measurements<input type="file" accept="application/json,.json" onChange={e=>{void restore(e.target.files?.[0]);e.target.value="";}}/></label><button onClick={()=>void removePlan()}>Remove stored plan</button></div></section></>}
+    <section className="save-working"><h2>Keep a backup</h2><p>Keep both the original PDF and measurement JSON. To restore, open that PDF and restore its matching JSON. Device storage can be cleared by the browser.</p><div className="save-actions"><button onClick={()=>file&&download(file,fileName)}>Export original PDF</button><button onClick={()=>download(new Blob([JSON.stringify({version:1,fileHash:hash,annotations},null,2)],{type:"application/json"}),`${fileName}.measurements.json`)}>Export measurements</button><label>Restore measurements<input type="file" accept="application/json,.json" onChange={e=>{void restore(e.target.files?.[0]);e.target.value="";}}/></label><button disabled={busy} onClick={()=>void removePlan()}>Remove stored plan</button></div></section></>}
   </main>;
 }
 function parseAnnotations(raw:unknown,hash:string,pages:number):Annotations{
