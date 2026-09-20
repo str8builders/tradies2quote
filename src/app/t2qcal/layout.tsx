@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { AppNavigation } from "@/t2qcal/components/AppNavigation";
 import { NativeShell } from "@/t2qcal/components/NativeShell";
 import "./t2qcal.css";
+import {BackupSyncProvider} from "@/t2qcal/components/BackupSync";
 
 export const metadata: Metadata = {
   title: { absolute: "T2QCAL — Construction calculators" },
@@ -14,10 +15,10 @@ export const metadata: Metadata = {
 };
 export const viewport: Viewport = { width: "device-width", initialScale: 1, maximumScale: 5, userScalable: true, themeColor: "#0a0a0a", viewportFit: "cover" };
 export default function CalculatorLayout({ children }: { children: React.ReactNode }) {
-  return <div className="t2qcal-app">
+  return <div className="t2qcal-app"><BackupSyncProvider>
     <NativeShell/>
     {children}
     <AppNavigation/>
 
-  </div>;
+  </BackupSyncProvider></div>;
 }

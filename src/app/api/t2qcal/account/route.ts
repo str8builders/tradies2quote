@@ -17,5 +17,5 @@ export async function GET(){
   const business=typeof profile?.business_name==="string"&&profile.business_name.trim()?profile.business_name.trim():null;
   const avatar=await getCachedAvatarUrl(user.id);
   const initial=(user.email??"?").trim().charAt(0).toUpperCase()||"?";
-  return Response.json({account:{email:user.email??null,name:business,avatar:avatar&&/^https:\/\//i.test(avatar)?avatar:null,initial}},{headers:privateHeaders});
+  return Response.json({account:{id:user.id,email:user.email??null,name:business,avatar:avatar&&/^https:\/\//i.test(avatar)?avatar:null,initial}},{headers:privateHeaders});
 }

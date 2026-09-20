@@ -9,6 +9,8 @@ export async function calculatorAccount(request:Request,write=false) {
   const db=await createClient() as SupabaseClient;
   const {data:{user},error}=await db.auth.getUser();
   if(error || !user)return {error:Response.json({error:"Sign in with your Tradies2Quote account."},{status:401,headers:privateHeaders})} as const;
+  const expectedOwner=request.headers.get("X-T2Q-Owner");
+  if(write && expectedOwner && expectedOwner!==user.id)return {error:Response.json({error:"Your signed-in account changed. Reopen Your working to review this backup."},{status:403,headers:privateHeaders})} as const;
   if(!consumeFixedWindow(`t2qcal:${write?"write":"read"}:${user.id}`,write?60:240,60_000).ok)return {error:Response.json({error:"Please wait a moment and try again."},{status:429,headers:privateHeaders})} as const;
   return {db,user} as const;
 }

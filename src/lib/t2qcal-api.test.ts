@@ -18,3 +18,7 @@ it('private API responses remain uncached for signed-out requests',async()=>{
 it('rejects an oversized JSON stream without trusting Content-Length',async()=>{
  await expect(smallJSON(new Request('https://tradies2quote.com',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({value:'x'.repeat(33000)})}))).rejects.toThrow('too large');
 });
+it('rejects a queued backup when the browser has switched accounts',async()=>{
+ const result=await calculatorAccount(new Request('https://tradies2quote.com/api/t2qcal/calculations',{headers:{Origin:'https://tradies2quote.com','X-T2Q-Owner':'previous-owner'}}),true);
+ expect(result.error?.status).toBe(403);expect(result.user).toBeUndefined();
+});
