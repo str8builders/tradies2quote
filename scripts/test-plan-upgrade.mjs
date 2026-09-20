@@ -24,6 +24,12 @@ try{
  const exported=page.waitForEvent('download');await page.getByRole('button',{name:'Export measurements',exact:true}).click();const download=await exported;const stream=await download.createReadStream();let text='';for await(const chunk of stream)text+=chunk;const backup=JSON.parse(text);assert.equal(backup.annotations.measurements.length,2);
  await page.getByLabel('Page',{exact:true}).selectOption('2');await page.getByText('Page 2 needs calibration for length and area. Counts do not need scale.').waitFor();
  await page.reload();await page.getByLabel('Device plans',{exact:true}).selectOption(backup.fileHash);await page.getByText('50 m²',{exact:true}).first().waitFor();
+ if(process.env.T2Q_CHECK_OFFLINE){
+  await page.evaluate(async()=>{await navigator.serviceWorker.ready;if(!navigator.serviceWorker.controller)await new Promise(resolve=>navigator.serviceWorker.addEventListener('controllerchange',resolve,{once:true}));});
+  await page.getByText('Offline plan viewing ready.',{exact:true}).waitFor();
+  await page.waitForFunction(async()=>Boolean(await caches.match(location.href)));
+  await context.setOffline(true);await page.reload();await page.getByLabel('Device plans',{exact:true}).selectOption(backup.fileHash);await page.getByText('50 m²',{exact:true}).first().waitFor();await page.locator('[data-testid="plan-canvas"] canvas').waitFor();await context.setOffline(false);
+ }
  await page.getByLabel('Zoom',{exact:true}).selectOption('1');await page.screenshot({path:'../../outputs/plan-takeoff-mobile.png',fullPage:true});
  assert.deepEqual(errors,[]);console.log('PASS: PDF render, keyboard calibration, measured area, zoom/rotation invariance, page scale isolation, quote provenance, export and device reload.');
 }catch(e){console.log("PAGE",await page.locator("main").innerText());console.log("ERRORS",errors);await page.screenshot({path:"../plan-failure.png",fullPage:true});throw e;}finally{await browser.close();}

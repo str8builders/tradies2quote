@@ -15,6 +15,7 @@ export function PlanTakeoff(){
   const [pdf,setPdf]=useState<PDFDocumentProxy|null>(null),[file,setFile]=useState<Blob|null>(null),[fileName,setFileName]=useState(""),[hash,setHash]=useState("");
   const [library,setLibrary]=useState<Array<Pick<PlanRecord,"id"|"name">>>([]),[annotations,setAnnotations]=useState<Annotations>(empty),[dirty,setDirty]=useState(false);
   const [page,setPage]=useState(1),[rotation,setRotation]=useState(0),[zoom,setZoom]=useState(1),[mode,setMode]=useState<PlanSource["kind"]|"calibrate">("calibrate"),[points,setPoints]=useState<PlanPoint[]>([]),[known,setKnown]=useState(""),[label,setLabel]=useState("");
+  const [offlineStatus,setOfflineStatus]=useState("Open this page while connected to prepare offline plan viewing.");
   const [pickerReady,setPickerReady]=useState(false);
   const [busy,setBusy]=useState(false),[progress,setProgress]=useState(""),[error,setError]=useState(""),[notice,setNotice]=useState(""),[selected,setSelected]=useState<PlanSource|null>(null);
   const uppy=useRef<Uppy|null>(null),reader=useRef<FileReader|null>(null),generation=useRef(0),documentRef=useRef<PDFDocumentProxy|null>(null),expected=useRef<string|null>(null);
@@ -26,6 +27,13 @@ export function PlanTakeoff(){
     void workingDB.plans.toArray().then(rows=>setLibrary(rows.map(({id,name})=>({id,name})))).catch(()=>setError("Device plan storage is unavailable."));
     const lifecycle=generation;
     return()=>{lifecycle.current++;reader.current?.abort();uppy.current?.destroy();void documentRef.current?.loadingTask.destroy();};
+  },[]);
+  useEffect(()=>{
+    if(process.env.NODE_ENV!=="production"||!("serviceWorker" in navigator))return;
+    let cancelled=false;const channel=new MessageChannel();
+    channel.port1.onmessage=event=>{if(!cancelled)setOfflineStatus(event.data?.ok?"Offline plan viewing ready.":"Offline plan viewing could not finish setup. Reconnect and reopen this page before going offline.");};
+    void navigator.serviceWorker.ready.then(registration=>{if(!cancelled)registration.active?.postMessage({type:"WARM_PDF_ENGINE"},[channel.port2]);});
+    return()=>{cancelled=true;channel.port1.close();};
   },[]);
   async function open(blob:Blob,name:string){
     const current=++generation.current;setBusy(true);setError("");setNotice("");setProgress("Reading PDF…");
@@ -39,8 +47,8 @@ export function PlanTakeoff(){
       if(current!==generation.current)return;
       setProgress("Opening PDF pages…");
       const digest=[...new Uint8Array(await crypto.subtle.digest("SHA-256",bytes))].map(byte=>byte.toString(16).padStart(2,"0")).join("");
-      const pdfjs=await import("pdfjs-dist");pdfjs.GlobalWorkerOptions.workerSrc="/vendor/pdfjs/6.3.289/pdf.worker.min.mjs";
-      task=pdfjs.getDocument({data:new Uint8Array(bytes),cMapUrl:"/vendor/pdfjs/6.3.289/cmaps/",cMapPacked:true,standardFontDataUrl:"/vendor/pdfjs/6.3.289/standard_fonts/",wasmUrl:"/vendor/pdfjs/6.3.289/wasm/"});
+      const pdfjs=await import("pdfjs-dist");pdfjs.GlobalWorkerOptions.workerSrc="/t2qcal/vendor/pdfjs/6.3.289/pdf.worker.min.mjs";
+      task=pdfjs.getDocument({data:new Uint8Array(bytes),cMapUrl:"/t2qcal/vendor/pdfjs/6.3.289/cmaps/",cMapPacked:true,standardFontDataUrl:"/t2qcal/vendor/pdfjs/6.3.289/standard_fonts/",wasmUrl:"/t2qcal/vendor/pdfjs/6.3.289/wasm/"});
       const next=await task.promise;
       if(current!==generation.current){await next.loadingTask.destroy();return;}
       if(next.numPages>500){await next.loadingTask.destroy();throw new Error("Use a PDF with 500 pages or fewer. Split larger drawing sets first.");}
@@ -84,7 +92,7 @@ export function PlanTakeoff(){
   async function restore(input:File|undefined){if(!input||!pdf)return;try{if(input.size>2_000_000)throw new Error("Choose a measurement file smaller than 2 MB.");const data=JSON.parse(await input.text());if(data.fileHash!==hash)throw new Error("This backup belongs to a different PDF. Open its original PDF first.");if(annotations.measurements.length&&!window.confirm("Replace this plan's current measurements with the backup?"))return;update(parseAnnotations(data.annotations,hash,pdf.numPages));setSelected(null);setPoints([]);}catch(e){setError(e instanceof Error?e.message:"This measurement backup could not be restored.");}}
   async function removePlan(){if(!hash||!window.confirm("Remove this plan and its saved measurements from this device? Export both files first. The open working stays available until you leave."))return;try{await workingDB.plans.delete(hash);expected.current=null;setDirty(true);await refreshLibrary();setNotice("Removed the stored plan. The open working is still available to export.");}catch{setError("The plan could not be removed.");}}
   const selectedValue=selected?planQuantity(selected):null;
-  return <main className="directory-page plan-takeoff"><section className="page-intro"><div className="eyebrow">T2QCAL · Plan takeoff</div><h1>Measure from a plan</h1><p>Open a PDF, calibrate a known dimension on each page, then mark lengths, areas or counts. Check the drawing revision and printed dimensions before ordering.</p><p>PDFs stay on this device. Save and export them here; account backup covers calculator working separately.</p></section>
+  return <main className="directory-page plan-takeoff"><section className="page-intro"><div className="eyebrow">T2QCAL · Plan takeoff</div><h1>Measure from a plan</h1><p>Open a PDF, calibrate a known dimension on each page, then mark lengths, areas or counts. Check the drawing revision and printed dimensions before ordering.</p><p>PDFs stay on this device. Save and export them here; account backup covers calculator working separately.</p><p role="status">{offlineStatus}</p></section>
     <div className="save-actions"><label className="directory-button">Open PDF (up to 20 MB)<input type="file" accept="application/pdf,.pdf" disabled={busy||!pickerReady} onChange={e=>{choose(e.target.files?.[0]);e.target.value="";}}/></label><label>Device plans<select aria-label="Device plans" value="" disabled={busy} onChange={e=>void reopen(e.target.value)}><option value="">Choose saved plan</option>{library.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label>{busy&&progress&&<button onClick={cancel}>Cancel opening</button>}</div>
     {progress&&<p role="status">{progress}</p>}{error&&<p role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}
     {pdf&&<><h2>{fileName}</h2><div className="save-actions"><label>Page<select aria-label="Page" value={page} onChange={e=>{setPage(Number(e.target.value));setPoints([]);setSelected(null);setMode("calibrate");}}>{Array.from({length:pdf.numPages},(_,i)=><option key={i+1}>{i+1}</option>)}</select></label><label>Zoom<select aria-label="Zoom" value={zoom} onChange={e=>setZoom(Number(e.target.value))}><option value={1}>Fit width</option><option value={2}>200%</option><option value={3}>300%</option></select></label><button onClick={()=>setRotation((rotation+90)%360)}>Rotate 90°</button><button disabled={busy||!dirty} onClick={()=>void save()}>{dirty?"Save plan on device":"Saved on device"}</button></div>

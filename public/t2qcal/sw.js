@@ -1,12 +1,12 @@
 /* T2QCAL's public calculator cache. Never cache accounts, APIs or saved URLs. */
-const CACHE = "t2qcal-web-20260920-offline-takeoff-1";
+const CACHE = "t2qcal-web-20260920-offline-takeoff-2";
 /* The tradie's own shelf of kept reference PDFs. Never versioned away with the page cache. */
 const DOCS = "t2qcal-docs-v1";
 const DOC_PREFIX = "/t2qcal/resources/file/";
 const HOME = "/t2qcal/calculators";
 const OFFLINE = "/t2qcal/offline.html";
 const publicPage = url => !url.search && (url.pathname === "/t2qcal" || [HOME,"/t2qcal/device","/t2qcal/install","/t2qcal/jobs","/t2qcal/measure","/t2qcal/takeoff","/t2qcal/resources"].includes(url.pathname) || /^\/t2qcal\/calculator\/[a-z0-9-]+$/.test(url.pathname));
-const staticAsset = url => url.pathname.startsWith("/vendor/pdfjs/6.3.289/") || url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/t2qcal/fonts/") || /^\/t2qcal\/(icon-\d+|apple-touch-icon|native-mark|native-icon)\.png$/.test(url.pathname);
+const staticAsset = url => url.pathname.startsWith("/t2qcal/vendor/pdfjs/6.3.289/") || url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/t2qcal/fonts/") || /^\/t2qcal\/(icon-\d+|apple-touch-icon|native-mark|native-icon)\.png$/.test(url.pathname);
 async function warmPage(path) {
   const url = new URL(path, self.location.origin);
   if (url.origin !== self.location.origin || !publicPage(url)) return;
@@ -31,7 +31,19 @@ self.addEventListener("activate",event=>event.waitUntil((async()=>{
   for(const key of await caches.keys())if(key.startsWith("t2qcal-web-")&&key!==CACHE)await caches.delete(key);
   await self.clients.claim();
 })()));
+async function warmPdfEngine(){
+  const base="/t2qcal/vendor/pdfjs/6.3.289/",cache=await caches.open(CACHE),manifest=base+"assets.json";
+  if(await cache.match(manifest))return;
+  const response=await fetch(manifest);if(!response.ok)throw new Error("PDF offline setup is unavailable.");
+  const files=await response.clone().json();
+  if(!Array.isArray(files)||files.length>1000||files.some(path=>typeof path!=="string"||path.includes("..")||path.startsWith("/")||!/^[-a-zA-Z0-9_./]+$/.test(path)))throw new Error("Invalid PDF asset manifest.");
+  // The marker is written last: a partial download must never report offline readiness.
+  for(const path of files){const url=base+path;if(!await cache.match(url)){const asset=await fetch(url);if(!asset.ok)throw new Error("PDF offline setup is incomplete.");await cache.put(url,asset);}}
+  await cache.put(manifest,response);
+}
 self.addEventListener("message",event=>{
+  if(event.data?.type==="WARM_PDF_ENGINE")event.waitUntil(warmPdfEngine().then(()=>event.ports[0]?.postMessage({ok:true})).catch(()=>event.ports[0]?.postMessage({ok:false})));
+
   if(event.data?.type==="WARM_PUBLIC_PAGE"&&typeof event.data.path==="string")event.waitUntil(warmPage(event.data.path).catch(()=>{}));
 });
 self.addEventListener("fetch",event=>{

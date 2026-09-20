@@ -47,4 +47,4 @@ next-env.d.ts
 .metadata_never_index
 
 # Generated from the pinned PDF.js package before dev/build
-/public/vendor/pdfjs/
+/public/t2qcal/vendor/pdfjs/
