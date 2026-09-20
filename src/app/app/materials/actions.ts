@@ -1,5 +1,7 @@
 "use server";
 
+import { isDeepStrictEqual } from "node:util";
+import { isUUID } from "@/t2qcal/lib/calculation-record";
 import * as Sentry from "@sentry/nextjs";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -434,6 +436,7 @@ export async function createQuoteFromScan(
     rowFailures?: Array<{ index: number; reason: string; raw_text: string | null }>;
     /** Ops — how many AI passes ran (1 = no retry). For the retry-rate metric. */
     extractionAttempts?: number;
+    idempotencyKey?: string;
   },
 ): Promise<{ id?: string; error?: string; blocked?: boolean }> {
   const supabase = await createClient();
@@ -441,6 +444,8 @@ export async function createQuoteFromScan(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  if (meta.idempotencyKey !== undefined && !isUUID(meta.idempotencyKey)) return {error: "Invalid quote request. Reload and try again."};
 
   if (!Array.isArray(lines) || lines.length === 0) {
     return { error: "No lines to turn into a quote." };
@@ -592,6 +597,7 @@ export async function createQuoteFromScan(
   const { data, error } = await supabase
     .from("quotes")
     .insert({
+      ...(meta.idempotencyKey ? {id: meta.idempotencyKey} : {}),
       user_id: user.id,
       voice_transcript: supplierName
         ? `Scanned ${supplierName} supplier quote`
@@ -604,6 +610,11 @@ export async function createQuoteFromScan(
     })
     .select("id")
     .single();
+  if (error?.code === "23505" && meta.idempotencyKey) {
+    const {data: previous} = await supabase.from("quotes").select("id,quote_data").eq("id", meta.idempotencyKey).eq("user_id", user.id).maybeSingle();
+    if (previous && isDeepStrictEqual(previous.quote_data, JSON.parse(JSON.stringify(quoteData)))) return {id: previous.id};
+    return {error: "This request was already used for different working. Reopen your quotes before creating another."};
+  }
   if (error || !data) {
     console.error("createQuoteFromScan insert failed", error);
     return { error: "Could not create the quote." };

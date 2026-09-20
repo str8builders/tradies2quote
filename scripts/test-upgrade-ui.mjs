@@ -1,0 +1,34 @@
+import { chromium } from '@playwright/test';
+import assert from 'node:assert/strict';
+const browser = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true });
+const page = await browser.newPage({viewport:{width:390,height:844},reducedMotion:'reduce'});
+page.setDefaultTimeout(90000);
+const errors=[];
+page.on('pageerror',error=>errors.push(error.message));
+await page.addInitScript(()=>localStorage.setItem('t2q-cookie-consent','declined'));
+await page.route('**/api/materials/extract-quote',route=>route.fulfill({json:{supplier:'Fixture Supplier',currency:'NZD',gst_inclusive:false,items:Array.from({length:200},(_,i)=>({name:`Material ${String(i).padStart(3,'0')}`,unit:'each',quantity:2,price:i+1,line_total:2*(i+1),sku:`SKU-${i}`,confidence:i%10===0?0.5:1,raw_text:`Source line ${i}` })),notes:[],extraction_status:'ok'}}));
+try {
+  await page.goto('http://127.0.0.1:3128/dev-upgrade',{timeout:120000});
+  await page.getByTestId('quote-import-file-library').setInputFiles({name:'supplier.png',mimeType:'image/png',buffer:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jX1sAAAAASUVORK5CYII=','base64')});
+  await page.getByTestId('quote-import-scan').click();
+  await page.getByLabel('Search lines',{exact:true}).waitFor({timeout:30000});
+  assert.equal(await page.getByTestId('quote-import-rows').locator(':scope > li').count(),200);
+  await page.getByLabel('View order').selectOption('amount-desc');
+  const first=page.getByTestId('quote-import-rows').locator(':scope > li').first();
+  assert.equal(await first.getByLabel('Material name').inputValue(),'Material 199');
+  await first.getByLabel('Quantity',{exact:true}).fill('3');
+  await page.getByLabel('Search lines',{exact:true}).fill('SKU-199');
+  assert.equal(await first.getByLabel('Quantity',{exact:true}).inputValue(),'3');
+  await page.getByRole('button',{name:'Exclude displayed lines',exact:true}).click();
+  await page.getByRole('button',{name:'Confirm change',exact:true}).click();
+  assert.equal(await first.getByRole('checkbox').isChecked(),false);
+  await page.getByRole('button',{name:'Undo last edit'}).click();
+  assert.equal(await first.getByRole('checkbox').isChecked(),true);
+  await page.getByLabel('Search lines',{exact:true}).fill('');
+  await page.getByLabel('Needs checking').check();
+  assert.equal(await page.getByTestId('quote-import-rows').locator(':scope > li').count(),20);
+  const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1);
+  assert.equal(overflow,false,'Mobile page must not overflow horizontally');
+  assert.deepEqual(errors,[]);
+  console.log('PASS: 200 rows, sorted edit identity, search, scoped bulk selection, undo, attention filter, mobile width, no page errors.');
+} finally {await browser.close();}

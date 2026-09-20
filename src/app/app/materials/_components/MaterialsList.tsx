@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
+import { ReviewToolbar, useReviewTable } from "@/components/review-table";
 import {
   ArrowSquareOut,
-  MagnifyingGlass,
   Sparkle,
 } from "@phosphor-icons/react/dist/ssr";
 import { formatCurrency } from "@/lib/quote-defaults";
@@ -16,36 +16,13 @@ type Props = {
 };
 
 export function MaterialsList({ materials, currency }: Props) {
-  const [query, setQuery] = useState("");
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return materials;
-    return materials.filter((m) => {
-      const name = m.name.toLowerCase();
-      const supplier = (m.supplier ?? "").toLowerCase();
-      return name.includes(q) || supplier.includes(q);
-    });
-  }, [materials, query]);
+  const entries = useMemo(() => materials.map(m => ({id: m.id, value: m, label: m.name, search: `${m.name} ${m.supplier ?? ""}`, amount: m.default_unit_price ?? 0, attention: m.is_ai_estimated || !(m.default_unit_price && m.default_unit_price > 0)})), [materials]);
+  const review = useReviewTable(entries);
+  const filtered = review.rows.map(row => row.value);
 
   return (
     <div className="mt-6">
-      <div className="relative">
-        <MagnifyingGlass
-          size={16}
-          weight="bold"
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"
-          aria-hidden="true"
-        />
-        <input
-          type="search"
-          data-testid="materials-search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by name or supplier"
-          className="block w-full rounded-sm border border-ink-700 bg-ink-800 py-2.5 pl-9 pr-3 text-sm text-white placeholder:text-ink-500 outline-none focus:border-brand"
-        />
-      </div>
+      <ReviewToolbar view={review} label="Search by name or supplier" />
 
       {filtered.length === 0 ? (
         <p

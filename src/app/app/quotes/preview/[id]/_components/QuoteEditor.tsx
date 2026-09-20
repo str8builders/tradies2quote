@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { ReviewToolbar, useReviewTable } from "@/components/review-table";
 import {
   ArrowsClockwise,
   ArrowSquareOut,
@@ -1368,6 +1369,8 @@ function ItemsSection({
   addLabel: string;
   disabled?: boolean;
 }) {
+  const entries = useMemo(() => rows.map(row => ({id: String(row.i), value: row, label: row.it.description, search: row.it.description, amount: row.it.unit_price, attention: !!row.it.is_missing_price || row.it.takeoff_status === "blocked" || row.it.is_ai_estimated === true})), [rows]);
+  const review = useReviewTable(entries);
   return (
     <section
       data-testid={`section-${title.toLowerCase()}`}
@@ -1396,13 +1399,14 @@ function ItemsSection({
         <ConfidenceLegend tally={confidenceTally} />
       )}
 
-      {rows.length === 0 ? (
+      <ReviewToolbar view={review} label={`Search ${title.toLowerCase()}`} />
+      {review.rows.length === 0 ? (
         <p className="mt-4 font-mono text-xs uppercase tracking-[0.2em] text-ink-500">
-          {"// no items — add one above"}
+          {rows.length ? "No lines match this view. Clear the filters to see all lines." : "No items — add one above"}
         </p>
       ) : (
         <ul className="mt-3 space-y-2">
-          {rows.map(({ it, i }) => {
+          {review.rows.map(({value: { it, i }}) => {
             const libMaterial = it.library_id
               ? libraryById.get(it.library_id)
               : undefined;

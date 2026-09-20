@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { ReviewToolbar, useReviewTable } from "@/components/review-table";
 import { useRouter } from "next/navigation";
 import {
   ArrowsClockwise,
@@ -290,6 +291,7 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
       setSrcGst(data.gst ?? null);
       setSrcTotal(data.total ?? null);
       setAcknowledged(false);
+      setHistory([]);
       setExtraction({
         status: data.extraction_status ?? "ok",
         reasons: data.extraction_reasons ?? [],
@@ -328,12 +330,27 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
     }
   }
 
-  function patchRow(id: string, patch: Partial<ReviewRow>) {
-    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  const [history, setHistory] = useState<ReviewRow[][]>([]);
+  function changeRows(next: ReviewRow[]) {
+    setHistory(old => [...old.slice(-39), rows]);
+    setRows(next);
+    setAcknowledged(false);
   }
-
-  function removeRow(id: string) {
-    setRows((rs) => rs.filter((r) => r.id !== id));
+  function patchRow(id: string, patch: Partial<ReviewRow>) {
+    changeRows(rows.map(r => r.id === id ? { ...r, ...patch } : r));
+  }
+  function removeRow(id: string) { changeRows(rows.filter(r => r.id !== id)); }
+  function undoRows() {
+    if (!history.length) return;
+    setRows(history[history.length - 1]); setHistory(history.slice(0, -1)); setAcknowledged(false);
+  }
+  const reviewEntries = useMemo(() => rows.map(r => ({ id: r.id, value: r, label: r.name, search: [r.name, r.sku, r.rawText].join(" "), amount: Number(r.price) || 0, attention: r.lowConfidence || !r.name.trim() || !(Number(r.price) > 0) || !(Number(r.quantity) > 0) })), [rows]);
+  const review = useReviewTable(reviewEntries);
+  const [bulk, setBulk] = useState<{ids: string[]; include: boolean} | null>(null);
+  function applyBulk() {
+    if (!bulk) return;
+    const ids = new Set(bulk.ids);
+    changeRows(rows.map(r => ids.has(r.id) ? {...r, include: bulk.include} : r)); setBulk(null);
   }
 
   const includable = rows.filter((r) => {
@@ -382,7 +399,7 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
       createableV.map((r, i) => [r.id, report.lines[i]] as const),
     );
     return { validation: report, lineCheckById: map };
-  }, [rows, supplier, currency, gstInclusive, srcSubtotal, srcGst, srcTotal]);
+  }, [rows, supplier, currency, gstInclusive, srcSubtotal, srcGst, srcTotal, taxRate]);
 
   // Block quote creation while an error-level mismatch is unacknowledged.
   const blocked = validation.blocking && !acknowledged;
@@ -432,7 +449,10 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
     }
   }
 
+  const createAttempt = useRef<{key: string; signature: string} | null>(null);
+  const savingLock = useRef(false);
   async function createQuote() {
+    if (savingLock.current) return;
     const quoteLines: ScanQuoteLine[] = createable.map((r) => ({
       name: r.name.trim(),
       unit: r.unit.trim() || "each",
@@ -446,6 +466,9 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
     }
     setError("");
     setPhase("creating");
+    savingLock.current = true;
+    const signature = JSON.stringify({quoteLines, supplier, gstInclusive, srcSubtotal, srcGst, srcTotal, acknowledged, extraction});
+    if (createAttempt.current?.signature !== signature) createAttempt.current = {key: crypto.randomUUID(), signature};
     try {
       const res = await createQuoteFromScan(quoteLines, {
         supplier: supplier.trim() || null,
@@ -458,6 +481,7 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
         extractionReasons: extraction?.reasons,
         rowFailures: extraction?.rowFailures,
         extractionAttempts: extraction?.attempts,
+        idempotencyKey: createAttempt.current.key,
       });
       if (res.error || !res.id) {
         setError(res.error ?? "Could not create the quote.");
@@ -469,7 +493,7 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
     } catch {
       setError("Could not create the quote. Please try again.");
       setPhase("review");
-    }
+    } finally { savingLock.current = false; }
   }
 
   // ── Done state ──────────────────────────────────────────────────────
@@ -708,7 +732,7 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
                 <input
                   type="checkbox"
                   checked={gstInclusive}
-                  onChange={(e) => setGstInclusive(e.target.checked)}
+                  onChange={(e) => {setGstInclusive(e.target.checked);setAcknowledged(false);}}
                   className="h-4 w-4 accent-brand"
                   data-testid="quote-import-gst"
                 />
@@ -773,8 +797,17 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
               )}
           </div>
 
+          <ReviewToolbar view={review}>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="min-h-11 rounded border border-ink-600 px-3" disabled={phase !== "review" || !review.rows.length} onClick={() => setBulk({ids: review.rows.map(r => r.id), include: true})}>Include displayed lines</button>
+              <button type="button" className="min-h-11 rounded border border-ink-600 px-3" disabled={phase !== "review" || !review.rows.length} onClick={() => setBulk({ids: review.rows.map(r => r.id), include: false})}>Exclude displayed lines</button>
+              <button type="button" className="min-h-11 rounded border border-ink-600 px-3" disabled={phase !== "review" || !history.length} onClick={undoRows}>Undo last edit</button>
+            </div>
+            {bulk && <div role="group" aria-label="Confirm bulk change" className="mt-3 rounded bg-ink-800 p-3"><p>{bulk.include ? "Include" : "Exclude"} {bulk.ids.length} displayed lines? Hidden lines stay as they are.</p><div className="flex gap-3"><button type="button" className="min-h-11 px-3 text-brand" disabled={phase !== "review"} onClick={applyBulk}>Confirm change</button><button type="button" className="min-h-11 px-3" onClick={() => setBulk(null)}>Cancel</button></div></div>}
+          </ReviewToolbar>
+          <fieldset disabled={phase !== "review"}>
           <ul className="space-y-2" data-testid="quote-import-rows">
-            {rows.map((r) => {
+            {review.rows.map(({value: r}) => {
               const priceNum = Number(r.price);
               const badPrice = !Number.isFinite(priceNum) || priceNum <= 0;
               return (
@@ -794,6 +827,7 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
                       <input
                         type="text"
                         value={r.name}
+                        aria-label="Material name"
                         onChange={(e) => patchRow(r.id, { name: e.target.value })}
                         className="w-full rounded-sm border border-ink-700 bg-ink-900 px-2 py-1.5 text-sm text-white outline-none focus:border-brand"
                       />
@@ -918,6 +952,7 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
               );
             })}
           </ul>
+          </fieldset>
 
           {(srcSubtotal != null || srcGst != null || srcTotal != null) && (
             <div
