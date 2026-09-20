@@ -53,5 +53,10 @@ describe("account outbox",()=>{
     expect((await database.outbox.get([accountA,item.id]))?.status).toBe("conflict");
     await expect(queueBackup({...item,ownerId:accountA},database)).rejects.toThrow("conflict");
     await resolveBackup(accountA,item.id,true,database);const copy=(await database.outbox.toArray())[0];expect(copy.id).not.toBe(item.id);expect(copy.revision).toBe(0);expect(copy.status).toBe("pending");
+    await queueBackup({...item,ownerId:accountA,name:"Edited copy while offline"},database);
+    expect(await database.outbox.count()).toBe(1);expect((await database.outbox.toArray())[0].id).toBe(copy.id);
+    await flushBackups(accountA,(async()=>Response.json({record:{...item,id:copy.id,name:"Edited copy while offline",revision:1}})) as typeof fetch,database);
+    await queueBackup({...item,ownerId:accountA,name:"Next edit"},database);
+    const next=(await database.outbox.toArray())[0];expect(next.id).toBe(copy.id);expect(next.revision).toBe(1);
   });
 });

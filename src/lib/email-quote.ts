@@ -1,3 +1,4 @@
+import {renderBusinessEmail} from "./emails/business-email";
 import "server-only";
 import { fetchWithTimeout, TIMEOUTS } from "@/lib/fetchTimeout";
 
@@ -28,33 +29,7 @@ export async function sendQuoteEmail(args: SendArgs): Promise<{ ok: true } | { o
   if (!from) return { ok: false, error: "email_from_not_configured" };
 
   const subject = `Quote ${args.quoteNumber} from ${args.businessName}`;
-  const text = `Hi ${args.clientName},
-
-Here's your quote from ${args.businessName} — ${args.total} total.
-
-The full quote PDF is attached. To accept it, click the link below:
-
-${args.acceptUrl}
-
-If you have any questions, reply to this email.
-
-— ${args.businessName}`;
-
-  const html = `<!doctype html>
-<html><body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #111;">
-  <p>Hi ${escapeHtml(args.clientName)},</p>
-  <p>Here's your quote from <strong>${escapeHtml(args.businessName)}</strong>.</p>
-  <p style="font-size: 32px; font-weight: bold; color: #FF5F15; margin: 24px 0;">${escapeHtml(args.total)}</p>
-  <p>The full quote PDF is attached. Tap the button to accept online:</p>
-  <p style="margin: 24px 0;">
-    <a href="${args.acceptUrl}"
-       style="display: inline-block; background: #FF5F15; color: #111; text-decoration: none; padding: 12px 24px; font-weight: bold; border-radius: 4px;">
-      Accept Quote
-    </a>
-  </p>
-  <p style="color: #666; font-size: 13px;">If the button doesn't work, copy this link: <br>${escapeHtml(args.acceptUrl)}</p>
-  <p style="color: #666; font-size: 13px; margin-top: 32px;">— ${escapeHtml(args.businessName)}</p>
-</body></html>`;
+  const {html,text}=await renderBusinessEmail({kind:"quote",businessName:args.businessName,clientName:args.clientName,number:args.quoteNumber,total:args.total,actionUrl:args.acceptUrl});
 
   const body = {
     from,
@@ -86,13 +61,4 @@ If you have any questions, reply to this email.
     return { ok: false, error: `email_send_failed_${res.status}` };
   }
   return { ok: true };
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }

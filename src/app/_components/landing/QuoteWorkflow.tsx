@@ -31,9 +31,9 @@ const VIEWS = [
     title: "Every detail. Your decision.",
     body: "Check the scope, quantities, labour and prices in an editable draft. Your experience has the final say.",
     points: [
-      "Separate materials and labour",
-      "Check markup and GST",
-      "Edit the terms before you send",
+      "Search and sort materials and labour",
+      "Check flagged supplier lines, markup and GST",
+      "Undo review edits before you send",
     ],
     image: "/screens/screen-6.jpg",
     alt: "Existing Tradies2Quote draft editor with item totals and GST",

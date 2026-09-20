@@ -27,6 +27,8 @@ const eslintConfig = defineConfig([
     // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
+    // Generated, pinned third-party PDF.js distribution (not application source).
+    "public/vendor/pdfjs/**",
     "build/**",
     "next-env.d.ts",
     // Don't lint sibling worktree checkouts or Vercel CLI artifacts —

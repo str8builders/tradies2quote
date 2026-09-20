@@ -5,8 +5,8 @@ import type {CalculationSnapshot} from "./calculation-record";
 
 const JOBS_KEY="t2qcal.device-jobs.v1";
 type State={key:string;value:string};
-export type BackupItem={ownerId:string;id:string;operation:string;name:string;snapshot:CalculationSnapshot;revision:number;status:"pending"|"sending"|"conflict"|"error";attempts:number;nextAttempt:number;leaseUntil:number;error:string};
-export type Receipt={ownerId:string;id:string;name:string;snapshot:CalculationSnapshot;revision:number;updated_at:string};
+export type BackupItem={ownerId:string;id:string;sourceId?:string;operation:string;name:string;snapshot:CalculationSnapshot;revision:number;status:"pending"|"sending"|"conflict"|"error";attempts:number;nextAttempt:number;leaseUntil:number;error:string};
+export type Receipt={ownerId:string;id:string;serverId?:string;name:string;snapshot:CalculationSnapshot;revision:number;updated_at:string};
 export type PlanRecord={id:string;name:string;file:Blob;annotations:string;updatedAt:string};
 export class WorkingDB extends Dexie {
   state!:Table<State,string>;
@@ -84,6 +84,7 @@ export const importLocalBackup=(backup:unknown,db=workingDB)=>mutate(store=>{
       if(links.length>100)throw new Error("A restored job would exceed 100 calculations.");
       if(previous)previous.calculationIds=links;else existing.jobs.push({...job,calculationIds:links});
     }
+    if(!existing.activeId&&incoming.activeId)existing.activeId=incoming.activeId;
     if(existing.jobs.length>100)throw new Error("This backup would exceed 100 jobs.");
     store.setItem(JOBS_KEY,JSON.stringify(existing));
   }

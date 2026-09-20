@@ -1,6 +1,7 @@
 import { Header } from "./_components/landing/Header";
 import { Hero } from "./_components/landing/Hero";
 import { DemoReel } from "./_components/landing/DemoReel";
+import {WorkflowExample} from "./_components/landing/WorkflowExample";
 import { QuoteWorkflow } from "./_components/landing/QuoteWorkflow";
 import { HowItWorks } from "./_components/landing/HowItWorks";
 import { Features } from "./_components/landing/Features";
@@ -47,6 +48,7 @@ export default async function HomePage() {
         <Reveal>
           <QuoteWorkflow />
         </Reveal>
+        {!nativeShell&&<Reveal><WorkflowExample/></Reveal>}
         <Reveal>
           <Features />
         </Reveal>

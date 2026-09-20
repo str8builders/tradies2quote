@@ -27,9 +27,9 @@ export function CompanionApp() {
             </div>
             <Calculator size={36} className="text-brand" aria-hidden />
             <h3 className="mt-5 font-display text-2xl text-white">T2QCAL</h3>
-            <p className="mt-3 flex-1 text-ink-300">95 construction calculators that draw the job as you type. Camera measuring for pitch, fall, height and photo lengths. NZ standards and manuals under every calculator, kept offline for site. Quantities land in a Tradies2Quote draft.</p>
+            <p className="mt-3 flex-1 text-ink-300">95 construction calculators that draw the job as you type. Camera measuring for pitch, fall, height and photo lengths. Calibrated PDF plan takeoff with quantities and source details for your quote. NZ standards and manuals under every calculator, kept offline for site. Quantities land in a Tradies2Quote draft.</p>
             <Link href="/t2qcal" className="studio-button studio-button-secondary mt-7">Open &amp; install T2QCAL web app <ArrowUpRight size={20} /></Link>
-            <p className="mt-3 text-sm text-ink-400">Calculators open without signing in. Sign in with your Tradies2Quote login to save working and send quantities to a quote.</p>
+            <p className="mt-3 text-sm text-ink-400">Calculators open without signing in. Device saves work without an account. Sign in with your Tradies2Quote login to queue calculator backups and send quantities to a quote.</p>
           </article>
         </div>
         <p className="mt-6 max-w-3xl text-sm leading-relaxed text-ink-400">On iPhone, open your chosen web app in Safari, tap Share, then Add to Home Screen. Repeat for the other app if you want both. T2QCAL is available as an installable web app now. The native iPhone version is retained for a future App Store release.</p>

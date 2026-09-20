@@ -4,11 +4,12 @@ export async function queueBackup(input:Pick<BackupItem,"ownerId"|"id"|"name"|"s
   if(!isUUID(input.ownerId)||!isUUID(input.id)||!input.name.trim()||input.name.trim().length>120||!Number.isSafeInteger(input.revision)||input.revision<0)throw new Error("Check the account, calculation name and version.");
   const snapshot=validateSnapshot(input.snapshot);
   await db.transaction("rw",db.outbox,db.receipts,async()=>{
-    const old=await db.outbox.get([input.ownerId,input.id]);
+    const receipt=await db.receipts.get([input.ownerId,input.id]);
+    const target=receipt?.serverId??input.id;
+    const old=await db.outbox.get([input.ownerId,target]);
     if(old?.status==="sending"&&old.leaseUntil>Date.now())throw new Error("This backup is being sent. Wait for its result before saving again.");
     if(old?.status==="conflict")throw new Error("Resolve this calculation’s backup conflict in Your working first.");
-    const receipt=await db.receipts.get([input.ownerId,input.id]);
-    await db.outbox.put({...input,name:input.name.trim(),snapshot,revision:old?.revision??receipt?.revision??input.revision,operation:crypto.randomUUID(),status:"pending",attempts:0,nextAttempt:0,leaseUntil:0,error:""});
+    await db.outbox.put({...input,id:target,...(target!==input.id?{sourceId:input.id}:{}),name:input.name.trim(),snapshot,revision:old?.revision??receipt?.revision??input.revision,operation:crypto.randomUUID(),status:"pending",attempts:0,nextAttempt:0,leaseUntil:0,error:""});
   });
 }
 /** A transaction lease serializes tabs. The server revision makes a response lost after commit safe to retry. */
@@ -36,7 +37,7 @@ export async function flushBackups(ownerId:string,fetcher:typeof fetch=fetch,db:
     }catch(e){error=e instanceof Error?e.message:"Backup will retry when the connection is available.";}
     await db.transaction("rw",db.outbox,db.receipts,async()=>{
       const current=await db.outbox.get([ownerId,item.id]);if(current?.operation!==item.operation)return;
-      if(record){await db.receipts.put(record);await db.outbox.delete([ownerId,item.id]);}
+      if(record){await db.receipts.put(record);if(item.sourceId)await db.receipts.put({...record,id:item.sourceId,serverId:record.id});await db.outbox.delete([ownerId,item.id]);}
       else await db.outbox.put({...current,status,error,leaseUntil:0,nextAttempt:Date.now()+Math.min(300_000,5_000*2**Math.min(current.attempts,6))});
     });
     if(pause)break;
@@ -44,9 +45,13 @@ export async function flushBackups(ownerId:string,fetcher:typeof fetch=fetch,db:
 }
 export async function retryBackup(ownerId:string,id:string,db=workingDB){await db.transaction("rw",db.outbox,async()=>{const item=await db.outbox.get([ownerId,id]);if(item&&item.status!=="conflict"&&item.leaseUntil<=Date.now())await db.outbox.put({...item,status:"pending",nextAttempt:0,error:""});});}
 export async function resolveBackup(ownerId:string,id:string,copy:boolean,db=workingDB){
-  await db.transaction("rw",db.outbox,async()=>{
+  await db.transaction("rw",db.outbox,db.receipts,async()=>{
     const item=await db.outbox.get([ownerId,id]);if(!item||item.status!=="conflict")return;
-    if(copy)await db.outbox.put({...item,id:crypto.randomUUID(),operation:crypto.randomUUID(),revision:0,status:"pending",attempts:0,nextAttempt:0,error:"",leaseUntil:0});
+    if(copy){
+      const target=crypto.randomUUID(),sourceId=item.sourceId??item.id;
+      await db.outbox.put({...item,id:target,sourceId,operation:crypto.randomUUID(),revision:0,status:"pending",attempts:0,nextAttempt:0,error:"",leaseUntil:0});
+      await db.receipts.put({ownerId,id:sourceId,serverId:target,revision:0,name:item.name,snapshot:item.snapshot,updated_at:new Date().toISOString()});
+    }
     await db.outbox.delete([ownerId,id]);
   });
 }

@@ -16,10 +16,10 @@ export function SaveCalculation({snapshot,title}:{snapshot:CalculationSnapshot;t
   useEffect(()=>{
     const sub=liveQuery(async()=>{
       if(!account)return "";
-      const pending=await workingDB.outbox.get([account.id,id]);
-      if(pending)return pending.status==="conflict"?"Backup conflict — open Your working to resolve it.":pending.status==="error"?"Backup needs attention — open Your working.":"Account backup pending";
       const receipt=await workingDB.receipts.get([account.id,id]);
-      return receipt&&signatureOf(receipt.snapshot,receipt.name)===signature?"Backed up to account":"";
+      const pending=await workingDB.outbox.get([account.id,receipt?.serverId??id]);
+      if(pending)return pending.status==="conflict"?"Backup conflict — open Your working to resolve it.":pending.status==="error"?"Backup needs attention — open Your working.":"Account backup pending";
+      return receipt&&receipt.revision>0&&signatureOf(receipt.snapshot,receipt.name)===signature?"Backed up to account":"";
     }).subscribe({next:setBackupState,error:()=>setBackupState("Account backup status unavailable")});
     return()=>sub.unsubscribe();
   },[account,id,signature]);
