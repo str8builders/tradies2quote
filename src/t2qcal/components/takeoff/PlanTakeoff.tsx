@@ -4,7 +4,7 @@ import {Input} from "@/components/ui/input";
 import Uppy from "@uppy/core";
 import type {PDFDocumentProxy} from "pdfjs-dist";
 import {workingDB,type PlanRecord} from "@/t2qcal/lib/local-db";
-import {saveLocalPlan,storedPlanFile} from "@/t2qcal/lib/plan-storage";
+import {listLocalPlans,saveLocalPlan,storedPlanFile} from "@/t2qcal/lib/plan-storage";
 import {planQuantity,pointDistance,validatePlanSource,type PlanCalibration,type PlanPoint,type PlanSource} from "@/t2qcal/lib/plan-measurement";
 import {QuoteTransfer} from "../calculators/QuoteTransfer";
 import {sendToCalculator} from "../measure/sendToCalculator";
@@ -21,11 +21,11 @@ export function PlanTakeoff(){
   const [busy,setBusy]=useState(false),[progress,setProgress]=useState(""),[error,setError]=useState(""),[notice,setNotice]=useState(""),[selected,setSelected]=useState<PlanSource|null>(null);
   const uppy=useRef<Uppy|null>(null),reader=useRef<FileReader|null>(null),generation=useRef(0),documentRef=useRef<PDFDocumentProxy|null>(null),expected=useRef<string|null>(null),editVersion=useRef(0);
   const pageMeasurements=annotations.measurements.filter(item=>item.page===page),calibration=annotations.calibrations[String(page)];
-  async function refreshLibrary(){setLibrary((await workingDB.plans.toArray()).map(({id,name})=>({id,name})));}
+  async function refreshLibrary(){setLibrary(await listLocalPlans());}
   useEffect(()=>{
     uppy.current=new Uppy({id:"t2qcal-plan-file",restrictions:{maxNumberOfFiles:1,maxFileSize:20*1024*1024,allowedFileTypes:[".pdf","application/pdf"]}});
     queueMicrotask(()=>setPickerReady(true));
-    void workingDB.plans.toArray().then(rows=>setLibrary(rows.map(({id,name})=>({id,name})))).catch(()=>setError("Device plan storage is unavailable."));
+    void listLocalPlans().then(setLibrary).catch(()=>setError("Device plan storage is unavailable."));
     const lifecycle=generation;
     return()=>{lifecycle.current++;reader.current?.abort();uppy.current?.destroy();void documentRef.current?.loadingTask.destroy();};
   },[]);

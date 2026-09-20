@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto";
 import {afterEach,expect,it} from "vitest";
 import {WorkingDB} from "./local-db";
-import {saveLocalPlan,storedPlanFile} from "./plan-storage";
+import {listLocalPlans,saveLocalPlan,storedPlanFile} from "./plan-storage";
 
 const databases:WorkingDB[]=[];
 function database(){const db=new WorkingDB(`plan-${crypto.randomUUID()}`);databases.push(db);return db;}
@@ -22,10 +22,12 @@ it("saves exact PDF bytes when IndexedDB rejects Blob values",async()=>{
 it("reads old Blob records and preserves their measurements when saved again",async()=>{
   const db=database(),plan=record();await db.plans.put(plan);
   const old=(await db.plans.get(plan.id))!;
+  expect(await listLocalPlans(db)).toEqual([{id:plan.id,name:plan.name}]);
   expect(await storedPlanFile(old).arrayBuffer()).toEqual(await plan.file.arrayBuffer());
   await saveLocalPlan({...plan,file:storedPlanFile(old)},old.annotations,db);
   const updated=(await db.plans.get(plan.id))!;
   expect(updated.annotations).toBe(old.annotations);
+  expect(await listLocalPlans(db)).toEqual([{id:plan.id,name:plan.name}]);
   expect(await storedPlanFile(updated).arrayBuffer()).toEqual(await plan.file.arrayBuffer());
 });
 

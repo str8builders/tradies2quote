@@ -66,3 +66,7 @@ offline emulation raised an internal browser error on service-worker navigation.
 The origin test confirms no requests are forwarded while the saved PDF and its
 50 m² measurement reopen after a full reload. This is automated WebKit evidence,
 not a physical iPhone/Safari or installed home-screen app certification.
+
+The saved-plan picker walks an IndexedDB cursor and retains only each plan's ID
+and name. It does not materialise the whole library's PDF byte arrays together.
+Legacy Blob and new byte-backed records are both covered by the list regression.

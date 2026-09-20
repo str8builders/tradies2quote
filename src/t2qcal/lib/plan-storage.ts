@@ -1,5 +1,13 @@
 import {workingDB,type PlanRecord} from "./local-db";
 
+export async function listLocalPlans(db=workingDB):Promise<Array<Pick<PlanRecord,"id"|"name">>> {
+  const plans:Array<Pick<PlanRecord,"id"|"name">>=[];
+  // Release each record's PDF bytes as the cursor advances rather than
+  // materialising every saved drawing together just to show its name.
+  await db.plans.each(({id,name})=>{plans.push({id,name});});
+  return plans;
+}
+
 export function storedPlanFile(record:Pick<PlanRecord,"file">):Blob {
   return record.file instanceof Blob?record.file:new Blob([record.file],{type:"application/pdf"});
 }
