@@ -5,20 +5,8 @@ import { useRouter } from "next/navigation";
 import { ShieldCheck } from "@phosphor-icons/react";
 import { recordAiConsentAction } from "../ai-consent-actions";
 
-/**
- * AI-processing consent (App Store Guideline 5.1.2(i)).
- *
- * Shown before the first AI action in the iOS shell (the New-quote page passes
- * `open` = native-shell AND not-yet-consented). Names the AI processors, the
- * data sent, and the purpose, links the privacy policy, and
- * requires an affirmative tap before any audio/photo/text can leave the device.
- * On accept, consent is recorded on the profile and the flow proceeds. On
- * decline, the tradie returns to the dashboard (the product is AI-first, so
- * there is no non-AI quoting path — declining simply doesn't proceed).
- *
- * Robustness: this is an overlay, not a page replacement, and the server AI
- * routes independently enforce consent — so a client bug here can never send
- * data without consent, nor permanently lock the tradie out of the page.
+/** Explicit AI permission for every account; server routes enforce it again.
+ * Declining returns to the dashboard. The native app also offers manual quotes.
  */
 export function AiConsentModal({
   open,
@@ -77,23 +65,22 @@ export function AiConsentModal({
 
         <div className="mt-4 space-y-3 text-sm leading-relaxed text-ink-200">
           <p>
-            To turn what you type into a quote, this app processes the text with
-            AI on the private server that runs Tradies2Quote:
+            With your permission, the enabled AI features send job descriptions,
+            transcripts, photos or drawings to the processors below. Avoid including
+            personal information that is not needed for the job.
           </p>
           <ul className="space-y-2">
             <li className="rounded-sm border border-ink-700 bg-ink-900/50 px-3 py-2">
-              <strong className="text-white">Local Qwen</strong> — builds quotes,
-              cleans transcripts and drafts text replies. Your text stays on our
-              server and is not sent to OpenAI or Anthropic.
+              <strong className="text-white">Anthropic</strong> — generates quote
+              drafts, cleans transcripts and analyses drawings and supplier documents.
             </li>
             <li className="rounded-sm border border-ink-700 bg-ink-900/50 px-3 py-2">
-              <strong className="text-white">Voice and image features</strong> —
-              require separate external AI providers. They are unavailable unless
-              those providers are configured and disclosed.
+              <strong className="text-white">OpenAI</strong> — transcribes voice
+              recordings and analyses photos for enabled voice and image features.
             </li>
           </ul>
           <p className="text-ink-300">
-            AI content is used only to return the requested result. Full detail
+            Check AI results before using or sending them. Full processing and retention detail
             is in our{" "}
             <a
               href="/privacy"

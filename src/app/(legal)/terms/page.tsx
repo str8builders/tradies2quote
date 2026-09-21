@@ -123,45 +123,43 @@ export default function TermsPage() {
 
         <LegalSection id="billing" number="05" title="Plans & billing">
           <p>
-            Paid plans are billed monthly in advance. The price shown on
-            our pricing page is the price you pay, in New Zealand dollars
-            and inclusive of GST.
+            Website subscriptions use the price, currency and billing period
+            shown at website checkout. Subscriptions purchased in the iOS app
+            are billed by Apple at the localized price and period shown before
+            you confirm the purchase. Subscription prices can differ by storefront.
           </p>
           <p>
-            Subscriptions <strong>auto-renew</strong> at the start of each
-            billing period until you cancel. We send a receipt by email
-            after every successful payment. If a payment fails, we will
-            retry for up to 7 days and then pause your account.
+            Subscriptions renew automatically until cancelled. Apple charges your
+            Apple Account and manages renewals, payment retries and any applicable
+            grace period. Manage an Apple subscription in your Apple Account settings.
+            A failed or expired subscription may pause paid features.
           </p>
           <p>
-            We may change pricing from time to time. If we change the
-            price of your current plan, we will tell you by email at least
-            30 days before the new price applies. You can cancel before
-            the new price takes effect.
+            Any price change is subject to the notice and consent requirements
+            of the billing provider and applicable law. You can cancel renewal
+            before a new billing period begins.
           </p>
         </LegalSection>
 
-        <LegalSection
-          id="cancellation"
-          number="06"
-          title="Cancellation & refunds"
-        >
+        <LegalSection id="cancellation" number="06" title="Cancellation & refunds">
           <p>
-            You can cancel at any time by emailing{" "}
-            <a href={`mailto:${LEGAL.supportEmail}`}>
-              {LEGAL.supportEmail}
-            </a>{" "}
-            from the address on your account. Cancellation takes effect
-            at the end of your current billing period — you keep access
-            until then.
+            For Apple subscriptions, use Settings &rarr; your name &rarr;
+            Subscriptions on your device, or <a href="https://apps.apple.com/account/subscriptions">manage subscriptions with Apple</a>.
+            Cancelling renewal normally keeps access until the paid period ends.
+            Deleting the app or your Tradies2Quote account does not cancel an
+            Apple subscription. You can delete your account without cancelling first.
           </p>
           <p>
-            <strong>Refunds.</strong> If you are in the United Kingdom or
-            European Union, you have the statutory right to cancel within
-            14 days of your first paid charge and receive a full refund.
-            Outside that period, we do not offer pro-rata refunds for
-            partial months, but we will always consider individual
-            requests in good faith.
+            For website subscriptions, use the website billing controls or email{" "}
+            <a href={`mailto:${LEGAL.supportEmail}`}>{LEGAL.supportEmail}</a> from
+            the address on your account. Cancellation takes effect at the end of
+            the current billing period.
+          </p>
+          <p>
+            Apple handles refund requests for Apple-billed purchases through{" "}
+            <a href="https://reportaproblem.apple.com">Report a Problem</a>.
+            Contact us about website-billed refunds. We consider individual requests
+            in good faith. Nothing in these terms limits your statutory consumer rights.
           </p>
         </LegalSection>
 
@@ -355,8 +353,8 @@ export default function TermsPage() {
             If you download {LEGAL.productName} from the Apple App Store,
             you also agree to Apple&apos;s Licensed Application End User
             Licence Agreement (the standard EULA). Where these terms
-            differ from Apple&apos;s EULA, these terms apply between you
-            and us; Apple&apos;s EULA applies between you and Apple.
+            differ from that licence, the standard EULA governs the app licence
+            between you and us. Apple&apos;s purchase terms govern Apple-billed purchases.
           </p>
           <p>
             Apple is not responsible for the {LEGAL.productName} service,

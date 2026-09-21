@@ -1,5 +1,6 @@
 "use client";
 
+import { AI_CONSENT_VERSION, PUBLIC_AI_DISCLOSURE } from "@/lib/ai-disclosure";
 import { useState } from "react";
 import { Camera, CheckCircle, PaperPlaneTilt, X } from "@phosphor-icons/react";
 
@@ -11,6 +12,7 @@ const MAX_PHOTOS = 3;
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 
 export function RequestForm({ slug, business }: { slug: string; business: string }) {
+  const [allowAI, setAllowAI] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -52,14 +54,14 @@ export function RequestForm({ slug, business }: { slug: string; business: string
 
   async function loadQuestions() {
     const text = description.trim();
-    if (text.length < MIN_DESCRIPTION || text === askedFor || asking) return;
+    if (!allowAI || text.length < MIN_DESCRIPTION || text === askedFor || asking) return;
     setAskedFor(text);
     setAsking(true);
     try {
       const res = await fetch(`/api/requests/${encodeURIComponent(slug)}/questions`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ description: text }),
+        body: JSON.stringify({ description: text, aiConsentVersion: AI_CONSENT_VERSION }),
         signal: AbortSignal.timeout(20_000),
       });
       const data = (await res.json().catch(() => ({}))) as { questions?: unknown };
@@ -99,6 +101,7 @@ export function RequestForm({ slug, business }: { slug: string; business: string
     setError("");
     try {
       const fields = {
+        aiConsentVersion: allowAI ? AI_CONSENT_VERSION : "",
         name,
         phone,
         email,
@@ -314,6 +317,11 @@ export function RequestForm({ slug, business }: { slug: string; business: string
         ) : null}
         {photoNote ? <p className="mt-1 text-xs text-hivis">{photoNote}</p> : null}
       </div>
+
+      <label className="flex items-start gap-3 text-sm text-ink-300">
+        <input type="checkbox" checked={allowAI} onChange={(event) => { setAllowAI(event.target.checked); if (!event.target.checked) { setQuestions([]); setAnswers([]); setAskedFor(""); } }} className="mt-1 h-5 w-5 shrink-0 accent-brand" />
+        <span>{PUBLIC_AI_DISCLOSURE} <a href="/privacy" className="underline">Privacy Policy</a></span>
+      </label>
 
       {/* Honeypot: off-screen, tab-skipped, autocomplete off. Bots fill it, people don't. */}
       <div aria-hidden="true" className="absolute -left-[9999px] top-0 h-0 w-0 overflow-hidden">

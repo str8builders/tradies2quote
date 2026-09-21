@@ -22,6 +22,12 @@ export async function POST(request: NextRequest) {
   try {
     const admin = adminClient();
     const stripe = stripeClient();
+    if (process.env.APPLE_SUBSCRIPTIONS_ENABLED === "true") {
+      const apple = await admin.from("apple_subscriptions" as "subscriptions").select("status,access_until,auto_renews" as never).eq("user_id", user.id);
+      if (apple.error) throw apple.error;
+      const active = (apple.data as unknown as Array<{ status: string; access_until: string; auto_renews: boolean }> | null)?.some(s => ["active", "grace"].includes(s.status) && Date.parse(s.access_until) > Date.now() || s.status === "retry" && s.auto_renews);
+      if (active) return NextResponse.json({ message: "You already have an Apple subscription. Manage it in your Apple Account settings to avoid paying twice." }, { status: 409 });
+    }
     const { data: teamOwner, error: teamError } = await db.rpc("my_team_owner");
     if (teamError) throw teamError;
     if (teamOwner && teamOwner !== user.id) return NextResponse.json({ message: "Your team owner manages your subscription." }, { status: 409 });

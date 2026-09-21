@@ -1,3 +1,4 @@
+import { aiConsentGate } from "@/lib/ai-consent";
 import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
@@ -37,6 +38,9 @@ export async function POST(req: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const consentGate = await aiConsentGate(supabase, user.id);
+  if (consentGate) return consentGate;
   // Owner-only, matching the /app/agents UI (Wave 13) — this endpoint has
   // no quota, so leaving it open lets any signup script LLM spend.
   if (!isOwnerEmail(user.email)) {

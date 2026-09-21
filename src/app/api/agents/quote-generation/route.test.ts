@@ -1,3 +1,5 @@
+// These orchestration cases start after permission has been granted.
+vi.mock("@/lib/ai-consent", () => ({ aiConsentGate: async () => null }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 

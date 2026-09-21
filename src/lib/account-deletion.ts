@@ -4,30 +4,10 @@ import { adminClient } from "@/lib/supabase/admin";
 import { captureError } from "@/lib/observability";
 import { isStripeConfigured, stripeClient } from "@/lib/stripe-client";
 
-/**
- * The account purge itself, with no opinion about who asked for it.
- *
- * Lifted verbatim out of the settings server action so the iOS calculator can
- * reach the same code path. T2QCAL cannot do this itself: deletion needs the
- * SERVICE_ROLE key, and that key must never be inside a shipped app. So the
- * calculator asks the server, and the server runs exactly what the website
- * runs — one implementation, one ordering, one set of guarantees.
- *
- * Order of operations (children before parents, auth user LAST):
- *   1. Best-effort cancel any live Stripe subscription so a deleted account
- *      can never keep being billed.
- *   2. Purge storage objects (avatars, quote PDFs, signatures).
- *   3. Purge rows — quote children by quote_id first (they don't all cascade),
- *      then user_id-keyed tables, then quotes/profiles.
- *   4. auth.admin.deleteUser — only after the data purge succeeded, so a
- *      mid-flight failure leaves a login that can simply retry, never an
- *      orphaned dataset with no owner.
- *
- * Any core-table failure aborts BEFORE the auth user is touched.
- *
- * Callers are responsible for authenticating the request, for the typed
- * confirmation, for the App Review comped-account exemption, and for ending
- * the session afterwards. This function only destroys.
+/** Resumable account purge. Keep the login until every required step succeeds.
+ * Storage contains personal data and is deleted through the storage API before
+ * its database references. Repeating any completed step is safe. Apple billing
+ * is managed by the customer separately; deleting an account cannot cancel it.
  */
 
 /** Tables keyed by quote_id whose FK to quotes may not cascade. */
@@ -37,10 +17,15 @@ const QUOTE_CHILD_TABLES = [
   "quote_edit_events",
   "quote_site_context",
   "agent_events",
+  "quote_attachments",
+  "chat_reports",
 ] as const;
 
 /** Tables keyed by user_id, deleted before quotes/profiles. */
 const USER_TABLES = [
+  "quote_requests",
+  "terms_templates",
+  "t2qcal_calculations",
   "customer_message_drafts",
   "job_weather_assessments",
   "ai_recommendations",
@@ -70,61 +55,52 @@ export type PurgeResult = { ok: true } | { ok: false; error: string };
 export async function purgeAccount(userId: string): Promise<PurgeResult> {
   const admin = adminClient();
 
-  // ── 1. Stop billing first — a deleted account must never keep paying. ──
+  // Cancel Stripe before removing its lookup record. A transient failure must
+  // remain retryable, not orphan an active paid subscription.
   try {
     if (isStripeConfigured()) {
-      const { data: sub } = await admin
-        .from("subscriptions")
-        .select("stripe_subscription_id")
-        .eq("user_id", userId)
-        .maybeSingle();
-      const subId = sub?.stripe_subscription_id;
-      if (typeof subId === "string" && subId.length > 0) {
-        await stripeClient()
-          .subscriptions.cancel(subId)
-          .catch(() => {
-            // Already canceled / not found — fine either way.
-          });
-      }
-    }
-  } catch (e) {
-    // Billing cleanup is best-effort: Stripe being down must not block a
-    // user's legal right to delete their data. Surface it for follow-up.
-    captureError(e, { route: "settings/delete-account" });
-  }
-
-  // ── 2. Collect quote ids while the rows still exist. ──
-  const { data: quoteRows, error: quotesReadErr } = await admin
-    .from("quotes")
-    .select("id")
-    .eq("user_id", userId);
-  if (quotesReadErr) {
-    captureError(quotesReadErr, { route: "settings/delete-account" });
-    return { ok: false, error: "Could not start deletion. Please try again." };
-  }
-  const quoteIds = (quoteRows ?? []).map((r) => r.id as string);
-
-  // ── 3. Storage purge (best-effort — orphaned bytes are not PII-critical
-  //       once the DB rows referencing them are gone, but tidy anyway). ──
-  try {
-    const buckets: Array<{ bucket: string; prefixes: string[] }> = [
-      { bucket: "profile-avatars", prefixes: [userId] },
-      { bucket: "quote-pdfs", prefixes: [userId] },
-      { bucket: "signatures", prefixes: quoteIds },
-    ];
-    for (const { bucket, prefixes } of buckets) {
-      for (const prefix of prefixes) {
-        const { data: objects } = await admin.storage
-          .from(bucket)
-          .list(prefix, { limit: 100 });
-        const paths = (objects ?? []).map((o) => `${prefix}/${o.name}`);
-        if (paths.length > 0) {
-          await admin.storage.from(bucket).remove(paths);
+      const { data: sub, error } = await admin.from("subscriptions")
+        .select("stripe_subscription_id").eq("user_id", userId).maybeSingle();
+      if (error) throw error;
+      if (sub?.stripe_subscription_id) {
+        try { await stripeClient().subscriptions.cancel(sub.stripe_subscription_id); }
+        catch (error) {
+          // Only a verified missing subscription is equivalent to cancellation.
+          if (!(error && typeof error === "object" && "code" in error && error.code === "resource_missing")) throw error;
         }
       }
     }
-  } catch (e) {
-    captureError(e, { route: "settings/delete-account" });
+  } catch (error) {
+    captureError(error, { route: "settings/delete-account/billing" });
+    return { ok: false, error: "We could not stop website subscription billing. Your account has not been deleted. Please retry or contact support@tradies2quote.com." };
+  }
+
+  const quoteIds: string[] = [];
+  try {
+    // PostgREST has a page limit; one select would silently omit older quotes.
+    for (let offset = 0; ; offset += 500) {
+      const { data, error } = await admin.from("quotes").select("id")
+        .eq("user_id", userId).order("id").range(offset, offset + 499);
+      if (error) throw error;
+      quoteIds.push(...(data ?? []).map(row => row.id));
+      if (!data || data.length < 500) break;
+    }
+    const { data: buckets, error: bucketError } = await admin.storage.listBuckets();
+    if (bucketError) throw bucketError;
+    const existing = new Set((buckets ?? []).map(bucket => bucket.id));
+    const targets = [
+      ...["profile-avatars", "business-logos", "quote-pdfs", "quote-attachments", "plan-uploads"]
+        .map(bucket => ({ bucket, prefixes: [userId] })),
+      { bucket: "signatures", prefixes: quoteIds },
+    ];
+    for (const { bucket, prefixes } of targets) {
+      if (!existing.has(bucket)) continue;
+      const storage = admin.storage.from(bucket);
+      for (const prefix of prefixes) await purgeStoragePrefix(storage, prefix);
+    }
+  } catch (error) {
+    captureError(error, { route: "settings/delete-account/storage" });
+    return { ok: false, error: "Deletion is incomplete. Some files may already have been removed. Your login is available so you can retry, or contact support@tradies2quote.com." };
   }
 
   // ── 4. Row purge. Quote children first (batched), then user tables,
@@ -136,7 +112,7 @@ export async function purgeAccount(userId: string): Promise<PurgeResult> {
       const batch = quoteIds.slice(i, i + 100);
       if (batch.length === 0) break;
       const { error } = await admin.from(table).delete().in("quote_id", batch);
-      if (error) {
+      if (error && error.code !== "42P01" && error.code !== "PGRST205") {
         // Tables that already cascade or predate a column simply no-op;
         // a real failure is captured and, for PII tables, aborts below.
         captureError(
@@ -150,8 +126,8 @@ export async function purgeAccount(userId: string): Promise<PurgeResult> {
   }
 
   for (const table of USER_TABLES) {
-    const { error } = await admin.from(table).delete().eq("user_id", userId);
-    if (error) {
+    const { error } = await admin.from(table as "materials").delete().eq("user_id", userId);
+    if (error && error.code !== "42P01" && error.code !== "PGRST205") {
       captureError(
         new Error(`delete-account: ${table} purge failed: ${error.message}`),
         { route: "settings/delete-account" },
@@ -172,29 +148,13 @@ export async function purgeAccount(userId: string): Promise<PurgeResult> {
     .eq("id", userId);
   if (profileErr) failures.push("profiles");
 
-  // PII-bearing tables MUST be gone before we destroy the login — losing
-  // the auth user while their data lingers would orphan it unrecoverable.
-  // Covers every table that can hold client contact details, free text the
-  // user wrote, or job-site locations — not just the headline entities.
-  const critical = new Set([
-    "quotes",
-    "profiles",
-    "clients",
-    "invoices",
-    "materials",
-    "tradie_memories",
-    "payments",
-    "push_subscriptions",
-    "customer_message_drafts",
-    "job_weather_assessments",
-    "calendar_notes",
-    "beta_feedback",
-  ]);
-  if (failures.some((t) => critical.has(t))) {
+  // Every enumerated personal-data table is required. An already-absent
+  // table is handled above; an access or schema error must never be ignored.
+  if (failures.length > 0) {
     return {
       ok: false,
       error:
-        "Some of your data could not be removed. Nothing was deleted — please try again or contact support@tradies2quote.com.",
+        "Deletion is incomplete. Some data may already have been removed. Your login is still available so you can retry, or contact support@tradies2quote.com.",
     };
   }
 
@@ -210,4 +170,27 @@ export async function purgeAccount(userId: string): Promise<PurgeResult> {
   }
 
   return { ok: true };
+}
+
+/** Enumerate each level before removing files so pagination never skips rows. */
+export async function purgeStoragePrefix(
+  storage: ReturnType<ReturnType<typeof adminClient>["storage"]["from"]>,
+  prefix: string,
+): Promise<void> {
+  const folders: string[] = [];
+  const files: string[] = [];
+  for (let offset = 0; ; offset += 100) {
+    const { data, error } = await storage.list(prefix, { limit: 100, offset, sortBy: { column: "name", order: "asc" } });
+    if (error) throw error;
+    for (const object of data ?? []) {
+      const path = `${prefix}/${object.name}`;
+      if (object.id === null) folders.push(path); else files.push(path);
+    }
+    if (!data || data.length < 100) break;
+  }
+  for (const folder of folders) await purgeStoragePrefix(storage, folder);
+  for (let start = 0; start < files.length; start += 100) {
+    const { error } = await storage.remove(files.slice(start, start + 100));
+    if (error) throw error;
+  }
 }

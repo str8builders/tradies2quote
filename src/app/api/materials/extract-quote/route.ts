@@ -1,3 +1,4 @@
+import { aiConsentGate } from "@/lib/ai-consent";
 import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
@@ -137,6 +138,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const consentGate = await aiConsentGate(supabase, user.id);
+  if (consentGate) return consentGate;
+
   const sub = await getSubscriptionStatus({
     userId: user.id,
     signedUpAt: new Date(user.created_at ?? Date.now()),
@@ -189,39 +193,22 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const image = form.get("image");
-  if (!(image instanceof File)) {
-    return NextResponse.json(
-      { error: "Missing 'image' file field." },
-      { status: 400 },
-    );
+  const images = form.getAll("image");
+  if (images.length < 1 || images.length > 8 || images.some(image => !(image instanceof File))) {
+    return NextResponse.json({ error: "Choose one to eight image pages from the same supplier document." }, { status: 400 });
   }
-  if (image.size === 0) {
-    return NextResponse.json({ error: "Image file is empty." }, { status: 400 });
+  const pages = images as File[];
+  if (pages.reduce((sum, image) => sum + image.size, 0) > MAX_SCAN_UPLOAD_BYTES) return NextResponse.json({ error: "The document is too large." }, { status: 413 });
+  const content: Array<{ type: "image"; source: { type: "base64"; media_type: string; data: string } }> = [];
+  for (const image of pages) {
+    if (image.size === 0) return NextResponse.json({ error: "Image file is empty." }, { status: 400 });
+    const mime = detectImageMime(image);
+    if (mime && !isPreparedScanMime(mime)) return NextResponse.json({ error: "Unsupported image type." }, { status: 415 });
+    const bytes = new Uint8Array(await image.arrayBuffer());
+    const mediaType = sniffPreparedImageMime(bytes);
+    if (!mediaType) return NextResponse.json({ error: "Unsupported or unreadable image file." }, { status: 415 });
+    content.push({ type: "image", source: { type: "base64", media_type: mediaType, data: Buffer.from(bytes).toString("base64") } });
   }
-  if (image.size > MAX_SCAN_UPLOAD_BYTES) {
-    return NextResponse.json(
-      { error: `Image exceeds ${Math.floor(MAX_SCAN_UPLOAD_BYTES / 1024 / 1024)} MB limit.` },
-      { status: 413 },
-    );
-  }
-  const mime = detectImageMime(image);
-  if (mime && !isPreparedScanMime(mime)) {
-    return NextResponse.json(
-      { error: `Unsupported image type: ${image.type || image.name || "unknown"}.` },
-      { status: 415 },
-    );
-  }
-
-  const arrayBuf = await image.arrayBuffer();
-  const mediaType = sniffPreparedImageMime(new Uint8Array(arrayBuf));
-  if (!mediaType) {
-    return NextResponse.json(
-      { error: "Unsupported or unreadable image file." },
-      { status: 415 },
-    );
-  }
-  const base64 = Buffer.from(arrayBuf).toString("base64");
 
   type RouteAttempt = {
     value: SupplierQuoteExtraction;
@@ -257,13 +244,10 @@ export async function POST(request: NextRequest) {
             {
               role: "user",
               content: [
-                {
-                  type: "image",
-                  source: { type: "base64", media_type: mediaType, data: base64 },
-                },
+                ...content,
                 {
                   type: "text",
-                  text: `Read every product line on this supplier quote and return the JSON described in the system prompt.${retryNote}`,
+                  text: `Read every product line across all ${pages.length} pages of this ONE supplier quote. Do not count carried-forward subtotals as product lines. Return the JSON described in the system prompt.${retryNote}`,
                 },
               ],
             },

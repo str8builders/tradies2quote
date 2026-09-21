@@ -1,3 +1,4 @@
+import { aiConsentGate } from "@/lib/ai-consent";
 import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
@@ -100,6 +101,9 @@ export async function POST(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+
+  const consentGate = await aiConsentGate(supabase, user.id);
+  if (consentGate) return consentGate;
   if (!isOwnerEmail(user.email)) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }

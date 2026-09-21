@@ -139,6 +139,7 @@ export async function createQuoteRequest(opts: {
   tradieUserId: string;
   input: CleanRequestInput;
   sourceIp: string | null;
+  aiConsentVersion?: string | null;
   userAgent: string | null;
 }): Promise<CreatedRequest> {
   const { admin, tradieUserId, input } = opts;
@@ -208,6 +209,8 @@ export async function createQuoteRequest(opts: {
       site_address: input.address,
       description: input.description,
       status: "new",
+      ai_consent_version: opts.aiConsentVersion ?? null,
+      ai_consent_at: opts.aiConsentVersion ? new Date().toISOString() : null,
       source_ip: opts.sourceIp,
       user_agent: opts.userAgent ? opts.userAgent.slice(0, 300) : null,
     })

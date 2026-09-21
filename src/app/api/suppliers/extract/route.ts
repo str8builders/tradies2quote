@@ -1,3 +1,4 @@
+import { aiConsentGate } from "@/lib/ai-consent";
 import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
 import { parseModelJsonObject } from "@/lib/modelJson";
@@ -169,6 +170,9 @@ export async function POST(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const consentGate = await aiConsentGate(supabase, user.id);
+  if (consentGate) return consentGate;
 
   // Owner bypass — lets the owner dogfood + stress-test without
   // tripping their own cap. Mirrors how /app/agents + /app/debug

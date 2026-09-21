@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { purgeAccount } from "@/lib/account-deletion";
-import { isCompedEmail } from "@/lib/reviewer";
 import { captureError } from "@/lib/observability";
 
 /**
@@ -75,13 +74,6 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser(token);
   if (authError || !user) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
-  }
-
-  // App Review demo account: run the flow and report success without
-  // destroying the login, exactly as the website's own action does. The
-  // reviewer needs to be able to sign in again on the next round.
-  if (isCompedEmail(user.email)) {
-    return NextResponse.json({ ok: true });
   }
 
   try {

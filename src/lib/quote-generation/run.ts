@@ -1,5 +1,6 @@
+import { AI_CONSENT_VERSION, hasAiConsent } from "@/lib/ai-consent";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database, Json } from "@/lib/supabase/database.types";
+import type { Database } from "@/lib/supabase/database.types";
 import { captureError } from "@/lib/observability";
 import { parseModelJsonObject } from "@/lib/modelJson";
 import { FetchTimeoutError } from "@/lib/fetchTimeout";
@@ -245,13 +246,14 @@ async function runQuotePipeline(
 
   const { data: quote, error: qErr } = await db
     .from("quotes")
-    .select("id, voice_transcript, quote_data")
+    .select("id, voice_transcript, quote_data, revision, status")
     .eq("id", id)
     .eq("user_id", userId)
     .single();
   if (qErr || !quote) {
     return fail(404, { error: "Quote not found" });
   }
+  if (quote.status !== "draft") return fail(409, { error: "Only a draft quote can be generated." });
   const transcript = (quote.voice_transcript ?? "").trim();
   if (!transcript) {
     return fail(400, { error: "Quote has no transcript" });
@@ -261,9 +263,14 @@ async function runQuotePipeline(
   // quote_data to '{}' (drift, since migrated away); shape-checking lets
   // any row poisoned by that default regenerate instead of 409ing forever.
   const existingData = quote.quote_data as { line_items?: unknown } | null;
-  if (existingData && Array.isArray(existingData.line_items)) {
+  if (existingData && Array.isArray(existingData.line_items) && existingData.line_items.length > 0) {
     return fail(409, { error: "Quote has already been generated" });
   }
+
+  if (!(await hasAiConsent(db, userId))) return fail(403, { error: "ai_consent_required" });
+  const requestConsent = await db.from("quote_requests").select("ai_consent_version").eq("quote_id", id).eq("user_id", userId).maybeSingle();
+  if (requestConsent.error) return fail(503, { error: "Could not check customer AI permission." });
+  if (requestConsent.data && requestConsent.data.ai_consent_version !== AI_CONSENT_VERSION) return fail(403, { error: "This customer request does not allow AI processing. Prepare the quote manually." });
 
   const { data: profileRow } = await db
     .from("profiles")
@@ -1072,10 +1079,21 @@ async function runQuotePipeline(
     }
   }
 
+  // Explicit details typed before generation are authoritative over model guesses.
+  const entered = quote.quote_data as Partial<QuoteData> | null;
+  if (entered?.client) {
+    parsed.client = { ...parsed.client, ...Object.fromEntries(Object.entries(entered.client).filter(([, value]) => typeof value === "string" && value.trim())) };
+  }
+  if (entered?.terms?.trim()) parsed.terms = entered.terms;
+  if (entered?.currency) parsed.currency = entered.currency;
+  if (typeof entered?.markup_pct === "number") parsed.markup_pct = entered.markup_pct;
+  if (typeof entered?.tax_rate === "number") parsed.tax_rate = entered.tax_rate;
+  if (entered?.tax_label) parsed.tax_label = entered.tax_label;
+
   const totals = computeQuoteTotals(
     parsed.line_items,
-    profile.default_markup_pct,
-    profile.tax_rate,
+    parsed.markup_pct,
+    parsed.tax_rate,
   );
   parsed.materials_subtotal = totals.materials_subtotal;
   parsed.labour_subtotal = totals.labour_subtotal;
@@ -1084,45 +1102,11 @@ async function runQuotePipeline(
   parsed.tax_amount = totals.tax_amount;
   parsed.total = totals.total;
 
-  if (parsed.line_items.length > 0) {
-    // Two rapid POSTs for the same quote can both pass the early
-    // "already generated" check (the LLM call sits in the window) — a
-    // plain insert then doubles every row. Delete-before-insert makes
-    // the last writer land a single clean set, matching saveQuoteChanges.
-    await db.from("quote_items").delete().eq("quote_id", quote.id);
-    const { error: iErr } = await db.from("quote_items").insert(
-      parsed.line_items.map((it) => ({
-        quote_id: quote.id,
-        type: it.type,
-        description: it.description,
-        quantity: it.quantity,
-        unit: it.unit,
-        unit_price: it.unit_price,
-        line_total: it.line_total,
-      })),
-    );
-    if (iErr) {
-      console.error("quote_items insert failed", iErr);
-      return fail(500, { error: "Failed to save line items" });
-    }
-  }
-
-  const { error: uErr } = await db
-    .from("quotes")
-    .update({
-      // The admin-typed client wants the generated Json shape; QuoteData is
-      // plain JSON by construction (it round-trips through the model).
-      quote_data: parsed as unknown as Json,
-      ai_snapshot: parsed as unknown as Json,
-      total_amount: parsed.total,
-      currency: parsed.currency,
-    })
-    .eq("id", quote.id)
-    .eq("user_id", userId);
-  if (uErr) {
-    console.error("quotes update failed", uErr);
-    return fail(500, { error: "Failed to save quote" });
-  }
+  const { error: commitError } = await db.rpc("commit_generated_quote" as never, {
+    p_user_id: userId, p_quote_id: quote.id, p_expected_revision: quote.revision,
+    p_data: parsed,
+  } as never);
+  if (commitError) return fail(commitError.code === "40001" ? 409 : 500, { error: commitError.code === "40001" ? "The quote changed while generating. Refresh before trying again." : "The draft could not be saved. Refresh before retrying." });
 
   if (usedLibraryIds.size > 0) {
     const ids = Array.from(usedLibraryIds);

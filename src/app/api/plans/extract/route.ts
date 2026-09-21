@@ -1,3 +1,4 @@
+import { aiConsentGate } from "@/lib/ai-consent";
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
@@ -41,6 +42,9 @@ export async function POST(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const consentGate = await aiConsentGate(supabase, user.id);
+  if (consentGate) return consentGate;
 
   if (!planReaderAllowed(user.email)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

@@ -3,6 +3,10 @@ import path from "node:path";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
+  outputFileTracingIncludes: {
+    "/api/mobile/v1/*": ["./src/lib/billing/apple-roots/*.cer"],
+    "/api/billing/apple/*": ["./src/lib/billing/apple-roots/*.cer"],
+  },
   // Self-hosting (Docker): emit a standalone server bundle that ships only
   // the file-traced runtime deps, so the production image doesn't need the
   // full node_modules. Opt-in via BUILD_STANDALONE=1 (set by deploy/Dockerfile)

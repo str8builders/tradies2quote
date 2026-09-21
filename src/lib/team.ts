@@ -17,8 +17,16 @@ export const getTeamContext = cache(async (userId: string) => {
   const ownerId = team?.owner_id ?? userId;
   const { data: sub, error } = await adminClient().from("subscriptions").select("plan,status,current_period_end").eq("user_id", ownerId).maybeSingle();
   if (error) throw error;
-  const plan = storedPlan(sub?.plan);
-  const paid = !!(plan && sub && ["active", "trialing", "past_due"].includes(sub.status ?? "") && sub.current_period_end && Date.parse(sub.current_period_end) > Date.now());
+  let plan = storedPlan(sub?.plan);
+  let paid = !!(plan && sub && ["active", "trialing", "past_due"].includes(sub.status ?? "") && sub.current_period_end && Date.parse(sub.current_period_end) > Date.now());
+  if (process.env.APPLE_SUBSCRIPTIONS_ENABLED === "true") {
+    const result = await adminClient().rpc("effective_subscription" as never, { p_user: ownerId } as never);
+    if (result.error) throw result.error;
+    const effective = result.data as { plan: string; expiresAt: string } | null;
+    if (effective && storedPlan(effective.plan) && Date.parse(effective.expiresAt) > Date.now()) {
+      plan = storedPlan(effective.plan); paid = true;
+    }
+  }
   const { data: activeOwner, error: activeError } = await db.rpc("my_team_owner");
   if (activeError) throw activeError;
   const effectivePlan: PlanId = paid && (!team || ownerId === userId || activeOwner === ownerId) ? plan! : "solo";

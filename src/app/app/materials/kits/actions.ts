@@ -57,41 +57,11 @@ export async function saveKit(input: SaveKitInput): Promise<SaveKitResult> {
   const notes = input?.notes ? String(input.notes).trim() || null : null;
   const items = sanitizeItems(input?.items);
 
-  // 1) upsert the kit row
-  let kitId = input?.id ? String(input.id) : null;
-  if (kitId) {
-    const { error } = await supabase
-      .from("kits")
-      .update({ name, trade, notes, updated_at: new Date().toISOString() })
-      .eq("id", kitId)
-      .eq("user_id", user.id);
-    if (error) return { ok: false, error: "Could not save the kit." };
-  } else {
-    const { data, error } = await supabase
-      .from("kits")
-      .insert({ user_id: user.id, name, trade, notes })
-      .select("id")
-      .single();
-    if (error || !data) return { ok: false, error: "Could not create the kit." };
-    kitId = data.id;
-  }
-
-  // 2) replace its items (delete-then-insert; both RLS-scoped to this user)
-  await supabase.from("kit_items").delete().eq("kit_id", kitId).eq("user_id", user.id);
-  if (items.length > 0) {
-    const rows = items.map((it, idx) => ({
-      kit_id: kitId as string,
-      user_id: user.id,
-      type: it.type,
-      description: it.description,
-      quantity: it.quantity,
-      unit: it.unit,
-      unit_price: it.unit_price,
-      position: idx,
-    }));
-    const { error } = await supabase.from("kit_items").insert(rows);
-    if (error) return { ok: false, error: "Saved the kit, but some lines didn't store." };
-  }
+  // The header and all lines commit or roll back together.
+  const { data: kitId, error } = await supabase.rpc("save_kit_atomic", {
+    p_id: input?.id || null, p_name: name, p_trade: trade, p_notes: notes, p_items: items,
+  });
+  if (error || !kitId) return { ok: false, error: "Could not save the kit. Your previous kit has not been changed." };
 
   revalidatePath("/app/materials/kits");
   return { ok: true, id: kitId as string };

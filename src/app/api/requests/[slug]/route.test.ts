@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const mock = vi.hoisted(() => ({
+  consented: true,
   tradie: { id: "tradie-1", business_name: "STR8 Builders", email: "owner@example.com" } as
     | { id: string; business_name: string | null; email: string | null }
     | null,
@@ -12,6 +13,7 @@ const mock = vi.hoisted(() => ({
   canWrite: true,
 }));
 
+vi.mock("@/lib/ai-consent", () => ({ AI_CONSENT_VERSION: "2026-09-external-ai-v2", hasAiConsent: async () => mock.consented }));
 vi.mock("@/lib/supabase/admin", () => ({
   adminClient: () => ({
     auth: { admin: { getUserById: async () => ({ data: { user: { email: "owner@example.com", created_at: "2026-09-01T00:00:00Z" } } }) } },
@@ -30,6 +32,7 @@ vi.mock("@/lib/quote-requests/intake", async (importOriginal) => {
 });
 vi.mock("@/lib/moderation", () => ({
   moderateChatText: async () => mock.moderation,
+  matchesBlocklist: () => !mock.moderation.allowed,
   sanitizeForPush: (s: string) => s,
 }));
 vi.mock("@/lib/subscription", () => ({
@@ -41,6 +44,7 @@ vi.mock("@/lib/observability", () => ({ captureError: vi.fn() }));
 import { POST } from "./route";
 
 const body = {
+  aiConsentVersion: "2026-09-external-ai-v2",
   name: "Sarah Smith",
   phone: "021 555 1234",
   email: "sarah@example.com",
@@ -68,6 +72,7 @@ describe("POST /api/requests/[slug]", () => {
     mock.tradie = { id: "tradie-1", business_name: "STR8 Builders", email: "owner@example.com" };
     mock.moderation = { allowed: true };
     mock.canWrite = true;
+    mock.consented = true;
     mock.created.mockClear();
     mock.notify.mockClear();
     mock.generate.mockClear();
@@ -82,6 +87,18 @@ describe("POST /api/requests/[slug]", () => {
     expect(mock.created.mock.calls[0][0]).toMatchObject({ tradieUserId: "tradie-1", sourceIp: expect.stringMatching(/^198\.51\.100\./) });
     expect(mock.notify).toHaveBeenCalledTimes(1);
     expect(mock.generate).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts a customer request without sending it to AI when permission is absent", async () => {
+    const res = await post("str8-builders", { ...body, aiConsentVersion: "" });
+    expect(res.status).toBe(200); await flush();
+    expect(mock.created.mock.calls[0][0]).toMatchObject({ aiConsentVersion: null });
+    expect(mock.generate).not.toHaveBeenCalled();
+  });
+  it("honours the business withdrawing AI permission", async () => {
+    mock.consented = false;
+    expect((await post("str8-builders", body)).status).toBe(200); await flush();
+    expect(mock.generate).not.toHaveBeenCalled();
   });
 
   it("404s for an unknown or malformed slug", async () => {

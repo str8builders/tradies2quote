@@ -1,3 +1,4 @@
+import { AI_CONSENT_VERSION, hasAiConsent } from "@/lib/ai-consent";
 import { NextResponse, type NextRequest } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
@@ -34,7 +35,8 @@ export async function POST(
 
   let description = "";
   try {
-    const body = (await request.json()) as { description?: unknown };
+    const body = (await request.json()) as { description?: unknown; aiConsentVersion?: unknown };
+    if (body.aiConsentVersion !== AI_CONSENT_VERSION) return NextResponse.json({ questions: [] });
     description = typeof body.description === "string" ? body.description.trim() : "";
   } catch {
     return NextResponse.json({ questions: [] });
@@ -48,6 +50,7 @@ export async function POST(
     return NextResponse.json({ error: "This request link isn't active." }, { status: 404 });
   }
 
+  if (!(await hasAiConsent(adminClient(), tradie.id))) return NextResponse.json({ questions: [] });
   const questions = await suggestClarifyingQuestions(description);
   return NextResponse.json({ questions });
 }

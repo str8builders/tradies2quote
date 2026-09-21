@@ -35,6 +35,7 @@ export interface SubscriptionStatus {
   state: SubscriptionState;
   plan?: PlanId | null;
   managedByTeam?: boolean;
+  source?: "apple" | "stripe";
   /** When the trial ends (or ended). Always populated, even if user is
    *  on a paid plan — useful for "trial converted on day X" analytics. */
   trialEndsAt: Date;
@@ -146,7 +147,7 @@ export async function getSubscriptionStatus(args: {
   // user a fresh 7-day window without recreating their auth rows.
   const admin = adminClient();
   let billingUserId = userId;
-  if (isStripeConfigured()) {
+  if (isStripeConfigured() || process.env.APPLE_SUBSCRIPTIONS_ENABLED === "true") {
     const result = await admin.rpc("active_team_owner" as never, { p_user: userId } as never);
     if (result.error) throw result.error;
     billingUserId = (result.data as string | null) ?? userId;
@@ -190,20 +191,16 @@ export async function getSubscriptionStatus(args: {
   const trialDaysLeft = Math.ceil(trialMsLeft / DAY_MS);
   const inTrial = trialMsLeft > 0;
 
-  // No Stripe configured = everyone is on a permanent trial. Lets the
-  // app run end-to-end during development before keys are wired. We
-  // still respect the trial_started_at anchor in dev so test users
-  // can experience the trial-expired UI by setting the anchor back.
-  if (!isStripeConfigured()) {
-    return {
-      state: inTrial ? "trialing" : "trialing",
-      trialEndsAt,
-      trialDaysLeft: inTrial ? trialDaysLeft : 0,
-      currentPeriodEnd: null,
-      stripeCustomerId: null,
-      stripeSubscriptionStatus: null,
-      betaFreeUntil: null,
-    };
+  if (process.env.APPLE_SUBSCRIPTIONS_ENABLED === "true") {
+    const { data, error } = await admin.rpc("effective_subscription" as never, { p_user: billingUserId } as never);
+    if (error) throw error;
+    const effective = data as { plan: string; source: "apple" | "stripe"; expiresAt: string } | null;
+    if (effective && storedPlan(effective.plan) && Date.parse(effective.expiresAt) > now.getTime()) {
+      return { state: "paid", plan: storedPlan(effective.plan), source: effective.source, managedByTeam: billingUserId !== userId,
+        trialEndsAt, trialDaysLeft: null, currentPeriodEnd: new Date(effective.expiresAt),
+        stripeCustomerId: billingUserId === userId ? subRes.data?.stripe_customer_id ?? null : null,
+        stripeSubscriptionStatus: subRes.data?.status ?? null, betaFreeUntil: null };
+    }
   }
 
   const sub = subRes.data;
@@ -232,6 +229,7 @@ export async function getSubscriptionStatus(args: {
   if (hasActiveSub) {
     return {
       state: "paid",
+      source: "stripe",
       trialEndsAt,
       trialDaysLeft: null,
       currentPeriodEnd: periodEnd,

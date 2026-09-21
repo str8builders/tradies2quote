@@ -1,3 +1,4 @@
+import { aiConsentGate } from "@/lib/ai-consent";
 import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
@@ -45,6 +46,9 @@ export async function POST(req: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const consentGate = await aiConsentGate(supabase, user.id);
+  if (consentGate) return consentGate;
 
   // Same spend gates as /api/quotes/generate — this route forwards images
   // to OpenAI Vision, so an expired trial or a scripted loop costs money.

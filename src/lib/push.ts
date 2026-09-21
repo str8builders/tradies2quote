@@ -48,7 +48,8 @@ export async function sendPushToUser(
   userId: string | null | undefined,
   payload: PushPayload,
 ): Promise<void> {
-  if (!userId || !ensureConfigured()) return;
+  if (!userId) return;
+  const webEnabled = ensureConfigured();
   try {
     // The generated Database types don't include push_subscriptions yet,
     // so use a loosely-typed handle for this table (mirrors how the
@@ -75,8 +76,8 @@ export async function sendPushToUser(
         // same way expired web endpoints are.
         if (sub.platform === "ios") {
           const result = await sendApnsNotification(sub.endpoint, {
-            title: payload.title,
-            body: payload.body,
+            title: "Tradies2Quote",
+            body: "There is an update in your account. Open the app to review it.",
             url: payload.url,
           });
           if (
@@ -93,7 +94,7 @@ export async function sendPushToUser(
           return;
         }
 
-        if (!sub.p256dh || !sub.auth) return; // malformed web row — skip
+        if (!webEnabled || !sub.p256dh || !sub.auth) return; // malformed web row — skip
         try {
           await webpush.sendNotification(
             {

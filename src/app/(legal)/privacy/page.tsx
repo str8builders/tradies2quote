@@ -24,7 +24,7 @@ const SECTIONS = [
   { id: "contact", label: "Contact" },
 ];
 
-const PRIVACY_LAST_UPDATED_DISPLAY = "6 September 2026";
+const PRIVACY_LAST_UPDATED_DISPLAY = "21 September 2026";
 
 export default function PrivacyPage() {
   return (
@@ -47,7 +47,7 @@ export default function PrivacyPage() {
             account details, the quotes you create, and the voice memos you
             record to build them. We do not sell your data. We do not train
             AI models on it. You can ask us to delete your account and all
-            of your data at any time by emailing{" "}
+            personal content in Settings, or request help by emailing{" "}
             <a href={`mailto:${LEGAL.privacyEmail}`}>{LEGAL.privacyEmail}</a>.
           </p>
         </div>
@@ -114,8 +114,8 @@ export default function PrivacyPage() {
           </p>
           <p>
             We do <strong>not</strong> collect payment card details
-            ourselves. If and when we charge for paid plans, payment is
-            handled by Stripe — your card never touches our servers.
+            ourselves. Website subscriptions use Stripe and iOS subscriptions use Apple.
+            Your card details never reach our servers.
           </p>
           <p>
             <strong>T2QCAL on-device work</strong> — calculator inputs, drawings,
@@ -159,7 +159,7 @@ export default function PrivacyPage() {
           </ul>
           <p>
             We do not sell your personal information. We do not share it
-            with advertisers. We do not use it to train AI models — see the
+            with advertisers. We do not use it to train our own AI models — see the
             next section for what happens to your voice memos.
           </p>
         </LegalSection>
@@ -170,50 +170,33 @@ export default function PrivacyPage() {
           title="Voice, photos & AI processing"
         >
           <p>
-            {LEGAL.productName} uses a locally hosted AI model for text. Voice
-            transcription and image-reading need separate external providers
-            and are unavailable unless we explicitly configure and disclose
-            them. Content is processed as follows:
+            When you allow AI processing, selected job information is sent to
+            the providers below to prepare editable draft content. You can
+            create quotes manually without enabling these features.
           </p>
           <ul>
-            <li>
-              <strong>Typed descriptions and transcripts</strong> — the text
-              is processed by our self-hosted Qwen model on the same private
-              server as the application. It is not sent to OpenAI or
-              Anthropic for quote generation.
-            </li>
-            <li>
-              <strong>Voice memos</strong> — voice transcription is disabled
-              on the local-model deployment. If an external transcription
-              provider is enabled later, we will disclose it before use; the
-              resulting text can then be processed locally by Qwen.
-            </li>
-            <li>
-              <strong>Photos and images</strong> — the installed Qwen model is
-              text-only, so plan scans, site drawings and photographed
-              documents are not sent to it. Image-reading remains unavailable
-              unless a compatible, disclosed vision provider is configured.
-            </li>
-            <li>
-              <strong>Customer quote chat</strong> — when your client uses
-              the chat on their quote page, their messages are processed
-              by the self-hosted Qwen model to generate the reply. The chat is
-              clearly labelled as AI, the conversation is visible to you, and
-              both sides of it are screened by an automated content filter.
-            </li>
+            <li><strong>Descriptions and transcripts</strong> — Anthropic processes
+              job text to prepare quotes, clean up transcripts and answer quote-chat questions.</li>
+            <li><strong>Voice recordings</strong> — OpenAI transcribes your recording;
+              the resulting text may then be processed by Anthropic to prepare a quote.</li>
+            <li><strong>Drawings and supplier documents</strong> — Anthropic reads
+              selected images. OpenAI analyses photos for enabled photo-assistance features.</li>
+            <li><strong>Customer requests and chat</strong> — customers choose whether
+              to allow AI processing before their content is sent to these providers.
+              Requests can be submitted without AI. Chat is labelled as AI and is visible
+              to the business receiving the quote request.</li>
           </ul>
           <p>
-            Text sent to the local Qwen model stays on infrastructure we
-            operate and is not used to train the model. If an optional external
-            AI provider is enabled, its identity, purpose and applicable data
-            handling terms will be disclosed before that feature is used.
+            These providers may process information overseas, including in the United States.
+            We do not use your content to train our own AI models. External providers
+            process content under their applicable business-service terms and retention policies.
+            Review every result before relying on it. You can withdraw your permission
+            for future AI requests in Settings; this does not undo processing already completed.
           </p>
           <p>
-            The text description or transcript lives inside your quote and is
-            deleted when you delete the quote or close your account. Plan and
-            site images you attach are stored with your account so your quotes
-            keep their source documents; delete the quote (or your account) and
-            they go with it.
+            Quote descriptions, transcripts and attachments are linked to your account.
+            Account deletion removes their active copies. Limited billing records and
+            backups are subject to the retention terms below.
           </p>
         </LegalSection>
 
@@ -232,21 +215,21 @@ export default function PrivacyPage() {
               <strong>Contabo GmbH</strong> — infrastructure. The
               application and its database run on a virtual private
               server we operate ourselves, hosted in Contabo&apos;s data
-              centre in France. Your account data, quotes, clients, and
+              centre in Sydney, Australia. Your account data, quotes, clients, and
               uploaded images live on that server (we run the database
               and file storage software ourselves — no third-party
               database service holds your data).
             </li>
             <li>
-              <strong>Local Qwen model</strong> — quote generation, transcript
-              cleanup and customer quote chat. It runs on the private server
-              described above; text is not sent to a third-party AI API.
+              <strong>Anthropic</strong> — quote generation, transcript cleanup,
+              customer quote chat, drawings and supplier-document analysis. Enabled
+              features send the relevant job text or images to Anthropic for processing.
             </li>
             <li>
-              <strong>OpenAI and Anthropic</strong> — optional external AI
-              providers for voice transcription or image analysis. They are
-              not configured for the local text deployment; we will update the
-              disclosure before enabling either service.
+              <strong>OpenAI</strong> — voice transcription and enabled photo
+              analysis. These features send the recording or selected image to OpenAI.
+              Authenticated AI features require your current, affirmative consent;
+              you can withdraw it in Settings.
             </li>
             <li>
               <strong>Open-Meteo</strong> — job-site weather. Receives
@@ -267,16 +250,19 @@ export default function PrivacyPage() {
               clients, and account notifications.
             </li>
             <li>
-              <strong>Apple</strong> — push notifications on iOS. If you
+              <strong>Apple</strong> — in-app subscriptions and push notifications on iOS.
+              Apple processes the purchase; we receive transaction identifiers and
+              subscription status to provide access. We do not receive your card details. If you
               turn notifications on in the iOS app, a device push token is
               stored and notifications are delivered through the Apple
               Push Notification service.
             </li>
           </ul>
           <p>
-            Text-message quote links are sent from <strong>your own
-            phone&apos;s Messages app</strong> — no SMS provider receives
-            your client&apos;s number or the message from us.
+            When you share through your phone&apos;s Messages app, your mobile
+            provider handles the message. If server SMS is enabled, Twilio receives
+            the recipient number and message to deliver it. The sending screen
+            identifies which method you are using.
           </p>
           <p>
             Error monitoring runs on our own server; crash and error
@@ -295,13 +281,12 @@ export default function PrivacyPage() {
         >
           <p>
             Your account data and quote content are stored on a server we
-            operate, hosted by Contabo GmbH in <strong>France</strong>
-            (European Union). Backups live on the same infrastructure.
+            operate, hosted by Contabo GmbH in <strong>Sydney, Australia</strong>. Backups live on the same infrastructure.
           </p>
           <p>
-            Typed descriptions, transcripts and AI chat messages are processed
-            by the local Qwen model on the same server infrastructure as the
-            application. They are not transferred to OpenAI or Anthropic.
+            Enabled AI features send relevant descriptions, transcripts, audio or
+            images to Anthropic or OpenAI, whose processing may take place outside
+            your country, including the United States.
             Weather lookups go to Open-Meteo in the EU; emails are delivered
             via Resend in the US.
           </p>
@@ -325,8 +310,9 @@ export default function PrivacyPage() {
               as your account is open.
             </li>
             <li>
-              <strong>Deleted quotes</strong> — purged within 30 days of
-              deletion.
+              <strong>Deleted quotes</strong> — hidden from active lists and public
+              sharing. Underlying records may remain until your account is deleted
+              or the records are permanently purged.
             </li>
             <li>
               <strong>Closed accounts</strong> — we delete your personal
@@ -341,7 +327,8 @@ export default function PrivacyPage() {
             </li>
             <li>
               <strong>Records we are legally required to keep</strong> —
-              tax invoices and similar records may be retained for the
+              billing transactions, including Apple transaction identifiers used to prevent
+              duplicate or misassigned purchases, and similar records may be retained for the
               period required by NZ law (typically 7 years).
             </li>
           </ul>

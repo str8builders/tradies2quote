@@ -1,3 +1,4 @@
+import { AI_CONSENT_VERSION, hasAiConsent } from "@/lib/ai-consent";
 import { type NextRequest, NextResponse } from "next/server";
 import { captureError } from "@/lib/observability";
 import { adminClient } from "@/lib/supabase/admin";
@@ -61,6 +62,7 @@ const MAX_MESSAGES_PER_DAY = 10;
 type Params = { token: string };
 
 type ChatBody = {
+  aiConsentVersion?: unknown;
   message?: unknown;
   history?: unknown;
 };
@@ -71,6 +73,7 @@ type ChatHistoryEntry = {
   timestamp: string;
   intent?: string;
   note_to_tradie?: string;
+  ai_consent_version?: string;
 };
 
 export async function POST(
@@ -99,6 +102,7 @@ export async function POST(
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
 
+  if (body?.aiConsentVersion !== AI_CONSENT_VERSION) return NextResponse.json({ error: "ai_consent_required", message: "Review and allow AI processing before sending a message." }, { status: 403 });
   const message =
     typeof body.message === "string" ? body.message.trim() : "";
   if (!message) {
@@ -155,12 +159,14 @@ export async function POST(
   // chat history. Admin client because the customer is anonymous.
   const { data: row, error: rowErr } = await admin
     .from("quotes")
-    .select("id, quote_data, chat_disabled")
+    .select("id, user_id, quote_data, chat_disabled")
     .eq("id", quote.id)
     .single();
   if (rowErr || !row) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
+
+  if (!(await hasAiConsent(admin, row.user_id))) return NextResponse.json({ error: "chat_unavailable", message: "The business has not enabled AI chat. Contact the tradie directly." }, { status: 403 });
 
   // Guideline 1.2 "block" control: the tradie can switch the chat off for
   // this quote link (the customer is an anonymous token-holder, so per-quote
@@ -241,7 +247,7 @@ export async function POST(
     await admin.rpc("append_quote_chat_messages", {
       p_quote_id: quote.id,
       p_messages: [
-        { role: "customer", content: message, timestamp: now },
+        { role: "customer", content: message, timestamp: now, ai_consent_version: AI_CONSENT_VERSION },
       ] as unknown,
     } as never);
     return NextResponse.json({
@@ -273,7 +279,7 @@ export async function POST(
   // Only chat_history is touched, so concurrent chats / tradie edits to
   // quote_data no longer clobber each other (lost-update fix).
   const newMessages: ChatHistoryEntry[] = [
-    { role: "customer", content: message, timestamp: now },
+    { role: "customer", content: message, timestamp: now, ai_consent_version: AI_CONSENT_VERSION },
     {
       role: "assistant",
       content: safeReply,

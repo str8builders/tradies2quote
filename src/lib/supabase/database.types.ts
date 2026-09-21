@@ -21,9 +21,18 @@ export type Database = {
         Relationships: []
       }
       quote_requests: {
-        Row: { id: string; user_id: string; quote_id: string | null; client_id: string | null; client_name: string; client_email: string | null; client_phone: string | null; site_address: string | null; description: string; status: string; error_message: string | null; source_ip: string | null; user_agent: string | null; created_at: string; generated_at: string | null; seen_at: string | null }
-        Insert: { id?: string; user_id: string; quote_id?: string | null; client_id?: string | null; client_name: string; client_email?: string | null; client_phone?: string | null; site_address?: string | null; description: string; status?: string; error_message?: string | null; source_ip?: string | null; user_agent?: string | null; created_at?: string; generated_at?: string | null; seen_at?: string | null }
-        Update: { quote_id?: string | null; client_id?: string | null; status?: string; error_message?: string | null; generated_at?: string | null; seen_at?: string | null }
+        Row: {
+          ai_consent_version: string | null
+          ai_consent_at: string | null
+          id: string; user_id: string; quote_id: string | null; client_id: string | null; client_name: string; client_email: string | null; client_phone: string | null; site_address: string | null; description: string; status: string; error_message: string | null; source_ip: string | null; user_agent: string | null; created_at: string; generated_at: string | null; seen_at: string | null }
+        Insert: {
+          ai_consent_version?: string | null
+          ai_consent_at?: string | null
+          id?: string; user_id: string; quote_id?: string | null; client_id?: string | null; client_name: string; client_email?: string | null; client_phone?: string | null; site_address?: string | null; description: string; status?: string; error_message?: string | null; source_ip?: string | null; user_agent?: string | null; created_at?: string; generated_at?: string | null; seen_at?: string | null }
+        Update: {
+          ai_consent_version?: string | null
+          ai_consent_at?: string | null
+          quote_id?: string | null; client_id?: string | null; status?: string; error_message?: string | null; generated_at?: string | null; seen_at?: string | null }
         Relationships: []
       }
 
@@ -1080,29 +1089,32 @@ export type Database = {
       }
       push_subscriptions: {
         Row: {
-          auth: string
+          platform: string | null
+          auth: string | null
           created_at: string
           endpoint: string
           id: string
-          p256dh: string
+          p256dh: string | null
           user_agent: string | null
           user_id: string
         }
         Insert: {
-          auth: string
+          platform?: string | null
+          auth: string | null
           created_at?: string
           endpoint: string
           id?: string
-          p256dh: string
+          p256dh: string | null
           user_agent?: string | null
           user_id: string
         }
         Update: {
-          auth?: string
+          platform?: string | null
+          auth?: string | null
           created_at?: string
           endpoint?: string
           id?: string
-          p256dh?: string
+          p256dh?: string | null
           user_agent?: string | null
           user_id?: string
         }
@@ -1300,6 +1312,8 @@ export type Database = {
       }
       quotes: {
         Row: {
+          revision: string
+          updated_at: string
           accepted_at: string | null
           accepted_email: string | null
           accepted_ip: string | null
@@ -1335,6 +1349,8 @@ export type Database = {
           voice_transcript: string | null
         }
         Insert: {
+          revision?: string
+          updated_at?: string
           accepted_at?: string | null
           accepted_email?: string | null
           accepted_ip?: string | null
@@ -1370,6 +1386,8 @@ export type Database = {
           voice_transcript?: string | null
         }
         Update: {
+          revision?: string
+          updated_at?: string
           accepted_at?: string | null
           accepted_email?: string | null
           accepted_ip?: string | null

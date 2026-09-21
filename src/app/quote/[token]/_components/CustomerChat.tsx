@@ -1,5 +1,6 @@
 "use client";
 
+import { AI_CONSENT_VERSION } from "@/lib/ai-disclosure";
 import { useEffect, useRef, useState } from "react";
 import {
   ChatCircle,
@@ -51,6 +52,7 @@ const MAX_HISTORY_FOR_API = 20;
 
 export function CustomerChat({ token, businessName, clientName }: Props) {
   const [open, setOpen] = useState(false);
+  const [aiAllowed, setAiAllowed] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -121,7 +123,7 @@ export function CustomerChat({ token, businessName, clientName }: Props) {
 
   async function sendMessage() {
     const trimmed = input.trim();
-    if (!trimmed || sending) return;
+    if (!trimmed || sending || !aiAllowed) return;
     setError(null);
 
     const customerMsg: Message = { role: "customer", content: trimmed };
@@ -143,6 +145,7 @@ export function CustomerChat({ token, businessName, clientName }: Props) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            aiConsentVersion: AI_CONSENT_VERSION,
             message: trimmed,
             history: historyForApi.slice(0, -1), // exclude the message we just sent
           }),
@@ -316,6 +319,10 @@ export function CustomerChat({ token, businessName, clientName }: Props) {
 
             {/* Composer */}
             <footer className="border-t border-ink-700 bg-ink-950 px-3 py-3 pb-[max(env(safe-area-inset-bottom),12px)]">
+              <label className="mb-3 flex items-start gap-2 text-xs text-ink-300">
+                <input type="checkbox" checked={aiAllowed} onChange={(e) => setAiAllowed(e.target.checked)} className="h-5 w-5 shrink-0 accent-brand" />
+                <span>Allow Anthropic to process this conversation and quote details to answer my questions. Processing may occur overseas. AI can make mistakes; the tradie can see this chat. <a href="/privacy" className="underline">Privacy Policy</a></span>
+              </label>
               {/* `min-w-0` on the inner flex AND the textarea is the
                   classic flexbox-shrink fix: without it, the textarea's
                   intrinsic min-content (sized to the long placeholder
@@ -336,7 +343,7 @@ export function CustomerChat({ token, businessName, clientName }: Props) {
                 <button
                   type="button"
                   onClick={sendMessage}
-                  disabled={!input.trim() || sending}
+                  disabled={!input.trim() || sending || !aiAllowed}
                   data-testid="customer-chat-send"
                   aria-label="Send message"
                   className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-sm bg-brand text-ink-900 hover:bg-hivis disabled:cursor-not-allowed disabled:opacity-50"

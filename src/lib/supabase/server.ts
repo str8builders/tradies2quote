@@ -1,6 +1,7 @@
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
+import { createClient as createTokenClient } from "@supabase/supabase-js";
 
 /**
  * Wave 18.1 — perf — wrapped in React `cache()` so multiple
@@ -14,6 +15,22 @@ import { createServerClient } from "@supabase/ssr";
  * proxy / middleware still runs separately (different runtime).
  */
 export const createClient = cache(async () => {
+  // Native requests carry a user access token. Never fall back to a browser
+  // session when an Authorization header is present but invalid: otherwise a
+  // mixed-session request could act as the wrong account. The caller still
+  // verifies identity with auth.getUser(); this client uses the user's RLS.
+  const authorization = (await headers()).get("authorization");
+  if (authorization !== null) {
+    const match = /^Bearer ([A-Za-z0-9._~-]+)$/i.exec(authorization);
+    return createTokenClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+      {
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+        global: { headers: { Authorization: `Bearer ${match?.[1] ?? "invalid"}` } },
+      },
+    );
+  }
   const cookieStore = await cookies();
 
   return createServerClient(

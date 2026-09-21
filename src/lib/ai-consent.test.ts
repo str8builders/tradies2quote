@@ -40,10 +40,10 @@ describe("hasAiConsent", () => {
   });
 });
 
-describe("aiConsentGate — native-shell scoped (5.1.2(i))", () => {
-  it("WEB request always proceeds, even without consent", async () => {
+describe("aiConsentGate — account-wide (5.1.2(i))", () => {
+  it("WEB request without consent is blocked too", async () => {
     mockUa = WEB_UA;
-    expect(await aiConsentGate(fakeSupabase(null), "u")).toBeNull();
+    expect((await aiConsentGate(fakeSupabase(null), "u"))?.status).toBe(403);
   });
 
   it("NATIVE + consented proceeds", async () => {

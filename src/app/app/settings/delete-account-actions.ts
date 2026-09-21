@@ -3,7 +3,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { purgeAccount } from "@/lib/account-deletion";
-import { isCompedEmail } from "@/lib/reviewer";
 
 /**
  * Account deletion — Apple App Store Guideline 5.1.1(v) requires that any
@@ -42,19 +41,6 @@ export async function deleteAccountAction(
   const confirm = String(formData.get("confirm") ?? "").trim();
   if (confirm !== "DELETE") {
     return { ok: false, error: 'Type DELETE (all caps) to confirm.' };
-  }
-
-  // App Review demo account: run the full deletion UX (confirmation + the
-  // same signed-out success redirect) WITHOUT purging data or destroying the
-  // login. Apple reviewers execute this flow to verify Guideline 5.1.1(v) —
-  // and the review notes point them at it — but the demo credential is the
-  // only way back into the app on the next review round, so actually
-  // deleting it would fail every subsequent sign-in (Guideline 2.1). Real
-  // customer accounts are unaffected: this branch matches only the comped
-  // review email(s) in src/lib/reviewer.ts.
-  if (isCompedEmail(user.email)) {
-    await supabase.auth.signOut();
-    redirect("/?account-deleted=1");
   }
 
   // The purge itself lives in `@/lib/account-deletion` so the iOS calculator

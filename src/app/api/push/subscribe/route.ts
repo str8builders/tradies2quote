@@ -1,3 +1,5 @@
+import { adminClient } from "@/lib/supabase/admin";
+import { consumeFixedWindow } from "@/lib/rate-limit";
 import { isPushServiceEndpoint } from "@/lib/push-endpoint";
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -11,6 +13,7 @@ type SubBody = {
   /** Wave 46 — iOS App Store shell registrations. */
   platform?: unknown;
   token?: unknown;
+  environment?: unknown;
 };
 
 /**
@@ -39,14 +42,17 @@ export async function POST(request: NextRequest) {
   }
 
   // iOS App Store shell — APNs device token registration.
-  if (body.platform === "ios") {
+  if (body?.platform === "ios") {
+    if (!consumeFixedWindow(`push:${user.id}`, 20, 60_000).ok) return NextResponse.json({ error: "Please wait a minute." }, { status: 429 });
+    const environment = process.env.APNS_ENV === "sandbox" ? "development" : "production";
+    if (body.environment && body.environment !== environment) return NextResponse.json({ error: "This build uses a different Apple notification environment." }, { status: 409 });
     const token = typeof body.token === "string" ? body.token.trim() : "";
     // APNs tokens are hex; length varies by device generation. Bound it
     // so junk can't fill the column.
     if (!/^[0-9a-f]{32,200}$/i.test(token)) {
       return NextResponse.json({ error: "invalid_token" }, { status: 400 });
     }
-    const { error } = await supabase.from("push_subscriptions").upsert(
+    const { error } = await adminClient().from("push_subscriptions").upsert(
       {
         user_id: user.id,
         endpoint: token,
@@ -64,9 +70,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  const endpoint = typeof body.endpoint === "string" ? body.endpoint : "";
-  const p256dh = typeof body.keys?.p256dh === "string" ? body.keys.p256dh : "";
-  const auth = typeof body.keys?.auth === "string" ? body.keys.auth : "";
+  const endpoint = typeof body?.endpoint === "string" ? body.endpoint : "";
+  const p256dh = typeof body?.keys?.p256dh === "string" ? body.keys.p256dh : "";
+  const auth = typeof body?.keys?.auth === "string" ? body.keys.auth : "";
   if (!endpoint || !p256dh || !auth) {
     return NextResponse.json({ error: "invalid_subscription" }, { status: 400 });
   }
@@ -110,7 +116,7 @@ export async function DELETE(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
-  const endpoint = typeof body.endpoint === "string" ? body.endpoint : "";
+  const endpoint = typeof body?.endpoint === "string" ? body.endpoint : "";
   if (!endpoint) {
     return NextResponse.json({ error: "invalid_subscription" }, { status: 400 });
   }

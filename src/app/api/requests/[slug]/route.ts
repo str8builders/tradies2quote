@@ -1,9 +1,10 @@
+import { AI_CONSENT_VERSION, hasAiConsent } from "@/lib/ai-consent";
 import { after, NextResponse, type NextRequest } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { captureError } from "@/lib/observability";
 import { isLinkPreviewBot } from "@/lib/bot-detection";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
-import { moderateChatText } from "@/lib/moderation";
+import { moderateChatText, matchesBlocklist } from "@/lib/moderation";
 import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
 import { isValidRequestSlug } from "@/lib/quote-requests/slug";
 import {
@@ -47,6 +48,7 @@ async function readSubmission(
       return typeof v === "string" ? v : "";
     };
     const fields = {
+      aiConsentVersion: text("aiConsentVersion"),
       name: text("name"),
       phone: text("phone"),
       email: text("email"),
@@ -114,6 +116,7 @@ export async function POST(
     return NextResponse.json({ error: validated.error }, { status: 400 });
   }
   const input = validated.value;
+  const allowAI = Boolean(submission.fields && typeof submission.fields === "object" && "aiConsentVersion" in submission.fields && submission.fields.aiConsentVersion === AI_CONSENT_VERSION);
 
   const admin = adminClient();
   const tradie = await findTradieBySlug(admin, slug);
@@ -135,7 +138,8 @@ export async function POST(
     );
   }
 
-  const verdict = await moderateChatText(input.description, "inbound");
+  const canProcessAI = allowAI && await hasAiConsent(admin, tradie.id);
+  const verdict = canProcessAI ? await moderateChatText(input.description, "inbound") : { allowed: !matchesBlocklist(input.description) };
   if (!verdict.allowed) {
     return NextResponse.json(
       { error: "We couldn't send that description. Please describe the job you need done." },
@@ -148,6 +152,7 @@ export async function POST(
     created = await createQuoteRequest({
       admin,
       tradieUserId: tradie.id,
+      aiConsentVersion: allowAI ? AI_CONSENT_VERSION : null,
       input,
       sourceIp: ip === "unknown" ? null : ip,
       userAgent: request.headers.get("user-agent"),
@@ -189,7 +194,7 @@ export async function POST(
             .eq("id", created.requestId)
             .eq("user_id", tradie.id);
         }
-        await describePhotosIntoTranscript({
+        if (canProcessAI) await describePhotosIntoTranscript({
           admin,
           tradieUserId: tradie.id,
           quoteId: created.quoteId,
@@ -199,6 +204,7 @@ export async function POST(
         captureError(e, { route: "quote-requests/photos" });
       }
     }
+    if (!canProcessAI) return;
     // Generation only while the tradie's account can create quotes; an
     // expired trial still receives the request and can generate later.
     try {

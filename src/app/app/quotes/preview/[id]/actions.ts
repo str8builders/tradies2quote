@@ -34,12 +34,14 @@ import {
 } from "@/lib/agent-monitor/logger";
 
 type SaveResult =
-  | { ok: true; materialsLearned?: number }
-  | { error: string };
+  | { ok: true; materialsLearned?: number; revision?: string }
+  | { error: string; code?: string };
 
 export async function saveQuoteChanges(
   id: string,
   data: QuoteData,
+  expectedRevision?: string,
+  transcript?: string,
 ): Promise<SaveResult> {
   const supabase = await createClient();
   const {
@@ -49,7 +51,7 @@ export async function saveQuoteChanges(
 
   const { data: priorRow } = await supabase
     .from("quotes")
-    .select("quote_data, ai_snapshot, status, user_id")
+    .select("quote_data, ai_snapshot, status, user_id, revision")
     .eq("id", id)
     .single();
   // RLS already scopes this, but check ownership explicitly so a
@@ -58,7 +60,7 @@ export async function saveQuoteChanges(
   if (!priorRow || priorRow.user_id !== user.id) {
     return { error: "Quote not found." };
   }
-  if (priorRow.status === "accepted") {
+  if (!["draft", "sent", "viewed", "declined"].includes(priorRow.status)) {
     return { error: "Quote already accepted — edits are locked." };
   }
   const prior = (priorRow.quote_data ?? null) as QuoteData | null;
@@ -77,7 +79,6 @@ export async function saveQuoteChanges(
   const markup_pct = clampMarkupPct(data.markup_pct);
   const tax_rate = clampTaxRate(data.tax_rate);
   const totals = computeQuoteTotals(items, markup_pct, tax_rate);
-  const total = totals.total;
 
   const next: QuoteData = {
     ...data,
@@ -107,59 +108,14 @@ export async function saveQuoteChanges(
     };
   }
 
-  const { data: updatedRows, error: uErr } = await supabase
-    .from("quotes")
-    .update({
-      quote_data: next,
-      total_amount: total,
-      currency: next.currency,
-    })
-    .eq("id", id)
-    .select("id");
-  if (uErr) {
-    captureError(new Error(`saveQuoteChanges update failed: ${uErr.message}`), {
-      route: "actions/saveQuoteChanges",
-      surface: "server_action",
-    });
-    console.error("saveQuoteChanges update failed", uErr);
-    return { error: "Could not save changes." };
-  }
-  if (!updatedRows || updatedRows.length === 0) {
-    // RLS blocked the write — zero rows changed but no error raised.
-    // Fail rather than report a save that never happened.
-    captureError(new Error("saveQuoteChanges updated 0 rows (RLS-blocked write)"), {
-      route: "actions/saveQuoteChanges",
-      surface: "server_action",
-    });
-    console.error("saveQuoteChanges updated 0 rows", { id });
-    return { error: "Could not save changes." };
-  }
-
-  const { error: dErr } = await supabase
-    .from("quote_items")
-    .delete()
-    .eq("quote_id", id);
-  if (dErr) {
-    console.error("saveQuoteChanges delete items failed", dErr);
-    return { error: "Could not refresh line items." };
-  }
-
-  if (items.length > 0) {
-    const { error: iErr } = await supabase.from("quote_items").insert(
-      items.map((it) => ({
-        quote_id: id,
-        type: it.type,
-        description: it.description,
-        quantity: it.quantity,
-        unit: it.unit,
-        unit_price: it.unit_price,
-        line_total: it.line_total,
-      })),
-    );
-    if (iErr) {
-      console.error("saveQuoteChanges insert items failed", iErr);
-      return { error: "Could not write line items." };
-    }
+  const { data: committed, error: saveError } = await supabase.rpc("save_quote_atomic", {
+    p_quote_id: id, p_data: next, p_expected_revision: expectedRevision ?? priorRow.revision, p_transcript: transcript ?? null,
+  });
+  if (saveError) {
+    captureError(saveError, { route: "actions/saveQuoteChanges", surface: "server_action" });
+    return { error: saveError.code === "40001"
+      ? "This quote changed on another device. Refresh and compare your local draft before saving."
+      : "Could not save changes. Refresh before retrying.", code: saveError.code };
   }
 
   // Stage 4.6 — feed user line edits into the user-scoped material library.
@@ -201,7 +157,7 @@ export async function saveQuoteChanges(
     quoteId: id,
   });
 
-  return { ok: true, materialsLearned: learn.materialsLearned };
+  return { ok: true, materialsLearned: learn.materialsLearned, revision: committed?.revision };
 }
 
 type ConfirmDimsResult =
@@ -554,31 +510,14 @@ export async function scheduleJob(
   quoteId: string,
   scheduledFor?: string,
 ): Promise<LifecycleResult> {
-  const res = await transition(quoteId, "scheduled");
-  // Persist the chosen job date alongside the status change. The
-  // transition RPC only flips status + writes the audit row; the actual
-  // calendar date lives in quotes.scheduled_for. Best-effort: a failed
-  // date write must never undo a successful schedule transition.
-  if ("ok" in res && scheduledFor) {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (user) {
-      const { error } = await supabase
-        .from("quotes")
-        .update({ scheduled_for: scheduledFor })
-        .eq("id", quoteId)
-        .eq("user_id", user.id);
-      if (error) {
-        console.error("scheduleJob scheduled_for write failed", error);
-        captureError(error, { route: "action:scheduleJob" });
-      }
-      revalidatePath(`/app/quotes/preview/${quoteId}`);
-      revalidatePath("/app");
-    }
-  }
-  return res;
+  if (!scheduledFor) return transition(quoteId, "scheduled");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+  const { data, error } = await supabase.rpc("schedule_quote_atomic", { p_quote_id: quoteId, p_date: scheduledFor });
+  if (error) { captureError(error, { route: "action:scheduleJob" }); return explainRpcError(error); }
+  revalidatePath(`/app/quotes/preview/${quoteId}`); revalidatePath("/app");
+  return { ok: true, status: data as QuoteStatus };
 }
 
 export async function markInProgress(
