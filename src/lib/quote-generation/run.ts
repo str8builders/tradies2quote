@@ -1106,7 +1106,7 @@ async function runQuotePipeline(
     p_user_id: userId, p_quote_id: quote.id, p_expected_revision: quote.revision,
     p_data: parsed,
   } as never);
-  if (commitError) return fail(commitError.code === "40001" ? 409 : 500, { error: commitError.code === "40001" ? "The quote changed while generating. Refresh before trying again." : "The draft could not be saved. Refresh before retrying." });
+  if (commitError) return fail(commitError.code === "PT409" ? 409 : 500, { error: commitError.code === "PT409" ? "The quote changed while generating. Refresh before trying again." : "The draft could not be saved. Refresh before retrying." });
 
   if (usedLibraryIds.size > 0) {
     const ids = Array.from(usedLibraryIds);

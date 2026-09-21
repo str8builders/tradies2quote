@@ -1,5 +1,4 @@
 import SwiftUI
-import PhotosUI
 import PDFKit
 
 struct QuoteDetail: View {
@@ -16,7 +15,10 @@ struct QuoteDetail: View {
     @State private var confirmSend = false
     @State private var confirmDelete = false
     @State private var date = Date()
-    @State private var photo: PhotosPickerItem?
+    @State private var reviewingDimensions = false
+    @State private var reporting = false
+    @State private var reportReason = ""
+    @State private var confirmChatBlock = false
     var body: some View {
         List {
             if let record {
@@ -39,9 +41,7 @@ struct QuoteDetail: View {
                 }
                 Section("Documents") {
                     Button("View and share PDF", systemImage: "doc.richtext") { Task { await openPDF() } }
-                    if record.status == "draft" {
-                        PhotosPicker(selection: $photo, matching: .images) { Label("Attach job photo", systemImage: "photo") }
-                    }
+                    NavigationLink("Job photos") { QuoteAttachmentsView(quoteID: id) }
                     if !record.raw["public_token"].string.isEmpty {
                         ShareLink("Share customer quote link", item: URL(string: "https://tradies2quote.com/quote/\(record.raw["public_token"].string)")!)
                     }
@@ -49,6 +49,9 @@ struct QuoteDetail: View {
                         .disabled(record.quote["client"]["email"].string.isEmpty || busy)
                 }
                 Section("Next step") {
+                    if !record.quote["dimension_confirmation"]["dimensions"].array.isEmpty && ["draft", "sent", "viewed", "declined"].contains(record.status) {
+                        Button("Check drawing dimensions") { reviewingDimensions = true }
+                    }
                     if ["draft", "sent", "viewed", "declined"].contains(record.status) { Button("Edit quote") { editing = true } }
                     if ["sent", "viewed"].contains(record.status) {
                         Button("Mark accepted") { Task { await action("accept") } }
@@ -64,12 +67,14 @@ struct QuoteDetail: View {
                     Button(record.raw["archived_at"].isNull ? "Archive quote" : "Restore quote") { Task { await action(record.raw["archived_at"].isNull ? "archive" : "restore") } }
                     Button("Delete quote", role: .destructive) { confirmDelete = true }
                 }.disabled(busy)
-                if !record.quote["chat_history"].array.isEmpty {
+                if !record.raw["public_token"].string.isEmpty || !record.quote["chat_history"].array.isEmpty {
                     Section("Customer conversation") {
                         ForEach(chat) { content in
                             let item = content.raw
                             VStack(alignment: .leading) { Text(item["role"].string.capitalized).font(.caption.bold()); Text(item["content"].string) }
                         }
+                        Button(record.raw["chat_disabled"].bool ? "Enable customer chat" : "Block customer chat") { confirmChatBlock = true }.disabled(busy)
+                        Button("Report conversation") { reporting = true }.disabled(busy)
                     }
                 }
             } else if message == nil { ProgressView("Loading quote…") }
@@ -79,13 +84,21 @@ struct QuoteDetail: View {
             .task { await load() }.refreshable { await load() }
             .sheet(isPresented: $editing, onDismiss: { Task { await load() } }) { if let record { NavigationStack { QuoteEditor(ownerID: state.accountID ?? "", record: record) } } }
             .sheet(item: $pdf) { PDFPreview(file: $0) }
+            .sheet(isPresented: $reviewingDimensions, onDismiss: { Task { await load() } }) { if let record { NavigationStack { DimensionReviewView(record: record) } } }
+            .alert("Report conversation", isPresented: $reporting) {
+                TextField("Reason (optional)", text: $reportReason)
+                Button("Report") { Task { await moderate("report") } }
+                Button("Cancel", role: .cancel) { }
+            } message: { Text("This flags the conversation for support review. You can also block further messages from this quote link.") }
+            .confirmationDialog(record?.raw["chat_disabled"].bool == true ? "Enable customer chat?" : "Block customer chat?", isPresented: $confirmChatBlock, titleVisibility: .visible) {
+                Button(record?.raw["chat_disabled"].bool == true ? "Enable chat" : "Block chat") { Task { await moderate(record?.raw["chat_disabled"].bool == true ? "enable" : "disable") } }
+            }
             .confirmationDialog("Email this quote?", isPresented: $confirmSend, titleVisibility: .visible) {
                 Button("I checked the quote — send email") { Task { await send() } }
             } message: { Text("The quote will be sent to \(record?.quote["client"]["email"].string ?? "the client"). Check quantities, prices and any required dimensions first.") }
             .confirmationDialog("Delete this quote?", isPresented: $confirmDelete, titleVisibility: .visible) {
                 Button("Delete quote", role: .destructive) { Task { await action("delete") } }
             }
-            .onChange(of: photo) { Task { await uploadPhoto() } }
     }
     private func load() async {
         do { record = BusinessRecord(raw: try await state.api.request("/api/mobile/v1/quotes/\(id)")["item"]); displayLines = DisplayContent.update(record?.quote["line_items"].array ?? [], preserving: displayLines); chat = DisplayContent.update(record?.quote["chat_history"].array ?? [], preserving: chat); message = nil }
@@ -106,12 +119,11 @@ struct QuoteDetail: View {
         do { pdf = try DocumentFile(data: await state.api.data("/api/quotes/\(id)/pdf"), name: "Quote-\(id.prefix(8)).pdf") }
         catch { message = error.localizedDescription }
     }
-    private func uploadPhoto() async {
-        guard let photo else { return }; busy = true; defer { busy = false; self.photo = nil }
+    private func moderate(_ action: String) async {
+        busy = true; defer { busy = false }
         do {
-            guard let bytes = try await photo.loadTransferable(type: Data.self), bytes.count <= 20_000_000 else { throw ServiceError(status: 0, message: "Choose a photo smaller than 20 MB.") }
-            _ = try await state.api.upload("/api/quotes/\(id)/photos", field: "photo", filename: "job-photo.jpg", contentType: "image/jpeg", bytes: PreparedImage.jpeg(bytes))
-            message = "Photo attached."
+            _ = try await state.api.request("/api/quotes/\(id)/chat/moderate", method: "POST", body: .object(["action": .string(action), "reason": .string(String(reportReason.prefix(500)))]))
+            await load(); if action == "report" { reportReason = ""; message = "Conversation reported to support." }
         } catch { message = error.localizedDescription }
     }
 }

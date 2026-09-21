@@ -53,6 +53,8 @@ end; $$;
 revoke all on function public.normalized_quote_data(jsonb) from public,anon,authenticated;
 
 drop function if exists public.save_quote_atomic(uuid,jsonb,uuid);
+-- PT409 is a permanent edit conflict. Do not use 40001: PostgREST 14
+-- retries serialization failures and can loop on an unchanged revision.
 create or replace function public.save_quote_atomic(p_quote_id uuid,p_data jsonb,p_expected_revision uuid,p_transcript text default null)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare q public.quotes%rowtype; actor uuid:=auth.uid(); normalized jsonb; line jsonb; next_revision uuid;
@@ -60,7 +62,7 @@ begin
   if actor is null then raise exception 'Sign in required' using errcode='28000'; end if;
   select * into q from public.quotes where id=p_quote_id and user_id=actor and deleted_at is null for update;
   if not found then raise exception 'Quote not found' using errcode='P0002'; end if;
-  if q.revision is distinct from p_expected_revision then raise exception 'Quote changed on another device. Refresh and compare your local draft.' using errcode='40001'; end if;
+  if q.revision is distinct from p_expected_revision then raise exception 'Quote changed on another device. Refresh and compare your local draft.' using errcode='PT409'; end if;
   if q.status not in ('draft','sent','viewed','declined') then raise exception 'This quote is locked after acceptance' using errcode='22023'; end if;
   if p_transcript is not null and length(p_transcript)>30000 then raise exception 'Description too long' using errcode='22023'; end if;
   normalized := public.normalized_quote_data(p_data);
@@ -130,7 +132,7 @@ begin
   if actor is null or actor<>p_user_id then raise exception 'Not allowed' using errcode='42501'; end if;
   select * into q from public.quotes where id=p_quote_id and user_id=actor and deleted_at is null for update;
   if not found then raise exception 'Quote not found' using errcode='P0002'; end if;
-  if q.revision is distinct from p_expected_revision or q.status<>'draft' then raise exception 'Quote changed while generating. Refresh to review it.' using errcode='40001'; end if;
+  if q.revision is distinct from p_expected_revision or q.status<>'draft' then raise exception 'Quote changed while generating. Refresh to review it.' using errcode='PT409'; end if;
   if not exists(select from public.profiles where id=actor and ai_consent_at is not null and ai_consent_version='2026-09-external-ai-v2') then raise exception 'AI permission was withdrawn' using errcode='42501'; end if;
   normalized:=public.normalized_quote_data(p_data);
   update public.quotes set quote_data=normalized,ai_snapshot=normalized,total_amount=(normalized->>'total')::numeric,currency=normalized->>'currency'

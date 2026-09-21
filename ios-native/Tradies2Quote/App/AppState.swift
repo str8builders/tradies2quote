@@ -18,6 +18,7 @@ final class AppState {
     let drafts: DraftStore?
     var accountID: String?
     var account: JSONValue = .null
+    private var didStart = false
     var isStarting = true
     var sessionMessage: String?
     var pendingQuoteID: String?
@@ -51,6 +52,10 @@ final class AppState {
     var capabilities: JSONValue { account["capabilities"] }
 
     func start() async {
+        guard !didStart else { return }; didStart = true
+        #if DEBUG && targetEnvironment(simulator)
+        if apiBaseURL.host == "127.0.0.1", ProcessInfo.processInfo.environment["T2Q_TEST_RESET"] == "1" { try? await auth.auth.signOut(scope: .local) }
+        #endif
         do {
             let session = try await auth.auth.session
             accountID = session.user.id.uuidString.lowercased()

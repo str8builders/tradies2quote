@@ -113,7 +113,7 @@ export async function saveQuoteChanges(
   });
   if (saveError) {
     captureError(saveError, { route: "actions/saveQuoteChanges", surface: "server_action" });
-    return { error: saveError.code === "40001"
+    return { error: saveError.code === "PT409"
       ? "This quote changed on another device. Refresh and compare your local draft before saving."
       : "Could not save changes. Refresh before retrying.", code: saveError.code };
   }
@@ -166,8 +166,9 @@ type ConfirmDimsResult =
       lineItems: QuoteLineItem[];
       dimensionConfirmation: DimensionConfirmation;
       changed: boolean;
+      revision: string;
     }
-  | { error: string };
+  | { error: string; code?: string };
 
 /**
  * #1 — confirm (or correct) a risky drawing's key dimensions.
@@ -184,6 +185,7 @@ export async function confirmDimensions(
   id: string,
   data: QuoteData,
   edits: DimensionEdit[],
+  expectedRevision?: string,
 ): Promise<ConfirmDimsResult> {
   const supabase = await createClient();
   const {
@@ -193,14 +195,21 @@ export async function confirmDimensions(
 
   const { data: priorRow } = await supabase
     .from("quotes")
-    .select("status, user_id")
+    .select("status, user_id, revision")
     .eq("id", id)
     .single();
   if (!priorRow || priorRow.user_id !== user.id) {
     return { error: "Quote not found." };
   }
-  if (priorRow.status === "accepted") {
+  if (!["draft", "sent", "viewed", "declined"].includes(priorRow.status)) {
     return { error: "Quote already accepted — edits are locked." };
+  }
+
+  const dimensions = data.dimension_confirmation?.dimensions;
+  if (!Array.isArray(edits) || edits.length > 12 || edits.some(edit =>
+    !edit || typeof edit.key !== "string" || !dimensions?.some(d => d.key === edit.key)
+    || typeof edit.value !== "number" || !Number.isFinite(edit.value) || edit.value <= 0 || edit.value > 1e6)) {
+    return { error: "Enter a positive, valid measurement for each dimension." };
   }
 
   const result = confirmAndRecalc(data, edits, {
@@ -208,7 +217,7 @@ export async function confirmDimensions(
     confirmedAt: new Date().toISOString(),
   });
   if (!result) {
-    return { error: "There are no drawing dimensions to confirm on this quote." };
+    return { error: "These dimensions could not be confirmed. Refresh the quote and check its saved takeoff inputs." };
   }
 
   const items = result.line_items.map((it) => {
@@ -229,47 +238,14 @@ export async function confirmDimensions(
     dimension_confirmation: result.dimension_confirmation,
   };
 
-  const { data: updatedRows, error: uErr } = await supabase
-    .from("quotes")
-    .update({
-      quote_data: next,
-      total_amount: totals.total,
-      currency: next.currency,
-    })
-    .eq("id", id)
-    .select("id");
-  if (uErr || !updatedRows || updatedRows.length === 0) {
-    console.error("confirmDimensions update failed", uErr);
-    captureError(uErr, { route: "action:confirmDimensions" });
-    return { error: "Could not save the confirmation." };
-  }
-
-  const { error: dErr } = await supabase
-    .from("quote_items")
-    .delete()
-    .eq("quote_id", id);
-  if (dErr) {
-    console.error("confirmDimensions delete items failed", dErr);
-    captureError(dErr, { route: "action:confirmDimensions" });
-    return { error: "Could not refresh line items." };
-  }
-  if (items.length > 0) {
-    const { error: iErr } = await supabase.from("quote_items").insert(
-      items.map((it) => ({
-        quote_id: id,
-        type: it.type,
-        description: it.description,
-        quantity: it.quantity,
-        unit: it.unit,
-        unit_price: it.unit_price,
-        line_total: it.line_total,
-      })),
-    );
-    if (iErr) {
-      console.error("confirmDimensions insert items failed", iErr);
-      captureError(iErr, { route: "action:confirmDimensions" });
-      return { error: "Could not write line items." };
-    }
+  const { data: committed, error } = await supabase.rpc("save_quote_atomic", {
+    p_quote_id: id, p_data: next, p_expected_revision: expectedRevision ?? priorRow.revision,
+  });
+  if (error) {
+    captureError(error, { route: "action:confirmDimensions" });
+    return { error: error.code === "PT409"
+      ? "This quote changed on another device. Refresh it before confirming dimensions."
+      : "Could not save the confirmation. No partial changes were saved.", code: error.code };
   }
 
   console.log("[takeoff] dimensions confirmed", {
@@ -283,6 +259,7 @@ export async function confirmDimensions(
     lineItems: items,
     dimensionConfirmation: result.dimension_confirmation,
     changed: result.changed,
+    revision: committed.revision,
   };
 }
 

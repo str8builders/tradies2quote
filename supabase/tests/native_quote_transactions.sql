@@ -33,7 +33,7 @@ begin
   begin
     perform public.save_quote_atomic('30303030-3030-4030-8030-303030303030',draft,first_revision);
     raise exception 'Stale save accepted';
-  exception when serialization_failure then null; end;
+  exception when sqlstate 'PT409' then null; end;
   first_revision:=(result->>'revision')::uuid;
   begin
     perform public.save_quote_atomic('30303030-3030-4030-8030-303030303030',jsonb_set(draft,'{line_items,0,quantity}','-1'),first_revision);

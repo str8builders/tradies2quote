@@ -28,7 +28,7 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({
     const result = () => table === "profiles"
       ? { data: mock.profileMissing ? null : { business_name: mock.name }, error: mock.profileError ? { message: "offline" } : null }
       : { data: mock.quoteVisible ? { id: "12345678-fixture", user_id: "owner-fixture", status: "draft", created_at: "2026-09-13T00:00:00Z", total_amount: 100, currency: "NZD", quote_data: { client: { name: "Test client" } } } : null, error: null };
-    const query = { select: () => query, eq: () => query, single: async () => result(), maybeSingle: async () => result() };
+    const query = { select: () => query, eq: () => query, is: () => query, single: async () => result(), maybeSingle: async () => result() };
     return query;
   },
 }) }));

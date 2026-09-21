@@ -51,7 +51,9 @@ targets:
   Tradies2QuoteUITests:
     type: bundle.ui-testing
     platform: iOS
-    sources: [Tradies2QuoteUITests]
+    sources:
+      - path: Tradies2QuoteUITests
+        excludes: [IntegrationCredentials.json]
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES

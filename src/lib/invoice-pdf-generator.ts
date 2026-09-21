@@ -167,7 +167,8 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
 
   // ===== Header =====
   // Optional logo top-left; pushes the business name down by whatever it used.
-  y -= await drawPdfLogo(pdf, page, logo, MARGIN_X, y);
+  const logoHeight = await drawPdfLogo(pdf, page, logo, MARGIN_X, y);
+  if (logoHeight > 0) y -= logoHeight + 18;
   const businessName = profile.business_name || "Your business";
   y = drawText(businessName.toUpperCase(), MARGIN_X, y, { font: bold, size: 18, maxWidth: 280 }) - 4;
 
@@ -375,7 +376,8 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
     : `Payment is due on receipt. Use ${invoiceNumber} as the reference.`);
   const paymentHeight = 46 + 13 * wrapText(sanitise(paymentText), helv, 10, PAGE_W - 2 * MARGIN_X).length;
   // Keep the amount due and ordinary payment instructions on the same page.
-  ensureSpace(Math.min(TOP - BOTTOM_MIN, 86 + Math.max(60, paymentHeight)));
+  const hasMarkup = Number.isFinite(snapshot.markup_amount) && snapshot.markup_amount !== 0;
+  ensureSpace(Math.min(TOP - BOTTOM_MIN, 86 + (hasMarkup ? 14 : 0) + Math.max(60, paymentHeight)));
   drawRule(y);
   y -= 14;
 
@@ -403,6 +405,7 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
     y -= emphasis ? 22 : 14;
   }
 
+  if (hasMarkup) drawTotalRow(`Markup (${snapshot.markup_pct}%)`, snapshot.markup_amount);
   drawTotalRow("Subtotal", snapshot.subtotal_before_tax);
   drawTotalRow(`${snapshot.tax_label} (${snapshot.tax_rate}%)`, snapshot.tax_amount);
   y -= 4;

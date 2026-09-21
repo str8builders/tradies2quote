@@ -5,7 +5,7 @@ import { MobileError, pageOffset, uuid } from "./contracts";
 
 const collections = {
   clients: { columns: "id,name,email,phone,address", sort: "name" },
-  quotes: { columns: "id,status,quote_data,total_amount,currency,created_at,updated_at,revision,scheduled_for,voice_transcript,public_token,archived_at,deleted_at", sort: "created_at" },
+  quotes: { columns: "id,status,quote_data,total_amount,currency,created_at,updated_at,revision,scheduled_for,voice_transcript,public_token,chat_disabled,archived_at,deleted_at", sort: "created_at" },
   invoices: { columns: "*", sort: "created_at" },
   materials: { columns: "*", sort: "name" },
   requests: { table: "quote_requests", columns: "*", sort: "created_at" },

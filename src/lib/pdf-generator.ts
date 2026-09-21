@@ -145,7 +145,9 @@ export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> 
 
   // ===== Header =====
   // Optional logo top-left; pushes the business name down by whatever it used.
-  y -= await drawPdfLogo(pdf, page, logo, MARGIN_X, y);
+  const logoHeight = await drawPdfLogo(pdf, page, logo, MARGIN_X, y);
+  // drawText takes a baseline; reserve the heading's height below the logo gap.
+  if (logoHeight > 0) y -= logoHeight + 18;
   y = drawText(businessName.toUpperCase(), MARGIN_X, y, { font: bold, size: 18, maxWidth: 280 }) - 4;
 
   const headerLines: string[] = [];

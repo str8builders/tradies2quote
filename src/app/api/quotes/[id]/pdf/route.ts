@@ -49,6 +49,7 @@ export async function GET(
     .select("id, quote_data, created_at, public_token")
     .eq("id", id)
     .eq("user_id", user.id)
+    .is("deleted_at", null)
     .maybeSingle();
   if (!quote || !quote.quote_data) {
     return NextResponse.json({ error: "no_quote" }, { status: 404 });

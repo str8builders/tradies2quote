@@ -291,6 +291,12 @@ const calcQty = (items: QuoteLineItem[]): number =>
     .reduce((s, i) => s + i.quantity, 0);
 
 describe("confirmAndRecalc", () => {
+  it("does not certify changed dimensions when the saved inputs cannot be recalculated", () => {
+    const qd = deckQuoteFixture();
+    qd.dimension_confirmation!.takeoff_type = "wall";
+    expect(confirmAndRecalc(qd, [{ key: "deckLengthM", value: 7.2 }], META)).toBeNull();
+    expect(qd.dimension_confirmation!.dimensions.every(d => !d.confirmed)).toBe(true);
+  });
   it("returns null when there's nothing to recalc (no dimension_confirmation)", () => {
     const qd = deckQuoteFixture();
     delete qd.dimension_confirmation;

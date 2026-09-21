@@ -235,13 +235,9 @@ export function confirmAndRecalc(
 
   const calc = runTakeoff(parsed);
   if (!calc) {
-    // Recompute couldn't run (shouldn't happen — dims are present). Keep the
-    // prior numbers but still record the confirmation.
-    return {
-      line_items: quoteData.line_items,
-      dimension_confirmation: newConfirmation,
-      changed: false,
-    };
+    // Never certify corrected measurements while retaining quantities that
+    // were calculated from different inputs.
+    return null;
   }
 
   // Preserve prices / library matches from the prior calculator lines.

@@ -39,7 +39,7 @@ export async function POST(
     action?: unknown;
     reason?: unknown;
   };
-  const action = body.action as Action;
+  const action = body?.action as Action;
   if (action !== "disable" && action !== "enable" && action !== "report") {
     return NextResponse.json({ error: "invalid_action" }, { status: 400 });
   }
@@ -51,6 +51,7 @@ export async function POST(
     .select("id")
     .eq("id", id)
     .eq("user_id", user.id)
+    .is("deleted_at", null)
     .maybeSingle();
   if (qErr || !quote) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });

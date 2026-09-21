@@ -64,7 +64,7 @@ A release record must distinguish **passed, failed, blocked, not run, and intent
 - TypeScript: passed with no emitted files.
 - Release-tool tests: 13 passed. These test the checker itself; the live configuration inventory still reports gaps.
 - Live health, privacy and support pages: HTTP 200. Provider credential presence inspected without exposing secrets.
-- Native acceptance matrix above: **not run**; authenticated native acceptance is still outstanding. The first native build and focused tests are now recorded below.
+- Native acceptance matrix above: **partially verified** in the isolated environment described below. Unrecorded journeys remain not run or blocked; this is not release acceptance.
 
 ## Implementation checkpoint — 21 September 2026
 
@@ -77,3 +77,15 @@ The SwiftUI target builds with Xcode 26.6 for iOS 17+, using pinned Supabase Swi
 - Private integration auth/REST/storage services now run against the rehearsal database with a separate JWT secret, local-only ports and bounded resources. No production customer records or provider credentials were copied.
 
 Release blockers include Apple distribution/account/product configuration, full authenticated and physical-device acceptance, provider receipts, real StoreKit/webhook tests, concurrency-safe deletion/retention verification, remaining feature parity, production migration rehearsal and final App Store materials.
+
+## Authenticated integration checkpoint — 21 September 2026
+
+- Signed simulator suite: **9 unit tests + 2 UI tests passed**, iPhone 17 Pro / iOS 26.5 / Xcode 26.6. Real isolated sign-in, dashboard counts, selecting a saved client/material, manual quote creation, server reload, termination/relaunch and persisted Keychain session passed. This does not validate every screen or physical-device capability.
+- HTTP suites: **34 API checks + 38 document/deletion checks + 18 quote-control checks passed**. The first document run also created six isolated storage buckets. Checks cover account isolation, canonical totals/provenance, idempotency, edit conflicts, negative input, consent, library data, photos, generated PDFs, lifecycle/invoice conversion and paid state, real synthetic account/file deletion, atomic dimension confirmation/correction, and chat block/report. Lifecycle starts from a synthetic sent fixture; no email delivery was attempted.
+- A permanent database conflict using SQLSTATE 40001 caused PostgREST retries/timeouts. Permanent conflicts now use PT409 and return promptly as HTTP 409. Async action validation now reaches the mobile error boundary.
+- Native job-photo management, dimension review and chat moderation screens compile. Their full interactive journeys are still pending. Invalid/deleted moderation requests and deleted quote PDF access are rejected.
+- Quote and invoice fixture PDFs were rendered and inspected. Logo spacing was corrected; the invoice now shows the markup included in its subtotal.
+- Latest full backend regression: **3,196 passed / 25 skipped**; lint, TypeScript and production build passed. Skips include provider-gated evaluations.
+- Reproducible HTTP suites live in `scripts/mobile-integration/`; credentials, generated files and customer data are excluded from source control.
+
+No production activation, customer messaging, real payment or App Store submission occurred. The release blockers listed above still apply.

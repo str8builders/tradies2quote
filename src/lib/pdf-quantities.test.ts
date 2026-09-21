@@ -47,6 +47,7 @@ describe("quote and invoice quantity columns", () => {
     }
     expect(calls.some(c => c.text === "0.237504 m3")).toBe(true);
     expect(calls.some(c => c.text === "$0.123456789012345")).toBe(true);
+    expect(calls.some(c => c.text === "MARKUP (20%)")).toBe(true);
     if (kind === "invoice") {
       expect(calls.find(c => c.text === "PAYMENT")?.page).toBe(calls.find(c => c.text === "AMOUNT DUE")?.page);
     }

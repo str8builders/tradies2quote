@@ -7,7 +7,7 @@ struct Tradies2QuoteApp: App {
     @State private var state = AppState()
     var body: some Scene {
         WindowGroup {
-            Group {
+            ZStack {
                 if state.isStarting { ProgressView("Opening Tradies2Quote…") }
                 else if state.accountID == nil { AuthView() }
                 else { MainTabs().id(state.accountID) }
