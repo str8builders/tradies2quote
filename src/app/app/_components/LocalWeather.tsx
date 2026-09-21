@@ -1,4 +1,5 @@
 "use client";
+import { WeatherAttribution } from "@/components/WeatherAttribution";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CaretDown, Crosshair, WarningCircle } from "@phosphor-icons/react";
@@ -89,6 +90,7 @@ export function LocalWeather({ todayISO }: { todayISO: string }) {
         </li>)}
       </ul>
       <Link href="/app/weather" className="mt-2 inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.25em] text-ink-400 hover:text-brand">Per-job detail <ArrowRight size={12} weight="bold" /></Link>
+      <WeatherAttribution />
     </> : null}
   </section>;
 }

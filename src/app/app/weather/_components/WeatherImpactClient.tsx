@@ -1,5 +1,6 @@
 "use client";
 
+import { WeatherAttribution } from "@/components/WeatherAttribution";
 import { formatNZTime, formatWeekdayShort } from "@/lib/format-date";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -272,6 +273,7 @@ export function WeatherImpactClient({
         </div>
       </section>
 
+      {weather.source === "Open-Meteo" ? <WeatherAttribution /> : null}
       {/* 5-day outlook — live fetches only (manual entry has no forecast). */}
       {weather.daily && weather.daily.length > 0 ? (
         <section className="t2q-card-pro p-5 sm:p-6" data-testid="weather-5day">

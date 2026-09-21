@@ -1,7 +1,7 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
 import { geocodeAddress } from "@/lib/weather-planning/geocode";
-import { fetchOpenMeteoWeather } from "./open-meteo";
+import { fetchOpenMeteoWeather } from "./open-meteo-server";
 import type { WeatherDailyForecast } from "./types";
 
 /**

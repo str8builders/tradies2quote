@@ -8,7 +8,7 @@
 
 import "server-only";
 
-const GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search";
+import { fetchWeatherProvider } from "./provider-access";
 
 export interface GeocodeResult {
   latitude: number;
@@ -40,13 +40,13 @@ export interface GeocodeArgs {
  * none do — the caller must treat null as "cannot assess", not as a default.
  */
 export async function geocodeAddress(args: GeocodeArgs): Promise<GeocodeResult | null> {
-  const doFetch = args.fetchImpl ?? fetch;
   for (const query of candidateQueries(args.address)) {
     const params = new URLSearchParams({ name: query, count: "1", language: "en", format: "json" });
     let res: Response;
     try {
-      res = await doFetch(`${GEOCODE_URL}?${params}`, { signal: args.signal });
+      res = await fetchWeatherProvider("geocoding", params, { signal: args.signal, fetchImpl: args.fetchImpl });
     } catch {
+      if (args.signal?.aborted) return null;
       continue;
     }
     if (!res.ok) continue;

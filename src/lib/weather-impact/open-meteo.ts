@@ -3,6 +3,7 @@ import type { WeatherDailyForecast, WeatherForecastWindow, WeatherImpactInput } 
 interface OpenMeteoResponse {
   current?: {
     time?: string;
+    interval?: number;
     temperature_2m?: number;
     relative_humidity_2m?: number;
     apparent_temperature?: number;
@@ -34,75 +35,33 @@ interface OpenMeteoResponse {
   };
 }
 
-export async function fetchOpenMeteoWeather({
-  latitude,
-  longitude,
-  signal,
-}: {
-  latitude: number;
-  longitude: number;
-  signal?: AbortSignal;
+/** Browser adapter: credentials and commercial provider access stay on the server. */
+export async function fetchOpenMeteoWeather({ latitude, longitude, signal }: {
+  latitude: number; longitude: number; signal?: AbortSignal;
 }): Promise<WeatherImpactInput> {
-  const params = new URLSearchParams({
-    latitude: String(latitude),
-    longitude: String(longitude),
-    timezone: "auto",
-    // 5 days so the PWA can show the full outlook; the better-window scan
-    // still only reads the first 24 hourly slots.
-    forecast_days: "5",
-    current: [
-      "temperature_2m",
-      "relative_humidity_2m",
-      "apparent_temperature",
-      "precipitation",
-      "rain",
-      "showers",
-      "weather_code",
-      "wind_speed_10m",
-      "wind_gusts_10m",
-    ].join(","),
-    hourly: [
-      "precipitation_probability",
-      "precipitation",
-      "weather_code",
-      "wind_gusts_10m",
-      "temperature_2m",
-      "visibility",
-    ].join(","),
-    daily: [
-      "weather_code",
-      "temperature_2m_max",
-      "temperature_2m_min",
-      "precipitation_probability_max",
-      "precipitation_sum",
-      "wind_speed_10m_max",
-      "wind_gusts_10m_max",
-    ].join(","),
-  });
-
-  const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
-    signal,
-  });
-  if (!response.ok) {
-    throw new Error(`Weather provider returned ${response.status}`);
-  }
-  const data = (await response.json()) as OpenMeteoResponse;
-  return normalizeOpenMeteo(data);
+  const params = new URLSearchParams({ lat: String(latitude), lng: String(longitude) });
+  const response = await fetch(`/api/weather/forecast?${params}`, { signal });
+  if (!response.ok) throw new Error("The forecast service did not answer. Try again shortly.");
+  return await response.json() as WeatherImpactInput;
 }
 
 export function normalizeOpenMeteo(data: OpenMeteoResponse): WeatherImpactInput {
   const current = data.current ?? {};
   const hourly = data.hourly ?? {};
   const currentHourIndex = findCurrentHourIndex(hourly.time, current.time);
-  const precipitation =
-    (current.precipitation ?? 0) + (current.rain ?? 0) + (current.showers ?? 0);
+  // Precipitation already includes rain/showers/snow. Current sums use the
+  // provider's interval (often 15 minutes); convert to the rate this model
+  // expects, or use the hourly sum. Missing observations remain unknown.
+  const precipitation = current.precipitation != null && current.interval != null && current.interval > 0
+    ? current.precipitation * 3600 / current.interval
+    : valueAt(hourly.precipitation, currentHourIndex);
   const forecast = buildForecast(hourly, currentHourIndex);
   return {
     observedAt: current.time ?? null,
     source: "Open-Meteo",
     summary: weatherCodeSummary(current.weather_code),
     rainProbabilityPct: valueAt(hourly.precipitation_probability, currentHourIndex),
-    precipitationMmPerHour: roundNumber(precipitation, 1),
+    precipitationMmPerHour: precipitation == null ? null : roundNumber(precipitation, 1),
     windSpeedKph: current.wind_speed_10m ?? null,
     windGustKph: current.wind_gusts_10m ?? null,
     thunderstormRisk: current.weather_code == null ? null : isThunderstormCode(current.weather_code),

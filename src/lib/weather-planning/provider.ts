@@ -10,7 +10,7 @@
 import "server-only";
 import type { ForecastHour, ForecastSnapshot, WeatherAlert } from "./types";
 
-const FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
+import { fetchWeatherProvider } from "./provider-access";
 
 interface OpenMeteoHourly {
   time?: string[];
@@ -45,7 +45,6 @@ export interface FetchForecastArgs {
  * comparable to the window epochs (no timezone maths needed to select hours).
  */
 export async function fetchForecastForWindow(args: FetchForecastArgs): Promise<ForecastSnapshot> {
-  const doFetch = args.fetchImpl ?? fetch;
   const startMs = Date.parse(args.windowStart);
   const endMs = Date.parse(args.windowEnd);
 
@@ -65,7 +64,7 @@ export async function fetchForecastForWindow(args: FetchForecastArgs): Promise<F
     ].join(","),
   });
 
-  const res = await doFetch(`${FORECAST_URL}?${params}`, { signal: args.signal });
+  const res = await fetchWeatherProvider("forecast", params, { signal: args.signal, fetchImpl: args.fetchImpl });
   if (!res.ok) {
     throw new Error(`Weather provider returned ${res.status}`);
   }

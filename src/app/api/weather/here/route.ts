@@ -1,7 +1,8 @@
+import { consumeFixedWindow, tooManyRequestsResponse } from "@/lib/rate-limit";
 import { NextResponse, type NextRequest } from "next/server";
 import { unstable_cache } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { fetchOpenMeteoWeather } from "@/lib/weather-impact/open-meteo";
+import { fetchOpenMeteoWeather } from "@/lib/weather-impact/open-meteo-server";
 import { classifyOutlookDay, type DayOutlook } from "@/lib/weather-impact/outlook";
 import { evaluateWeatherImpact } from "@/lib/weather-impact/evaluate";
 import { TRADE_PROFILES } from "@/lib/weather-impact/config";
@@ -45,9 +46,11 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const quota = consumeFixedWindow(`weather:${user.id}`, 60, 15 * 60_000);
+  if (!quota.ok) return tooManyRequestsResponse(quota.resetAt);
   const lat = Number(request.nextUrl.searchParams.get("lat"));
   const lng = Number(request.nextUrl.searchParams.get("lng"));
-  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+  if (!request.nextUrl.searchParams.get("lat")?.trim() || !request.nextUrl.searchParams.get("lng")?.trim() || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
     return NextResponse.json({ error: "Send lat and lng." }, { status: 400 });
   }
   try {

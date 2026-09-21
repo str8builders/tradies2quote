@@ -18,6 +18,7 @@ function fixture() {
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: jwt({role:"anon",exp:4102444800}), SUPABASE_SERVICE_ROLE_KEY:"synthetic-service-key",
       TEXT_AI_PROVIDER:"local", LOCAL_LLM_BASE_URL:"http://127.0.0.1:8080/v1", LOCAL_LLM_API_KEY:"synthetic-local-key", LOCAL_LLM_MODEL:"fixture-model",
       ANTHROPIC_API_KEY:"synthetic-anthropic-key", OPENAI_API_KEY:"synthetic-openai-key", PLAN_READER_ENABLED:"true",
+      OPEN_METEO_API_KEY:"synthetic-weather-key",
       RESEND_API_KEY:"synthetic-resend-key", RESEND_FROM_EMAIL:"T2Q <quotes@example.invalid>",
       STRIPE_SECRET_KEY:"sk_live_synthetic", STRIPE_PRICE_ID:"price_synthetic", STRIPE_WEBHOOK_SECRET:"whsec_synthetic",
       STRIPE_PAYMENTS_WEBHOOK_SECRET:"whsec_payments_synthetic", PAYMENTS_ENABLED:"true",
@@ -36,7 +37,7 @@ test("all settings can pass configuration without claiming transaction readiness
   assert.ok(result.notVerified.some(x=>x.includes("distribution")));
 });
 test("every required service credential blocks release when missing", () => {
-  for (const key of ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY","SUPABASE_SERVICE_ROLE_KEY","LOCAL_LLM_API_KEY","LOCAL_LLM_MODEL","ANTHROPIC_API_KEY","OPENAI_API_KEY","RESEND_API_KEY","RESEND_FROM_EMAIL","STRIPE_SECRET_KEY","STRIPE_WEBHOOK_SECRET","STRIPE_PRICE_ID","STRIPE_PAYMENTS_WEBHOOK_SECRET","TWILIO_AUTH_TOKEN","CRON_SECRET","VAPID_PRIVATE_KEY"]) {
+  for (const key of ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY","SUPABASE_SERVICE_ROLE_KEY","LOCAL_LLM_API_KEY","LOCAL_LLM_MODEL","ANTHROPIC_API_KEY","OPENAI_API_KEY","OPEN_METEO_API_KEY","RESEND_API_KEY","RESEND_FROM_EMAIL","STRIPE_SECRET_KEY","STRIPE_WEBHOOK_SECRET","STRIPE_PRICE_ID","STRIPE_PAYMENTS_WEBHOOK_SECRET","TWILIO_AUTH_TOKEN","CRON_SECRET","VAPID_PRIVATE_KEY"]) {
     const {env,auth}=fixture(); delete env[key]; assert.equal(checkRelease(env,auth).configurationReady,false,key);
   }
 });
@@ -63,7 +64,7 @@ test("test billing and disabled client flags cannot be mistaken for a full relea
 test("diagnostics contain no secret values or malformed credential URLs", () => {
   const {env,auth}=fixture(); env.LOCAL_LLM_BASE_URL="https://user:secret@example.invalid";
   const result=JSON.stringify(checkRelease(env,auth));
-  for (const key of ["SUPABASE_SERVICE_ROLE_KEY","LOCAL_LLM_API_KEY","ANTHROPIC_API_KEY","OPENAI_API_KEY","RESEND_API_KEY","STRIPE_SECRET_KEY","VAPID_PRIVATE_KEY"]) assert.ok(!result.includes(env[key]));
+  for (const key of ["SUPABASE_SERVICE_ROLE_KEY","LOCAL_LLM_API_KEY","ANTHROPIC_API_KEY","OPENAI_API_KEY","OPEN_METEO_API_KEY","RESEND_API_KEY","STRIPE_SECRET_KEY","VAPID_PRIVATE_KEY"]) assert.ok(!result.includes(env[key]));
   assert.ok(!result.includes(auth.GOTRUE_SMTP_PASS)); assert.ok(!result.includes("user:secret"));
 });
 test("wrong production origin, nonpositive timeout and unpaired VAPID keys fail", () => {

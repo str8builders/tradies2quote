@@ -56,6 +56,7 @@ export function checkRelease(env, authEnv = {}, now = Date.now()) {
   // call OpenAI. A working local text model cannot satisfy either dependency.
   requireKeys("plans-and-anthropic-agents", ["ANTHROPIC_API_KEY"]);
   requireKeys("voice-and-photo-agents", ["OPENAI_API_KEY"]);
+  requireKeys("commercial-weather", ["OPEN_METEO_API_KEY"]);
   add("client-plan-reader", env.PLAN_READER_ENABLED === "true", "PLAN_READER_ENABLED=true is required for clients; enable only after representative plan evaluations pass.");
   requireKeys("quote-invoice-email", ["RESEND_API_KEY", "RESEND_FROM_EMAIL"]);
   const email = env.RESEND_FROM_EMAIL?.trim() ?? "";

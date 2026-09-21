@@ -3,6 +3,18 @@ import { normalizeOpenMeteo } from "./open-meteo";
 
 // 5-day daily outlook normalization — the strip shown on /app/weather.
 describe("normalizeOpenMeteo daily (5-day outlook)", () => {
+  it("converts the current interval to mm/hour without counting rain twice", () => {
+    expect(normalizeOpenMeteo({ current: { precipitation: 1.5, rain: 1, showers: 0.5, interval: 900 } }).precipitationMmPerHour).toBe(6);
+  });
+
+  it("uses the hourly sum when the current aggregation interval is unknown", () => {
+    expect(normalizeOpenMeteo({ current: { precipitation: 1.5 }, hourly: { precipitation: [4] } }).precipitationMmPerHour).toBe(4);
+  });
+
+  it("keeps missing precipitation unknown instead of inventing dry conditions", () => {
+    expect(normalizeOpenMeteo({}).precipitationMmPerHour).toBeNull();
+  });
+
   const daily = {
     time: ["2026-06-12", "2026-06-13", "2026-06-14", "2026-06-15", "2026-06-16"],
     weather_code: [0, 61, 95, 2, 45],

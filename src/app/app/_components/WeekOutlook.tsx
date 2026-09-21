@@ -1,3 +1,4 @@
+import { WeatherAttribution } from "@/components/WeatherAttribution";
 import Link from "next/link";
 import {
   CloudFog,
@@ -122,6 +123,7 @@ export async function WeekOutlook({
           );
         })}
       </div>
+      <WeatherAttribution />
     </div>
   );
 }
