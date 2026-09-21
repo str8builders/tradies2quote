@@ -115,3 +115,11 @@ The current source passed **10 unit tests and 2 UI tests on iPad (A16), iOS 26.5
 Native request-path inspection found 52 concrete HTTP references with corresponding backend routes. This static match checks wiring only, not request semantics or delivery. A private-fixture scan found no integration credentials in changed/tracked source. Synthetic test credentials remain ignored.
 
 The passing UI run emitted Supabase Swift's notice about future initial-session behavior. The app explicitly reads/refetches the session and ignores the initial-session event; this notice is retained in the result bundle and is not an assertion failure.
+
+## Release archive checkpoint — 21 September 2026
+
+An **unsigned Release archive succeeded** with Xcode 26.6 / iPhoneOS 26.5 SDK, version 1.0.0 (1), minimum iOS 17. Its twelve static bundle checks passed: native identity, production API/auth/push configuration, phone/tablet support, iPad orientations, permission descriptions, app/SDK privacy manifests, no declared tracking, no embedded test credentials/StoreKit fixtures, no web-wrapper assets and no simulator endpoint-override strings. The 1024×1024 app icon has no alpha channel.
+
+This archive intentionally has no distribution signature; signature verification failed as expected. It cannot be uploaded as an App Store release. Actual distribution entitlements/provisioning, Apple's archive validation, privacy labels and TestFlight/device/provider acceptance are still required. The archive emitted the standard AppIntents metadata warning because the target has no AppIntents dependency; no App Intents functionality is claimed.
+
+`python3 scripts/mobile-integration/check_archive.py --archive PATH.xcarchive --output report.json` reproduces the bundle inspection. It always records `submissionReady: false`, because these static checks cannot establish App Store readiness.
