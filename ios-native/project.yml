@@ -64,5 +64,8 @@ schemes:
     build:
       targets:
         Tradies2Quote: all
+    run:
+      config: Debug
+      storeKitConfiguration: Tradies2QuoteTests/LocalSubscriptions.storekit
     test:
       targets: [Tradies2QuoteTests, Tradies2QuoteUITests]

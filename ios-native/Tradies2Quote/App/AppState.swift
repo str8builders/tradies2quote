@@ -96,7 +96,8 @@ final class AppState {
         accountID = nil; account = .null; pendingQuoteID = nil; needsPasswordChange = false
     }
     func deleteAccount() async throws {
-        _ = try await api.request("/api/account/delete", method: "POST", body: .object(["confirm": .string("DELETE")]))
+        do { _ = try await api.request("/api/account/delete", method: "POST", body: .object(["confirm": .string("DELETE")])) }
+        catch { await refreshAccount(); throw error }
         let deletedID = accountID
         var cleanupError: (any Error)?
         if let deletedID { do { try await drafts?.clear(accountID: deletedID) } catch { cleanupError = error } }

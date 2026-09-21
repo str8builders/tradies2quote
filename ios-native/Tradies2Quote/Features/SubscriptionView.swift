@@ -69,9 +69,7 @@ struct SubscriptionView: View {
 extension AppState {
     func deliverPurchase(_ result: VerificationResult<StoreKit.Transaction>) async throws {
         guard case .verified(let transaction) = result else { throw ServiceError(status: 0, message: "Apple could not verify this purchase.") }
-        guard transaction.appAccountToken?.uuidString.lowercased() == accountID else { throw ServiceError(status: 409, message: "This purchase belongs to another Tradies2Quote account. Sign into the account that bought it, or contact support.") }
-        _ = try await api.request("/api/mobile/v1/billing/apple/verify", method: "POST", body: .object(["signedTransaction": .string(result.jwsRepresentation)]))
-        await transaction.finish()
+        try await PurchaseDelivery.deliver(transaction, signedTransaction: result.jwsRepresentation, accountID: accountID, api: api)
         await refreshAccount()
     }
     func reconcilePurchases() async {
@@ -90,5 +88,15 @@ extension AppState {
             guard accountID != nil else { continue }
             do { try await deliverPurchase(result) } catch { sessionMessage = error.localizedDescription }
         }
+    }
+}
+
+enum PurchaseDelivery {
+    /// Finish only after the server accepts the verified transaction for its
+    /// original app account. Errors deliberately leave it queued for retry.
+    static func deliver(_ transaction: StoreKit.Transaction, signedTransaction: String, accountID: String?, api: MobileAPI) async throws {
+        guard let accountID, transaction.appAccountToken?.uuidString.lowercased() == accountID.lowercased() else { throw ServiceError(status: 409, message: "This purchase belongs to another Tradies2Quote account. Sign into the account that bought it, or contact support.") }
+        _ = try await api.request("/api/mobile/v1/billing/apple/verify", method: "POST", body: .object(["signedTransaction": .string(signedTransaction)]))
+        await transaction.finish()
     }
 }

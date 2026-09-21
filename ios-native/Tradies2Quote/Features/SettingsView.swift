@@ -15,6 +15,9 @@ struct SettingsView: View {
     @State private var confirmSignOut = false
     var body: some View {
         Form {
+            if state.account["deletionPending"].bool {
+                Section { Text("Deletion is incomplete and account changes are paused. Use Delete account below to retry, or contact support.") }
+            }
             Section("Business details") {
                 TextField("Business name", text: text("business_name"))
                 TextField("Business email", text: text("email")).keyboardType(.emailAddress).textInputAutocapitalization(.never)

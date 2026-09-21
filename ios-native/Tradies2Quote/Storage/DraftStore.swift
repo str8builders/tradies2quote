@@ -39,6 +39,15 @@ actor DraftStore {
             }
         }
     }
+    /// Save a separate, unsynced copy before replacing an editor snapshot.
+    /// Failure must leave the original draft intact and stop the UI change.
+    func preserveCopy(of draft: SavedDraft) throws -> SavedDraft {
+        var quote = draft.quote
+        quote["job_summary"] = .string((quote["job_summary"].string.nonempty ?? "Quote") + " (recovered copy)")
+        let copy = SavedDraft(id: UUID().uuidString.lowercased(), accountID: draft.accountID, quote: quote, transcript: draft.transcript, serverRevision: nil, updatedAt: Date())
+        try save(copy)
+        return copy
+    }
     func remove(id: String, accountID: String) throws {
         try database.write { db in try db.execute(sql: "DELETE FROM drafts WHERE id=? AND account_id=?", arguments: [id, accountID]) }
     }

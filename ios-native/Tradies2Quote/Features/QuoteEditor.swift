@@ -20,6 +20,7 @@ struct QuoteEditor: View {
     @State private var revision: String?
     @State private var finished = false
     @State private var persistenceTask: Task<Void, Never>?
+    @State private var conflict: BusinessRecord?
     // One-time editor snapshot: changes stay private until Save. Remote updates
     // are checked by revision on save, never injected into an in-progress form.
     init(ownerID: String, record: BusinessRecord? = nil, localDraft: SavedDraft? = nil) {
@@ -77,8 +78,9 @@ struct QuoteEditor: View {
                 Text(savedLocally ? "Draft saved on this device." : "Changes will be saved privately on this device.").font(.footnote).foregroundStyle(.secondary)
                 Button("Save quote") { Task { await save() } }.disabled(busy).accessibilityIdentifier("quote.save")
             }
-        } .disabled(busy).navigationTitle(serverExists ? "Edit quote" : "New quote").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { Task { await flushDraft(); dismiss() } } } }
+        }.accessibilityIdentifier("quote.editor.form").scrollDismissesKeyboard(.immediately).disabled(busy).navigationTitle(serverExists ? "Edit quote" : "New quote").navigationBarTitleDisplayMode(.inline)
+            .interactiveDismissDisabled()
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { Task { if await flushDraft() { dismiss() } } }.disabled(busy) } }
             .onChange(of: quote) { queuePersist() }.onChange(of: lines) { queuePersist() }.onChange(of: transcript) { queuePersist() }
             .task {
                 if record == nil && localDraft == nil { quote = QuoteMath.blank(profile: state.profile) }
@@ -86,13 +88,31 @@ struct QuoteEditor: View {
             .sheet(item: $library) { kind in LibraryPicker(kind: kind) { item in applyLibrary(item, kind: kind) } }
             .sheet(isPresented: $consentSheet) { AIConsentView() }
             .sheet(isPresented: $captureSheet) { VoiceCaptureView(transcript: $transcript) }
+            .sheet(item: $conflict) { latest in
+                NavigationStack {
+                    List {
+                        Section { Text("This quote changed before your save finished. Compare both versions below. " + (savedLocally ? "Your changes remain saved on this device." : "Keep this screen open until your changes are saved.")) }
+                        Section("Your changes") { QuoteVersionSummary(quote: snapshot, transcript: transcript) }
+                        Section("Latest saved version") {
+                            LabeledContent("Status", value: latest.status.capitalized)
+                            QuoteVersionSummary(quote: latest.quote, transcript: latest.raw["voice_transcript"].string)
+                        }
+                        Section {
+                            Button("Keep my changes as a separate quote") { Task { await resolveConflict(latest, useLatest: false) } }.accessibilityIdentifier("quote.conflict.copy")
+                            Button("Open latest version and keep a local backup") { Task { await resolveConflict(latest, useLatest: true) } }.accessibilityIdentifier("quote.conflict.latest")
+                        } footer: { Text("Neither choice overwrites the saved version. Recovered copies appear under Drafts on this device in Quotes.") }
+                        if let message { ErrorNotice(message: message) }
+                    }.accessibilityIdentifier("quote.conflict.list").disabled(busy).navigationTitle("Compare versions")
+                        .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Keep editing") { conflict = nil } } }
+                }
+            }
     }
     private func applyLibrary(_ item: JSONValue, kind: LibraryKind) {
         switch kind {
         case .clients:
             for key in ["name", "email", "phone", "address"] { quote["client"][key] = item[key].isNull ? .string("") : item[key] }
         case .materials:
-            lines.append(EditableLine(raw: .object(["type": .string("material"), "description": item["name"], "quantity": .number(1), "unit": item["unit"], "unit_price": item["default_unit_price"], "library_id": item["id"], "price_source": .string("library"), "is_missing_price": .bool(false)])))
+            lines.append(EditableLine(raw: .object(["type": .string("material"), "description": item["name"], "quantity": .number(1), "unit": item["unit"], "unit_price": item["default_unit_price"], "library_id": item["id"], "price_source": .string("user_library"), "is_missing_price": .bool(false)])))
         case .kits:
             lines.append(contentsOf: item["kit_items"].array.sorted { $0["position"].number < $1["position"].number }.map { source in
                 var line = source; line["unit"] = .string(source["unit"].string.nonempty ?? "each"); return EditableLine(raw: line)
@@ -105,21 +125,23 @@ struct QuoteEditor: View {
     private func clientBinding(_ key: String) -> Binding<String> { Binding(get: { quote["client"][key].string }, set: { quote["client"][key] = .string($0) }) }
     private func queuePersist() {
         guard !finished else { return }
+        savedLocally = false
         persistenceTask?.cancel()
         persistenceTask = Task { try? await Task.sleep(for: .milliseconds(250)); if !Task.isCancelled { await persist() } }
     }
-    private func flushDraft() async {
+    @discardableResult private func flushDraft() async -> Bool {
         persistenceTask?.cancel()
         await persistenceTask?.value
-        await persist()
+        return await persist()
     }
-    private func persist() async {
-        guard !finished else { return }
-        guard state.accountID == ownerID, let store = state.drafts else { return }; let accountID = ownerID
+    @discardableResult private func persist() async -> Bool {
+        guard !finished, state.accountID == ownerID else { return false }
+        guard let store = state.drafts else { savedLocally = false; message = "Local storage is unavailable. Keep this screen open until you can save the quote online."; return false }; let accountID = ownerID
         do {
             try await store.save(SavedDraft(id: id, accountID: accountID, quote: snapshot, transcript: transcript, serverRevision: revision, updatedAt: Date()))
             savedLocally = true
-        } catch { message = "Could not save this draft on your device: \(error.localizedDescription)" }
+            return true
+        } catch { savedLocally = false; message = "Could not save this draft on your device. Keep this screen open until it is saved: \(error.localizedDescription)"; return false }
     }
     private func writeServer() async throws {
         guard state.accountID == ownerID else { throw ServiceError(status: 401, message: "Sign back into the account that owns this draft.") }
@@ -139,7 +161,7 @@ struct QuoteEditor: View {
             await persistenceTask?.value
             try await state.drafts?.remove(id: id, accountID: ownerID)
             state.refreshID = UUID(); dismiss()
-        } catch { finished = false; message = error.localizedDescription }
+        } catch { finished = false; await handleSaveError(error) }
     }
     private func generate() async {
         busy = true; defer { busy = false }; await flushDraft()
@@ -150,7 +172,55 @@ struct QuoteEditor: View {
             revision = response["item"]["revision"].string.nonempty
             quote = response["item"]["quote_data"]; lines = quote["line_items"].array.map { EditableLine(raw: $0) }
             await persist(); message = "Draft ready. Check all quantities, prices and details before sending."
-        } catch { message = error.localizedDescription }
+        } catch { await handleSaveError(error) }
+    }
+    private func handleSaveError(_ error: any Error) async {
+        message = error.localizedDescription
+        guard let service = error as? ServiceError, service.status == 409 else { return }
+        do {
+            let latest = BusinessRecord(raw: try await state.api.request("/api/mobile/v1/quotes/\(id)")["item"])
+            guard state.accountID == ownerID else { return }
+            conflict = latest
+        } catch { message = (savedLocally ? "Your changes are saved locally. " : "Keep this screen open to preserve your changes. ") + "The latest version could not be loaded: \(error.localizedDescription)" }
+    }
+    private func resolveConflict(_ latest: BusinessRecord, useLatest: Bool) async {
+        guard state.accountID == ownerID else { return }
+        guard let store = state.drafts else { message = "Local storage is unavailable. Keep editing until your changes can be preserved."; return }
+        busy = true; defer { busy = false }
+        persistenceTask?.cancel(); await persistenceTask?.value
+        do {
+            let current = SavedDraft(id: id, accountID: ownerID, quote: snapshot, transcript: transcript, serverRevision: revision, updatedAt: Date())
+            let copy = try await store.preserveCopy(of: current)
+            if useLatest {
+                // The local copy is durable before adopting a remote snapshot.
+                quote = latest.quote; transcript = latest.raw["voice_transcript"].string
+                revision = latest.raw["revision"].string.nonempty; serverExists = true
+                if !["draft", "sent", "viewed", "declined"].contains(latest.status) {
+                    finished = true; try await store.remove(id: id, accountID: ownerID)
+                    state.refreshID = UUID(); conflict = nil; dismiss(); return
+                }
+            } else {
+                let oldID = id
+                id = copy.id; quote = copy.quote; revision = nil; serverExists = false
+                try await store.remove(id: oldID, accountID: ownerID)
+            }
+            lines = quote["line_items"].array.map { EditableLine(raw: $0) }
+            let persisted = await persist(); state.refreshID = UUID(); conflict = nil
+            if persisted { message = useLatest ? "Latest version opened. Your previous edits are kept in a recovered local copy." : "Your changes are now a separate local draft. Review it and tap Save quote." }
+        } catch { message = "Could not preserve your changes. The original draft is still available: \(error.localizedDescription)" }
+    }
+}
+
+private struct QuoteVersionSummary: View {
+    let quote: JSONValue
+    let transcript: String
+    var body: some View {
+        Text(quote["job_summary"].string)
+        Text(quote["client"]["name"].string)
+        if !transcript.isEmpty { Text(transcript).font(.footnote) }
+        Text(quote["line_items"].array.map { "\($0["description"].string): \($0["quantity"].number.formatted()) \($0["unit"].string) × \($0["unit_price"].number.formatted())" }.joined(separator: "\n")).font(.footnote)
+        LabeledContent("Total") { Text(quote["total"].number, format: .currency(code: quote["currency"].string.nonempty ?? "NZD")) }
+        if !quote["terms"].string.isEmpty { Text(quote["terms"].string).font(.footnote) }
     }
 }
 

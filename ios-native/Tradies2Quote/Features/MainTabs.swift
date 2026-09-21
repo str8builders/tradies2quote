@@ -28,6 +28,12 @@ struct HomeView: View {
     @State private var creating = false
     var body: some View {
         List {
+            if state.account["deletionPending"].bool {
+                Section {
+                    Text("Account deletion is pending. Changes are paused so cleanup can finish.")
+                    NavigationLink("Retry deletion in Settings") { SettingsView() }
+                }
+            }
             Section {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(state.profile["business_name"].string.nonempty ?? "Your work, organised").font(.title2.bold())
@@ -50,6 +56,7 @@ struct HomeView: View {
             .sheet(isPresented: $creating) { NavigationStack { QuoteEditor(ownerID: state.accountID ?? "") } }
     }
     private func load() async {
+        if state.sessionMessage != nil { await state.refreshAccount() }
         do { counts = try await state.api.request("/api/mobile/v1/dashboard"); message = nil }
         catch { message = error.localizedDescription }
     }

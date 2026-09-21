@@ -66,6 +66,8 @@ struct ScheduleView: View {
     @State private var jobs: [BusinessRecord] = []
     @State private var notes: [BusinessRecord] = []
     @State private var note = ""
+    @State private var editingNote: BusinessRecord?
+    @State private var editedBody = ""
     @State private var message: String?
     @State private var busy = false
     private var day: String { LocalDay.string(date) }
@@ -77,7 +79,8 @@ struct ScheduleView: View {
             }
             Section("Day notes") {
                 ForEach(notes.filter { $0.raw["note_date"].string == day }) { item in
-                    Text(item.raw["body"].string).swipeActions { Button("Delete", role: .destructive) { Task { await remove(item.id) } } }
+                    Button(item.raw["body"].string) { editedBody = item.raw["body"].string; editingNote = item }
+                        .swipeActions { Button("Delete", role: .destructive) { Task { await remove(item.id) } } }
                 }
                 TextField("Add a note", text: $note, axis: .vertical)
                 Button("Save note") { Task { await saveNote() } }.disabled(busy || note.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -85,10 +88,24 @@ struct ScheduleView: View {
             NavigationLink { WeatherView() } label: { Label("Check local weather", systemImage: "cloud.sun") }
             if let message { ErrorNotice(message: message) { Task { await load() } } }
         }.navigationTitle("Schedule").task { await load() }.refreshable { await load() }
+            .sheet(item: $editingNote) { item in
+                NavigationStack {
+                    Form {
+                        TextEditor(text: $editedBody).frame(minHeight: 180).accessibilityLabel("Day note")
+                        Button("Save changes") { Task { await updateNote(item.id) } }.disabled(busy || editedBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        if let message { ErrorNotice(message: message) }
+                    }.navigationTitle("Edit note").toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { editingNote = nil } } }
+                }
+            }
     }
     private func load() async { do { async let jobRows = state.api.collection("quotes"); async let noteRows = state.api.collection("notes"); jobs = try await jobRows; notes = try await noteRows; message = nil } catch { message = error.localizedDescription } }
     private func saveNote() async { busy = true; defer { busy = false }; do { _ = try await state.api.request("/api/mobile/v1/notes", method: "POST", body: .object(["date": .string(day), "body": .string(note)])); note = ""; await load() } catch { message = error.localizedDescription } }
     private func remove(_ id: String) async { do { _ = try await state.api.request("/api/mobile/v1/notes/\(id)", method: "DELETE", body: .object([:])); await load() } catch { message = error.localizedDescription } }
+    private func updateNote(_ id: String) async {
+        busy = true; defer { busy = false }
+        do { _ = try await state.api.request("/api/mobile/v1/notes/\(id)", method: "PATCH", body: .object(["body": .string(editedBody)])); editingNote = nil; await load() }
+        catch { message = error.localizedDescription }
+    }
 }
 
 @MainActor final class LocationReader: NSObject, @preconcurrency CLLocationManagerDelegate {
@@ -142,6 +159,11 @@ struct WeatherView: View {
                     ForEach(weather["trades"].array.map(BusinessRecord.init(raw:))) { trade in
                         VStack(alignment: .leading) { Text(trade.raw["label"].string).bold(); Text(trade.raw["status"].string.capitalized); Text(trade.raw["reason"].string).font(.footnote) }
                     }
+                }
+                Section {
+                    Link("Weather data by Open-Meteo", destination: URL(string: "https://open-meteo.com/")!)
+                    Link("Data licence: CC BY 4.0", destination: URL(string: "https://creativecommons.org/licenses/by/4.0/")!)
+                    Text("Trade assessments calculated by Tradies2Quote.").font(.footnote)
                 }
                 Text("Forecast guidance is not a site safety assessment. Check conditions before starting work.").font(.footnote).foregroundStyle(.secondary)
             }

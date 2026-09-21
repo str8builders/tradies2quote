@@ -80,7 +80,7 @@ struct QuoteDetail: View {
             } else if message == nil { ProgressView("Loading quote…") }
             if busy { ProgressView() }
             if let message { ErrorNotice(message: message) { Task { await load() } } }
-        }.navigationTitle("Quote").navigationBarTitleDisplayMode(.inline)
+        }.accessibilityIdentifier("quote.detail.list").navigationTitle("Quote").navigationBarTitleDisplayMode(.inline)
             .task { await load() }.refreshable { await load() }
             .sheet(isPresented: $editing, onDismiss: { Task { await load() } }) { if let record { NavigationStack { QuoteEditor(ownerID: state.accountID ?? "", record: record) } } }
             .sheet(item: $pdf) { PDFPreview(file: $0) }
@@ -157,12 +157,14 @@ struct PDFCanvas: UIViewRepresentable {
 
 struct InvoiceDetail: View {
     @Environment(AppState.self) private var state
+    @Environment(\.dismiss) private var dismiss
     @State private var record: BusinessRecord
     init(record: BusinessRecord) { _record = State(initialValue: record) }
     @State private var message: String?
     @State private var pdf: DocumentFile?
     @State private var confirmSend = false
     @State private var confirmPaid = false
+    @State private var confirmDelete = false
     @State private var busy = false
     var body: some View {
         List {
@@ -178,17 +180,22 @@ struct InvoiceDetail: View {
                 Button("Email invoice") { confirmSend = true }
                 if !["paid", "cancelled"].contains(record.status) { Button("Mark paid") { confirmPaid = true } }
                 NavigationLink("View original quote") { QuoteDetail(id: record.raw["quote_id"].string) }
+                Button("Delete invoice", role: .destructive) { confirmDelete = true }
             }.disabled(busy)
             if busy { ProgressView() }
             if let message { ErrorNotice(message: message) }
         }.navigationTitle("Invoice").sheet(item: $pdf) { PDFPreview(file: $0) }
             .confirmationDialog("Send invoice email?", isPresented: $confirmSend, titleVisibility: .visible) { Button("Send to \(record.raw["invoice_data"]["client"]["email"].string)") { Task { await perform("send") } } }
             .confirmationDialog("Have you received payment?", isPresented: $confirmPaid, titleVisibility: .visible) { Button("Yes, mark paid") { Task { await perform("paid") } } }
+            .confirmationDialog("Delete this invoice?", isPresented: $confirmDelete, titleVisibility: .visible) { Button("Delete invoice", role: .destructive) { Task { await perform("delete") } } } message: { Text("This removes it from your invoice list. It does not refund or cancel a customer payment.") }
     }
     private func perform(_ action: String) async {
         busy = true; defer { busy = false }
         do {
             if action == "pdf" { pdf = try DocumentFile(data: await state.api.data("/api/invoices/\(record.id)/pdf"), name: "Invoice-\(record.id.prefix(8)).pdf") }
+            else if action == "delete" {
+                _ = try await state.api.request("/api/mobile/v1/invoices/\(record.id)/delete", method: "POST", body: .object([:])); state.refreshID = UUID(); dismiss()
+            }
             else {
                 let path = action == "paid" ? "/api/mobile/v1/invoices/\(record.id)/paid" : "/api/invoices/\(record.id)/send"
                 _ = try await state.api.request(path, method: "POST", body: .object([:])); message = action == "paid" ? "Invoice marked paid." : "Invoice email sent."; state.refreshID = UUID(); record = BusinessRecord(raw: try await state.api.request("/api/mobile/v1/invoices/\(record.id)")["item"])

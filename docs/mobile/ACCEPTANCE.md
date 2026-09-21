@@ -89,3 +89,29 @@ Release blockers include Apple distribution/account/product configuration, full 
 - Reproducible HTTP suites live in `scripts/mobile-integration/`; credentials, generated files and customer data are excluded from source control.
 
 No production activation, customer messaging, real payment or App Store submission occurred. The release blockers listed above still apply.
+
+## Recovery and wider-device checkpoint — 21 September 2026
+
+- Backend at `f22acc7`: **3,208 passed / 25 skipped**, TypeScript/lint/production build passed. Seven migrations and four SQL suites passed in the isolated schema clone. This supersedes the earlier 3,196-test checkpoint.
+- HTTP acceptance: **108 checks passed** (34 API, 44 document/deletion, 18 quote controls, 12 supplier atomic-import). Deletion crash/retry refuses late row/file writes. Supplier replay preserves later edits and the original baseline, validates malformed inputs and rejects cross-account collisions.
+- iPad (A16), iOS 26.5: **10 unit + 2 UI tests passed** for the manual quote flow and persistent sign-in. Small iPhone SE also passed the earlier two UI journeys. The newly expanded conflict journey requires its own passing result; earlier device results do not cover the added steps.
+- Local StoreKit tests are **not accepted**. Initial iOS 26.5 runs reported `SKInternalErrorDomain Code 3` while loading configuration and returned no products. iOS 27 returned no products; subsequent runs were interrupted by disk/resource failures. Xcode normalized the fixture from schema 3 to schema 5. A successful rerun plus real signed sandbox/TestFlight lifecycle testing is still mandatory. Do not interpret other passing tests or a compile as purchase acceptance.
+- Account deletion recovery, owner/team controls, invoice deletion, note editing, local conflict backups and weather attribution have additional native UI work in progress. Compile coverage is not full interactive acceptance.
+
+Every result above uses synthetic data. No production migrations, real customer delivery, paid purchase or App Store upload is included in this evidence.
+
+## StoreKit recovery checkpoint — 21 September 2026
+
+The normalized schema 5 fixture **passed both StoreKit tests on iPhone 17 Pro / iOS 27**: Ask to Buy remains pending without access; account mismatch and backend failure leave the verified transaction unfinished; backend acceptance finishes it. These are actual local StoreKit transactions with a synthetic HTTP verification responder, not mocked StoreKit products. The production server continues to reject local Xcode-signed transactions.
+
+The iPhone SE / iOS 26.5 run passed ten other unit tests and both UI tests, including real HTTP concurrent quote edits, separate-copy recovery and relaunch. Its two StoreKit tests still fail with configuration Code 3 and are recorded as failures, not skips/passes. Signed Apple sandbox/TestFlight and current production-device coverage remain outstanding.
+
+Final backend regression after commercial weather/rain-rate corrections: **3,224 passed / 25 skipped**. Weather no longer double-counts rain/showers and does not invent zero precipitation when data is missing. Thirteen release-checker tests passed.
+
+## Final native workflow checkpoint — 21 September 2026
+
+The current source passed **10 unit tests and 2 UI tests on iPad (A16), iOS 26.5**, including the expanded conflict journey and the guard against dismissing a draft when local persistence fails. The latter guard compiled in this run; forced disk-failure UI injection has not been exercised. StoreKit was explicitly excluded from this iPad invocation because it passed separately on iOS 27; the exclusion is not additional purchase evidence. The same conflict journey passed on the small iPhone SE before the final local-storage messaging guard.
+
+Native request-path inspection found 52 concrete HTTP references with corresponding backend routes. This static match checks wiring only, not request semantics or delivery. A private-fixture scan found no integration credentials in changed/tracked source. Synthetic test credentials remain ignored.
+
+The passing UI run emitted Supabase Swift's notice about future initial-session behavior. The app explicitly reads/refetches the session and ignores the initial-session event; this notice is retained in the result bundle and is not an assertion failure.
