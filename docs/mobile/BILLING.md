@@ -1,0 +1,19 @@
+# Native Apple subscriptions and recovery
+
+The bundle is `com.str8builders.tradies2quote`. Product identifiers, prices, storefronts and the paid Apple Developer/App Store Connect account still need to be configured and verified. The code does not create those products or sign distribution builds.
+
+Create one subscription group with monthly Solo, Crew and Builder products. Example identifiers are `com.str8builders.tradies2quote.solo.monthly`, `.crew.monthly` and `.builder.monthly`; use the exact identifiers actually created in App Store Connect. The app obtains localized product text and prices from StoreKit. Do not advertise example pricing as approved pricing.
+
+Configure server-only `APPLE_SUBSCRIPTIONS_ENABLED=true`, `APPLE_IAP_PRIVATE_KEY`, `APPLE_IAP_KEY_ID`, `APPLE_ISSUER_ID`, numeric `APPLE_APP_ID`, and `APPLE_PRODUCT_PLANS_JSON` mapping the real product IDs to `solo`, `crew`, or `builder`. Never place private keys in the iOS target. `APPLE_SANDBOX_USER_IDS` is a comma-separated list of account UUIDs permitted to attach sandbox transactions; include designated TestFlight and App Review accounts. Purchase testing needs an account whose access is not already paid/comped. New review/test accounts must be provisioned on this list before their purchases can activate access.
+
+Configure App Store Server Notifications V2 to `https://tradies2quote.com/api/billing/apple/notifications` for production and sandbox. The service verifies Apple's signed chain, bundle, environment, product and account token, then queries current subscription status before changing access. Apple and Stripe ledgers remain separate. Receipt finish occurs only after the backend verifies delivery. Deleted-account purchase lineages stay detached and cannot be moved to another account.
+
+Apply the Apple subscription and reconciliation migrations before enabling billing. The `apple-reconcile` cron job claims up to ten known account-bound subscriptions, with a fifteen-minute retry interval and locked claims. It refreshes current status without waiting for the app to open or a webhook to arrive. Apple HTTP requests have a twenty-second timeout, bounded response size and redirects disabled. Failures do not grant access or overwrite a good entitlement with fabricated state, and produce a failed scheduled job. The job does not send email itself.
+
+The timer source is `deploy/systemd/t2q-apple-reconcile.timer`; install and enable it during the approved production rollout, after configuration and dry-run verification. It calls the existing protected loopback runner using `CRON_SECRET`. `node deploy/run-cron.mjs apple-reconcile --dry-run` only counts known subscriptions; it neither claims work nor contacts Apple. Monitor failures and batch backlog as usage grows.
+
+Recovery currently sweeps known transaction lineages. For an outage spanning the very first purchase before any lineage was saved, the client retries unfinished/current transactions and Apple retries notifications. Operator recovery using Apple's Get Notification History is a remaining release check; an automatic history backfill is not yet implemented. The shipped system must be exercised with actual signed sandbox events before release.
+
+Required evidence remains: localized product loading, purchase/cancel/pending, restore on another device, another app account on the same Apple ID, renew/expire/grace/retry/refund/revoke, upgrade/downgrade, duplicate/out-of-order notifications, webhook outage and recovery, and TestFlight. Local tests with synthetic state are not evidence of an Apple purchase.
+
+References: [Apple notification recovery](https://developer.apple.com/documentation/AppStoreServerNotifications/responding-to-app-store-server-notifications), [sandbox overview](https://developer.apple.com/help/app-store-connect/test-in-app-purchases/overview-of-testing-in-sandbox).

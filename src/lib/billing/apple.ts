@@ -2,11 +2,12 @@ import "server-only";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { AppStoreServerAPIClient, SignedDataVerifier, Environment, VerificationException, VerificationStatus, type JWSTransactionDecodedPayload, type ResponseBodyV2DecodedPayload } from "@apple/app-store-server-library";
+import { SignedDataVerifier, Environment, VerificationException, VerificationStatus, type JWSTransactionDecodedPayload, type ResponseBodyV2DecodedPayload } from "@apple/app-store-server-library";
 import { adminClient } from "@/lib/supabase/admin";
 import { MobileError } from "@/lib/mobile/contracts";
 import { APPLE_BUNDLE_ID, appleProductPlans, appleSubscriptionsReady } from "./apple-config";
 import { appleState } from "./apple-state";
+import { BoundedAppleClient } from "./apple-client";
 
 const trustedRoots = () => ["AppleIncRootCertificate.cer", "AppleRootCA-G2.cer", "AppleRootCA-G3.cer"].map(file => readFileSync(path.join(process.cwd(), "src/lib/billing/apple-roots", file)));
 function verifier(environment: Environment) {
@@ -14,7 +15,7 @@ function verifier(environment: Environment) {
   return new SignedDataVerifier(trustedRoots(), true, environment, APPLE_BUNDLE_ID, Number(process.env.APPLE_APP_ID));
 }
 function api(environment: Environment) {
-  return new AppStoreServerAPIClient(process.env.APPLE_IAP_PRIVATE_KEY!.replace(/\\n/g, "\n"), process.env.APPLE_IAP_KEY_ID!, process.env.APPLE_ISSUER_ID!, APPLE_BUNDLE_ID, environment);
+  return new BoundedAppleClient(process.env.APPLE_IAP_PRIVATE_KEY!.replace(/\\n/g, "\n"), process.env.APPLE_IAP_KEY_ID!, process.env.APPLE_ISSUER_ID!, APPLE_BUNDLE_ID, environment);
 }
 async function decodeTransaction(signed: string): Promise<JWSTransactionDecodedPayload> {
   try { return await verifier(Environment.PRODUCTION).verifyAndDecodeTransaction(signed); }
@@ -67,7 +68,9 @@ export async function receiveAppleNotification(signed: string) {
   if (error) throw error;
   if ((event as { handled?: boolean } | null)?.handled) return;
   if (!notification.data?.signedTransactionInfo) {
-    if (notification.notificationType !== "TEST") throw new Error("Apple event has no transaction to reconcile");
+    // Renewal-extension summaries have no individual transaction; the regular
+    // status sweep reconciles affected lineages. Unknown events remain retryable.
+    if (notification.notificationType !== "TEST" && !(notification.notificationType === "RENEWAL_EXTENSION" && notification.summary)) throw new Error("Apple event has no transaction to reconcile");
     const result = await db.rpc("finish_apple_notification" as never, { p_id: notification.notificationUUID } as never);
     if (result.error) throw result.error;
     return;

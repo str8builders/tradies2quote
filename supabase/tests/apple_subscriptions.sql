@@ -18,6 +18,10 @@ begin
  if public.effective_subscription(actor)->>'source'<>'apple' or public.team_seat_limit(actor)<>5 then raise exception 'Apple entitlement not granted'; end if;
  perform public.apply_apple_subscription(state);
  if (select count(*) from public.apple_subscriptions where user_id=actor)<>1 then raise exception 'Duplicate renewal'; end if;
+ if (select count(*) from public.claim_apple_reconciliation(10) where user_id=actor)<>1 then raise exception 'Recovery did not claim due subscription'; end if;
+ if exists(select from public.claim_apple_reconciliation(10) where user_id=actor) then raise exception 'Recovery claimed same row twice'; end if;
+ update public.apple_subscriptions set last_reconcile_attempt_at=now()-interval '16 minutes' where user_id=actor;
+ if (select count(*) from public.claim_apple_reconciliation(10) where user_id=actor)<>1 then raise exception 'Failed recovery cannot be retried'; end if;
  begin
   perform public.apply_apple_subscription(jsonb_set(state,'{accountToken}','"20202020-2020-4020-8020-202020202020"'));
   raise exception 'Purchase reassigned';
@@ -50,6 +54,10 @@ do $$ begin
  begin
   perform public.apply_apple_subscription('{}');
   raise exception 'Untrusted account granted itself access';
+ exception when insufficient_privilege then null; end;
+ begin
+  perform public.claim_apple_reconciliation(10);
+  raise exception 'Untrusted account claimed billing recovery';
  exception when insufficient_privilege then null; end;
 end $$;
 reset role;

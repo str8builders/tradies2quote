@@ -3,7 +3,7 @@
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 
-export const JOBS = new Set(['trial-emails', 'engagement', 'weekly-digest', 'error-digest']);
+export const JOBS = new Set(['trial-emails', 'engagement', 'weekly-digest', 'error-digest', 'apple-reconcile']);
 export async function runCron(job, { dryRun = false, env = process.env, fetchImpl = fetch } = {}) {
   if (!JOBS.has(job)) throw new Error('Unknown scheduled job.');
   if ((env.CRON_SECRET?.length ?? 0) < 32) throw new Error('CRON_SECRET is missing or too short.');

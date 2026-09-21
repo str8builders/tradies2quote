@@ -1,0 +1,11 @@
+[Unit]
+Description=Tradies2Quote Apple subscription recovery
+
+[Timer]
+OnCalendar=*:0/5
+Persistent=true
+RandomizedDelaySec=30
+Unit=t2q-cron@apple-reconcile.service
+
+[Install]
+WantedBy=timers.target
