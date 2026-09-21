@@ -6,22 +6,16 @@ vi.mock("next/cache", () => ({revalidatePath: vi.fn()}));
 vi.mock("@/lib/supabase/server", () => ({createClient: async () => ({
   auth: {getUser: async () => ({data:{user:{id:state.owner}}})},
   from: (table: string) => {
-    let payload: Record<string,unknown> = {}; const filters: Record<string,unknown> = {};
-    const q = {
-      select: () => q, eq: (key:string,value:unknown) => {filters[key]=value;return q;},
-      insert: (value: Record<string,unknown>) => {payload=value;return q;},
-      maybeSingle: async () => {
-        if(table==="profiles") return {data:{tax_rate:15,tax_label:"GST",currency:"NZD"}};
-        const row=state.records.get(String(filters.id));
-        return {data:row?.user_id===filters.user_id?row:null};
-      },
-      single: async () => {
-        const id=String(payload.id);
-        if(state.records.has(id)) return {data:null,error:{code:"23505"}};
-        state.inserts++; state.records.set(id,JSON.parse(JSON.stringify(payload))); return {data:{id},error:null};
-      },
-      then: (resolve:(x:unknown)=>unknown) => Promise.resolve({error:null}).then(resolve),
-    }; return q;
+    if (table !== "profiles") throw new Error("Supplier quote must be created atomically");
+    const q = { select: () => q, eq: () => q, maybeSingle: async () => ({ data: {tax_rate:15,tax_label:"GST",currency:"NZD"}, error: null }) }; return q;
+  },
+  rpc: async (name: string, args: { p_quote_id: string; p_data: unknown; p_transcript: string }) => {
+    expect(name).toBe("create_supplier_quote_atomic");
+    const receipt = JSON.stringify({ owner: state.owner, quote: args.p_data, transcript: args.p_transcript });
+    const existing = state.records.get(args.p_quote_id);
+    if (existing) return existing.receipt === receipt ? { data: { id: args.p_quote_id }, error: null } : { error: { code: "23505" } };
+    state.inserts++; state.records.set(args.p_quote_id, { receipt });
+    return { data: { id: args.p_quote_id }, error: null };
   },
 })}));
 import { createQuoteFromScan } from "./actions";
@@ -43,4 +37,14 @@ it("does not return another owner's quote after an ID collision",async()=>{
   await createQuoteFromScan(lines,meta);state.owner="owner-b";
   expect((await createQuoteFromScan(lines,meta)).id).toBeUndefined();
   expect(state.inserts).toBe(1);
+});
+
+it("rejects malformed runtime input and string acknowledgements before any writes", async () => {
+  for (const invalid of [null, {}, { ...meta, acknowledge: "yes" }, { ...meta, total: "999" }, { ...meta, rowFailures: [null] }]) {
+    expect((await createQuoteFromScan(lines, invalid as never)).error).toBeTruthy();
+  }
+  for (const invalid of [null, [null], [{...lines[0], quantity: -1}], [{...lines[0], price: "10"}]]) {
+    expect((await createQuoteFromScan(invalid as never, meta)).error).toBeTruthy();
+  }
+  expect(state.inserts).toBe(0);
 });

@@ -24,10 +24,10 @@ def call(label,path,method='GET',body=None,expected=200,service=False,anonymous=
 
 def app(label,path,method='GET',body=None,**kw):return call(label,'/api'+path,method,body,backend=True,**kw)
 def rest(label,path,method='GET',body=None,**kw):return call(label,'/rest/v1/'+path,method,body,service=True,**kw)
-def multipart(label,path,field,png):
+def multipart(label,path,field,png,**kw):
  boundary='NativeAcceptance'+uuid.uuid4().hex
  data=(f'--{boundary}\r\nContent-Disposition: form-data; name="{field}"; filename="synthetic.png"\r\nContent-Type: image/png\r\n\r\n').encode()+png+f'\r\n--{boundary}--\r\n'.encode()
- return app(label,path,'POST',raw=data,mime='multipart/form-data; boundary='+boundary)
+ return app(label,path,'POST',raw=data,mime='multipart/form-data; boundary='+boundary,**kw)
 def png():
  def chunk(k,d):return struct.pack('!I',len(d))+k+d+struct.pack('!I',zlib.crc32(k+d)&0xffffffff)
  return b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('!2I5B',16,16,8,2,0,0,0))+chunk(b'IDAT',zlib.compress((b'\x00'+b'\xff\x60\x20'*16)*16))+chunk(b'IEND',b'')
@@ -76,9 +76,15 @@ try:
  assert app('Reload paid invoice','/mobile/v1/invoices/'+invoice)['item']['status']=='paid'
  app('Reject repeated paid operation','/mobile/v1/invoices/'+invoice+'/paid','POST',{},expected=400)
  app('Require explicit deletion confirmation','/account/delete','POST',{},expected=400)
+ # Simulate interruption immediately after durable intent was committed.
+ rest('Persist deletion before cleanup','rpc/begin_account_deletion','POST',{'p_user':user},expected=[200,204])
+ assert app('Pending deletion survives another request','/mobile/v1/account')['deletionPending'] is True
+ app('Block another device profile edit','/mobile/v1/profile','POST',{'business_name':'Late device edit'},expected=400)
+ rest('Block service write during deletion','materials','POST',{'user_id':user,'name':'Late write','unit':'each','default_unit_price':10},expected=403)
+ multipart('Block late logo upload','/mobile/v1/business-logo','logo',picture,expected=400)
  app('Delete disposable account','/account/delete','POST',{'confirm':'DELETE'})
  call('Deleted login rejected','/auth/v1/user',expected=403)
- for table,key in [('profiles','id'),('quotes','user_id'),('invoices','user_id'),('subscriptions','user_id')]:assert not rest('No remaining '+table,table+'?'+key+'=eq.'+user+'&select='+key)
+ for table,key in [('profiles','id'),('quotes','user_id'),('invoices','user_id'),('subscriptions','user_id'),('account_deletion_requests','user_id')]:assert not rest('No remaining '+table,table+'?'+key+'=eq.'+user+'&select='+key)
  call('Deleted logo inaccessible','/storage/v1/object/public/business-logos/'+logo['logoUrl'].split('/business-logos/')[1],anonymous=True,expected=400)
  for bucket in ['business-logos','quote-attachments']:
   listing=call('No remaining '+bucket,'/storage/v1/object/list/'+bucket,'POST',{'prefix':user,'limit':100},service=True);assert not listing

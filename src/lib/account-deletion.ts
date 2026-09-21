@@ -55,6 +55,14 @@ export type PurgeResult = { ok: true } | { ok: false; error: string };
 export async function purgeAccount(userId: string): Promise<PurgeResult> {
   const admin = adminClient();
 
+  // Persist intent before external/storage work. Database and storage guards
+  // prevent concurrent app/device writes; a failed step can be retried safely.
+  const { error: beginError } = await admin.rpc("begin_account_deletion" as never, { p_user: userId } as never);
+  if (beginError) {
+    captureError(beginError, { route: "settings/delete-account/start" });
+    return { ok: false, error: "Deletion could not start. Your account has not been changed. Please retry." };
+  }
+
   // Cancel Stripe before removing its lookup record. A transient failure must
   // remain retryable, not orphan an active paid subscription.
   try {
@@ -72,7 +80,7 @@ export async function purgeAccount(userId: string): Promise<PurgeResult> {
     }
   } catch (error) {
     captureError(error, { route: "settings/delete-account/billing" });
-    return { ok: false, error: "We could not stop website subscription billing. Your account has not been deleted. Please retry or contact support@tradies2quote.com." };
+    return { ok: false, error: "We could not stop website subscription billing. Account changes are paused while deletion is pending. Retry deletion or contact support@tradies2quote.com." };
   }
 
   const quoteIds: string[] = [];

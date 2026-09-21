@@ -74,13 +74,15 @@ export async function dispatchMobile(request: NextRequest, path: string[]) {
     }
     if (request.method === "GET") {
       if (route === "account") {
-        const [profile, entitlement, consented] = await Promise.all([
+        const [profile, entitlement, consented, deletion] = await Promise.all([
           db.from("profiles").select("*").eq("id", user.id).maybeSingle(),
           getSubscriptionStatus({ userId: user.id, signedUpAt: new Date(user.created_at), email: user.email }),
           hasAiConsent(db, user.id),
+          db.from("account_deletion_requests" as never).select("user_id").eq("user_id", user.id).maybeSingle(),
         ]);
         if (profile.error) throw profile.error;
-        return json({ id: user.id, email: user.email, profile: profile.data ?? {}, entitlement, consented, capabilities: mobileCapabilities() });
+        if (deletion.error) throw deletion.error;
+        return json({ id: user.id, email: user.email, profile: profile.data ?? {}, entitlement, consented, deletionPending: Boolean(deletion.data), capabilities: mobileCapabilities() });
       }
       if (route === "dashboard") {
         const [quotes, invoices, requests] = await Promise.all([

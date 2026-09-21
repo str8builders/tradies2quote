@@ -1,8 +1,8 @@
 "use server";
 
-import { isDeepStrictEqual } from "node:util";
+import { randomUUID } from "node:crypto";
 import { isUUID } from "@/t2qcal/lib/calculation-record";
-import * as Sentry from "@sentry/nextjs";
+import { captureError } from "@/lib/observability";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -438,7 +438,26 @@ export async function createQuoteFromScan(
     extractionAttempts?: number;
     idempotencyKey?: string;
   },
-): Promise<{ id?: string; error?: string; blocked?: boolean }> {
+): Promise<{ id?: string; error?: string; blocked?: boolean; code?: string }> {
+  if (!meta || typeof meta !== "object" || Array.isArray(meta)
+    || typeof meta.gstInclusive !== "boolean"
+    || (meta.acknowledge !== undefined && typeof meta.acknowledge !== "boolean")
+    || (meta.supplier != null && (typeof meta.supplier !== "string" || meta.supplier.length > 250))
+    || [meta.subtotal, meta.gst, meta.total].some(value => value != null && (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1e12))
+    || (meta.extractionStatus !== undefined && !["ok", "needs_review", "blocked"].includes(meta.extractionStatus))
+    || (meta.extractionReasons !== undefined && (!Array.isArray(meta.extractionReasons) || meta.extractionReasons.length > 100 || meta.extractionReasons.some(reason => typeof reason !== "string" || reason.length > 2000)))
+    || (meta.rowFailures !== undefined && (!Array.isArray(meta.rowFailures) || meta.rowFailures.length > 400 || meta.rowFailures.some(row => !row || !Number.isInteger(row.index) || row.index < 0 || typeof row.reason !== "string" || row.reason.length > 2000 || (row.raw_text != null && (typeof row.raw_text !== "string" || row.raw_text.length > 8000)))))
+    || (meta.extractionAttempts !== undefined && (!Number.isInteger(meta.extractionAttempts) || meta.extractionAttempts < 1 || meta.extractionAttempts > 10))) {
+    return { error: "Invalid supplier details. Review the scan and retry." };
+  }
+  if (!Array.isArray(lines) || lines.length === 0 || lines.length > 400 || lines.some(line => !line || typeof line !== "object"
+    || typeof line.name !== "string" || !line.name.trim() || line.name.length > 2000
+    || typeof line.unit !== "string" || line.unit.length > 40
+    || typeof line.quantity !== "number" || !Number.isFinite(line.quantity) || line.quantity <= 0 || line.quantity > 1e6
+    || typeof line.price !== "number" || !Number.isFinite(line.price) || line.price < 0 || line.price > 1e6
+    || (line.line_total != null && (typeof line.line_total !== "number" || !Number.isFinite(line.line_total) || line.line_total < 0 || line.line_total > 1e12)))) {
+    return { error: "Review every supplier line, quantity and price before creating the quote." };
+  }
   const supabase = await createClient();
   const {
     data: { user },
@@ -594,61 +613,23 @@ export async function createQuoteFromScan(
     },
   };
 
-  const { data, error } = await supabase
-    .from("quotes")
-    .insert({
-      ...(meta.idempotencyKey ? {id: meta.idempotencyKey} : {}),
-      user_id: user.id,
-      voice_transcript: supplierName
-        ? `Scanned ${supplierName} supplier quote`
-        : "Scanned supplier quote",
-      status: "draft",
-      quote_data: quoteData,
-      ai_snapshot: quoteData,
-      total_amount: totals.total,
-      currency,
-    })
-    .select("id")
-    .single();
-  if (error?.code === "23505" && meta.idempotencyKey) {
-    const {data: previous} = await supabase.from("quotes").select("id,quote_data").eq("id", meta.idempotencyKey).eq("user_id", user.id).maybeSingle();
-    if (previous && isDeepStrictEqual(previous.quote_data, JSON.parse(JSON.stringify(quoteData)))) return {id: previous.id};
-    return {error: "This request was already used for different working. Reopen your quotes before creating another."};
-  }
-  if (error || !data) {
-    console.error("createQuoteFromScan insert failed", error);
-    return { error: "Could not create the quote." };
-  }
-
-  const { error: iErr } = await supabase.from("quote_items").insert(
-    lineItems.map((it) => ({
-      quote_id: data.id,
-      type: it.type,
-      description: it.description,
-      quantity: it.quantity,
-      unit: it.unit,
-      unit_price: it.unit_price,
-      line_total: it.line_total,
-    })),
-  );
-  if (iErr) {
-    // The quote still renders fine — line items live in quote_data (JSON),
-    // which inserted above; quote_items is a secondary/denormalised table.
-    // So we DON'T fail the user or roll back a working quote. But the silent
-    // console.error meant a quote_items inconsistency was invisible — report
-    // it so we actually find out if this starts happening.
-    console.error("createQuoteFromScan items insert failed", iErr);
-    Sentry.captureException(iErr, {
-      tags: { area: "createQuoteFromScan", step: "quote_items_insert" },
-      extra: { quoteId: data.id, lineCount: lineItems.length },
-    });
+  const { data, error } = await supabase.rpc("create_supplier_quote_atomic" as never, {
+    p_quote_id: meta.idempotencyKey ?? randomUUID(),
+    p_transcript: supplierName ? `Scanned ${supplierName} supplier quote` : "Scanned supplier quote",
+    p_data: JSON.parse(JSON.stringify(quoteData)),
+  } as never);
+  if (error?.code === "23505") return { code: "PT409", error: "This request was already used for different working. Reopen your quotes before creating another." };
+  const result = data as { id?: string } | null;
+  if (error || !result?.id) {
+    captureError(new Error("Atomic supplier quote creation failed"), { route: "materials/create-from-scan" });
+    return { error: "Could not confirm the quote was saved. Retry the same scan before creating another." };
   }
 
   console.log("[import-quote] created quote from scan", {
     userId: user.id,
-    quoteId: data.id,
+    quoteId: result.id,
     lines: lineItems.length,
   });
 
-  return { id: data.id };
+  return { id: result.id };
 }
