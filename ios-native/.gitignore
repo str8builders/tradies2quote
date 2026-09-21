@@ -1,0 +1,8 @@
+DerivedData/
+build/
+**/xcuserdata/
+*.xcuserstate
+*.xcresult
+.DS_Store
+
+Tradies2QuoteUITests/IntegrationCredentials.json
