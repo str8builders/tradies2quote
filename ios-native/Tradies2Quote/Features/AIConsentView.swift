@@ -22,7 +22,7 @@ struct AIConsentView: View {
                     if busy { ProgressView() }
                     if let message { ErrorNotice(message: message) }
                 }
-            }.navigationTitle("AI permission").navigationBarTitleDisplayMode(.inline)
+            }.accessibilityIdentifier("consent.form").navigationTitle("AI permission").navigationBarTitleDisplayMode(.inline)
         }
     }
 }

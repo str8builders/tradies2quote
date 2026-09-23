@@ -46,12 +46,12 @@ struct HomeView: View {
                 NavigationLink { RecordList(kind: .invoices) } label: { LabeledContent("Invoices", value: counts["invoices"].isNull ? "—" : String(Int(counts["invoices"].number))) }
                 NavigationLink { RecordList(kind: .requests) } label: { LabeledContent("New requests", value: counts["requests"].isNull ? "—" : String(Int(counts["requests"].number))) }
                 NavigationLink { ScheduleView() } label: { Label("Schedule", systemImage: "calendar") }
-            }.accessibilityIdentifier(counts.isNull ? "home.loading" : "home.loaded")
+            }
             if let message = message ?? state.sessionMessage { Section { ErrorNotice(message: message) { Task { await load() } } } }
             Section {
                 Text("Review every price, quantity and job detail before sending a quote.").font(.footnote).foregroundStyle(.secondary)
             }
-        }.navigationTitle("Tradies2Quote")
+        }.accessibilityIdentifier(counts.isNull ? "home.loading" : "home.loaded").navigationTitle("Tradies2Quote")
             .task(id: state.refreshID) { await load() }.refreshable { await load() }
             .sheet(isPresented: $creating) { NavigationStack { QuoteEditor(ownerID: state.accountID ?? "") } }
     }
@@ -83,7 +83,7 @@ struct MoreView: View {
                 NavigationLink { SubscriptionView() } label: { Label("Subscription", systemImage: "creditcard") }
                 Link("Help and support", destination: URL(string: "https://tradies2quote.com/support")!)
             }
-        }.navigationTitle("More")
+        }.accessibilityIdentifier("more.list").navigationTitle("More")
     }
 }
 

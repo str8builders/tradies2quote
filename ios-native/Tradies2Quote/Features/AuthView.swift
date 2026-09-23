@@ -46,7 +46,8 @@ struct AuthView: View {
                     Link("Terms of Use", destination: URL(string: "https://tradies2quote.com/terms")!)
                     Link("Support", destination: URL(string: "https://tradies2quote.com/support")!)
                 }
-            }.navigationTitle(mode.rawValue).navigationBarTitleDisplayMode(.inline)
+            }.accessibilityIdentifier("auth.form").scrollDismissesKeyboard(.immediately)
+                .navigationTitle(mode.rawValue).navigationBarTitleDisplayMode(.inline)
         }
     }
     private func submit() async {

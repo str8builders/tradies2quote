@@ -48,10 +48,14 @@ struct QuoteEditor: View {
             if !serverExists || lines.isEmpty {
                 Section("Describe the work") {
                     TextEditor(text: $transcript).frame(minHeight: 100).accessibilityLabel("Job description").accessibilityIdentifier("quote.description")
-                    Button("Record a voice note", systemImage: "mic") { if state.consented { captureSheet = true } else { consentSheet = true } }
-                    Button("Generate draft quote", systemImage: "sparkles") {
-                        if state.consented { Task { await generate() } } else { consentSheet = true }
-                    }.disabled(busy || transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    if state.capabilities["voice"].bool {
+                        Button("Record a voice note", systemImage: "mic") { if state.consented { captureSheet = true } else { consentSheet = true } }
+                    } else { Text("Voice input is unavailable right now. You can type your description.").font(.footnote).foregroundStyle(.secondary) }
+                    if state.capabilities["aiText"].bool {
+                        Button("Generate draft quote", systemImage: "sparkles") {
+                            if state.consented { Task { await generate() } } else { consentSheet = true }
+                        }.disabled(busy || transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    } else { Text("AI drafting is unavailable right now. Add quote lines manually or from your saved materials.").font(.footnote).foregroundStyle(.secondary) }
                 }
             }
             Section("Quote lines") {
@@ -225,18 +229,31 @@ private struct QuoteVersionSummary: View {
 }
 
 struct LineEditor: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding var line: EditableLine
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             TextField("Description", text: text("description"), axis: .vertical)
             Picker("Type", selection: text("type")) { Text("Material").tag("material"); Text("Labour").tag("labour"); Text("Other").tag("other") }
-            HStack {
-                TextField("Quantity", value: number("quantity"), format: .number).keyboardType(.decimalPad).accessibilityLabel("Quantity")
-                TextField("Unit", text: text("unit")).accessibilityLabel("Unit")
-                TextField("Unit price", value: number("unit_price"), format: .number).keyboardType(.decimalPad).accessibilityLabel("Unit price")
-            }
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 12) { amountFields }
+            } else { HStack { amountFields } }
             if !line.raw["t2qcal_source_key"].string.isEmpty { Text("Imported from your separate calculator app").font(.caption).foregroundStyle(.secondary) }
         }.padding(.vertical, 5)
+    }
+    @ViewBuilder private var amountFields: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Quantity").font(.caption).foregroundStyle(.secondary)
+            TextField("Quantity", value: number("quantity"), format: .number).keyboardType(.decimalPad).accessibilityLabel("Quantity").frame(minHeight: 44)
+        }
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Unit").font(.caption).foregroundStyle(.secondary)
+            TextField("Unit", text: text("unit")).accessibilityLabel("Unit").frame(minHeight: 44)
+        }
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Unit price").font(.caption).foregroundStyle(.secondary)
+            TextField("Unit price", value: number("unit_price"), format: .number).keyboardType(.decimalPad).accessibilityLabel("Unit price").frame(minHeight: 44)
+        }
     }
     private func text(_ key: String) -> Binding<String> { Binding(get: { line.raw[key].string }, set: { line.raw[key] = .string($0) }) }
     private func number(_ key: String) -> Binding<Double> { Binding(get: { line.raw[key].number }, set: { line.raw[key] = .number($0) }) }

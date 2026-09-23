@@ -35,12 +35,18 @@ try:
  call(base+'/save','POST',{'expectedRevision':changed['revision'],'quote_data':invalid},expected=400)
  assert call(base)['item']['voice_transcript']=='Updated description'
  call(base+'/schedule','POST',{'date':'2026-10-01'},expected=400)
- call('/api/clients','POST',{'name':'Integration Client','email':'client@example.invalid','address':'Test address'})
+ # These named fixtures are also selected by native UI tests. Reuse them on
+ # subsequent rehearsals so duplicate-name validation is not a harness failure.
+ existing_clients=call('/api/mobile/v1/clients')['items']
+ if not any(c['name']=='Integration Client' for c in existing_clients):
+  call('/api/clients','POST',{'name':'Integration Client','email':'client@example.invalid','address':'Test address'})
  contacts=call('/api/mobile/v1/clients');assert any(c['name']=='Integration Client' for c in contacts['items'])
  assert not call('/api/mobile/v1/clients',owner='bob')['items']
- call('/api/mobile/v1/materials','POST',{'name':'Integration Material','unit':'each','default_unit_price':12.5})
+ existing_materials=call('/api/mobile/v1/materials')['items']
+ if not any(m['name']=='Integration Material' for m in existing_materials):
+  call('/api/mobile/v1/materials','POST',{'name':'Integration Material','unit':'each','default_unit_price':12.5})
  assert any(m['name']=='Integration Material' for m in call('/api/mobile/v1/materials')['items'])
- kit=call('/api/mobile/v1/kits','POST',{'name':'Integration Kit','items':[{'type':'material','description':'Test board','unit':'each','quantity':2,'unit_price':10}]});assert kit['id']
+ kit=call('/api/mobile/v1/kits','POST',{'name':'Integration Kit '+uuid.uuid4().hex[:8],'items':[{'type':'material','description':'Test board','unit':'each','quantity':2,'unit_price':10}]});assert kit['id']
  assert any(k['id']==kit['id'] and len(k['kit_items'])==1 for k in call('/api/mobile/v1/kits')['items'])
  call('/api/mobile/v1/notes','POST',{'date':'2026-10-01','body':'Integration day note'})
  assert any(n['body']=='Integration day note' for n in call('/api/mobile/v1/notes')['items'])

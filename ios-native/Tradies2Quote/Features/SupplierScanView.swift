@@ -22,7 +22,9 @@ struct SupplierScanView: View {
         Form {
             Section("Read a supplier quote") {
                 Text("Choose one supplier document with up to eight pages. Review the extracted quantities, units, tax treatment and prices before saving anything.")
-                if state.consented {
+                if !state.capabilities["drawingScan"].bool {
+                    Text("Supplier document reading is unavailable right now. You can enter materials and quote lines manually.").foregroundStyle(.secondary)
+                } else if state.consented {
                     PhotosPicker(selection: $photo, matching: .images) { Label("Choose photo", systemImage: "photo") }.disabled(busy)
                     if VNDocumentCameraViewController.isSupported { Button("Scan document", systemImage: "camera") { camera = true }.disabled(busy) }
                     Button("Choose image or PDF", systemImage: "folder") { filePicker = true }.disabled(busy)

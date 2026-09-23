@@ -40,7 +40,7 @@ struct ContactEditor: View {
             if let message { ErrorNotice(message: message) }
             Button("Save client") { Task { await save() } }.disabled(busy || data["name"].string.trimmingCharacters(in: .whitespaces).isEmpty)
             if busy { ProgressView() }
-        }.navigationTitle(data["id"].isNull ? "New client" : "Client")
+        }.accessibilityIdentifier("client.form").scrollDismissesKeyboard(.immediately).navigationTitle(data["id"].isNull ? "New client" : "Client")
     }
     private func text(_ key: String) -> Binding<String> { Binding(get: { data[key].string }, set: { data[key] = .string($0) }) }
     private func save() async { busy = true; defer { busy = false }; do { _ = try await state.api.request("/api/clients", method: "POST", body: data); state.refreshID = UUID(); dismiss() } catch { message = error.localizedDescription } }
@@ -70,7 +70,7 @@ struct MaterialEditor: View {
                 if !data["id"].isNull { Button("Delete material", role: .destructive) { deleting = true } }
                 if busy { ProgressView() }
             }
-        }.navigationTitle("Material")
+        }.accessibilityIdentifier("material.form").scrollDismissesKeyboard(.immediately).navigationTitle("Material")
             .confirmationDialog("Delete this material?", isPresented: $deleting, titleVisibility: .visible) { Button("Delete", role: .destructive) { Task { await save(deleting: true) } } }
     }
     private func text(_ key: String) -> Binding<String> { Binding(get: { data[key].string }, set: { data[key] = .string($0) }) }

@@ -27,7 +27,7 @@ struct LibraryPicker: View {
                 }
                 if !loading && records.isEmpty && message == nil { ContentUnavailableView("Nothing saved yet", systemImage: "tray", description: Text("Add reusable details from Clients or More.")) }
                 if let message { ErrorNotice(message: message) }
-            }.navigationTitle(kind.title).searchable(text: $query)
+            }.accessibilityIdentifier("library.picker").navigationTitle(kind.title).searchable(text: $query)
                 .toolbar { Button("Cancel") { dismiss() } }.task { await load() }
         }
     }

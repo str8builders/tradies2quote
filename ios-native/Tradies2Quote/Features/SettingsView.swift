@@ -61,7 +61,7 @@ struct SettingsView: View {
             }
             if busy { ProgressView() }
             if let message { ErrorNotice(message: message) }
-        }.navigationTitle("Settings")
+        }.accessibilityIdentifier("settings.form").scrollDismissesKeyboard(.immediately).navigationTitle("Settings")
             .task { if !loaded { await state.refreshAccount(); profile = state.profile; loaded = !state.account.isNull } }
             .onChange(of: logo) { Task { await changeLogo() } }
             .sheet(isPresented: $consentSheet) { AIConsentView() }
@@ -108,7 +108,7 @@ struct DeleteAccountView: View {
                     if busy { ProgressView("Deleting your account…") }
                     if let message { ErrorNotice(message: message) }
                 }
-            }.navigationTitle("Delete account").navigationBarTitleDisplayMode(.inline).toolbar { Button("Cancel") { dismiss() }.disabled(busy) }
+            }.accessibilityIdentifier("delete.form").scrollDismissesKeyboard(.immediately).navigationTitle("Delete account").navigationBarTitleDisplayMode(.inline).toolbar { Button("Cancel") { dismiss() }.disabled(busy) }
         }.interactiveDismissDisabled(busy)
     }
     private func delete() async { busy = true; defer { busy = false }; do { try await state.deleteAccount(); dismiss() } catch { message = error.localizedDescription } }
