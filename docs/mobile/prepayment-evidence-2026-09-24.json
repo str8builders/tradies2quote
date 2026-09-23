@@ -1,0 +1,232 @@
+{
+  "date": "2026-09-24",
+  "status": "Prepayment preparation saved; not submission ready",
+  "submissionReady": false,
+  "nativeSourceCommit": "d75824505c263107460e130c223f189edea1c63c",
+  "web": {
+    "productionBuild": "passed",
+    "typeCheck": "passed as part of production build",
+    "targetedPolicyLint": "passed",
+    "releaseCheckerTests": {
+      "passed": 13
+    },
+    "fullBackendSuite": "Historical 21 September result: 3224 passed, 25 skipped; not repeated in full today"
+  },
+  "http": {
+    "date": "2026-09-24",
+    "scope": "Isolated synthetic HTTP acceptance; no external provider delivery or Apple sandbox purchase",
+    "suites": [
+      {
+        "suite": "api-results.json",
+        "checks": 34,
+        "passed": true
+      },
+      {
+        "suite": "documents-deletion-results.json",
+        "checks": 44,
+        "passed": true
+      },
+      {
+        "suite": "quote-controls-results.json",
+        "checks": 18,
+        "passed": true
+      },
+      {
+        "suite": "supplier-results.json",
+        "checks": 12,
+        "passed": true
+      }
+    ],
+    "total": 108,
+    "submissionReady": false
+  },
+  "native": {
+    "date": "2026-09-24",
+    "submissionReady": false,
+    "sourceScope": "24 September working candidate before final navigation/layout corrections; not final source acceptance",
+    "completedRun": {
+      "device": "iPhone SE (3rd generation)",
+      "os": "26.5",
+      "result": "Failed",
+      "total": 16,
+      "passed": 13,
+      "failed": 3,
+      "unitPassed": 10,
+      "uiPassed": 3,
+      "uiFailed": 3,
+      "storeKitExcluded": true
+    },
+    "passedUI": [
+      "Launch account screen",
+      "Create client/material and verify server persistence",
+      "Device draft survives termination, unavailable local API and reconnection"
+    ],
+    "failedUI": [
+      "testConsentAccountControlsAndUnavailableServices()",
+      "testLargerTextQuoteControlsRemainReachable()",
+      "testSignInCreateManualQuoteAndReopenFromServer()"
+    ],
+    "failureFollowUp": "Corrected offscreen navigation helpers and compiled final app/test sources; simulator installation/startup failed before accepted rerun",
+    "localStoreKit": {
+      "os": "27",
+      "passedCases": 2,
+      "wholeCombinedRunPassed": false,
+      "realAppleSandbox": false,
+      "knownIOS26ConfigurationFailureUnresolved": true
+    },
+    "finalSourceCompiled": true,
+    "finalAccessibilityAuditPassed": false,
+    "physicalDeviceTested": false,
+    "screenshots": [
+      {
+        "file": "tradies2quote-clients-test-2026-09-24.png",
+        "dimensions": "750 \u00d7 1334",
+        "scope": "Synthetic pre-correction test evidence; not final App Store gallery"
+      },
+      {
+        "file": "tradies2quote-materials-test-2026-09-24.png",
+        "dimensions": "750 \u00d7 1334",
+        "scope": "Synthetic pre-correction test evidence; not final App Store gallery"
+      },
+      {
+        "file": "tradies2quote-offline-draft-test-2026-09-24.png",
+        "dimensions": "750 \u00d7 1334",
+        "scope": "Synthetic pre-correction test evidence; not final App Store gallery"
+      }
+    ]
+  },
+  "archive": {
+    "buildChecksPassed": true,
+    "signatureVerificationPassed": false,
+    "submissionReady": false,
+    "version": "1.0.0",
+    "build": "1",
+    "minimumOS": "17.0",
+    "sdk": "iphoneos26.5",
+    "executableSHA256": "23b759057da72b64c218cced9face16fe9ab363b3c5e5b89e0970097c01c8d20",
+    "checks": [
+      {
+        "check": "native_bundle_identifier",
+        "passed": true
+      },
+      {
+        "check": "production_api_origin",
+        "passed": true
+      },
+      {
+        "check": "production_auth_origin",
+        "passed": true
+      },
+      {
+        "check": "production_push_configuration",
+        "passed": true
+      },
+      {
+        "check": "iphone_and_ipad",
+        "passed": true
+      },
+      {
+        "check": "ipad_multitasking_orientations",
+        "passed": true
+      },
+      {
+        "check": "camera_microphone_location_descriptions",
+        "passed": true
+      },
+      {
+        "check": "no_test_credentials_or_storekit_fixture",
+        "passed": true
+      },
+      {
+        "check": "no_web_wrapper_assets",
+        "passed": true
+      },
+      {
+        "check": "no_debug_endpoint_override",
+        "passed": true
+      },
+      {
+        "check": "app_privacy_manifest",
+        "passed": true
+      },
+      {
+        "check": "no_tracking_declared",
+        "passed": true
+      }
+    ],
+    "privacyManifests": [
+      {
+        "path": "PrivacyInfo.xcprivacy",
+        "tracking": false,
+        "requiredReasonAPIs": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "C617.1"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "swift-crypto_Crypto.bundle/PrivacyInfo.xcprivacy",
+        "tracking": false,
+        "requiredReasonAPIs": []
+      },
+      {
+        "path": "GRDB_GRDB.bundle/PrivacyInfo.xcprivacy",
+        "tracking": false,
+        "requiredReasonAPIs": []
+      }
+    ],
+    "remaining": [
+      "Distribution identity/profile and entitlements",
+      "App Store archive validation",
+      "Final privacy-label and required-reason API review",
+      "StoreKit sandbox/TestFlight and provider acceptance",
+      "Physical-device acceptance and App Store submission"
+    ],
+    "date": "2026-09-24",
+    "nativeSourceCommit": "d75824505c263107460e130c223f189edea1c63c",
+    "appPrivacyDataCategories": 17,
+    "archiveSucceeded": true
+  },
+  "deployment": {
+    "candidateBranchOnly": true,
+    "correctedPoliciesLive": false,
+    "productionMigrationsApplied": false
+  },
+  "apple": {
+    "membershipPaymentCompleted": false,
+    "activationConfirmed": false,
+    "appStoreRecordCreated": false,
+    "productsCreated": false,
+    "testFlightVerified": false,
+    "submitted": false
+  },
+  "cleanup": {
+    "temporaryTestContainers": "stopped and verified",
+    "localBackendGatewayTunnel": "stopped",
+    "disposableSimulator": "deleted",
+    "syntheticDatabaseAndPrivateConfiguration": "retained"
+  },
+  "inputsNeeded": [
+    "Authorized email address and mobile number for delivery tests",
+    "Apple monthly prices and launch countries",
+    "Available physical device"
+  ],
+  "remaining": [
+    "Rerun corrected native UI tests and accessibility audit on a working simulator/device",
+    "Physical camera, microphone, APNs, interruptions and separate T2QCAL handoff",
+    "Real provider results, inbox/SMS receipts and sandbox deposit flows",
+    "Verify all backup archives, retention and deletion handling on restore",
+    "Paid Apple membership activation, seller agreements, signing and product setup",
+    "Signed Apple sandbox/TestFlight lifecycle and release archive validation",
+    "Accepted backend/policy release, exact-build screenshots, final metadata/privacy/export/age answers and review submission"
+  ]
+}
