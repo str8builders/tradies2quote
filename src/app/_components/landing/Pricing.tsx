@@ -13,7 +13,7 @@ export function Pricing() {
       <div className="studio-container">
         <div className="studio-section-heading">
           <div>
-            <div className="studio-eyebrow">06 / STRAIGHT-UP PRICING</div>
+            <div className="studio-eyebrow">05 / STRAIGHT-UP PRICING</div>
             <h2>
               A small business expense.
               <br />
@@ -33,14 +33,14 @@ export function Pricing() {
               data-testid={`pricing-tier-${t.slug}`}
               className={`studio-price-card ${!t.comingSoon ? "studio-price-live" : ""}`}
             >
-              <div
-                className="studio-price-status"
-                data-testid={
-                  t.comingSoon ? `pricing-coming-soon-${t.slug}` : undefined
-                }
-              >
-                {t.comingSoon ? "COMING SOON" : "AVAILABLE NOW"}
-              </div>
+              {t.comingSoon ? (
+                <div
+                  className="studio-price-status"
+                  data-testid={`pricing-coming-soon-${t.slug}`}
+                >
+                  COMING SOON
+                </div>
+              ) : null}
               <h3>{t.name}</h3>
               <p>{t.tag}</p>
               <div className="studio-price">

@@ -5,98 +5,116 @@ import {
   Calculator,
   Stack,
   Camera,
-  Ruler,
-  Books,
   QrCode,
   ArrowUpRight,
 } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
+
+/**
+ * Six things the app does, each with a screen from the marketing kit
+ * (src/remotion, rendered by `npm run render:marketing`). The screens are
+ * redrawn from the real app with one fictional example job, so no real
+ * account, client or figure ever appears on the public site.
+ */
 const FEATURES = [
   {
     slug: "voice-first",
     icon: Microphone,
     title: "Talk it through.",
-    body: "Get your first draft out of your head and onto the page. Voice, typed notes, or a scanned plan.",
-  },
-  {
-    slug: "branded-pdf",
-    icon: FileText,
-    title: "Look the business.",
-    body: "Professional quote PDFs with your branding, terms, and a clear breakdown of the job.",
-  },
-  {
-    slug: "tax-built-in",
-    icon: Calculator,
-    title: "Know your numbers.",
-    body: "Materials, labour, markup and GST, laid out clearly. You check the figures before sending.",
-  },
-  {
-    slug: "materials-labour",
-    icon: Stack,
-    title: "Keep it all together.",
-    body: "Your clients, material rates, quotes, invoices and job calendar in one place, ready for the next job.",
+    body: "Record a walkthrough, type a few lines or scan a plan. Your words become the first draft.",
+    image: "/images/marketing/feature-voice.webp",
+    alt: "Recording a site note about a new timber deck",
   },
   {
     slug: "supplier-scan",
     icon: Camera,
     title: "Scan the supplier's quote.",
-    body: "Photograph a quote or invoice from ITM, PlaceMakers or Mitre 10 — up to six pages at once — and the prices land in your materials library. CSV import too.",
+    body: "Photograph a quote or invoice from ITM, PlaceMakers, Mitre 10 or any supplier, up to six pages at once. The lines land in your materials.",
+    image: "/images/marketing/feature-supplier-scan.webp",
+    alt: "A supplier quote being read into material lines",
   },
   {
-    slug: "qr-requests",
+    slug: "qr-request",
     icon: QrCode,
     title: "Your QR code. Their request.",
-    body: "Print your code on the van, the site fence or a card. Clients scan it, describe the job and add photos. It lands in the app as a draft quote, written up and waiting for you.",
+    body: "Put your code on the van, the site fence or a card. Clients describe the job and add photos, and a draft is waiting for you.",
+    image: "/images/marketing/feature-qr-request.webp",
+    alt: "A client sending a job request with photos from a QR code",
   },
   {
-    slug: "t2qcal",
-    icon: Ruler,
-    title: "Measure it. Draw it. Quote it.",
-    body: "T2QCAL's 95 calculators draw the job as you type. The camera reads pitch, fall, height and lengths from a photo, and the quantities go straight into a draft quote at your markup and GST.",
+    slug: "branded-pdf",
+    icon: FileText,
+    title: "Look the business.",
+    body: "A branded quote your client reads, accepts and signs on their phone. You get told the moment they do.",
+    image: "/images/marketing/feature-client-accept.webp",
+    alt: "A client accepting and signing a quote on their phone",
   },
   {
-    slug: "the-books",
-    icon: Books,
-    title: "The books, on the job.",
-    body: "NZS 3604, the Building Code clauses and the GIB, MiTek, James Hardie and Pryda manuals sit under every calculator. Keep them on the phone and open them with no signal.",
+    slug: "tax-built-in",
+    icon: Calculator,
+    title: "Know your numbers.",
+    body: "Your rates, your markup and GST, line by line. You check every figure before it goes.",
+    image: "/images/marketing/feature-numbers.webp",
+    alt: "Quote totals showing materials, labour, GST and the total",
+  },
+  {
+    slug: "materials-labour",
+    icon: Stack,
+    title: "Keep it all together.",
+    body: "Clients, material prices, quotes, invoices and your job calendar in one place.",
+    image: "/images/marketing/feature-invoices.webp",
+    alt: "The invoices list with a paid invoice",
   },
 ];
+
 export function Features() {
   return (
     <section
       id="features"
       data-testid="section-features"
       className="studio-section studio-feature-section"
+      aria-labelledby="features-heading"
     >
       <div className="studio-container">
         <div className="studio-section-heading">
           <div>
-            <div className="studio-eyebrow">03 / YOUR EVERYDAY TOOLBOX</div>
-            <h2>
+            <div className="studio-eyebrow">02 / WHAT YOU GET</div>
+            <h2 id="features-heading">
               Built for your work.
               <br />
               <em>And your working day.</em>
             </h2>
           </div>
           <Link className="studio-text-link" href="/signup">
-            Put it to work <ArrowUpRight size={21} />
+            Start your free trial <ArrowUpRight size={21} />
           </Link>
         </div>
-        <div className="studio-feature-grid">
-          {FEATURES.map(({ slug, icon: Icon, title, body }) => (
-            <article
-              className="studio-feature"
+        <ul className="studio-feature-cards" aria-label="Features">
+          {FEATURES.map(({ slug, icon: Icon, title, body, image, alt }) => (
+            <li
+              className="studio-feature-card"
               key={slug}
               data-testid={`feature-${slug}`}
             >
-              <div className="studio-icon-box">
-                <Icon size={26} weight="duotone" />
+              <div className="studio-feature-shot">
+                <Image
+                  src={image}
+                  alt={alt}
+                  width={960}
+                  height={1200}
+                  sizes="(max-width: 800px) 70vw, 300px"
+                />
               </div>
-              <h3>{title}</h3>
-              <p>{body}</p>
-            </article>
+              <div className="studio-feature-text">
+                <h3>
+                  <Icon size={20} weight="duotone" aria-hidden="true" />
+                  {title}
+                </h3>
+                <p>{body}</p>
+              </div>
+            </li>
           ))}
-        </div>
+        </ul>
         <div className="studio-worksite">
           <Image
             src="/images/worksite.webp"
@@ -110,20 +128,17 @@ export function Features() {
             <div className="studio-eyebrow">
               <span className="studio-status-dot" /> MADE FOR DAYS LIKE THIS
             </div>
-            <h2>
+            <p className="studio-worksite-title">
               Your best work happens
               <br />
               <em>away from a desk.</em>
-            </h2>
+            </p>
             <p>
-              Take your quoting with you. On site, in the ute,
-              <br />
-              or wherever the next job takes you.
+              Take your quoting with you. On site, in the ute, or wherever the
+              next job takes you.
             </p>
           </div>
-          <span className="studio-worksite-caption">
-            ILLUSTRATIVE WORKSITE IMAGE
-          </span>
+          <span className="studio-worksite-caption">ILLUSTRATIVE PHOTO</span>
         </div>
       </div>
     </section>

@@ -32,14 +32,19 @@ const PILLARS = [
 ];
 export function FounderStory() {
   return (
-    <section id="trust" data-testid="section-trust" className="studio-section">
+    <section
+      id="trust"
+      data-testid="section-trust"
+      className="studio-section"
+      aria-labelledby="trust-heading"
+    >
       <div className="studio-container">
         <div className="studio-founder">
           <div>
             <div className="studio-eyebrow">
-              05 / FROM ONE TRADIE TO ANOTHER
+              04 / FROM ONE TRADIE TO ANOTHER
             </div>
-            <h2>
+            <h2 id="trust-heading">
               Built by a builder.
               <br />
               <em>Who gets it.</em>
@@ -70,6 +75,14 @@ export function FounderStory() {
             </article>
           ))}
         </div>
+        <p className="studio-founder-facts" data-testid="trust-facts">
+          <span>Made in Tauranga, New Zealand.</span>
+          <span>
+            Questions? Email{" "}
+            <a href="mailto:support@tradies2quote.com">support@tradies2quote.com</a>{" "}
+            and a real person answers.
+          </span>
+        </p>
       </div>
     </section>
   );

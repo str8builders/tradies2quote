@@ -48,25 +48,30 @@
 }
 .studio-hero {
   position: relative;
-  padding-top: 88px;
+  padding-top: 56px;
   overflow: clip;
 }
 .studio-hero-grid {
   display: grid;
   grid-template-columns: 1.1fr 1fr;
-  align-items: center;
+  /* Top-aligned: centring against the taller product visual pushed the
+     headline and main button below the fold on laptop screens. */
+  align-items: start;
   gap: 70px;
-  padding-bottom: 85px;
+  padding-bottom: 72px;
+}
+.studio-hero-copy {
+  padding-top: clamp(8px, 4vh, 48px);
 }
 .studio-hero h1 {
-  font-size: clamp(48px, 5.65vw, 80px);
-  line-height: 1.06;
-  margin: 24px 0;
+  font-size: clamp(46px, 5.3vw, 76px);
+  line-height: 1.05;
+  margin: 18px 0;
   letter-spacing: -0.065em;
 }
 .studio-hero-copy > p {
-  font-size: 18px;
-  line-height: 1.8;
+  font-size: 17px;
+  line-height: 1.65;
   max-width: 475px;
   color: var(--studio-muted);
 }
@@ -74,7 +79,7 @@
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
-  margin-top: 30px;
+  margin-top: 26px;
 }
 .studio-button {
   min-height: 52px;
@@ -109,33 +114,38 @@
 }
 .studio-hero-assurances {
   display: flex;
-  gap: 16px;
+  gap: 8px 18px;
   flex-wrap: wrap;
-  color: #aaa;
-  font-size: 12px;
-  margin-top: 20px;
+  color: #c4c4c4;
+  font-size: 13px;
+  margin-top: 18px;
+  padding: 0;
+  list-style: none;
 }
-.studio-hero-assurances span {
+.studio-hero-assurances li {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
+}
+/* Short laptop screens (1366x768 and friends): keep the headline and the
+   main button above the fold. */
+@media (min-width: 801px) and (max-height: 820px) {
+  .studio-hero {
+    padding-top: 36px;
+  }
+  .studio-hero-copy {
+    padding-top: 12px;
+  }
+  .studio-hero h1 {
+    font-size: clamp(44px, 4.7vw, 66px);
+    margin: 14px 0;
+  }
+  .studio-actions {
+    margin-top: 22px;
+  }
 }
 .studio-hero-assurances svg {
   color: #d0d0d0;
-}
-.studio-install {
-  margin-top: 18px;
-}
-.studio-install button {
-  font-size: 12px;
-  min-height: 44px;
-  border: 0 !important;
-  background: transparent !important;
-  color: #aaa;
-  box-shadow: none !important;
-  padding: 6px 0;
-  letter-spacing: 0;
-  text-transform: none;
 }
 .studio-product-stage {
   position: relative;
@@ -538,10 +548,10 @@
     font-size: 10px;
   }
   .studio-hero-assurances {
-    gap: 10px;
+    gap: 6px 12px;
   }
-  .studio-hero-assurances span {
-    font-size: 11px;
+  .studio-hero-assurances li {
+    font-size: 12px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -872,7 +882,7 @@
   max-width: 260px;
 }
 .studio-worksite {
-  min-height: 490px;
+  min-height: 380px;
   position: relative;
   overflow: hidden;
   border-radius: 18px 18px 0 0;
@@ -894,13 +904,19 @@
     linear-gradient(0deg, #0a0b0b80, transparent 50%);
 }
 .studio-worksite-copy {
-  padding: 100px 52px;
+  padding: 72px 52px;
   max-width: 660px;
 }
-.studio-worksite h2 {
+.studio-worksite-title {
+  font-family: var(--font-plus-jakarta), var(--font-ibm-plex-sans), sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.055em;
+  line-height: 1.12;
   font-size: 44px;
+  margin-top: 16px;
 }
-.studio-worksite h2 em {
+.studio-worksite-title em {
+  font-style: normal;
   color: #ff965f;
 }
 .studio-worksite-copy > p {
@@ -1472,13 +1488,13 @@
     font-size: 14px;
   }
   .studio-worksite {
-    min-height: 420px;
+    min-height: 340px;
   }
   .studio-worksite-copy {
-    padding: 72px 28px;
+    padding: 56px 24px;
   }
-  .studio-worksite h2 {
-    font-size: 34px;
+  .studio-worksite-title {
+    font-size: 32px;
   }
   .studio-worksite-shade {
     background:
@@ -2121,5 +2137,250 @@
   .studio-auth-story * {
     animation: none !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Landing v3 (Sep 2026): feature cards with app screens, the T2QCAL section
+   and its try-it calculator, the founder facts row.
+   ------------------------------------------------------------------------- */
+.studio-feature-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  margin: 0 0 64px;
+  padding: 0;
+  list-style: none;
+}
+.studio-feature-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #ffffff14;
+  border-radius: 16px;
+  background: #141515cc;
+  overflow: hidden;
+}
+.studio-feature-shot {
+  aspect-ratio: 4 / 3;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(ellipse at 50% 90%, #ff5f1522, transparent 65%), #0f1010;
+  border-bottom: 1px solid #ffffff10;
+  overflow: hidden;
+}
+.studio-feature-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+.studio-feature-text {
+  padding: 20px 22px 24px;
+}
+.studio-feature-text h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 19px;
+  letter-spacing: -0.035em;
+  margin-bottom: 8px;
+}
+.studio-feature-text h3 svg {
+  color: #ff7a3d;
+  flex: none;
+}
+.studio-feature-text p {
+  font-size: 15px;
+  line-height: 1.7;
+  color: #b4b4b4;
+}
+.studio-calc-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
+  gap: 56px;
+  align-items: center;
+}
+.studio-calc-points {
+  display: grid;
+  gap: 22px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.studio-calc-points li {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  font-size: 16px;
+  line-height: 1.7;
+  color: #b4b4b4;
+}
+.studio-calc-points .studio-icon-box {
+  margin: 0;
+  flex: none;
+}
+.studio-calc-points strong {
+  color: #f4f4f1;
+  font-weight: 700;
+}
+.studio-calc-shot {
+  justify-self: center;
+  width: min(300px, 100%);
+  border-radius: 34px;
+  padding: 9px;
+  background: #0a0a0a;
+  border: 1px solid #ffffff24;
+  box-shadow: 0 40px 90px #000a;
+  transform: rotate(2deg);
+}
+.studio-calc-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 26px;
+}
+.studio-fineprint {
+  margin-top: 16px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #b4b4b4;
+  max-width: 620px;
+}
+.studio-inline-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #ff8b54;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+.studio-tryit {
+  margin-top: 56px;
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr) minmax(0, 0.8fr);
+  gap: 24px 32px;
+  align-items: center;
+  padding: 26px 28px;
+  border: 1px solid #ff5f1540;
+  border-radius: 16px;
+  background: #141515e6;
+}
+.studio-tryit h3 {
+  font-size: 20px;
+  letter-spacing: -0.035em;
+}
+.studio-tryit > div:first-child p {
+  margin-top: 6px;
+  font-size: 14px;
+  color: #b4b4b4;
+}
+.studio-tryit-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.studio-tryit-fields label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: #d0d0d0;
+}
+.studio-tryit-result {
+  display: grid;
+  gap: 4px;
+  color: #b4b4b4;
+  font-size: 14px;
+}
+.studio-tryit-result strong {
+  font-size: 30px;
+  letter-spacing: -0.03em;
+  color: var(--color-brand);
+}
+.studio-tryit .studio-fineprint {
+  grid-column: 1 / -1;
+  margin-top: 0;
+  max-width: none;
+}
+.studio-founder-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 28px;
+  margin-top: 36px;
+  padding-top: 24px;
+  border-top: 1px solid #ffffff12;
+  font-size: 14px;
+  color: #b4b4b4;
+}
+.studio-founder-facts a {
+  color: #ff8b54;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@media (max-width: 1100px) {
+  .studio-feature-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .studio-tryit {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 800px) {
+  /* Phones: one swipeable row instead of a tall stack of cards. */
+  .studio-feature-cards {
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    margin: 0 -20px 48px;
+    padding: 0 20px 6px;
+    scrollbar-width: none;
+  }
+  .studio-feature-cards::-webkit-scrollbar {
+    display: none;
+  }
+  .studio-feature-card {
+    flex: 0 0 78%;
+    scroll-snap-align: start;
+  }
+  .studio-feature-text p {
+    font-size: 14px;
+  }
+  .studio-calc-grid {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
+  .studio-calc-shot {
+    width: min(240px, 70%);
+  }
+  .studio-tryit {
+    margin-top: 40px;
+    padding: 20px;
+  }
+  .studio-tryit-fields {
+    grid-template-columns: 1fr 1fr;
+  }
+  .studio-tryit-fields label:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Install nudge entrance (replaces a framer-motion spring). */
+@keyframes studio-nudge-in {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.studio-nudge-in {
+  animation: studio-nudge-in 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-nudge-in {
+    animation: none;
   }
 }

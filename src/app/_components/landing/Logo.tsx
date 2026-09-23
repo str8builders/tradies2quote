@@ -18,7 +18,8 @@
  *     because the wasted padding is gone.
  *
  * `size` controls HEIGHT; the ~2.12:1 asset aspect sets the width.
- * `?v=21` busts the wave-19.11 (white-bg) cached copy.
+ * Served as a 424px-wide WebP (sharp from the transparent PNG): big enough
+ * for the largest use (96px tall at 2x) at ~5% of the PNG's weight.
  *
  * The legacy export name `LogoMark` is preserved so existing imports
  * keep working without churn.
@@ -38,10 +39,10 @@ export function LogoMark({
     // eslint-disable-next-line @next/next/no-img-element
     <img
       data-testid="logo-mark"
-      src="/logo-horizontal.png?v=21"
+      src="/logo-horizontal.webp"
       alt={title}
-      width={1084}
-      height={512}
+      width={424}
+      height={200}
       className={`block w-auto shrink-0 ${className}`}
       style={{ height: size }}
     />

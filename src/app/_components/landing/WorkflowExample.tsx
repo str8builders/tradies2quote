@@ -1,12 +1,65 @@
 "use client";
-import {useState} from "react";
+import { useId, useState } from "react";
 import Link from "next/link";
-import {Input} from "@/components/ui/input";
-import {ArrowRight,Check} from "@phosphor-icons/react";
-export function WorkflowExample(){
-  const [length,setLength]=useState("5"),[width,setWidth]=useState("4"),[price,setPrice]=useState("35");
-  const values=[Number(length),Number(width),Number(price)];
-  const valid=[length,width,price].every(value=>value.trim()!=="")&&values.every(value=>Number.isFinite(value)&&value>0&&value<=10000);
-  const area=valid?values[0]*values[1]:0,total=area*values[2];
-  return <section id="worked-example" className="studio-section" aria-labelledby="example-title"><div className="studio-container"><div className="studio-eyebrow">WORKED EXAMPLE / FICTIONAL JOB</div><h2 id="example-title" className="mt-4 font-display text-3xl uppercase sm:text-5xl">From a measured floor<br/>to a reviewed quote.</h2><p className="mt-5 max-w-2xl text-ink-300">Try a simple flooring line. In T2QCAL, calibrate and mark your PDF plan, then carry the quantity and source into a private Tradies2Quote draft.</p><div className="mt-8 grid gap-6 lg:grid-cols-2"><div className="rounded-xl border border-ink-700 bg-ink-900 p-6"><h3 className="text-xl font-bold">1. Check the measurements</h3><div className="mt-5 grid gap-4 sm:grid-cols-3"><label className="text-sm">Length (m)<Input aria-label="Example length (m)" type="number" min="0.01" max="10000" step="0.1" value={length} onChange={e=>setLength(e.target.value)}/></label><label className="text-sm">Width (m)<Input aria-label="Example width (m)" type="number" min="0.01" max="10000" step="0.1" value={width} onChange={e=>setWidth(e.target.value)}/></label><label className="text-sm">Rate per m² (NZD)<Input aria-label="Example rate" type="number" min="0.01" max="10000" step="1" value={price} onChange={e=>setPrice(e.target.value)}/></label></div><p className="mt-4 text-sm text-ink-400">Example dimensions and price only. No labour, waste, markup or tax is included.</p></div><div className="rounded-xl border border-brand/50 bg-ink-900 p-6"><h3 className="text-xl font-bold">2. Review the material line</h3><div className="mt-6" role="status" aria-live="polite">{valid?<><p className="text-ink-300">Flooring · {area.toLocaleString(undefined,{maximumFractionDigits:3})} m²</p><p className="mt-3 text-3xl font-bold text-brand">{new Intl.NumberFormat("en-NZ",{style:"currency",currency:"NZD"}).format(total)}</p></>:<p>Enter a positive measurement and rate in each field.</p>}</div><p className="mt-5 flex gap-2 text-sm text-ink-300"><Check size={18} aria-hidden/>Your business settings, prices and final review stay in your control.</p></div></div><div className="mt-7 flex flex-wrap gap-4"><Link className="studio-button studio-button-primary" href="/t2qcal/takeoff">Try PDF plan takeoff <ArrowRight size={18}/></Link><Link className="studio-button studio-button-secondary" href="/app/materials/import-quote">Review a supplier quote <ArrowRight size={18}/></Link></div><p className="mt-5 max-w-3xl text-sm text-ink-400">Save calculations and jobs on the device for site work. Signed-in calculator backups queue until the app is connected. PDFs and plan annotations stay on the device and have their own export.</p></div></section>;
+import { Input } from "@/components/ui/input";
+import { ArrowRight } from "@phosphor-icons/react";
+import { formatCurrency } from "@/lib/quote-defaults";
+
+function trimNumber(value: number): string {
+  // Deterministic on server and phone (Intl/toLocaleString output differs
+  // between ICU builds and tripped hydration before).
+  return String(Math.round(value * 1000) / 1000);
+}
+
+/** A tiny try-it calculator inside the T2QCAL section. Example numbers only. */
+export function WorkflowExample() {
+  const [length, setLength] = useState("5");
+  const [width, setWidth] = useState("4");
+  const [price, setPrice] = useState("35");
+  const id = useId();
+  const values = [Number(length), Number(width), Number(price)];
+  const valid =
+    [length, width, price].every((value) => value.trim() !== "") &&
+    values.every((value) => Number.isFinite(value) && value > 0 && value <= 10000);
+  const area = valid ? values[0] * values[1] : 0;
+  const total = area * values[2];
+  return (
+    <div className="studio-tryit" aria-labelledby={`${id}-title`} role="group">
+      <div>
+        <h3 id={`${id}-title`}>Try it: price a floor.</h3>
+        <p>Change the numbers and watch the material line update.</p>
+      </div>
+      <div className="studio-tryit-fields">
+        <label>
+          Length (m)
+          <Input type="number" inputMode="decimal" min="0.01" max="10000" step="0.1" value={length} onChange={(e) => setLength(e.target.value)} />
+        </label>
+        <label>
+          Width (m)
+          <Input type="number" inputMode="decimal" min="0.01" max="10000" step="0.1" value={width} onChange={(e) => setWidth(e.target.value)} />
+        </label>
+        <label>
+          Rate per m² (NZD)
+          <Input type="number" inputMode="decimal" min="0.01" max="10000" step="1" value={price} onChange={(e) => setPrice(e.target.value)} />
+        </label>
+      </div>
+      <div className="studio-tryit-result" role="status" aria-live="polite">
+        {valid ? (
+          <>
+            <span>Flooring · {trimNumber(area)} m²</span>
+            <strong>{formatCurrency(total, "NZD")}</strong>
+          </>
+        ) : (
+          <span>Enter a positive length, width and rate.</span>
+        )}
+      </div>
+      <p className="studio-fineprint">
+        Example only. A real quote adds your labour, waste, markup and GST
+        from your own settings.{" "}
+        <Link href="/t2qcal/takeoff" className="studio-inline-link">
+          Measure from a PDF plan <ArrowRight size={14} aria-hidden="true" />
+        </Link>
+      </p>
+    </div>
+  );
 }

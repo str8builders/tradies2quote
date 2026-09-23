@@ -14,8 +14,9 @@ import { Cookie } from "@phosphor-icons/react";
  * tracker must NOT run until the visitor has opted in — a passive notice
  * isn't enough. So this component owns two jobs:
  *
- *   1. Show a one-time bottom banner with Accept / Decline + a link to
- *      the privacy policy. The choice is stored in
+ *   1. Show a one-time slim bottom bar with Accept / Decline + a link to
+ *      the privacy policy (on the home page only once the visitor scrolls,
+ *      so it never covers the hero). The choice is stored in
  *      `localStorage["t2q-cookie-consent"]` ("accepted" | "declined").
  *      Once a choice exists the banner never shows again.
  *   2. Only inject `track.js` once consent is "accepted" (either this
@@ -43,8 +44,15 @@ export function CookieConsent() {
   // The consent banner belongs on the public/marketing surface, not inside the
   // authenticated app shell (it overlapped the app's own bottom controls). The
   // analytics-injection logic below still runs everywhere for opted-in users.
-  const pathname = usePathname();
-  const inApp = pathname?.startsWith("/app") ?? false;
+  const pathname = usePathname() ?? "";
+  const inApp = pathname.startsWith("/app");
+  const onT2qcal = pathname.startsWith("/t2qcal");
+  // On the home page the bar waits until the visitor scrolls. It used to sit
+  // over the headline and the "Start your free trial" button on every first
+  // visit. Nothing non-essential loads before a choice is made, so showing it
+  // a moment later changes nothing about consent. Other pages show it at once.
+  const onHome = pathname === "/";
+  const [engaged, setEngaged] = useState(false);
 
   useEffect(() => {
     // Defer the read to a 0-ms timer so it doesn't run synchronously in
@@ -60,6 +68,21 @@ export function CookieConsent() {
     }, 0);
     return () => clearTimeout(t);
   }, []);
+
+  useEffect(() => {
+    if (!onHome || consent !== null || engaged) return;
+    const reveal = () => {
+      if (window.scrollY > window.innerHeight * 0.5) setEngaged(true);
+    };
+    window.addEventListener("scroll", reveal, { passive: true });
+    // Deferred so a page restored mid-scroll still reveals, without a
+    // synchronous setState in the effect body (react-hooks/set-state-in-effect).
+    const t = setTimeout(reveal, 0);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("scroll", reveal);
+    };
+  }, [onHome, consent, engaged]);
 
   const choose = useCallback((value: "accepted" | "declined") => {
     try {
@@ -77,46 +100,38 @@ export function CookieConsent() {
         <Script src={ANALYTICS_SRC} strategy="afterInteractive" />
       ) : null}
 
-      {consent === null && !inApp ? (
+      {consent === null && !inApp && (!onHome || engaged) ? (
         <div
           data-testid="cookie-consent"
           role="dialog"
           aria-label="Cookie consent"
-          className="fixed bottom-[88px] left-4 right-4 z-50 sm:bottom-6 sm:left-6 sm:right-auto sm:max-w-md"
-          style={pathname?.startsWith("/t2qcal") ? { bottom: "calc(env(safe-area-inset-bottom, 0px) + 96px)" } : undefined}
+          className="fixed inset-x-0 z-50 border-t border-ink-700 bg-ink-950/[0.97] px-4 pt-3 shadow-[0_-12px_32px_-18px_rgba(0,0,0,0.8)] sm:px-6"
+          style={{
+            bottom: onT2qcal ? "calc(env(safe-area-inset-bottom, 0px) + 84px)" : 0,
+            paddingBottom: onT2qcal ? 12 : "calc(env(safe-area-inset-bottom, 0px) + 12px)",
+          }}
         >
-          <div className="t2q-card-pro flex flex-col gap-3 p-4 shadow-[0_16px_40px_-16px_rgba(0,0,0,0.7)] sm:p-5">
-            <div className="flex items-start gap-3">
-              <span
-                aria-hidden="true"
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-brand/30 bg-brand/10 text-brand"
-              >
-                <Cookie size={18} weight="bold" />
+          <div className="mx-auto flex max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+            <p className="flex flex-1 items-start gap-2.5 text-xs leading-relaxed text-ink-300 sm:text-sm">
+              <Cookie size={18} weight="bold" className="mt-0.5 shrink-0 text-brand" aria-hidden="true" />
+              <span>
+                Essential cookies keep you signed in to {onT2qcal ? "T2QCAL" : "Tradies2Quote"}.
+                With your okay we also run a small analytics script to see
+                what&apos;s working.{" "}
+                <Link
+                  href="/privacy"
+                  className="text-brand underline underline-offset-2"
+                >
+                  Privacy policy
+                </Link>
               </span>
-              <div className="min-w-0 flex-1">
-                <p className="font-display text-sm uppercase tracking-tight text-white">
-                  Cookies on {pathname.startsWith("/t2qcal") ? "T2QCAL" : "Tradies2Quote"}
-                </p>
-                <p className="mt-1 text-xs leading-relaxed text-ink-300 sm:text-sm">
-                  We use essential cookies to keep you signed in. With your
-                  okay we also load a small analytics script to see what&apos;s
-                  working. See our{" "}
-                  <Link
-                    href="/privacy"
-                    className="text-brand underline-offset-2 hover:underline"
-                  >
-                    privacy policy
-                  </Link>
-                  .
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2">
+            </p>
+            <div className="flex shrink-0 gap-2">
               <button
                 type="button"
                 onClick={() => choose("declined")}
                 data-testid="cookie-consent-decline"
-                className="t2q-btn-ghost-pro flex-1 justify-center"
+                className="t2q-btn-ghost-pro min-h-11 flex-1 justify-center px-5 sm:flex-none"
               >
                 Decline
               </button>
@@ -124,7 +139,7 @@ export function CookieConsent() {
                 type="button"
                 onClick={() => choose("accepted")}
                 data-testid="cookie-consent-accept"
-                className="t2q-btn-primary-pro flex-1 justify-center"
+                className="t2q-btn-primary-pro min-h-11 flex-1 justify-center px-5 sm:flex-none"
               >
                 Accept
               </button>

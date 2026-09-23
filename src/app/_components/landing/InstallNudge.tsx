@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { isNativeIOSApp } from "@/lib/native-app";
 import { InstallAppChooser } from "../InstallAppChooser";
 import {
@@ -158,18 +157,14 @@ export default function InstallNudge() {
         onClose={() => setChooser(false)}
       />
     )}
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          key="nudge"
-          initial={{ y: 240, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 280, opacity: 0 }}
-          transition={{ type: "spring", stiffness: 320, damping: 30 }}
-          className="fixed left-3 right-3 bottom-3 sm:left-auto sm:right-6 sm:bottom-6 sm:max-w-sm z-[80]"
+    {/* Slides in with a CSS animation (studio-nudge-in); framer-motion used to
+        ship to every home-page visitor just for this entrance. */}
+    {open && (
+        <div
+          className="studio-nudge-in fixed left-3 right-3 bottom-3 sm:left-auto sm:right-6 sm:bottom-6 sm:max-w-sm z-[80]"
           data-testid="install-nudge"
         >
-          <div className="t2q-card bg-ink-950/95 backdrop-blur-xl border border-brand/40 shadow-[0_18px_60px_rgba(0,0,0,0.55),0_0_30px_rgba(255,95,21,0.18)] overflow-hidden relative">
+          <div className="t2q-card bg-ink-950/[0.97] border border-brand/40 shadow-[0_18px_60px_rgba(0,0,0,0.55),0_0_30px_rgba(255,95,21,0.18)] overflow-hidden relative">
             <div className="h-1.5 bg-hivis" />
 
             <button
@@ -243,9 +238,8 @@ export default function InstallNudge() {
               )}
             </div>
           </div>
-        </motion.div>
+        </div>
       )}
-    </AnimatePresence>
     </>
   );
 }

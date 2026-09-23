@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Plus, ArrowUpRight } from "@phosphor-icons/react/dist/ssr";
-const FAQS = [
+export const FAQS = [
   {
     slug: "tech-skill",
     q: "Do I need to be good with technology?",
@@ -52,7 +52,7 @@ export function FAQ() {
     <section id="faq" data-testid="section-faq" className="studio-section">
       <div className="studio-container studio-faq-grid">
         <div>
-          <div className="studio-eyebrow">07 / GOOD QUESTIONS</div>
+          <div className="studio-eyebrow">06 / GOOD QUESTIONS</div>
           <h2>
             No jargon.
             <br />

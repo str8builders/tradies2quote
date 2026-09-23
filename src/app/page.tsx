@@ -1,14 +1,11 @@
 import { Header } from "./_components/landing/Header";
 import { Hero } from "./_components/landing/Hero";
 import { DemoReel } from "./_components/landing/DemoReel";
-import {WorkflowExample} from "./_components/landing/WorkflowExample";
-import { QuoteWorkflow } from "./_components/landing/QuoteWorkflow";
-import { HowItWorks } from "./_components/landing/HowItWorks";
 import { Features } from "./_components/landing/Features";
 import { CompanionApp } from "./_components/landing/CompanionApp";
 import { FounderStory } from "./_components/landing/FounderStory";
 import { Pricing } from "./_components/landing/Pricing";
-import { FAQ } from "./_components/landing/FAQ";
+import { FAQ, FAQS } from "./_components/landing/FAQ";
 import { FinalCta } from "./_components/landing/FinalCta";
 import { Footer } from "./_components/landing/Footer";
 import { ScrollProgress } from "./_components/landing/ScrollProgress";
@@ -17,9 +14,26 @@ import { Reveal } from "./_components/landing/Reveal";
 import { HideInNativeApp } from "./_components/HideInNativeApp";
 import { NativeAppRedirect } from "./_components/landing/NativeAppRedirect";
 import { isNativeShellRequest } from "@/lib/native-shell";
-import { softwareApplicationLd } from "./_components/landing/structured-data";
+import { faqPageLd, softwareApplicationLd } from "./_components/landing/structured-data";
+import type { Viewport } from "next";
 
-/** Marketing redesign; native-shell gates remain server-side. */
+// The public home page lets visitors pinch-zoom. The root layout locks zoom
+// for the installed app shell (see the mobile shell contract); the home page
+// never renders inside that shell (NativeAppRedirect), and T2QCAL already
+// overrides the lock the same way. Other fields mirror the root viewport.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  viewportFit: "cover",
+  themeColor: "#0A0A0A",
+};
+
+/**
+ * Marketing home page. Seven sections: hero, demo, features, T2QCAL, founder,
+ * pricing + FAQ, final call to action. Native-shell gates stay server-side.
+ */
 export default async function HomePage() {
   // 3.1.3(f) — the pricing + FAQ sections carry tier prices, so their HTML
   // must never reach the iOS App Store shell (a client-only hide leaves it
@@ -38,17 +52,12 @@ export default async function HomePage() {
       </a>
       <main id="main-content" className="relative z-[2]">
         <Hero />
-        <Reveal>
-          <HowItWorks />
-        </Reveal>
-        {/* Remotion walkthrough: capture, draft, review, ready to send. */}
+        {/* 01: the walkthrough video with its chapter buttons (talk, draft,
+            check, send, invoice). It replaced three sections that told the
+            same story: How it works, A closer look and the worked example. */}
         <Reveal>
           <DemoReel />
         </Reveal>
-        <Reveal>
-          <QuoteWorkflow />
-        </Reveal>
-        {!nativeShell&&<Reveal><WorkflowExample/></Reveal>}
         <Reveal>
           <Features />
         </Reveal>
@@ -101,6 +110,14 @@ export default async function HomePage() {
           type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify(softwareApplicationLd),
+          }}
+        />
+      )}
+      {!nativeShell && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(faqPageLd(FAQS)),
           }}
         />
       )}

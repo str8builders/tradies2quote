@@ -17,3 +17,16 @@ export const softwareApplicationLd = {
     },
   ],
 } as const;
+
+/** FAQPage rich result built from the same questions the page shows. */
+export function faqPageLd(faqs: ReadonlyArray<{ q: string; a: string }>) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map(({ q, a }) => ({
+      "@type": "Question",
+      name: q,
+      acceptedAnswer: { "@type": "Answer", text: a },
+    })),
+  };
+}

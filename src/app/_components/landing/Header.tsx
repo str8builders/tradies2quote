@@ -4,16 +4,10 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { List, X } from "@phosphor-icons/react";
 import { Logo } from "./Logo";
-import InstallPWAButton from "./InstallPWAButton";
 
-// Wave 12.3 — InstallPWAButton removed from the landing top bar.
-// Wave 36 — re-added in a compact "icon" variant pinned next to the
-// hamburger button on mobile so the install path is discoverable
-// from the very first frame of the landing. Tap fires the same
-// component's instruction modal (iOS Add-to-Home-Screen steps on
-// Safari, native install prompt on Android Chrome/Edge). Hidden on
-// lg+ since the desktop hero already carries an explicit
-// "Install on phone" CTA.
+// Phones get a compact "Start free" button next to the menu. It used to be an
+// Install button, but a first-time visitor should be asked to try the product
+// before installing it; install lives in the menu and inside the app.
 //
 // The desktop bar switches on at `lg`, not `md`. Between 768px and ~940px the
 // four original nav labels plus Sign in plus the trial button already wrapped
@@ -22,9 +16,9 @@ import InstallPWAButton from "./InstallPWAButton";
 // is lost at those widths.
 
 const LINKS = [
-  { href: "#how", label: "How it works" },
+  { href: "#demo-reel", label: "How it works" },
   { href: "#features", label: "Features" },
-  { href: "#calculator", label: "Get the apps" },
+  { href: "#calculator", label: "Calculators" },
   { href: "#pricing", label: "Pricing" },
   { href: "#faq", label: "FAQ" },
 ];
@@ -129,7 +123,13 @@ export function Header({
         </div>
 
         <div className="flex items-center gap-2 lg:hidden">
-          <InstallPWAButton variant="icon" />
+          <Link
+            href="/signup"
+            data-testid="nav-mobile-start-free-compact"
+            className="inline-flex min-h-11 items-center whitespace-nowrap rounded-sm bg-brand px-3.5 font-display text-xs uppercase tracking-tight text-ink-900 hover:bg-hivis transition-colors"
+          >
+            Start free
+          </Link>
           <button
             ref={toggleRef}
             type="button"
@@ -181,8 +181,14 @@ export function Header({
                 Start free trial
               </Link>
             </div>
-            {/* Install CTA moved to the floating bottom-right pill —
-                see <FloatingInstallButton /> in src/app/layout.tsx. */}
+            <Link
+              href="/install"
+              data-testid="nav-mobile-install"
+              onClick={() => setOpen(false)}
+              className="py-2 text-center text-sm text-ink-300 underline underline-offset-4"
+            >
+              Install the app on your phone
+            </Link>
           </div>
         </div>
       )}

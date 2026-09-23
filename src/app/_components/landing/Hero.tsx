@@ -7,7 +7,6 @@ import {
   FileText,
 } from "@phosphor-icons/react/dist/ssr";
 import { VoiceSignal } from "../VoiceSignal";
-import InstallPWAButton from "./InstallPWAButton";
 
 export function Hero() {
   return (
@@ -42,23 +41,20 @@ export function Hero() {
               className="studio-button studio-button-secondary"
               data-testid="hero-cta-how-it-works"
             >
-              <Play size={17} weight="fill" /> See it in action
+              <Play size={17} weight="fill" /> Watch the 30-second demo
             </a>
           </div>
-          <div className="studio-hero-assurances">
-            <span>
-              <Check size={15} /> 7 days free
-            </span>
-            <span>
-              <Check size={15} /> No credit card
-            </span>
-            <span>
-              <Check size={15} /> You review. You send.
-            </span>
-          </div>
-          <div className="studio-install">
-            <InstallPWAButton variant="hero" />
-          </div>
+          <ul className="studio-hero-assurances" aria-label="Why tradies trust it">
+            <li>
+              <Check size={15} aria-hidden="true" /> Built in NZ by a qualified builder
+            </li>
+            <li>
+              <Check size={15} aria-hidden="true" /> 7 days free, no card
+            </li>
+            <li>
+              <Check size={15} aria-hidden="true" /> You check every quote before it goes
+            </li>
+          </ul>
         </div>
         <div
           className="studio-product-stage"

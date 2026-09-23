@@ -9,7 +9,8 @@ import { Footer } from "./Footer";
 import { Pricing } from "./Pricing";
 import { FAQ } from "./FAQ";
 import { CompanionApp } from "./CompanionApp";
-import { softwareApplicationLd } from "./structured-data";
+import { faqPageLd, softwareApplicationLd } from "./structured-data";
+import { FAQS } from "./FAQ";
 
 type ElementProps = { children?: unknown; hidePricingLinks?: boolean; dangerouslySetInnerHTML?: { __html: string } };
 function elements(node: unknown): ReactElement<ElementProps>[] {
@@ -32,8 +33,10 @@ describe("marketing release contract", () => {
     for (const component of [Pricing, FAQ, CompanionApp]) {
       expect(tree.some(e => e.type === component)).toBe(true);
     }
-    const json = tree.find(e => e.type === "script")?.props.dangerouslySetInnerHTML?.__html;
-    expect(JSON.parse(json!)).toEqual(softwareApplicationLd);
+    const scripts = tree.filter(e => e.type === "script").map(e => JSON.parse(e.props.dangerouslySetInnerHTML!.__html));
+    expect(scripts[0]).toEqual(softwareApplicationLd);
+    expect(scripts[1]).toEqual(faqPageLd(FAQS));
+    expect(scripts[1].mainEntity).toHaveLength(FAQS.length);
   });
   it("offers only the available Solo plan, at the visible NZD price", () => {
     expect(softwareApplicationLd.offers).toHaveLength(1);

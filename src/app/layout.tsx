@@ -77,7 +77,7 @@ export const metadata: Metadata = {
   },
   description:
     "Turn site notes into professional quotes and invoices. Voice, text or scan, with your rates, branding and GST. Built in New Zealand for the trades.",
-  applicationName: "tradies2Quote",
+  applicationName: "Tradies2Quote",
   keywords: [
     "quoting app for tradies",
     "voice quote app",
@@ -88,15 +88,15 @@ export const metadata: Metadata = {
     "quote app for plumbers",
     "quote app for electricians",
   ],
-  authors: [{ name: "tradies2Quote" }],
-  creator: "tradies2Quote",
-  publisher: "tradies2Quote",
+  authors: [{ name: "Tradies2Quote" }],
+  creator: "Tradies2Quote",
+  publisher: "Tradies2Quote",
   alternates: {
     canonical: "/",
   },
   openGraph: {
     type: "website",
-    siteName: "tradies2Quote",
+    siteName: "Tradies2Quote",
     title: "Tradies2Quote — AI quotes & invoices for NZ tradies",
     description:
       "Turn site notes into a professional quote. Review your scope, rates and GST before you send. Built for NZ tradies.",
@@ -107,7 +107,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Tradies2Quote — AI quotes & invoices for NZ tradies",
     description:
-      "Voice-first AI quoting for tradies. NZ, AU, UK, US, CA.",
+      "Turn site notes into a professional quote. Review your scope, rates and GST before you send. Built for NZ tradies.",
   },
   robots: {
     index: true,
