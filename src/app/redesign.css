@@ -795,7 +795,9 @@
   padding: 72px 52px;
   max-width: 660px;
 }
-.studio-worksite-title {
+/* Two classes deep so it beats `.studio-worksite-copy > p` (body text). */
+.studio-worksite-copy > .studio-worksite-title {
+  color: #fff;
   font-family: var(--font-plus-jakarta), var(--font-ibm-plex-sans), sans-serif;
   font-weight: 800;
   letter-spacing: -0.055em;
@@ -1123,7 +1125,7 @@
   .studio-worksite-copy {
     padding: 56px 24px;
   }
-  .studio-worksite-title {
+  .studio-worksite-copy > .studio-worksite-title {
     font-size: 32px;
   }
   .studio-worksite-shade {
@@ -1737,6 +1739,10 @@
   height: 100%;
   object-fit: contain;
   object-position: center;
+}
+.studio-feature-glyph {
+  color: #ff7a3d;
+  opacity: 0.9;
 }
 .studio-feature-text {
   padding: 20px 22px 24px;

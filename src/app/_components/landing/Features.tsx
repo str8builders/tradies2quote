@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import Image from "next/image";
 import {
   Microphone,
@@ -67,6 +69,12 @@ const FEATURES = [
   },
 ];
 
+// The screens are produced by the marketing render; until they are in public/
+// the cards show a large icon instead of a broken image.
+const HAS_SHOTS = FEATURES.every((f) =>
+  existsSync(path.join(process.cwd(), "public", f.image)),
+);
+
 export function Features() {
   return (
     <section
@@ -97,13 +105,17 @@ export function Features() {
               data-testid={`feature-${slug}`}
             >
               <div className="studio-feature-shot">
-                <Image
-                  src={image}
-                  alt={alt}
-                  width={960}
-                  height={1200}
-                  sizes="(max-width: 800px) 70vw, 300px"
-                />
+                {HAS_SHOTS ? (
+                  <Image
+                    src={image}
+                    alt={alt}
+                    width={960}
+                    height={1200}
+                    sizes="(max-width: 800px) 70vw, 300px"
+                  />
+                ) : (
+                  <Icon size={64} weight="duotone" className="studio-feature-glyph" aria-hidden="true" />
+                )}
               </div>
               <div className="studio-feature-text">
                 <h3>
