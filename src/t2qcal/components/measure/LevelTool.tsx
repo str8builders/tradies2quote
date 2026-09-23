@@ -4,7 +4,7 @@ import {ArrowRight,ArrowsVertical,Compass,Crosshair,Pause,Play,Target} from "@ph
 import {compassPoint,fallRatio,formatDegrees,gradePercent,pitchFromAngle,plumbError} from "@/t2qcal/lib/measure";
 import {useCamera,useOrientation} from "./useSensors";
 import {sendToCalculator} from "./sendToCalculator";
-import {SensorGate,Stat,WaitingForSensor} from "./shared";
+import {CameraResume,SensorGate,Stat,WaitingForSensor} from "./shared";
 
 type Mode="sight"|"surface"|"plumb";
 
@@ -40,6 +40,7 @@ export function LevelTool(){
     <div className={`measure-stage${level?" is-level":""}`} data-mode={mode}>
       <video ref={videoRef} className="measure-video" playsInline muted autoPlay hidden={mode!=="sight"||cameraState!=="live"}/>
       {!started&&<SensorGate state={orientation.state} cameraState={cameraState} cameraMessage={cameraMessage} onStart={begin}/>}
+      {started&&mode==="sight"&&<CameraResume cameraState={cameraState} cameraMessage={cameraMessage} onResume={()=>void startCamera()}/>}
       {started&&mode==="sight"&&<svg className="measure-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
         <g transform={`rotate(${r?-r.roll:0} 50 50)`}><line x1="0" y1="50" x2="100" y2="50" className="measure-horizon"/><line x1="0" y1="50" x2="100" y2="50" className="measure-horizon-glow"/></g>
         <line x1="50" y1="0" x2="50" y2="100" className="measure-axis"/><line x1="0" y1="50" x2="100" y2="50" className="measure-axis"/>

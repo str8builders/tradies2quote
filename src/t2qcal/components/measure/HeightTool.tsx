@@ -4,7 +4,7 @@ import {ArrowCounterClockwise,ArrowRight,Crosshair} from "@phosphor-icons/react"
 import {distanceFromBase,formatDegrees,formatMm,heightFromTop} from "@/t2qcal/lib/measure";
 import {useCamera,useOrientation} from "./useSensors";
 import {sendToCalculator} from "./sendToCalculator";
-import {SensorGate,Stat,WaitingForSensor} from "./shared";
+import {CameraResume,SensorGate,Stat,WaitingForSensor} from "./shared";
 
 /**
  * Two-tap clinometer. With the camera held at a known height, aiming at the
@@ -36,6 +36,7 @@ export function HeightTool(){
     <div className="measure-stage">
       <video ref={videoRef} className="measure-video" playsInline muted autoPlay hidden={cameraState!=="live"}/>
       {!started&&<SensorGate state={orientation.state} cameraState={cameraState} cameraMessage={cameraMessage} onStart={begin}/>}
+      {started&&<CameraResume cameraState={cameraState} cameraMessage={cameraMessage} onResume={()=>void startCamera()}/>}
       {started&&<svg className="measure-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><line x1="50" y1="0" x2="50" y2="100" className="measure-axis"/><line x1="0" y1="50" x2="100" y2="50" className="measure-axis"/><circle cx="50" cy="50" r="6" className="measure-ring"/><circle cx="50" cy="50" r="0.8" className="measure-dot"/></svg>}
       {started&&<WaitingForSensor reading={r}/>}
       {started&&<div className="measure-readout" role="status" aria-live="polite"><strong data-testid="measure-height-angle">{r?formatDegrees(r.elevation):"—"}</strong><span>{groundTape!==null&&step<3?`ground ${formatMm(groundTape*1000)} away · `:""}{step===1?"aim at the base, then tap Mark base":step===2?"now aim at the top, then tap Mark top":"done — reset to measure again"}</span></div>}

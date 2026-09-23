@@ -101,3 +101,36 @@ describe("photo shapes and plumb",()=>{
     close(plumbError(88,0),2);
   });
 });
+
+import {rectifyFromRectangle,isConvexQuad,mappedDistance,mappedArea,mappedQuadSides,closureError} from "./measure";
+describe("perspective rectification", () => {
+  // A 1200 × 2400 sheet photographed at an angle: project it with a known homography.
+  const project=(p:{x:number;y:number})=>{const w=0.0002*p.x+0.0001*p.y+1;return {x:(0.5*p.x+0.05*p.y+100)/w,y:(0.02*p.x+0.4*p.y+80)/w};};
+  const sheet=[{x:0,y:0},{x:1200,y:0},{x:1200,y:2400},{x:0,y:2400}];
+  const photo=sheet.map(project);
+  const toMm=rectifyFromRectangle(photo,1200,2400)!;
+  it("maps the reference corners back onto the rectangle", () => {
+    const back=photo.map(toMm);
+    back.forEach((p,i)=>{expect(p.x).toBeCloseTo(sheet[i].x,3);expect(p.y).toBeCloseTo(sheet[i].y,3);});
+  });
+  it("measures a skewed length in the same plane true", () => {
+    const a=project({x:300,y:500}),b=project({x:900,y:1300});
+    expect(mappedDistance(a,b,toMm)).toBeCloseTo(1000,2);
+  });
+  it("measures area and sides on the plane", () => {
+    const quad=[{x:100,y:100},{x:700,y:100},{x:700,y:500},{x:100,y:500}].map(project);
+    expect(mappedArea(quad,toMm)).toBeCloseTo(600*400,0);
+    const sides=mappedQuadSides(quad,toMm)!;
+    expect(sides[0]).toBeCloseTo(600,2);expect(sides[1]).toBeCloseTo(400,2);
+  });
+  it("refuses degenerate or crossed corners", () => {
+    expect(rectifyFromRectangle([{x:0,y:0},{x:1,y:1},{x:2,y:2},{x:3,y:3}],10,10)).toBeNull();
+    expect(isConvexQuad([{x:0,y:0},{x:10,y:10},{x:10,y:0},{x:0,y:10}])).toBe(false);
+    expect(rectifyFromRectangle(photo,0,100)).toBeNull();
+  });
+  it("reports room closure error against the perimeter", () => {
+    const e=closureError({x:0,y:0},{x:0.03,y:0.04},10)!;
+    expect(e.mm).toBeCloseTo(50,6);expect(e.percent).toBeCloseTo(0.5,6);
+    expect(closureError({x:0,y:0},{x:1,y:1},0)).toBeNull();
+  });
+});

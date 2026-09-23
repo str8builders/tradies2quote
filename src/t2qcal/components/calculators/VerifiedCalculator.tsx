@@ -5,7 +5,7 @@ import { useCalculationSeed } from "./CalculationSeed";
 import { fieldBounds, initialCalculatorValues, displayFactor, fieldVisible } from "@/t2qcal/lib/calculator-inputs";
 import type { ToolEntry } from "@/t2qcal/lib/tools";
 import { getVerifiedDefinition, type VerifiedUnit } from "@/t2qcal/lib/verified-calculators";
-import { CalculatorFrame, DimensionLine, NumberField, SelectField, ResultGrid, SectionHead, TechnicalCanvas } from "./CalculatorUI";
+import { CalculatorFrame, DimensionLine, DrawingStack, NumberField, SelectField, ResultGrid, SectionHead, TechnicalCanvas } from "./CalculatorUI";
 import { detailKind, drawDiagram, to3DKind, type DiagramKind } from "./technicalDrawing";
 
 const inchFactor = 25.4;
@@ -41,7 +41,8 @@ export function VerifiedCalculator({ tool }: { tool: ToolEntry }) {
   const definition = useMemo(() => getVerifiedDefinition(tool.slug), [tool.slug]);
   const [unit, setUnit] = useState<VerifiedUnit>(saved?.snapshot.unit ?? (tool.units === "imperial" ? "imperial" : "metric"));
   const [values, setValues] = useState<Record<string, number>>(() => saved ? saved.snapshot.values as Record<string,number> : initialCalculatorValues(definition.fields, tool.units === "imperial" ? "imperial" : "metric"));
-  const [sheet, setSheet] = useState(0);
+  // -1 is "All drawings": every sheet stacked down the page, as blocklayer lays them out.
+  const [sheet, setSheet] = useState(-1);
   const output = useMemo(() => {
     try { return definition.compute(values, unit); }
     catch { return { errors: ["Calculation could not be completed"], results: [{ label: "Check inputs", value: "Enter valid positive dimensions", primary: true }] }; }
@@ -59,7 +60,7 @@ export function VerifiedCalculator({ tool }: { tool: ToolEntry }) {
     ...(definition.showsAssembly === false ? []
       : [{ label: "3D assembly", diagram: definition.assembly ?? calculatorModelKind(tool.slug, definition.diagram) }]),
   ];
-  const activeSheet = sheets[Math.min(sheet, sheets.length - 1)];
+  const activeSheet = sheets[Math.min(Math.max(sheet, 0), sheets.length - 1)];
   const diagramValues = { ...values, ...(output.diagramValues || {}) };
   const unitLabel = unit === "metric" ? "mm" : "in";
 
@@ -84,7 +85,9 @@ export function VerifiedCalculator({ tool }: { tool: ToolEntry }) {
     setUnit(next);
   }
 
-  const draw = (ctx: CanvasRenderingContext2D, width: number, height: number) => drawDiagram(ctx, width, height, activeSheet.diagram, diagramValues, unitLabel, `${definition.title} · ${activeSheet.label}`);
+  const drawSheet = (item: { label: string; diagram: DiagramKind }) => (ctx: CanvasRenderingContext2D, width: number, height: number) => drawDiagram(ctx, width, height, item.diagram, diagramValues, unitLabel, `${definition.title} · ${item.label}`);
+  const draw = drawSheet(activeSheet);
+  const invalid = !!output.errors?.length || output.diagramValues?.invalid === 1;
 
   return <CalculatorFrame values={values} tool={tool} unit={unit} onUnitChange={changeUnit}>
     <div className="calculator-workbench">
@@ -113,9 +116,11 @@ export function VerifiedCalculator({ tool }: { tool: ToolEntry }) {
       </section>
       <section className="diagram-panel detailed-diagram-panel">
         <div className="diagram-toolbar">
-          <label className="native-drawing-picker">Drawing<select aria-label="Drawing view" value={sheet} onChange={e=>setSheet(Number(e.target.value))}>{sheets.map((item,index)=><option key={item.label} value={index}>{item.label}</option>)}</select></label>
+          <label className="native-drawing-picker">Drawing<select aria-label="Drawing view" value={sheet} onChange={e=>setSheet(Number(e.target.value))}><option value={-1}>All drawings</option>{sheets.map((item,index)=><option key={item.label} value={index}>{item.label}</option>)}</select></label>
         </div>
-        {output.errors?.length || output.diagramValues?.invalid === 1 ? <div className="verification-note" role="alert">Correct the highlighted inputs to generate this drawing.</div> : <TechnicalCanvas draw={draw} label={`${definition.title} ${activeSheet.label} technical diagram`} height={350} />}
+        {invalid ? <div className="verification-note" role="alert">Correct the highlighted inputs to generate this drawing.</div>
+          : sheet < 0 ? <DrawingStack sheets={sheets.map((item) => ({ key: item.label, caption: item.label, draw: drawSheet(item) }))} />
+          : <TechnicalCanvas draw={draw} label={`${definition.title} ${activeSheet.label} technical diagram`} height={300} />}
         <div className="drawing-legend"><span><i className="legend-cut" />Geometry &amp; dimensions</span><span><i className="legend-setout" />Running set-out</span><span><i className="legend-adjust" />Adjusted value</span><span><i className="legend-angle" />Angle</span><span>Measured dimensions govern</span></div>
       </section>
     </div>
