@@ -576,19 +576,15 @@
   background: #0d0e0e;
   contain: strict;
 }
-.studio-wallpaper canvas {
-  width: 100%;
-  height: 100%;
-  position: absolute;
-  inset: 0;
-}
 .studio-wallpaper-glow {
   position: absolute;
   inset: -20%;
   background:
     radial-gradient(ellipse at 84% 20%, #ff5f151b, transparent 48%),
     radial-gradient(ellipse at 14% 88%, #ffea0009, transparent 48%);
-  animation: studio-ambient 28s ease-in-out infinite alternate;
+  animation:
+    studio-ambient 28s ease-in-out infinite alternate,
+    studio-glow-breathe 11s ease-in-out infinite alternate;
 }
 .studio-wallpaper-grid {
   position: absolute;
@@ -601,6 +597,21 @@
   mask-image: linear-gradient(100deg, transparent, #0007);
   transform-origin: 50% 50%;
 }
+/* Precomputed wireframe terrain (src/app/_components/wallpaper/terrain.ts).
+   The SVG is scaled by viewport height and centred, exactly like the old
+   WebGL camera; the -8% inset is overscan baked into the SVG so the drift
+   never exposes an edge. Only transform animates: no paint per frame. */
+.studio-wallpaper-terrain {
+  position: absolute;
+  inset: -8%;
+  background: url("/wallpaper/terrain-wide.svg") 50% 50% / cover no-repeat;
+  animation: studio-terrain-drift 60s ease-in-out infinite alternate;
+}
+@media (max-width: 799.98px) {
+  .studio-wallpaper-terrain {
+    background-image: url("/wallpaper/terrain-compact.svg");
+  }
+}
 .studio-wallpaper-vignette {
   position: absolute;
   inset: 0;
@@ -608,26 +619,27 @@
     linear-gradient(90deg, #0d0e0e70, transparent 55%),
     radial-gradient(ellipse at center, transparent 20%, #0d0e0e66);
 }
-.studio-motion-control {
-  position: fixed;
-  bottom: 18px;
-  left: 18px;
-  z-index: 45;
-  display: flex;
+/* Behind the app and print sheets the wallpaper stays completely still. */
+.studio-wallpaper[data-wallpaper="still"] * {
+  animation: none;
+}
+/* Footer control (MotionToggle): in-flow text button, 44px tap target. */
+.studio-motion-toggle {
+  display: inline-flex;
   align-items: center;
-  gap: 7px;
-  min-height: 36px;
-  padding: 8px 12px;
-  border: 1px solid #ffffff1a;
-  background: #161717eb;
-  backdrop-filter: blur(12px);
-  border-radius: 100px;
-  font-size: 11px;
-  color: #bbb;
+  justify-self: start;
+  gap: 8px;
+  min-height: 44px;
+  margin-inline-start: -10px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
   cursor: pointer;
 }
-.studio-motion-control:hover {
-  border-color: #ff5f1588;
+.studio-motion-toggle:hover {
   color: white;
 }
 .studio-skip-link {
@@ -646,11 +658,12 @@
 }
 .studio-site :is(a, button, summary):focus-visible,
 .studio-public :is(a, button, summary):focus-visible,
-.studio-motion-control:focus-visible {
+.studio-motion-toggle:focus-visible {
   outline: 2px solid #ffea00;
   outline-offset: 4px;
 }
-[data-motion="paused"] .studio-wallpaper-glow,
+[data-motion="paused"] .studio-wallpaper *,
+.studio-wallpaper[data-page="hidden"] *,
 [data-motion="paused"] .studio-site *,
 [data-motion="paused"] .studio-public * {
   animation-play-state: paused !important;
@@ -666,31 +679,37 @@
     transform: translate3d(5%, 5%, 0);
   }
 }
-@media (max-width: 640px) {
-  .studio-motion-control {
-    min-width: 44px;
-    min-height: 44px;
-    bottom: 14px;
-    left: 14px;
+@keyframes studio-glow-breathe {
+  0% {
+    opacity: 0.72;
   }
-  .studio-motion-control span {
-    display: none;
+  100% {
+    opacity: 1;
   }
-  .studio-motion-control-app {
-    bottom: calc(85px + env(safe-area-inset-bottom));
+}
+/* A slow camera drift with a slight tilt, so the terrain appears to swell. */
+@keyframes studio-terrain-drift {
+  0% {
+    transform: perspective(1400px) translate3d(-1.2%, 0.7%, 0) rotateX(0deg)
+      rotate(-0.35deg) scale(1.02);
+  }
+  100% {
+    transform: perspective(1400px) translate3d(1.2%, -0.7%, 0) rotateX(2.4deg)
+      rotate(0.45deg) scale(1.05);
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .studio-wallpaper-glow {
-    animation: none;
+  .studio-wallpaper * {
+    animation: none !important;
   }
-  .studio-motion-control {
+  /* The OS setting governs; no in-page control is offered. */
+  .studio-motion-toggle {
     display: none;
   }
 }
 @media print {
   .studio-wallpaper,
-  .studio-motion-control {
+  .studio-motion-toggle {
     display: none !important;
   }
   .studio-content {
