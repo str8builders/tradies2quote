@@ -95,7 +95,9 @@ export default function PrivacyPage() {
             <strong>1. Account information</strong> — your name, email
             address, business name, hashed password, country, and any
             branding (logo, business number, contact details) you choose to
-            add for your quotes.
+            add for your quotes. If you save bank details or other payment
+            instructions for your invoices, we store and print those instructions
+            on the documents you choose to share.
           </p>
           <p>
             <strong>2. Job and quote content</strong> — the audio you record,
@@ -150,9 +152,16 @@ export default function PrivacyPage() {
               resets, your client&apos;s opened-quote notifications).
             </li>
             <li>
-              To debug, monitor, and improve the service. Where we look at
-              usage to improve the product, we work from aggregated data, not
-              from the content of your individual quotes.
+              To debug, monitor, and improve the service. We store account-linked
+              quote edits and differences from generated drafts to assess quote
+              quality. These records may include the quote content and client
+              details, rather than only anonymous totals.
+            </li>
+            <li>
+              To update your own materials library from corrections you make and
+              retain account-specific preferences, such as materials, prices and
+              markup. These records are kept with your account and are not used
+              to train our own AI models.
             </li>
             <li>To detect, prevent, and respond to abuse or fraud.</li>
             <li>To comply with our legal obligations.</li>
