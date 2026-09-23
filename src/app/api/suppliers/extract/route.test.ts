@@ -55,6 +55,13 @@ vi.mock("@/lib/llm/local-chat", async (importOriginal) => {
   };
 });
 vi.mock("@/lib/observability", () => ({ captureError: vi.fn() }));
+// The page fetch goes through the SSRF-safe helper; keep its URL checks real
+// and stub only the network read.
+const pageFetch = vi.hoisted(() => ({ get: vi.fn() }));
+vi.mock("@/lib/net/safeFetch", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/net/safeFetch")>()),
+  safeGetText: pageFetch.get,
+}));
 
 import { POST } from "./route";
 
@@ -77,22 +84,24 @@ function post(url = "https://supplier.example/product/pine-90x45") {
 }
 
 describe("POST /api/suppliers/extract", () => {
-  let originalFetch: typeof fetch;
-
   beforeEach(() => {
     mock.structured.mockClear();
     mock.local.mockClear();
-    originalFetch = globalThis.fetch;
-    // The supplier page fetch is real `fetch` in the route — stub it.
-    globalThis.fetch = (async () =>
-      new Response(PAGE_HTML, {
-        status: 200,
-        headers: { "content-type": "text/html" },
-      })) as unknown as typeof fetch;
+    pageFetch.get.mockReset();
+    pageFetch.get.mockResolvedValue({ ok: true, status: 200, url: "https://supplier.example/product/pine-90x45", text: PAGE_HTML });
+  });
+
+  it("refuses internal addresses before fetching anything (SSRF)", async () => {
+    process.env.TEXT_AI_PROVIDER = "anthropic";
+    process.env.ANTHROPIC_API_KEY = "test-key-not-real";
+    for (const url of ["http://127.0.0.1:2019/config/", "http://localhost/", "http://169.254.169.254/latest/meta-data/"]) {
+      const res = await post(url);
+      expect(res.status).toBe(400);
+    }
+    expect(pageFetch.get).not.toHaveBeenCalled();
   });
 
   afterEach(() => {
-    globalThis.fetch = originalFetch;
     if (ENV.provider === undefined) delete process.env.TEXT_AI_PROVIDER;
     else process.env.TEXT_AI_PROVIDER = ENV.provider;
     if (ENV.key === undefined) delete process.env.ANTHROPIC_API_KEY;

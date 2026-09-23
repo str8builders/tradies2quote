@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
+import { safeGetText, UnsafeUrlError, assertSafeUrl } from "@/lib/net/safeFetch";
 import { parseModelJsonObject } from "@/lib/modelJson";
 import { createClient } from "@/lib/supabase/server";
 import { isOwnerEmail } from "@/lib/owner";
@@ -222,9 +223,13 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid URL." }, { status: 400 });
   }
-  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+  // SSRF guard: public http(s) hosts on default ports only. The fetch below
+  // re-checks every DNS answer and redirect hop (src/lib/net/safeFetch.ts).
+  try {
+    assertSafeUrl(parsedUrl);
+  } catch (e) {
     return NextResponse.json(
-      { error: "Only http(s) URLs are supported." },
+      { error: e instanceof UnsafeUrlError ? e.message : "Invalid URL." },
       { status: 400 },
     );
   }
@@ -237,11 +242,9 @@ export async function POST(request: NextRequest) {
   let fetched = false;
   let reason: string | undefined;
   try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
-    const res = await fetch(parsedUrl.toString(), {
-      signal: ctrl.signal,
-      redirect: "follow",
+    const res = await safeGetText(parsedUrl.toString(), {
+      timeoutMs: FETCH_TIMEOUT_MS,
+      maxBytes: MAX_HTML_CHARS * 4,
       headers: {
         "user-agent":
           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
@@ -250,15 +253,16 @@ export async function POST(request: NextRequest) {
         "accept-language": "en-NZ,en;q=0.9",
       },
     });
-    clearTimeout(timer);
     if (!res.ok) {
       reason = `Supplier responded with ${res.status}.`;
     } else {
-      const text = await res.text();
-      html = text.slice(0, MAX_HTML_CHARS);
+      html = res.text.slice(0, MAX_HTML_CHARS);
       fetched = true;
     }
   } catch (e) {
+    if (e instanceof UnsafeUrlError) {
+      return NextResponse.json({ error: e.message }, { status: 400 });
+    }
     reason =
       e instanceof Error && e.name === "AbortError"
         ? "Supplier page took too long to load."
