@@ -16,15 +16,15 @@ export function Footer({
       className="studio-footer relative pt-16 pb-16"
     >
       <div className="max-w-7xl mx-auto px-6 md:px-12">
-        <div className="grid md:grid-cols-5 gap-10 pt-8 border-t border-ink-700">
-          <div className="md:col-span-2">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-10 pt-8 border-t border-ink-700">
+          <div className="col-span-2">
             {/* Wave 19.12 — <Logo> now renders the founder's real
                 transparent T2Q artwork (light letterforms, orange 2)
                 straight on the dark footer — no white pill. text-white
                 still styles the TRADIES2QUOTE wordmark text beside it. */}
             <Logo size={40} className="text-white" />
             <p className="mt-4 text-ink-300 text-sm max-w-sm">
-              Voice in. Quote out. Built in New Zealand by a qualified builder — made for the trades.
+              Voice in. Quote out. Built in New Zealand by a qualified builder, made for the trades.
             </p>
           </div>
           <div>
@@ -34,7 +34,7 @@ export function Footer({
             <ul className="space-y-2 text-ink-200 text-sm">
               <li>
                 <Link
-                  href="/#how"
+                  href="/#demo-reel"
                   data-testid="footer-link-how"
                   className="hover:text-white"
                 >
@@ -100,6 +100,40 @@ export function Footer({
                   Start trial
                 </Link>
               </li>
+              <li>
+                <Link
+                  href="/install"
+                  data-testid="footer-link-install"
+                  className="hover:text-white"
+                >
+                  Install the app
+                </Link>
+              </li>
+            </ul>
+          </div>
+          <div>
+            <div className="font-mono text-xs uppercase tracking-[0.18em] text-ink-300 mb-3">
+              Help
+            </div>
+            <ul className="space-y-2 text-ink-200 text-sm">
+              <li>
+                <Link
+                  href="/support"
+                  data-testid="footer-link-support"
+                  className="hover:text-white"
+                >
+                  Support
+                </Link>
+              </li>
+              <li>
+                <a
+                  href={`mailto:${LEGAL.supportEmail}`}
+                  data-testid="footer-link-contact"
+                  className="hover:text-white"
+                >
+                  Contact
+                </a>
+              </li>
             </ul>
           </div>
           <div>
@@ -125,40 +159,13 @@ export function Footer({
                   Terms
                 </Link>
               </li>
-              <li>
-                <Link
-                  href="/install"
-                  data-testid="footer-link-install"
-                  className="hover:text-white"
-                >
-                  Install the app
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/support"
-                  data-testid="footer-link-support"
-                  className="hover:text-white"
-                >
-                  Support
-                </Link>
-              </li>
-              <li>
-                <a
-                  href={`mailto:${LEGAL.supportEmail}`}
-                  data-testid="footer-link-contact"
-                  className="hover:text-white"
-                >
-                  Contact
-                </a>
-              </li>
             </ul>
           </div>
         </div>
 
         <div className="mt-12 pt-6 border-t border-ink-800 grid gap-3 text-xs font-mono uppercase tracking-[0.16em] text-ink-300">
           <div className="flex flex-col md:flex-row gap-3 justify-between">
-            <span>© {new Date().getFullYear()} tradies2Quote · Built in NZ</span>
+            <span>© {new Date().getFullYear()} Tradies2Quote · Built in NZ</span>
             <span>Voice in. Quote out. Your final say.</span>
           </div>
           <div

@@ -67,7 +67,7 @@ export default async function RequestPosterPage() {
       @media print{
         html,body{background:#fff!important;}
         .t2q-poster-page{background:#fff;padding:0;min-height:0;}
-        .t2q-poster-top,.t2q-poster-actions,.t2q-poster-hint,.studio-wallpaper,.studio-motion-control,[data-testid="cookie-consent"],[data-testid="site-live-wallpaper"]{display:none!important;}
+        .t2q-poster-top,.t2q-poster-actions,.t2q-poster-hint,.studio-wallpaper,.studio-motion-toggle,[data-testid="cookie-consent"],[data-testid="site-live-wallpaper"]{display:none!important;}
         .t2q-poster{box-shadow:none;border-radius:0;max-width:none;page-break-inside:avoid;}
         .t2q-poster-band{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
         .t2q-poster-qr{width:105mm;}

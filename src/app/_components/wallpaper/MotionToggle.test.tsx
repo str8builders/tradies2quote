@@ -12,7 +12,7 @@ describe("MotionToggle", () => {
   it("is a real toggle button whose visible text is its whole accessible name", () => {
     const html = renderToStaticMarkup(createElement(MotionToggle));
     expect(html).toMatch(/^<button type="button" class="studio-motion-toggle"/);
-    expect(html).toContain('aria-pressed="false"');
+    expect(html).not.toContain("aria-pressed");
     expect(html).not.toContain("aria-label");
     expect(textOf(html)).toBe(MOTION_TOGGLE_LABELS.playing);
     // The icon is decoration only.

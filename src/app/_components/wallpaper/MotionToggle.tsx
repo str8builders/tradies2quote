@@ -11,8 +11,9 @@ export const MOTION_TOGGLE_LABELS = {
 
 /**
  * In-flow footer control for the site's background motion. The visible text
- * is the whole accessible name; CSS hides it when the OS asks for reduced
- * motion, because that setting already governs.
+ * is the whole accessible name and says what a press will do (the standard
+ * play/pause pattern, so no aria-pressed alongside a changing label). CSS
+ * hides it when the OS asks for reduced motion, which already governs.
  */
 export function MotionToggle() {
   // Server-render the common case (motion playing); a stored "paused" choice
@@ -24,7 +25,6 @@ export function MotionToggle() {
       type="button"
       className="studio-motion-toggle"
       data-testid="motion-toggle"
-      aria-pressed={paused}
       onClick={() => setMotionPaused(!paused)}
     >
       <Icon size={12} weight="fill" aria-hidden="true" />
