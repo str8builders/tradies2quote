@@ -1,16 +1,18 @@
 "use client";
 import {useEffect,useState} from "react";
-import {ArrowsLeftRight,CaretRight,Crosshair,Cube,Ruler,TreeEvergreen} from "@phosphor-icons/react";
+import {ArrowsLeftRight,CaretRight,Crosshair,Cube,Ruler,TreeEvergreen,Scan} from "@phosphor-icons/react";
 import {LevelTool} from "./measure/LevelTool";
 import {HeightTool} from "./measure/HeightTool";
 import {PhotoMeasureTool} from "./measure/PhotoMeasureTool";
 import {RoomScanTool} from "./measure/RoomScanTool";
+import {ARTapeTool} from "./measure/ARTapeTool";
 
-type ToolId="level"|"height"|"photo"|"room";
+type ToolId="ar"|"level"|"height"|"photo"|"room";
 const TOOLS:Array<{id:ToolId;name:string;summary:string;Icon:typeof Crosshair}>=[
+  {id:"ar",name:"AR tape",summary:"Drop points on floors, walls and benches through the camera: 3D lengths, rise and floor areas.",Icon:Scan},
   {id:"level",name:"Level & pitch",summary:"Sight a roof line for its pitch, or lay the phone on a member for tilt, fall and grade.",Icon:Crosshair},
   {id:"height",name:"Height & distance",summary:"Aim at the base, then the top: distance to a wall or pole and its height.",Icon:TreeEvergreen},
-  {id:"photo",name:"Measure a photo",summary:"Tap a known size in the shot, then read lengths, areas and angles in the same plane.",Icon:Ruler},
+  {id:"photo",name:"Measure a photo",summary:"Tap a door or sheet in the shot to correct the angle, then read true lengths, areas and angles.",Icon:Ruler},
   {id:"room",name:"Room scan (3D)",summary:"Aim at each floor corner: a plan, a 3D model, and the wall and floor quantities.",Icon:Cube},
 ];
 const LINKS=[{slug:"all-unit-converter",name:"All-unit converter",summary:"Convert your site measurements."},{slug:"pitch-angle",name:"Pitch, rise & angle",summary:"Move between angle, grade and pitch."},{slug:"equal-spacing",name:"Equal spacing",summary:"Centers, clear gaps and running marks."}];
@@ -26,7 +28,7 @@ export function MeasureScreen(){
   return <main className="native-page">
     {active?<>
       <div className="measure-head"><button type="button" className="native-pill" onClick={()=>open(null)} data-testid="measure-back">‹ All tools</button><h1 className="native-heading measure-title">{active.name}</h1></div>
-      {tool==="level"&&<LevelTool/>}{tool==="height"&&<HeightTool/>}{tool==="photo"&&<PhotoMeasureTool/>}{tool==="room"&&<RoomScanTool/>}
+      {tool==="ar"&&<ARTapeTool onOpenTool={open}/>}{tool==="level"&&<LevelTool/>}{tool==="height"&&<HeightTool/>}{tool==="photo"&&<PhotoMeasureTool/>}{tool==="room"&&<RoomScanTool/>}
     </>:<>
       <section className="native-hero"><div className="native-eyebrow">{"// CAMERA & SENSORS"}</div><h1>POINT.<br/><em>READ IT.</em></h1><p>The phone’s camera and tilt sensors as site tools: pitch, fall, height, distance and lengths from a photo. Runs on the phone, works offline once opened.</p></section>
       <h2 className="native-section-label">{"// MEASURE"}</h2>

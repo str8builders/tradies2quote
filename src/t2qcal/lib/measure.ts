@@ -173,3 +173,104 @@ export function quadSidesMm(points:Array<{x:number;y:number}>,mmPerPixel:number)
   const a=(side(0)+side(2))/2,b=(side(1)+side(3))/2;
   return a>=b?[a,b]:[b,a];
 }
+
+type P2={x:number;y:number};
+
+/**
+ * Perspective correction for photo measuring. Four taps on the corners of
+ * something rectangular of known size (a door, a GIB sheet, an A4 page) fix
+ * a plane homography from image pixels to millimetres on that plane, so a
+ * wall shot at an angle still measures true — the single-reference scale
+ * only holds when the photo is square-on.
+ *
+ * Corners are taken in tapping order round the rectangle; the first edge
+ * tapped is the width. Returns a pixel→mm mapping, or null for a degenerate
+ * (collinear or self-crossing) quadrilateral.
+ */
+export function rectifyFromRectangle(corners:P2[],widthMm:number,heightMm:number):((p:P2)=>P2)|null{
+  if(corners.length!==4||!(widthMm>0)||!(heightMm>0))return null;
+  if(!isConvexQuad(corners))return null;
+  const dst:P2[]=[{x:0,y:0},{x:widthMm,y:0},{x:widthMm,y:heightMm},{x:0,y:heightMm}];
+  const h=solveHomography(corners,dst);
+  if(!h)return null;
+  return (p:P2)=>{
+    const w=h[6]*p.x+h[7]*p.y+1;
+    return {x:(h[0]*p.x+h[1]*p.y+h[2])/w,y:(h[3]*p.x+h[4]*p.y+h[5])/w};
+  };
+}
+
+/** True when the four points make a simple convex quadrilateral (either winding). */
+export function isConvexQuad(q:P2[]):boolean{
+  if(q.length!==4)return false;
+  let sign=0;
+  for(let i=0;i<4;i++){
+    const a=q[i],b=q[(i+1)%4],c=q[(i+2)%4];
+    const cross=(b.x-a.x)*(c.y-b.y)-(b.y-a.y)*(c.x-b.x);
+    if(Math.abs(cross)<1e-6)return false;
+    const s=Math.sign(cross);
+    if(sign===0)sign=s;else if(s!==sign)return false;
+  }
+  return true;
+}
+
+/** Eight-parameter homography mapping src[i] → dst[i] (h33 = 1), by Gaussian elimination. */
+export function solveHomography(src:P2[],dst:P2[]):number[]|null{
+  const A:number[][]=[];
+  for(let i=0;i<4;i++){
+    const {x,y}=src[i],{x:u,y:v}=dst[i];
+    A.push([x,y,1,0,0,0,-u*x,-u*y,u]);
+    A.push([0,0,0,x,y,1,-v*x,-v*y,v]);
+  }
+  for(let col=0;col<8;col++){
+    let pivot=col;
+    for(let r=col+1;r<8;r++)if(Math.abs(A[r][col])>Math.abs(A[pivot][col]))pivot=r;
+    if(Math.abs(A[pivot][col])<1e-12)return null;
+    [A[col],A[pivot]]=[A[pivot],A[col]];
+    for(let r=0;r<8;r++){
+      if(r===col)continue;
+      const f=A[r][col]/A[col][col];
+      if(f===0)continue;
+      for(let k=col;k<9;k++)A[r][k]-=f*A[col][k];
+    }
+  }
+  const h=A.map((row,i)=>row[8]/row[i]);
+  return h.every(Number.isFinite)?h:null;
+}
+
+/** Distance in mm between two image points through a pixel→mm mapping. */
+export function mappedDistance(a:P2,b:P2,toMm:(p:P2)=>P2){const A=toMm(a),B=toMm(b);return Math.hypot(B.x-A.x,B.y-A.y);}
+
+/** Area in mm² of an image polygon through a pixel→mm mapping. */
+export function mappedArea(points:P2[],toMm:(p:P2)=>P2){return polygonAreaPx(points.map(toMm));}
+
+/** Angle at the vertex, measured on the mapped plane. */
+export function mappedAngle(a:P2,v:P2,b:P2,toMm:(p:P2)=>P2){return angleAtVertex(toMm(a),toMm(v),toMm(b));}
+
+/** Four-point outline side lengths (mm) through a mapping, averaging opposite sides, longest first. */
+export function mappedQuadSides(points:P2[],toMm:(p:P2)=>P2):[number,number]|null{
+  if(points.length!==4)return null;
+  const m=points.map(toMm),side=(i:number)=>Math.hypot(m[(i+1)%4].x-m[i].x,m[(i+1)%4].y-m[i].y);
+  const a=(side(0)+side(2))/2,b=(side(1)+side(3))/2;
+  return a>=b?[a,b]:[b,a];
+}
+
+/** Rectangles a tradie usually has in shot, in mm (width × height as first tapped). */
+export const REFERENCE_RECTANGLES:Array<{id:string;label:string;w:number;h:number}>=[
+  {id:"gib",label:"GIB sheet 2400 × 1200",w:1200,h:2400},
+  {id:"door",label:"Door leaf 810 × 1980",w:810,h:1980},
+  {id:"door760",label:"Door leaf 760 × 1980",w:760,h:1980},
+  {id:"a4",label:"A4 sheet 210 × 297",w:210,h:297},
+  {id:"ply",label:"Plywood sheet 1200 × 2400",w:1200,h:2400},
+  {id:"brick",label:"Brick face 230 × 76",w:230,h:76},
+];
+
+/**
+ * Room-scan closure: the gap between corner 1 and a second sighting of it at
+ * the end of the lap, as millimetres and as a share of the perimeter. Big
+ * numbers mean the compass drifted or the phone height changed.
+ */
+export function closureError(first:P2,again:P2,perimeterM:number):{mm:number;percent:number}|null{
+  if(!(perimeterM>0))return null;
+  const m=Math.hypot(again.x-first.x,again.y-first.y);
+  return {mm:m*1000,percent:m/perimeterM*100};
+}

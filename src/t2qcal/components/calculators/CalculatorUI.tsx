@@ -106,7 +106,33 @@ export function SectionHead({ index, title, note }: { index: string; title: stri
 type DrawFunction = (ctx: CanvasRenderingContext2D, width: number, height: number) => {unitsPerPixel:number;unit:string} | void;
 type CanvasModel = { kind: DiagramKind; values: Record<string, number>; unit: string; title: string };
 
-export function TechnicalCanvas({ draw, label, height = 440, zoom = 1, model, measurable = false }: { draw: DrawFunction; label: string; height?: number; zoom?: number; model?: CanvasModel; measurable?: boolean }) {
+type CanvasView = "measured" | "detail" | "template" | "3d";
+
+/** The drawings a modelled calculator can show, in blocklayer order: measured first, 3D last. */
+function canvasViews(model: CanvasModel): { view: CanvasView; label: string }[] {
+  const hasDetail = detailKind(model.kind) !== model.kind;
+  return [
+    { view: "measured", label: "Measured view" },
+    ...(hasDetail ? [{ view: "detail" as const, label: model.kind === "stairs" ? "Tread detail" : "Set-out detail" }] : []),
+    ...(model.kind === "stairs" ? [{ view: "template" as const, label: "Stringer template" }] : []),
+    { view: "3d", label: "3D assembly" },
+  ];
+}
+
+/**
+ * A blocklayer-style stack: every drawing of the calculator down the page,
+ * each under its own caption with its own zoom. Used when "All drawings" is
+ * selected, which is the default.
+ */
+export function DrawingStack({ sheets, measurable = false }: { sheets: { key: string; caption: string; draw: DrawFunction; model?: CanvasModel; view?: CanvasView }[]; measurable?: boolean }) {
+  return <div className="drawing-stack" data-testid="drawing-stack">
+    {sheets.map((sheet) => <figure className="drawing-sheet" key={sheet.key}>
+      <TechnicalCanvas compact caption={sheet.caption} draw={sheet.draw} label={sheet.caption} model={sheet.model} fixedView={sheet.view} measurable={measurable} />
+    </figure>)}
+  </div>;
+}
+
+export function TechnicalCanvas({ draw, label, height = 300, zoom = 1, model, measurable = false, compact = false, caption, fixedView }: { draw: DrawFunction; label: string; height?: number; zoom?: number; model?: CanvasModel; measurable?: boolean; compact?: boolean; caption?: string; fixedView?: CanvasView }) {
   const valid=useContext(ValidCalculation);
   const ref = useRef<HTMLCanvasElement>(null);
   const scaleRef = useRef<{unitsPerPixel:number;unit:string} | null>(null);
@@ -120,11 +146,13 @@ export function TechnicalCanvas({ draw, label, height = 440, zoom = 1, model, me
   const tapAnchor=useRef<{x:number;y:number;key:string}|null>(null);
   const drawingSize=useRef("");
   const [imageError,setImageError]=useState("");
-  // Blocklayer leads with the measured 2D drawing; 3D is a secondary reference view.
-  const [view, setView] = useState<"measured" | "detail" | "template" | "3d">("measured");
+  // Blocklayer shows every drawing of a calculator down the page, measured
+  // views first and the 3D assembly last; a single view can still be picked.
+  const [view, setView] = useState<CanvasView | "all">(fixedView ?? (model ? "all" : "measured"));
   // Only offer the set-out sheet when it resolves to a genuinely different drawing.
   const hasDetail = !!model && detailKind(model.kind) !== model.kind;
-  const active = view === "detail" && !hasDetail ? "measured" : view;
+  const chosen = fixedView ?? view;
+  const active: CanvasView = chosen === "all" ? "measured" : chosen === "detail" && !hasDetail ? "measured" : chosen;
   const drawingKey=JSON.stringify([model?.values,model?.unit,active,magnification,pan,zoom]);
   const currentMeasurement=measurement?.key===drawingKey?measurement:null;
   const measureEnabled=measurable && (active==="measured"||active==="template") && measuring;
@@ -163,8 +191,23 @@ export function TechnicalCanvas({ draw, label, height = 440, zoom = 1, model, me
     return () => observer.disconnect();
   }, [render]);
 
+  const picker = model && !fixedView && <div className="diagram-toolbar"><label className="native-drawing-picker">Drawing<select aria-label={`${model.title} drawing view`} value={chosen} onChange={e=>{setView(e.target.value as CanvasView|"all");fit();}}><option value="all">All drawings</option>{canvasViews(model).map((item)=><option key={item.view} value={item.view}>{item.label}</option>)}</select></label></div>;
+  if (model && chosen === "all") {
+    return <>
+      {picker}
+      <DrawingStack measurable={measurable} sheets={canvasViews(model).map((item) => ({ key: item.view, caption: item.label, draw, model, view: item.view }))} />
+    </>;
+  }
   return <>
-    {model && <div className="diagram-toolbar"><label className="native-drawing-picker">Drawing<select aria-label={`${model.title} drawing view`} value={active} onChange={e=>{setView(e.target.value as "measured"|"detail"|"template"|"3d");fit();}}><option value="measured">Measured view</option>{hasDetail&&<option value="detail">{model.kind==="stairs"?"Tread detail":"Set-out detail"}</option>}{model.kind==="stairs"&&<option value="template">Stringer template</option>}<option value="3d">3D assembly</option></select></label></div>}
+    {picker}
+    {compact ? <div className="drawing-sheet-head">
+      <figcaption>{caption ?? label}</figcaption>
+      <div className="drawing-mini-controls" aria-label={`${caption ?? label} drawing controls`}>
+        <input aria-label={`${caption ?? label} zoom`} type="range" min="1" max="4" step="0.25" value={magnification} onChange={e=>setMagnification(Number(e.target.value))}/>
+        <button type="button" onClick={fit} disabled={magnification===1&&!pan.x&&!pan.y&&!measurement}>Fit</button>
+        {measurable&&(active==="measured"||active==="template")&&<button type="button" aria-pressed={measureEnabled} onClick={()=>{setMeasuring(!measuring);setMeasurement(null);tapAnchor.current=null;}}>Measure</button>}
+      </div>
+    </div> : <>
     <div className="drawing-controls" aria-label="Drawing controls">
       <label>Zoom <input aria-label="Drawing zoom" type="range" min="1" max="4" step="0.25" value={magnification} onChange={e=>setMagnification(Number(e.target.value))}/><output>{Math.round(magnification*100)}%</output></label>
       <button onClick={fit}>Fit drawing</button>
@@ -172,9 +215,10 @@ export function TechnicalCanvas({ draw, label, height = 440, zoom = 1, model, me
       <button disabled={!valid||copies.length>=4} onClick={()=>{try{const image=ref.current?.toDataURL("image/png");if(image){const id=++copyID.current;setCopies(old=>[...old,{id,image,caption:`${model?.title??label} · ${active} · ${model?.unit??""} · option ${id}`}]);setImageError("");}}catch{setImageError("Could not copy the drawing. Please try again.");}}}>Keep comparison</button>
     </div>
     <details className="drawing-help"><summary>Drawing controls & help</summary><p>{measureEnabled?"Tap two points or drag to measure. Keyboard: Enter starts at the centre; arrows move the endpoint.":"Zoom in, then drag to inspect. Arrow keys pan the focused drawing; Home fits it."} Comparisons keep the visible drawing; print at page-fit size.</p></details>
+    </>}
     {imageError&&<p role="alert">{imageError}</p>}
     <div className="drawing-viewport">
-    <canvas className="technical-canvas" ref={ref} style={{ height,touchAction:measureEnabled||magnification>1?"none":"pan-y",cursor:measureEnabled?"crosshair":magnification>1?"grab":"default" }} role="img" tabIndex={0} aria-label={model ? `${model.title} ${active} diagram` : label}
+    <canvas className="technical-canvas" ref={ref} style={{ minHeight: height,touchAction:measureEnabled||magnification>1?"none":"pan-y",cursor:measureEnabled?"crosshair":magnification>1?"grab":"default" }} role="img" tabIndex={0} aria-label={model ? `${model.title} ${active} diagram` : label}
       onKeyDown={e=>{if(measureEnabled && (e.key==="Enter" || e.key.startsWith("Arrow"))){e.preventDefault();const r=e.currentTarget.getBoundingClientRect(),scale=scaleRef.current;if(!scale)return;const delta=e.shiftKey?1:10;setMeasurement(m=>{if(e.key==="Enter"||!m||m.key!==drawingKey)return {x:r.width/2,y:r.height/2,endX:r.width/2,endY:r.height/2,scale:scale.unitsPerPixel,unit:scale.unit,key:drawingKey};return {...m,endX:Math.max(0,Math.min(r.width,m.endX+(e.key==="ArrowRight"?delta:e.key==="ArrowLeft"?-delta:0))),endY:Math.max(0,Math.min(r.height,m.endY+(e.key==="ArrowDown"?delta:e.key==="ArrowUp"?-delta:0)))};});}else if(e.key==="Home"){e.preventDefault();fit();}else if(magnification>1&&["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key)){e.preventDefault();setPan(p=>({x:p.x+(e.key==="ArrowLeft"?30:e.key==="ArrowRight"?-30:0),y:p.y+(e.key==="ArrowUp"?30:e.key==="ArrowDown"?-30:0)}));}}}
       onPointerDown={e=>{if(e.button!==0||(!measureEnabled&&magnification===1))return;const r=e.currentTarget.getBoundingClientRect();const x=e.clientX-r.left,y=e.clientY-r.top;e.currentTarget.setPointerCapture(e.pointerId);dragRef.current={x,y,panX:pan.x,panY:pan.y,moved:false};if(measureEnabled&&scaleRef.current){const anchor=tapAnchor.current?.key===drawingKey?tapAnchor.current:null;setMeasurement({x:anchor?.x??x,y:anchor?.y??y,endX:x,endY:y,scale:scaleRef.current.unitsPerPixel,unit:scaleRef.current.unit,key:drawingKey});}}}
       onPointerMove={e=>{const d=dragRef.current;if(!d)return;const r=e.currentTarget.getBoundingClientRect(),x=Math.max(0,Math.min(r.width,e.clientX-r.left)),y=Math.max(0,Math.min(r.height,e.clientY-r.top));if(Math.hypot(x-d.x,y-d.y)>3)d.moved=true;if(measureEnabled){if(d.moved)setMeasurement(m=>m?{...m,x:d.x,y:d.y,endX:x,endY:y}:null);}else setPan({x:Math.max(-(magnification-1)*r.width/2,Math.min((magnification-1)*r.width/2,d.panX+x-d.x)),y:Math.max(-(magnification-1)*r.height/2,Math.min((magnification-1)*r.height/2,d.panY+y-d.y))});}}
@@ -182,7 +226,7 @@ export function TechnicalCanvas({ draw, label, height = 440, zoom = 1, model, me
     {currentMeasurement&&<svg className="measurement-overlay" aria-hidden="true"><line x1={currentMeasurement.x} y1={currentMeasurement.y} x2={currentMeasurement.endX} y2={currentMeasurement.endY} stroke="#d51919" strokeWidth="2"/><circle cx={currentMeasurement.x} cy={currentMeasurement.y} r="4" fill="#d51919"/><circle cx={currentMeasurement.endX} cy={currentMeasurement.endY} r="4" fill="#d51919"/></svg>}
     </div>
     {currentMeasurement&&<p className="measurement-result" role="status">Horizontal {nfmt(Math.abs(currentMeasurement.endX-currentMeasurement.x)*currentMeasurement.scale,2)} {currentMeasurement.unit} · Vertical {nfmt(Math.abs(currentMeasurement.endY-currentMeasurement.y)*currentMeasurement.scale,2)} {currentMeasurement.unit} · Distance {nfmt(Math.hypot(currentMeasurement.endX-currentMeasurement.x,currentMeasurement.endY-currentMeasurement.y)*currentMeasurement.scale,2)} {currentMeasurement.unit}</p>}
-    {copies.length > 0 && <section className="drawing-comparisons" aria-label="Comparison drawings">
+    {!compact && copies.length > 0 && <section className="drawing-comparisons" aria-label="Comparison drawings">
       <h3>Compare your options</h3>
       {copies.map(copy => <figure key={copy.id}>
         {/* Local canvas snapshot: no remote image request or optimisation is needed. */}

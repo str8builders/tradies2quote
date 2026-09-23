@@ -1,6 +1,6 @@
 "use client";
 import {useCallback,useEffect,useRef,useState} from "react";
-import {cameraElevation,cameraRoll,headingFromEvent,screenUp,smooth,surfaceTilt,upVector} from "@/t2qcal/lib/measure";
+import {DEG,cameraElevation,headingFromEvent,screenUp,smooth,surfaceTilt,upVector} from "@/t2qcal/lib/measure";
 
 export type SensorState="idle"|"ready"|"denied"|"unsupported";
 export type Reading={elevation:number;roll:number;tilt:number;up:[number,number,number];heading:number|null;beta:number;gamma:number};
@@ -29,7 +29,8 @@ export function useOrientation(){
     const rawUp=upVector(beta,gamma),up=screenUp(rawUp,screenAngle());
     const s=smoothed.current;
     s.elevation=smooth(s.elevation,cameraElevation(beta,gamma));
-    s.roll=smooth(s.roll,cameraRoll(beta,gamma));
+    // roll from the screen-rotated up vector, so the horizon stays true in landscape too
+    s.roll=smooth(s.roll,Math.atan2(-up[0],up[1])/DEG);
     s.tilt=smooth(s.tilt,surfaceTilt(beta,gamma));
     const heading=headingFromEvent(event as DeviceOrientationEvent&{webkitCompassHeading?:number});
     const next:Reading={elevation:s.elevation-zeroRef.current.elevation,roll:s.roll-zeroRef.current.roll,tilt:Math.max(0,s.tilt-zeroRef.current.tilt),up,heading:heading??last.current?.heading??null,beta,gamma};

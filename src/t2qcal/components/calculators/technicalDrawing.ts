@@ -206,10 +206,41 @@ export function grainFor(x1: number, y1: number, x2: number, y2: number): Grain 
 let sheetW = 0;
 let sheetH = 0;
 
+/*
+ * Labels already painted on this sheet. Blocklayer drawings stay readable
+ * because no two figures ever land on top of each other, so every label
+ * registers the box it covers and later text is nudged clear before it is
+ * painted: dimensions slide along their own normal (further off the line),
+ * plain notes step up or down a line, running set-out marks stagger upward.
+ * The nudge is at most a couple of text heights, so a label never wanders
+ * away from the geometry it describes.
+ */
+type Box = { x: number; y: number; w: number; h: number };
+let placed: Box[] = [];
+const overlaps = (a: Box, b: Box) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+function collides(box: Box) {
+  for (const other of placed) if (overlaps(box, other)) return true;
+  return false;
+}
+function claim(box: Box) {
+  if (sheetW > 0 && placed.length < 4000) placed.push(box);
+}
+/** First offset from `steps` (in sheet units) at which `box` shifted along (dx,dy) sits clear. */
+function clearance(box: Box, dx: number, dy: number, steps: number[]) {
+  if (sheetW <= 0 || !collides(box)) return 0;
+  for (const step of steps) {
+    const moved = { x: box.x + dx * step, y: box.y + dy * step, w: box.w, h: box.h };
+    if (moved.x < 0 || moved.y < 0 || moved.x + moved.w > sheetW || moved.y + moved.h > sheetH) continue;
+    if (!collides(moved)) return step;
+  }
+  return 0;
+}
+
 /** White sheet. Blocklayer draws no border, grid or title block. */
 export function prepareSheet(ctx: CanvasRenderingContext2D, width: number, height: number) {
   sheetW = width;
   sheetH = height;
+  placed = [];
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = WHITE;
   ctx.fillRect(0, 0, width, height);
@@ -248,7 +279,16 @@ export function note(ctx: CanvasRenderingContext2D, text: string, x: number, y: 
   ctx.font = font(size, weight);
   ctx.textAlign = align;
   ctx.fillStyle = color;
-  ctx.fillText(text, sheetW > 0 ? clampText(ctx, text, x, align) : x, sheetH > 0 ? Math.min(Math.max(y, size), sheetH - size * .8) : y);
+  const tx = sheetW > 0 ? clampText(ctx, text, x, align) : x;
+  let ty = sheetH > 0 ? Math.min(Math.max(y, size), sheetH - size * .8) : y;
+  if (sheetW > 0) {
+    const w = ctx.measureText(text).width;
+    const box: Box = { x: align === "center" ? tx - w / 2 : align === "right" ? tx - w : tx, y: ty - size * .72, w, h: size * 1.44 };
+    // step a line up or down, whichever first reads clear
+    ty += clearance(box, 0, 1, [-size * 1.5, size * 1.5, -size * 3, size * 3]);
+    claim({ ...box, y: ty - size * .72 });
+  }
+  ctx.fillText(text, tx, ty);
   ctx.restore();
 }
 
@@ -337,6 +377,17 @@ export function dimension(
   let midY = (ay + by) / 2;
   if (sheetW > 0) midX = Math.min(Math.max(midX, hx + 2), sheetW - hx - 2);
   if (sheetH > 0) midY = Math.min(Math.max(midY, hy + 2), sheetH - hy - 2);
+  if (sheetW > 0) {
+    // slide the label along the dimension's normal, first further off the
+    // measured line (the side the caller staged it on), until it sits clear
+    const side = offset < 0 ? -1 : 1;
+    const box: Box = { x: midX - hx, y: midY - hy, w: hx * 2, h: hy * 2 };
+    const step = size * 1.5;
+    const shift = clearance(box, nx, ny, [side * step, -side * step, side * step * 2, -side * step * 2]);
+    midX += nx * shift;
+    midY += ny * shift;
+    claim({ x: midX - hx, y: midY - hy, w: hx * 2, h: hy * 2 });
+  }
   ctx.translate(midX, midY);
   ctx.rotate(angle);
   // Clear the hairline behind the text so the label stays legible.
@@ -357,6 +408,14 @@ export function shortDimension(ctx: CanvasRenderingContext2D, x: number, y: numb
 export function setOutMark(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color = BLUE, size = 11) {
   ctx.save();
   ctx.font = font(size);
+  if (sheetW > 0) {
+    // the mark reads upward from (x, y); a crowded run staggers each figure
+    // higher rather than sideways, so every mark stays over its own tick
+    const w = ctx.measureText(text).width;
+    const box: Box = { x: x - size * .72, y: y - w, w: size * 1.44, h: w };
+    y += clearance(box, 0, 1, [-size * 1.5, -size * 3, size * 1.5]);
+    claim({ ...box, y: y - w });
+  }
   ctx.translate(x, y);
   ctx.rotate(-Math.PI / 2);
   ctx.textAlign = "left";
@@ -1441,10 +1500,24 @@ export function drawDiagram(ctx: CanvasRenderingContext2D, width: number, height
     const treads = Math.max(1, risers - 1);
     const totalRunValue = L("totalRun", L("run", 3000) * treads);
     const totalRiseValue = L("totalRise", L("rise", 175) * risers);
-    const stepW = w * .80 / treads;
-    const stepH = h * .74 / risers;
+    const riseStep = totalRiseValue / risers;
+    const runStep = totalRunValue / treads;
+    // One scale for both axes, as blocklayer prints it: a stretched profile
+    // would show a pitch the stair does not have.
+    const scale = Math.min(w * .80 / totalRunValue, h * .74 / totalRiseValue);
+    const stepW = runStep * scale;
+    const stepH = riseStep * scale;
     const x = left + 54;   // clear of the angle callout at the base
     const y = bottom - 22;
+    const pitch = Math.atan2(riseStep, runStep);   // the stair's pitch, through the nosings
+    const widthMM = L("width", 1000);
+    const metricSheet = unit === "mm";
+    // the text block goes down first so every dimension after it steers clear
+    infoLines(ctx, [
+      `${risers} Rises @ ${n(riseStep)} - ${treads} Runs @ ${n(runStep)}`,
+      `Stair Width ${fmt(widthMM)} ${unit}`,
+      `Void Volume ${n(totalRiseValue * totalRunValue * widthMM / 2 / (metricSheet ? 1e9 : 1728), 2)} ${metricSheet ? "m³" : "ft³"}`,
+    ], left, top + 4, "left");
     const topX = x + treads * stepW;
     const topY = y - risers * stepH;
 
@@ -1466,7 +1539,8 @@ export function drawDiagram(ctx: CanvasRenderingContext2D, width: number, height
       plate(ctx, tx, ty, 4, stepH);        // riser
       plate(ctx, tx, ty - 7, stepW, 7);    // tread
     }
-    hairline(ctx, x, y, topX, topY);
+    // pitch line through every nosing, first tread to the landing
+    hairline(ctx, x, y - stepH, topX, topY);
 
     // upper-floor landing at the top nosing level, when the calculator gives a
     // floor thickness — the built context blocklayer's sheet shows
@@ -1484,8 +1558,6 @@ export function drawDiagram(ctx: CanvasRenderingContext2D, width: number, height
     // the full blocklayer dimension set: nested rises on the right, floor
     // opening and headroom off the landing, slope along the stringer, and the
     // void volume printed with the width
-    const riseStep = totalRiseValue / risers;
-    const runStep = totalRunValue / treads;
     const floorMM = safe(values.floorThickness, 0);
     const thkPx = floorMM > 0 ? Math.min(Math.max(floorMM * (risers * stepH) / totalRiseValue, 7), 46) : 0;
     dimension(ctx, x - ox / 2, y - oy / 2, topX - ox / 2, topY - oy / 2,
@@ -1501,27 +1573,20 @@ export function drawDiagram(ctx: CanvasRenderingContext2D, width: number, height
     }
     const openingMM = safe(values.openingRun, 0);
     if (floorMM > 0 && openingMM > 0 && openingMM < totalRunValue) {
-      const k = (treads * stepW) / totalRunValue;
-      const xEdge = topX - openingMM * k;
+      const xEdge = topX - openingMM * scale;
       // above the landing on a wide sheet, below it on a narrow one where the
       // info block owns the top-left corner
       const openY = width < 520 ? topY + thkPx + 18 : topY - thkPx - 6;
       dimension(ctx, xEdge, openY, topX, openY, `Floor Opening ${n(openingMM)}`, BLACK, width < 520 ? 0 : -16);
-      const lineY = y + (xEdge - x) * (topY - y) / Math.max(topX - x, 1e-6);
-      const headroomMM = totalRiseValue - floorMM
-        - Math.tan(Math.atan2(totalRiseValue, totalRunValue)) * (totalRunValue - openingMM);
+      // headroom is plumb from the opening edge down to the pitch line, which
+      // rises one riser per going from the first nosing
+      const lineY = (y - stepH) + (xEdge - x) * (topY - (y - stepH)) / Math.max(topX - x, 1e-6);
+      const headroomMM = openingMM * riseStep / runStep - floorMM;
       if (headroomMM > riseStep && lineY > topY + thkPx + 30) {
         dimension(ctx, xEdge, topY + thkPx, xEdge, lineY, `Headroom ${n(headroomMM)}`, BLACK, 0);
       }
     }
-    angleLabel(ctx, `${n(Math.atan2(totalRiseValue, totalRunValue) * 180 / Math.PI)}°`, left, y - 18, "left");
-    const widthMM = L("width", 1000);
-    const metricSheet = unit === "mm";
-    infoLines(ctx, [
-      `${risers} Rises @ ${n(riseStep)} - ${treads} Runs @ ${n(runStep)}`,
-      `Stair Width ${fmt(widthMM)} ${unit}`,
-      `Void Volume ${n(totalRiseValue * totalRunValue * widthMM / 2 / (metricSheet ? 1e9 : 1728), 2)} ${metricSheet ? "m³" : "ft³"}`,
-    ], left, top + 4, "left");
+    angleLabel(ctx, `${n(pitch * 180 / Math.PI)}°`, left, y - 18, "left");
   } else if (kind === "stairdetail") {
     const runValue = L("run", L("totalRun", 3750) / Math.max(1, Math.round(safe(values.risers || values.count, 15)) - 1));
     const riseValue = L("rise", L("totalRise", 2800) / Math.max(2, Math.round(safe(values.risers || values.count, 16))));
@@ -1581,8 +1646,13 @@ export function drawDiagram(ctx: CanvasRenderingContext2D, width: number, height
     const count = Math.max(2, Math.min(28, Math.round(values.count || 8)));
     const span = L("span", L("length", 6000));
     const memberW = Math.max(4, w / count * .18);
-    const planTop = top + 46;
-    const planH = Math.max(24, h - 96);
+    // Blocklayer prints the whole schedule above the plan, adjusted value in red;
+    // the plan starts below however many lines that schedule needs.
+    const memberLen = safe(values.width, 0);
+    const deckLines = kind === "deck" && values.length && memberLen ? (values.rows ? 2 : 1) : 0;
+    const infoH = (2 + deckLines) * 19 + 8;
+    const planTop = top + infoH;
+    const planH = Math.max(24, h - 50 - infoH);
     plate(ctx, left, planTop, w, planH, PALE, SILVER);
 
     // Follow the calculator's own set-out when it supplies one (centres inset by
@@ -1607,8 +1677,6 @@ export function drawDiagram(ctx: CanvasRenderingContext2D, width: number, height
     }
 
     dimension(ctx, left, planTop + planH, right, planTop + planH, fmt(span), BLACK, 40);
-    // Blocklayer prints the whole schedule on the plan, adjusted value in red.
-    const memberLen = safe(values.width, 0);
     infoLines(ctx, [
       `${count} Members across ${fmt(span)} ${unit}`,
       [`Adjusted Spacing ${n(step)}`, RED],

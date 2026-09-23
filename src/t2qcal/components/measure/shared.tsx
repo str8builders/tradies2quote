@@ -15,6 +15,19 @@ export function Stat({label,value,hint,testId}:{label:string;value:string;hint?:
   return <div className="measure-stat"><small>{label}</small><strong data-testid={testId}>{value}</strong>{hint&&<span>{hint}</span>}</div>;
 }
 
+/**
+ * The camera is stopped whenever the phone hides the page (a call, the app
+ * switcher, Control Center). Sensors keep their permission, so without this
+ * the preview would stay black with no way back short of a reload.
+ */
+export function CameraResume({cameraState,cameraMessage,onResume}:{cameraState:CameraState;cameraMessage:string;onResume:()=>void}){
+  if(cameraState==="live"||cameraState==="unsupported")return null;
+  return <div className="measure-resume">
+    <button type="button" className="native-primary" onClick={onResume} disabled={cameraState==="starting"} data-testid="measure-resume-camera"><Camera size={18} weight="bold"/>{cameraState==="starting"?"Starting…":"Resume camera"}</button>
+    {cameraMessage&&<p role="alert"><Warning size={16} weight="bold"/>{cameraMessage}</p>}
+  </div>;
+}
+
 /** The start button and every honest reason it might not work. */
 export function SensorGate({state,cameraState,cameraMessage,onStart,label="Start camera & sensors"}:{state:SensorState;cameraState:CameraState;cameraMessage:string;onStart:()=>void;label?:string}){
   const blocked=state==="denied"||state==="unsupported";
