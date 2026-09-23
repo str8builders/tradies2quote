@@ -23,7 +23,7 @@ const TOPICS = [
   {
     icon: Microphone,
     title: "The mic won't record",
-    body: "Make sure your browser has permission to use the microphone. On iOS Safari, tap the AA icon in the address bar and check Microphone is set to Allow. Reload the page and try again.",
+    body: "For the iPhone or iPad app, check microphone access for Tradies2Quote in your device Settings. For the website, allow microphone access in your browser's site permissions. You can always type your job description instead. AI processing permission is separate and can be reviewed in the app's Settings.",
   },
   {
     icon: FilePdf,
@@ -33,7 +33,19 @@ const TOPICS = [
   {
     icon: CreditCard,
     title: "Trial, plans & billing",
-    body: `New accounts get a 7-day free trial with no card required. Paid plans (when they launch) auto-renew monthly until you cancel. To cancel a paid plan, email ${LEGAL.supportEmail} from the address on your account — your access continues until the end of the current period.`,
+    body: (
+      <>
+        Plans, prices and any trial terms are shown before you subscribe.
+        For purchases billed by Apple, open device Settings &rarr; your name
+        &rarr; Subscriptions, or{" "}
+        <a className="underline" href="https://apps.apple.com/account/subscriptions">manage your Apple subscription</a>.
+        For website subscriptions, use the website billing controls or email{" "}
+        <a className="underline" href={`mailto:${LEGAL.supportEmail}`}>{LEGAL.supportEmail}</a>.
+        Cancelling renewal normally keeps access until the paid period ends.
+        Request an Apple-billed refund through{" "}
+        <a className="underline" href="https://reportaproblem.apple.com">Apple&apos;s Report a Problem</a>.
+      </>
+    ),
   },
   {
     icon: LockKey,
@@ -184,10 +196,19 @@ export default function SupportPage() {
                 further 30 days.
               </p>
               <p className="mt-4 text-ink-300 text-sm leading-relaxed">
-                Prefer self-serve? You can delete your account directly
-                in the app — open <strong>Settings</strong> and scroll to
-                the delete-account section. It removes your quotes,
-                clients and account on the spot, no email needed.
+                You can request account deletion directly in the app — open{" "}
+                <strong>Settings</strong> and choose <strong>Delete account</strong>.
+                This deletes the shared Tradies2Quote and T2QCAL account and
+                its personal content. If cleanup is interrupted, the app
+                explains what remains pending and lets you retry or contact
+                support. Retained billing records and backups are described
+                in our <Link className="underline" href="/privacy">Privacy Policy</Link>.
+              </p>
+              <p className="mt-4 text-ink-300 text-sm leading-relaxed">
+                Deleting your account or uninstalling the app does not cancel
+                an Apple subscription. You can{" "}
+                <a className="underline" href="https://apps.apple.com/account/subscriptions">manage or cancel it with Apple</a>.
+                You can still delete your account without cancelling first.
               </p>
             </div>
 

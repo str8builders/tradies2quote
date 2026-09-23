@@ -288,12 +288,15 @@ export default function TermsPage() {
             first.
           </p>
           <p>
-            You can close your account at any time by emailing{" "}
+            You can request account deletion in Settings, or ask for help by emailing{" "}
             <a href={`mailto:${LEGAL.privacyEmail}`}>
               {LEGAL.privacyEmail}
             </a>{" "}
-            from the address on your account. On closure we delete your
-            personal information as described in our{" "}
+            from the address on your account. Deletion affects your shared
+            Tradies2Quote and T2QCAL account. The app reports interrupted cleanup
+            and allows you to retry. Deleting the account does not cancel an
+            Apple subscription, and cancelling is not a condition of deletion.
+            We delete or retain personal information as described in our{" "}
             <a href="/privacy">Privacy Policy</a>.
           </p>
         </LegalSection>

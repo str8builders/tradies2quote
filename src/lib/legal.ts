@@ -49,6 +49,6 @@ export const LEGAL: LegalConfig = {
   siteDomain: "tradies2quote.com",
   supportEmail: "support@tradies2quote.com",
   privacyEmail: "privacy@tradies2quote.com",
-  lastUpdated: "2026-07-18",
-  lastUpdatedDisplay: "18 July 2026",
+  lastUpdated: "2026-09-24",
+  lastUpdatedDisplay: "24 September 2026",
 };
