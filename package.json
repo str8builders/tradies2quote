@@ -16,6 +16,7 @@
     "eval:corrections": "RUN_CORRECTIONS_EVAL=1 vitest run src/eval/corrections-eval.test.ts",
     "release:check": "node deploy/check-release.mjs",
     "release:test": "node --test deploy/test-release.mjs",
+    "render:marketing": "node scripts/render-marketing.mjs",
     "prebuild": "node scripts/prepare-pdf-assets.mjs",
     "predev": "node scripts/prepare-pdf-assets.mjs"
   },
@@ -58,6 +59,9 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
+    "@remotion/bundler": "4.0.488",
+    "@remotion/google-fonts": "4.0.488",
+    "@remotion/renderer": "4.0.488",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/qrcode": "^1.5.6",

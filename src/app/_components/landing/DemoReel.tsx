@@ -1,60 +1,18 @@
 "use client";
-import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
-import type { PlayerRef } from "@remotion/player";
-import { useMotionPaused } from "../LiveWallpaper";
-const LazyPlayer = dynamic(() => import("./DemoReelPlayer"), {
-  ssr: false,
-  loading: () => (
-    <div className="studio-reel-poster">
-      <span>VOICE IN. QUOTE OUT.</span>
-      <strong>
-        Your next quote,
-        <br />
-        from start to send.
-      </strong>
-      <p>Loading the product walkthrough…</p>
-    </div>
-  ),
-});
+import { useRef, useState } from "react";
+import { DEMO_CHAPTERS, type DemoChapterId } from "@/remotion/demo-script";
+import { MarketingVideo, type MarketingVideoHandle } from "./MarketingVideo";
+
+const VIDEO_ID = "demo-reel-video";
+
+/**
+ * The product walkthrough: a pre-rendered video (tall on phones, wide
+ * elsewhere) with chapter buttons that jump to each step. No player
+ * library loads on the landing page.
+ */
 export function DemoReel() {
-  const paused = useMotionPaused();
-  const ref = useRef<HTMLDivElement>(null);
-  const [near, setNear] = useState(false);
-  const [visible, setVisible] = useState(false);
-  const [pageVisible, setPageVisible] = useState(true);
-  const [player, setPlayer] = useState<PlayerRef | null>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const preload = new IntersectionObserver(
-      ([e]) => {
-        if (e.isIntersecting) {
-          setNear(true);
-          preload.disconnect();
-        }
-      },
-      { rootMargin: "300px" },
-    );
-    const visibility = new IntersectionObserver(
-      ([e]) => setVisible(e.isIntersecting),
-      { threshold: 0.1 },
-    );
-    preload.observe(el);
-    visibility.observe(el);
-    const onVisibility = () => setPageVisible(!document.hidden);
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      preload.disconnect();
-      visibility.disconnect();
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, []);
-  useEffect(() => {
-    if (!player) return;
-    if (visible && pageVisible && !paused) player.play();
-    else player.pause();
-  }, [player, visible, pageVisible, paused]);
+  const video = useRef<MarketingVideoHandle>(null);
+  const [chapter, setChapter] = useState<DemoChapterId>(DEMO_CHAPTERS[0].id);
   return (
     <section
       id="demo-reel"
@@ -74,40 +32,46 @@ export function DemoReel() {
             </h2>
           </div>
           <p>
-            A 30-second look at the workflow, on real app screens.
+            A 30-second look at the workflow, from talking the job to getting paid.
             <br />
-            Illustrative job, real possibilities.
+            Example job and figures.
           </p>
         </div>
-        <div
-          ref={ref}
-          className="studio-reel-frame"
-          aria-label="Animated product walkthrough, using example quote data"
+        <MarketingVideo
+          ref={video}
+          variant="demo"
+          videoId={VIDEO_ID}
+          onChapterChange={setChapter}
+          className="rounded-[10px] border border-white/[0.125] shadow-[0_30px_90px_#0005] md:rounded-[18px]"
+        />
+        <nav
+          aria-label="Walkthrough chapters"
+          className="mt-4 grid grid-cols-5 gap-2 md:mt-5 md:flex md:flex-wrap md:gap-3"
         >
-          {near ? (
-            <LazyPlayer playerRef={setPlayer} autoPlay={false} controls />
-          ) : (
-            <div className="studio-reel-poster">
-              <span>VOICE IN. QUOTE OUT.</span>
-              <strong>
-                Your next quote,
-                <br />
-                from start to send.
-              </strong>
-              <p>Talk → Draft → Check → Send → Invoice</p>
+          {DEMO_CHAPTERS.map((c, i) => {
+            const active = c.id === chapter;
+            return (
               <button
-                className="studio-button"
+                key={c.id}
                 type="button"
-                onClick={() => setNear(true)}
+                aria-controls={VIDEO_ID}
+                aria-current={active ? "step" : undefined}
+                onClick={() => video.current?.seekToChapter(c.id)}
+                className={`min-h-11 rounded-full border px-1 font-mono text-[11px] uppercase tracking-[0.1em] transition-colors md:px-5 md:tracking-[0.14em] ${
+                  active
+                    ? "border-[#FF5F15] bg-[#FF5F15]/10 text-[#ff8b54]"
+                    : "border-white/15 text-[#c4c4c4] hover:border-white/35 hover:text-white"
+                }`}
               >
-                Load the walkthrough
+                <span className="hidden md:inline">{String(i + 1).padStart(2, "0")} </span>
+                {c.label}
               </button>
-            </div>
-          )}
-        </div>
+            );
+          })}
+        </nav>
         <div className="studio-reel-caption">
           <span>YOUR SCOPE. YOUR RATES. YOUR FINAL SAY.</span>
-          <span>Play, pause or explore the timeline.</span>
+          <span>Choose a chapter to jump straight to it.</span>
         </div>
       </div>
     </section>

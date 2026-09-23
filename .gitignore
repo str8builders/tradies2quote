@@ -48,3 +48,6 @@ next-env.d.ts
 
 # Generated from the pinned PDF.js package before dev/build
 /public/t2qcal/vendor/pdfjs/
+
+# Marketing video renders for sharing (scripts/render-marketing.mjs); not served by the site
+/marketing-media/
