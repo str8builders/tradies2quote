@@ -28,7 +28,7 @@ const CHAPTERS = [
   { kicker: "VOICE IN", title: "Talk the job", body: "Record a walkthrough on site. Your words are the starting point.", screen: "/screens/screen-4.jpg" },
   { kicker: "QUOTE OUT", title: "Draft builds itself", body: "Materials, labour, markup and GST, laid out line by line.", screen: "/screens/screen-6.jpg" },
   { kicker: "YOUR CALL", title: "Check every line", body: "Scope, quantities, rates and terms. Your experience has the final say.", screen: "/screens/screen-7.jpg" },
-  { kicker: "SEND IT", title: "Get the yes", body: "A branded quote your client reads and accepts from their phone.", screen: "/screens/screen-3.jpg" },
+  { kicker: "SEND IT", title: "Get the yes", body: "A branded quote your client reads and accepts from their phone.", screen: "/screens/screen-6.jpg" },
   { kicker: "GET PAID", title: "Invoice. Repeat", body: "Turn the accepted quote into an invoice. The paperwork stays together.", screen: "/screens/screen-9.jpg" },
 ] as const;
 

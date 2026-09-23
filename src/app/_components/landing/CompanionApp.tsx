@@ -13,7 +13,7 @@ export function CompanionApp() {
         <div className="mt-8 grid gap-6 md:grid-cols-2">
           <article className="studio-app-card flex flex-col rounded-2xl border border-ink-700 bg-ink-900 p-6 sm:p-8">
             <div className="studio-app-shot" aria-hidden="true">
-              <Image src="/screens/screen-2.jpg" alt="" width={360} height={780} sizes="200px" />
+              <Image src="/screens/screen-4.jpg" alt="" width={360} height={780} sizes="200px" />
             </div>
             <Receipt size={36} className="text-brand" aria-hidden />
             <h3 className="mt-5 font-display text-2xl text-white">Tradies2Quote</h3>
