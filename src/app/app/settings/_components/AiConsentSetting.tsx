@@ -46,7 +46,7 @@ export function AiConsentSetting({
           </h2>
           <p className="mt-2 text-sm text-ink-300">
             {consentedAt
-              ? "Local Qwen text features are on. Voice and image features need separately configured external providers. Withdraw and you'll be asked again before the next AI action."
+              ? "AI features are on: Anthropic (Claude) drafts quotes and reads drawings, OpenAI transcribes voice notes and describes photos. Withdraw and you'll be asked again before the next AI action."
               : "AI is off. You'll be asked to turn it on before your next voice, scan or quote-generation action."}
           </p>
           {consentedAt ? (

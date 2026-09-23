@@ -27,12 +27,30 @@ const nextConfig: NextConfig = {
   //   - Permissions-Policy keeps microphone (voice quotes), camera
   //     (materials capture) and geolocation (weather planning) available
   //     to OUR origin only, and shuts them off for any embedded content.
-  //   - HSTS is intentionally absent — Vercel injects it on HTTPS domains.
+  //   - HSTS: the site is self-hosted behind Caddy (no Vercel to inject it),
+  //     so it is set here. No includeSubDomains/preload: conservative, and
+  //     every current host is HTTPS-only anyway.
+  //   - Public media (/videos, /images, /wallpaper, logos) had max-age=0, so
+  //     every visit re-downloaded the demo videos. Names are not hashed, so
+  //     cache for a day and serve stale for a week while revalidating.
   async headers() {
+    const mediaCache = {
+      key: "Cache-Control",
+      value: "public, max-age=86400, stale-while-revalidate=604800",
+    };
     return [
+      { source: "/videos/:path*", headers: [mediaCache] },
+      { source: "/images/:path*", headers: [mediaCache] },
+      { source: "/wallpaper/:path*", headers: [mediaCache] },
+      { source: "/screens/:path*", headers: [mediaCache] },
+      { source: "/logo-horizontal.webp", headers: [mediaCache] },
       {
         source: "/(.*)",
         headers: [
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=15552000",
+          },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
           {
@@ -77,6 +95,10 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "8mb",
     },
+    // The proxy (src/proxy.ts) buffers request bodies and Next's default cap
+    // is 10 MB: a client quote request with three phone photos or a long voice
+    // note (transcribe allows 25 MB) was cut off and failed as a bad form.
+    proxyClientMaxBodySize: "40mb",
   },
 };
 

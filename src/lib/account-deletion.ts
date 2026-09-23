@@ -107,19 +107,22 @@ export async function purgeAccount(userId: string): Promise<PurgeResult> {
   // ── 3. Storage purge (best-effort — orphaned bytes are not PII-critical
   //       once the DB rows referencing them are gone, but tidy anyway). ──
   try {
+    // Every bucket that stores this user's files, keyed the way uploads are
+    // written: `${userId}/…` (including nested `${userId}/${quoteId}/…` and
+    // `${userId}/${fileId}/…` folders) and signatures under `${quoteId}/…`.
     const buckets: Array<{ bucket: string; prefixes: string[] }> = [
       { bucket: "profile-avatars", prefixes: [userId] },
+      { bucket: "business-logos", prefixes: [userId] },
       { bucket: "quote-pdfs", prefixes: [userId] },
+      { bucket: "quote-attachments", prefixes: [userId] },
+      { bucket: "plan-uploads", prefixes: [userId] },
       { bucket: "signatures", prefixes: quoteIds },
     ];
     for (const { bucket, prefixes } of buckets) {
       for (const prefix of prefixes) {
-        const { data: objects } = await admin.storage
-          .from(bucket)
-          .list(prefix, { limit: 100 });
-        const paths = (objects ?? []).map((o) => `${prefix}/${o.name}`);
-        if (paths.length > 0) {
-          await admin.storage.from(bucket).remove(paths);
+        const paths = await listStoragePathsRecursive(admin.storage.from(bucket), prefix);
+        for (let i = 0; i < paths.length; i += 100) {
+          await admin.storage.from(bucket).remove(paths.slice(i, i + 100));
         }
       }
     }
@@ -210,4 +213,39 @@ export async function purgeAccount(userId: string): Promise<PurgeResult> {
   }
 
   return { ok: true };
+}
+
+/** Minimal slice of the Supabase storage bucket API used for the purge. */
+export interface StorageLister {
+  list(
+    path: string,
+    options: { limit: number; offset: number },
+  ): Promise<{ data: Array<{ name: string; id: string | null }> | null; error: unknown }>;
+}
+
+/**
+ * Every object path under `prefix`, descending into sub-folders (Supabase
+ * lists a folder as an entry with `id: null`) and paging past 100 entries.
+ * The old purge listed one level with a 100-item limit, so nested client
+ * photos and plan files were never removed.
+ */
+export async function listStoragePathsRecursive(bucket: StorageLister, prefix: string): Promise<string[]> {
+  const out: string[] = [];
+  const folders = [prefix];
+  let guard = 0;
+  while (folders.length > 0 && guard++ < 10_000) {
+    const folder = folders.pop() as string;
+    for (let offset = 0; ; offset += 100) {
+      const { data, error } = await bucket.list(folder, { limit: 100, offset });
+      if (error) throw error;
+      const items = data ?? [];
+      for (const item of items) {
+        const path = `${folder}/${item.name}`;
+        if (item.id === null) folders.push(path);
+        else out.push(path);
+      }
+      if (items.length < 100) break;
+    }
+  }
+  return out;
 }

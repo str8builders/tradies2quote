@@ -7,9 +7,9 @@ import { isNativeShellRequest } from "@/lib/native-shell";
  * Explicit consent for third-party AI processing (App Store Guideline 5.1.2(i)).
  *
  * The iOS app must get affirmative, informed consent before sending a tradie's
- * audio / photos / text to the configured AI processors. Text generation is
- * handled by the locally hosted Qwen model on this deployment; optional voice
- * or vision features may use a disclosed external provider when configured.
+ * audio / photos / text to the configured AI processors: Anthropic (quote
+ * drafting, clean-up, drawing and supplier-quote reading, chat) and OpenAI
+ * (voice transcription, job-photo descriptions).
  * Consent is recorded on the
  * profile (`ai_consent_at` + `ai_consent_version`).
  *
@@ -21,7 +21,9 @@ import { isNativeShellRequest } from "@/lib/native-shell";
  * if the disclosure materially changes.
  */
 
-export const AI_CONSENT_VERSION = "2026-08-local-qwen-v1";
+// v2: the disclosure changed from "local Qwen, nothing sent out" to naming
+// Anthropic and OpenAI, which production actually uses — so re-ask.
+export const AI_CONSENT_VERSION = "2026-09-anthropic-openai-v2";
 
 /** True if the user has an on-record AI-processing consent. */
 export async function hasAiConsent(

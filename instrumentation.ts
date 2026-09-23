@@ -45,6 +45,15 @@ export async function onRequestError(
     // Node runtime only — the internal sink hashes fingerprints with
     // node:crypto, which the Edge runtime (proxy only) can't load.
     if (process.env.NEXT_RUNTIME === "nodejs") {
+      // "/" has no Server Actions: action-id errors there are exploit scans
+      // (React2Shell probes with ids like "x", "0", "action"), not app bugs.
+      const message = err instanceof Error ? err.message : String(err);
+      if (
+        request.path === "/" &&
+        /Failed to find Server Action|Server Reference ID did not match/i.test(message)
+      ) {
+        return;
+      }
       const { captureError } = await import("@/lib/observability");
       captureError(err, {
       route: request.path,

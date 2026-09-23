@@ -4,7 +4,9 @@
  *
  * After a deploy, any already-open tab / Capacitor webview still holds
  * HTML that references chunk files and Server Action ids that no longer
- * exist. Its next interaction throws one of the signatures below and the
+ * exist. Its next interaction throws one of the signatures below (Next 16's
+ * browser error is `UnrecognizedActionError: Server Action "…" was not found
+ * on the server`) and the
  * app looks broken until a manual refresh. Window-level listeners catch
  * the async cases, but a chunk that fails DURING RENDER (e.g. a
  * dynamic-import component like AccountHub) is swallowed by the nearest
@@ -13,7 +15,7 @@
  * new build and the user's tap works on the second try instead of never.
  */
 export const STALE_DEPLOY_RE =
-  /Failed to find Server Action|ChunkLoadError|Failed to load chunk|Loading chunk .+ failed|error loading dynamically imported module/i;
+  /Failed to find Server Action|was not found on the server|UnrecognizedActionError|ChunkLoadError|Failed to load chunk|Loading chunk .+ failed|error loading dynamically imported module/i;
 
 export const STALE_DEPLOY_RELOAD_FLAG = "t2q-stale-deploy-reloaded";
 

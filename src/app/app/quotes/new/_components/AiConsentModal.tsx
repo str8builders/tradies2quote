@@ -77,23 +77,23 @@ export function AiConsentModal({
 
         <div className="mt-4 space-y-3 text-sm leading-relaxed text-ink-200">
           <p>
-            To turn what you type into a quote, this app processes the text with
-            AI on the private server that runs Tradies2Quote:
+            To turn what you say, type or photograph into a quote, this app
+            sends it to two AI providers:
           </p>
           <ul className="space-y-2">
             <li className="rounded-sm border border-ink-700 bg-ink-900/50 px-3 py-2">
-              <strong className="text-white">Local Qwen</strong> — builds quotes,
-              cleans transcripts and drafts text replies. Your text stays on our
-              server and is not sent to OpenAI or Anthropic.
+              <strong className="text-white">Anthropic (Claude)</strong> — builds
+              quotes, cleans transcripts, reads drawings and supplier quotes, and
+              drafts text replies.
             </li>
             <li className="rounded-sm border border-ink-700 bg-ink-900/50 px-3 py-2">
-              <strong className="text-white">Voice and image features</strong> —
-              require separate external AI providers. They are unavailable unless
-              those providers are configured and disclosed.
+              <strong className="text-white">OpenAI</strong> — turns voice notes
+              into text and describes job photos.
             </li>
           </ul>
           <p className="text-ink-300">
-            AI content is used only to return the requested result. Full detail
+            They process it only to return the result and don&apos;t use it to
+            train their models. Full detail
             is in our{" "}
             <a
               href="/privacy"

@@ -64,6 +64,31 @@ export function truncate(input: string, max: number): string {
   return input.length <= max ? input : input.slice(0, max) + "…";
 }
 
+const MAX_ROUTE_PATH = 200;
+
+/**
+ * Reduce a page pathname to a route shape: numeric / uuid / hash ids → :id,
+ * opaque public tokens (e.g. /quote/<token>) → :token, so a live client link
+ * is never stored in the error log. Shared with the server-side capture path.
+ */
+export function sanitizeRoutePath(p: string): string | null {
+  if (typeof p !== "string" || !p) return null;
+  const cleaned = scrubText(p).replace(/[?#].*$/, "");
+  const shaped = cleaned
+    .split("/")
+    .map((seg) => {
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(seg))
+        return ":id";
+      if (/^\d+$/.test(seg)) return ":id";
+      if (/^[0-9a-f]{16,}$/i.test(seg)) return ":id";
+      // Mixed-case base64url tokens (public quote links, request slugs).
+      if (/^[A-Za-z0-9_-]{16,}$/.test(seg) && /\d/.test(seg) && /[A-Za-z]/.test(seg)) return ":token";
+      return seg;
+    })
+    .join("/");
+  return truncate(shaped, MAX_ROUTE_PATH);
+}
+
 /** Collapse volatile tokens so the same bug groups regardless of values. */
 export function normalizeMessage(message: string): string {
   return scrubText(message)
@@ -125,9 +150,10 @@ export function buildFingerprint(parts: {
 }
 
 function toEnvironment(v: string | null): AppErrorRow["environment"] {
-  return v === "production" || v === "preview" || v === "development"
-    ? v
-    : "development";
+  if (v === "production" || v === "preview" || v === "development") return v;
+  // Self-hosted (no VERCEL_ENV): label by NODE_ENV. Everything used to be
+  // tagged "development", so the production-only error digest never fired.
+  return process.env.NODE_ENV === "production" ? "production" : "development";
 }
 
 /**
@@ -147,7 +173,8 @@ export function buildErrorRow(
   const normalizedMessage = normalizeMessage(rawMessage);
   const frames = extractTopFrame(err.stack);
   const surface = ctx.surface ?? "api";
-  const route = ctx.route ?? null;
+  // Same route shaping as client reports: never store a live token or id.
+  const route = ctx.route ? sanitizeRoutePath(ctx.route) : null;
   const build = getBuildIdentity();
 
   let extra: Record<string, unknown> | null = null;

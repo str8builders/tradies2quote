@@ -18,6 +18,7 @@
 import {
   buildFingerprint,
   normalizeMessage,
+  sanitizeRoutePath,
   scrubText,
   truncate,
   type AppErrorRow,
@@ -29,7 +30,6 @@ const MAX_STACK = 4096;
 const MAX_TITLE = 200;
 const MAX_NORMALISED = 200;
 const MAX_NAME = 100;
-const MAX_PATH = 200;
 const MAX_FRAME = 300;
 
 const ALLOWED_KINDS = new Set(["error", "unhandledrejection", "boundary"]);
@@ -45,9 +45,10 @@ export interface ClientErrorReport {
 }
 
 function toEnvironment(v: string | null): AppErrorRow["environment"] {
-  return v === "production" || v === "preview" || v === "development"
-    ? v
-    : "development";
+  if (v === "production" || v === "preview" || v === "development") return v;
+  // Self-hosted (no VERCEL_ENV): label by NODE_ENV. Everything used to be
+  // tagged "development", so the production-only error digest never fired.
+  return process.env.NODE_ENV === "production" ? "production" : "development";
 }
 
 /** Drop the content hash that Next adds to chunk filenames, plus long hex ids. */
@@ -112,22 +113,6 @@ export function extractClientTopFrame(stack: string | null | undefined): {
   return { display, stable };
 }
 
-/** Reduce a page pathname to a route shape: numeric / uuid / hash ids → :id. */
-function sanitizeRoutePath(p: string): string | null {
-  if (typeof p !== "string" || !p) return null;
-  const cleaned = scrubText(p).replace(/[?#].*$/, "");
-  const shaped = cleaned
-    .split("/")
-    .map((seg) => {
-      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(seg))
-        return ":id";
-      if (/^\d+$/.test(seg)) return ":id";
-      if (/^[0-9a-f]{16,}$/i.test(seg)) return ":id";
-      return seg;
-    })
-    .join("/");
-  return truncate(shaped, MAX_PATH);
-}
 
 /**
  * Build the bounded, PII-free AppErrorRow for one client error report. Returns
@@ -141,6 +126,12 @@ export function sanitizeClientReport(raw: unknown): AppErrorRow | null {
   const rawMessage = typeof r.message === "string" ? r.message : "";
   const rawStack = typeof r.stack === "string" ? r.stack : null;
   if (!rawMessage && !rawStack) return null; // nothing actionable
+  // Errors thrown by browser extensions (every frame is chrome-extension://,
+  // moz-extension://, safari-web-extension://…) are not app errors.
+  if (rawStack) {
+    const frameUrls = rawStack.match(/\b[a-z][a-z0-9+.-]*:\/\/[^\s)]+/gi) ?? [];
+    if (frameUrls.length > 0 && frameUrls.every((u) => !/^https?:\/\//i.test(u))) return null;
+  }
 
   const name =
     typeof r.name === "string" && r.name ? truncate(r.name, MAX_NAME) : "Error";
