@@ -78,7 +78,7 @@ export function Header({
           href="/"
           data-testid="nav-logo"
           className="group inline-flex items-center text-white"
-          aria-label="tradies2Quote home"
+          aria-label="Tradies2Quote home"
         >
           {/* Wave 19.4 — replaced the PNG-in-a-white-pill with the
               first-class <Logo /> SVG mark. Wave 19.8 — swapped the

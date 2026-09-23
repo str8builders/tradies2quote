@@ -89,7 +89,10 @@ export function Logo({
       data-testid="brand-logo"
       className={`inline-flex items-center gap-3 ${className}`}
     >
-      <LogoMark size={size} />
+      {/* With the wordmark beside it the mark is decorative: its alt text
+          would only repeat the word (Lighthouse image-redundant-alt). A link
+          that hides the wordmark on small screens labels itself. */}
+      <LogoMark size={size} title={withWordmark ? "" : undefined} />
       {withWordmark && (
         <span
           className={`font-display uppercase tracking-tight leading-none whitespace-nowrap ${wordmarkClassName}`}
