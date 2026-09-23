@@ -2,51 +2,60 @@
  * Sentry — browser-side init (Next 16 native client instrumentation).
  *
  * Next.js 16 auto-loads `instrumentation-client.ts` on the client, which is
- * how the browser Sentry SDK now activates (this replaces the legacy
+ * how the browser Sentry SDK activates (this replaces the legacy
  * `sentry.client.config.ts`, which was NOT auto-loaded under Turbopack).
  *
- * `Sentry.init` is a no-op when `dsn` is undefined, and `enabled` is
- * production-only, so this file is safe with or without
- * `NEXT_PUBLIC_SENTRY_DSN` set — no events are sent until a DSN exists.
+ * The SDK is loaded lazily and ONLY when `NEXT_PUBLIC_SENTRY_DSN` is set (see
+ * src/lib/observability/sentryBrowser.ts). Without a DSN nothing from Sentry
+ * reaches the browser; the internal error sink below still runs everywhere.
  *
  * Session Replay is sampled at 0% normally and 100% on error, with all text
  * + media masked so a tradie's transcript / client PII is never captured.
  */
-import * as Sentry from "@sentry/nextjs";
 import { reportClientError } from "@/lib/observability/clientReport";
 import {
   isLocalSentrySink,
   isSentryEnabled,
   sentryTracesSampleRate,
 } from "@/lib/observability/sentryTarget";
+import { loadSentry, sentryDsn as DSN } from "@/lib/observability/sentryBrowser";
 
-const DSN = process.env.NEXT_PUBLIC_SENTRY_DSN;
+type SentryModule = typeof import("@sentry/nextjs");
+let sentry: SentryModule | null = null;
 
-Sentry.init({
-  dsn: DSN,
-  // Production as before; also on in dev when the DSN is a local sink
-  // (STR8SENTRY), where capturing dev errors is the entire point.
-  enabled: isSentryEnabled(DSN),
-  tracesSampleRate: sentryTracesSampleRate(DSN),
-  replaysSessionSampleRate: 0,
-  replaysOnErrorSampleRate: 1.0,
-  integrations: [
-    Sentry.replayIntegration({
-      maskAllText: true,
-      blockAllMedia: true,
-    }),
-  ],
-  sendDefaultPii: true,
-  environment:
-    process.env.NEXT_PUBLIC_VERCEL_ENV ??
-    process.env.NODE_ENV ??
-    "development",
-});
+if (DSN) {
+  void loadSentry().then((Sentry) => {
+    if (!Sentry) return;
+    sentry = Sentry;
+    Sentry.init({
+      dsn: DSN,
+      // Production as before; also on in dev when the DSN is a local sink
+      // (STR8SENTRY), where capturing dev errors is the entire point.
+      enabled: isSentryEnabled(DSN),
+      tracesSampleRate: sentryTracesSampleRate(DSN),
+      replaysSessionSampleRate: 0,
+      replaysOnErrorSampleRate: 1.0,
+      integrations: [
+        Sentry.replayIntegration({
+          maskAllText: true,
+          blockAllMedia: true,
+        }),
+      ],
+      sendDefaultPii: true,
+      environment:
+        process.env.NEXT_PUBLIC_VERCEL_ENV ??
+        process.env.NODE_ENV ??
+        "development",
+    });
+    identifyLocalVisitor(Sentry);
+  });
+}
 
 // Sessions carry no identity unless a user is set, so the local monitor could
 // count visits but not people. A random per-browser id fixes that. Local sink
 // only — this must never attach an identifier to events leaving the machine.
-if (isLocalSentrySink(DSN)) {
+function identifyLocalVisitor(Sentry: SentryModule) {
+  if (!isLocalSentrySink(DSN)) return;
   try {
     const KEY = "s8.visitor";
     let visitor = window.localStorage.getItem(KEY);
@@ -62,7 +71,12 @@ if (isLocalSentrySink(DSN)) {
 
 // Next 16 client navigation instrumentation — lets Sentry tie errors to the
 // route transition the user was on. Required hook export for the App Router.
-export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
+// A no-op until (and unless) the SDK has loaded.
+export function onRouterTransitionStart(
+  ...args: Parameters<SentryModule["captureRouterTransitionStart"]>
+) {
+  sentry?.captureRouterTransitionStart(...args);
+}
 
 // Internal monitor — global handlers for errors React boundaries don't catch
 // (async callbacks, event handlers, unhandled promise rejections). Conservative

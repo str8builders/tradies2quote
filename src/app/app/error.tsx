@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import * as Sentry from "@sentry/nextjs";
+import { captureToSentry } from "@/lib/observability/sentryBrowser";
 import { reportClientError } from "@/lib/observability/clientReport";
 import { maybeRecoverFromStaleDeploy } from "@/lib/staleDeploy";
 import { ArrowClockwise, House, WarningOctagon } from "@phosphor-icons/react";
@@ -30,7 +30,7 @@ export default function AppError({
     // Report to Sentry (no-op without a DSN), then log the full error for the
     // owner's browser console (and Vercel function logs for SSR errors). End
     // users only ever see the digest.
-    Sentry.captureException(error);
+    captureToSentry(error);
     reportClientError(error, "boundary");
     console.error("[/app/* error]", error);
     // Stale-deploy chunk death during render lands HERE, not on

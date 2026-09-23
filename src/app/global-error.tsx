@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import * as Sentry from "@sentry/nextjs";
+import { captureToSentry } from "@/lib/observability/sentryBrowser";
 import { reportClientError } from "@/lib/observability/clientReport";
 
 /**
@@ -26,7 +26,7 @@ export default function GlobalError({
     // Next's Sentry SDK does NOT auto-instrument global-error — the
     // root-layout-crash case, the worst class of error, must be reported
     // explicitly or it's silently swallowed. No-ops without a DSN.
-    Sentry.captureException(error);
+    captureToSentry(error);
     reportClientError(error, "boundary");
     console.error("[global error]", error);
   }, [error]);

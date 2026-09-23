@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import * as Sentry from "@sentry/nextjs";
+import { captureToSentry } from "@/lib/observability/sentryBrowser";
 import { reportClientError } from "@/lib/observability/clientReport";
 import { maybeRecoverFromStaleDeploy } from "@/lib/staleDeploy";
 import {
@@ -33,7 +33,7 @@ export default function RootError({
   useEffect(() => {
     // Report to Sentry (no-op without a DSN) so client render crashes caught
     // by this boundary aren't only in the console.
-    Sentry.captureException(error);
+    captureToSentry(error);
     reportClientError(error, "boundary");
     console.error("[root error]", error);
     // Render-path chunk death after a deploy lands here, not on
