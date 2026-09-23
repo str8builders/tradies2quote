@@ -44,6 +44,10 @@ const fraunces = Fraunces({
   weight: ["400", "500", "600"],
   style: ["normal", "italic"],
   subsets: ["latin"],
+  // App-only face: not preloaded on every page (it cost the public home page
+  // ~80 KB of high-priority downloads it never uses). It still loads, with
+  // swap, wherever the app's CSS asks for it.
+  preload: false,
 });
 
 // Neutral UI sans for the in-app experience — Inter is kept around as a
@@ -52,6 +56,8 @@ const inter = Inter({
   variable: "--font-inter",
   weight: ["400", "500", "600", "700"],
   subsets: ["latin"],
+  // Fallback face only; loads on demand instead of being preloaded everywhere.
+  preload: false,
 });
 
 // Xero-style in-app UI sans. Plus Jakarta Sans is the closest free
@@ -60,9 +66,10 @@ const inter = Inter({
 // `--font-sans` inside `[data-shell="app"][data-theme="light"]` so the
 // /app shell reads like Xero while the marketing landing keeps its
 // Archivo / IBM Plex pairing.
+// Variable font: one file covers every weight (it was a file per weight, three
+// of them on the home page alone).
 const plusJakartaSans = Plus_Jakarta_Sans({
   variable: "--font-plus-jakarta",
-  weight: ["400", "500", "600", "700", "800"],
   subsets: ["latin"],
 });
 

@@ -36,12 +36,14 @@ describe("MarketingVideo server render", () => {
     expect(html).not.toContain("Pause video");
   });
 
-  it("renders the hero portrait poster eagerly, still without sources or autoplay", () => {
+  it("renders the hero portrait poster at low priority, without sources or autoplay", () => {
     const html = renderToString(createElement(MarketingVideo, { variant: "hero" }));
     expect(html).toContain('preload="none"');
     expect(html).not.toMatch(/autoplay/i);
     expect(html).toContain('src="/images/marketing/poster-hero.webp"');
-    expect(html).toContain('loading="eager"');
+    // Decorative: it must not compete with the headline font for the first paint.
+    expect(html).toContain('loading="lazy"');
+    expect(html).toMatch(/fetchPriority="low"|fetchpriority="low"/);
     expect(html).toContain("aspect-[1/2]");
     expect(html).not.toContain("/videos/hero-loop");
     expect(html).toContain(escapeHtml(HERO_DESCRIPTION));

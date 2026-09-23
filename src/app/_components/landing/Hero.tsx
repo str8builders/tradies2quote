@@ -1,12 +1,6 @@
 import Link from "next/link";
-import {
-  ArrowRight,
-  Play,
-  Check,
-  ArrowUpRight,
-  FileText,
-} from "@phosphor-icons/react/dist/ssr";
-import { VoiceSignal } from "../VoiceSignal";
+import { Play, Check, ArrowUpRight } from "@phosphor-icons/react/dist/ssr";
+import { MarketingVideo } from "./MarketingVideo";
 
 export function Hero() {
   return (
@@ -56,91 +50,12 @@ export function Hero() {
             </li>
           </ul>
         </div>
-        <div
-          className="studio-product-stage"
-          aria-label="Example of a voice note becoming an editable quote"
-        >
-          <div className="studio-stage-orbit" aria-hidden="true" />
-          <div className="studio-stage-label">
-            <span /> FROM A QUICK SITE NOTE
-          </div>
-          <div className="studio-voice-card">
-            <VoiceSignal compact />
-            <div>
-              <strong>Your words. Your quote.</strong>
-              <p>“New timber deck, 24 square metres...”</p>
-            </div>
-            <div className="studio-wave" aria-hidden="true">
-              {Array.from({ length: 12 }, (_, i) => (
-                <i
-                  key={i}
-                  style={{
-                    height: `${12 + ((i * 17) % 25)}px`,
-                    animationDelay: `${i * -0.12}s`,
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-          <div className="studio-quote-card">
-            <div className="studio-quote-top">
-              <span className="studio-quote-brand">
-                YOUR BUSINESS<span>PROFESSIONAL QUOTE</span>
-              </span>
-              <FileText size={26} weight="duotone" />
-            </div>
-            <div className="studio-quote-title">
-              <div>
-                <span className="studio-small-label">QUOTE / EXAMPLE</span>
-                <h2>
-                  One great-looking
-                  <br />
-                  timber deck.
-                </h2>
-              </div>
-              <span className="studio-draft">Draft</span>
-            </div>
-            <div className="studio-quote-lines">
-              <div>
-                <span>
-                  Decking &amp; fixings<small>Materials</small>
-                </span>
-                <strong>$2,640.00</strong>
-              </div>
-              <div>
-                <span>
-                  Site preparation &amp; installation<small>Labour</small>
-                </span>
-                <strong>$1,560.00</strong>
-              </div>
-            </div>
-            <div className="studio-quote-subtotal">
-              <span>Subtotal</span>
-              <span>$4,200.00</span>
-            </div>
-            <div className="studio-quote-subtotal">
-              <span>GST (15%)</span>
-              <span>$630.00</span>
-            </div>
-            <div className="studio-quote-total">
-              <span>Total NZD</span>
-              <strong>$4,830.00</strong>
-            </div>
-            <div className="studio-quote-review">
-              <Check size={18} weight="bold" /> Ready for your review{" "}
-              <ArrowRight size={19} />
-            </div>
-          </div>
-          <div className="studio-approval">
-            <span>
-              <Check size={17} weight="bold" />
-            </span>
-            <div>
-              Your name on it.<strong>Your final say.</strong>
-            </div>
+        <div className="studio-hero-media">
+          <div className="studio-hero-phone">
+            <MarketingVideo variant="hero" className="studio-hero-phone-screen" />
           </div>
           <span className="studio-demo-caption">
-            ILLUSTRATIVE QUOTE · YOU SET YOUR OWN RATES
+            EXAMPLE JOB · SCREENS REDRAWN FROM THE APP
           </span>
         </div>
       </div>

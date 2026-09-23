@@ -51,10 +51,10 @@ export default async function ResetPasswordPage({
                 bg-ink-950 which the light theme remaps to cream). */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/logo-horizontal.png?v=21"
+              src="/logo-horizontal.webp"
               alt="Tradies2Quote"
-              width={1084}
-              height={512}
+              width={424}
+              height={200}
               className="block h-9 w-auto"
             />
           </Link>

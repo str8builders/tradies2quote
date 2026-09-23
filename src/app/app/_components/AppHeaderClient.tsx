@@ -129,10 +129,10 @@ export function AppHeaderClient({
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/logo-horizontal.png?v=21"
+              src="/logo-horizontal.webp"
               alt="Tradies2Quote"
-              width={1084}
-              height={512}
+              width={424}
+              height={200}
               className="block h-6 w-auto sm:h-7"
             />
           </Link>

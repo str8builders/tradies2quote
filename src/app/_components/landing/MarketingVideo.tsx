@@ -113,6 +113,35 @@ export function MarketingVideo({ variant, className = "", onChapterChange, video
   /** Once a frame has played, keep showing video (a pause holds its frame, not the poster). */
   const [started, setStarted] = useState(false);
   const [blocked, setBlocked] = useState(false);
+  /**
+   * Autoplay waits for the page's own load event plus a short idle, so a
+   * video download never competes with the headline font and scripts on a
+   * slow phone (it pushed Lighthouse LCP out by about a second). The poster
+   * is the first frame, so the wait is invisible. A visitor's own play or
+   * chapter tap does not wait.
+   */
+  const [pageSettled, setPageSettled] = useState(false);
+
+  useEffect(() => {
+    let idleHandle: number | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const settle = () => {
+      const w = window as Window & {
+        requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number;
+        cancelIdleCallback?: (handle: number) => void;
+      };
+      if (w.requestIdleCallback) idleHandle = w.requestIdleCallback(() => setPageSettled(true), { timeout: 1500 });
+      else timer = setTimeout(() => setPageSettled(true), 300);
+    };
+    if (document.readyState === "complete") timer = setTimeout(settle, 0);
+    else window.addEventListener("load", settle, { once: true });
+    return () => {
+      window.removeEventListener("load", settle);
+      if (timer) clearTimeout(timer);
+      const w = window as Window & { cancelIdleCallback?: (handle: number) => void };
+      if (idleHandle !== undefined) w.cancelIdleCallback?.(idleHandle);
+    };
+  }, []);
 
   useEffect(() => {
     const box = boxRef.current;
@@ -138,7 +167,11 @@ export function MarketingVideo({ variant, className = "", onChapterChange, video
     video.load();
   }, [shape]);
 
-  const wantsPlay = shape !== null && visible && pageVisible && (intent === "play" || (intent === "auto" && !motionPaused));
+  const wantsPlay =
+    shape !== null &&
+    visible &&
+    pageVisible &&
+    (intent === "play" || (intent === "auto" && !motionPaused && pageSettled));
 
   useEffect(() => {
     const video = videoRef.current;
@@ -227,8 +260,10 @@ export function MarketingVideo({ variant, className = "", onChapterChange, video
             height={MEDIA.hero.height}
             alt=""
             aria-hidden="true"
-            loading="eager"
-            fetchPriority="high"
+            // Decorative and never the largest paint (the headline is), so it
+            // must not queue ahead of the fonts and CSS: low priority, lazy.
+            loading="lazy"
+            fetchPriority="low"
             decoding="async"
             className="absolute inset-0 h-full w-full object-cover"
           />

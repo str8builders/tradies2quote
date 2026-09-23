@@ -23,7 +23,7 @@ export function DemoReel() {
         <div className="studio-section-heading">
           <div>
             <div className="studio-eyebrow">
-              02 / LESS EXPLAINING. MORE SHOWING.
+              01 / LESS EXPLAINING. MORE SHOWING.
             </div>
             <h2>
               Your next quote.
