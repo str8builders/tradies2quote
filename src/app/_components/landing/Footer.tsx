@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { LEGAL } from "@/lib/legal";
 import { Logo } from "./Logo";
+import { MotionToggle } from "../wallpaper/MotionToggle";
 
 export function Footer({
   // 3.1.3(f) — set server-side (see src/lib/native-shell.ts) inside the iOS
@@ -167,6 +168,7 @@ export function Footer({
             Operated by {LEGAL.companyName}
             {LEGAL.nzbn ? <> (NZBN {LEGAL.nzbn})</> : null}, {LEGAL.address}.
           </div>
+          <MotionToggle />
         </div>
       </div>
     </footer>
