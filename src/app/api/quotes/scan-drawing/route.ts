@@ -3,6 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
 import { aiConsentGate } from "@/lib/ai-consent";
+import { prepareImageForAi, UnreadableImageError } from "@/lib/aiImage";
+import { fetchWithOverloadRetry } from "@/lib/anthropicRetry";
 import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
 import { resolveDocumentType } from "@/lib/scanClassify";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
@@ -13,15 +15,15 @@ import {
   sniffPreparedImageMime,
 } from "@/lib/imageUpload";
 import { parseModelJsonObject } from "@/lib/modelJson";
-import { fetchWithTimeout, TIMEOUTS } from "@/lib/fetchTimeout";
+import { TIMEOUTS } from "@/lib/fetchTimeout";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// Opus on a detailed image can take 20-40s. Vercel's default function
-// timeout is 10s on Hobby, 60s on Pro — bump to 60 so we don't 502
-// while Anthropic is still thinking. Clamped to the plan's max by
-// Vercel.
-export const maxDuration = 60;
+// A 4,096-token Opus read of a dense drawing can run well past 50 s, and a
+// 429/529 gets one retry — so each attempt may use the full generation
+// ceiling (TIMEOUTS.generation). Self-hosted (Sydney VPS), so this is a
+// ceiling for platforms that enforce it, not a kill timer.
+export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -127,14 +129,25 @@ export async function POST(request: NextRequest) {
   }
 
   const arrayBuf = await image.arrayBuffer();
-  const mediaType = sniffPreparedImageMime(new Uint8Array(arrayBuf));
-  if (!mediaType) {
+  if (!sniffPreparedImageMime(new Uint8Array(arrayBuf))) {
     return NextResponse.json(
       { error: "Unsupported or unreadable image file." },
       { status: 415 },
     );
   }
-  const base64 = Buffer.from(arrayBuf).toString("base64");
+  // Re-encode so no camera metadata (EXIF/GPS) reaches the AI provider.
+  let prepared: Awaited<ReturnType<typeof prepareImageForAi>>;
+  try {
+    prepared = await prepareImageForAi(new Uint8Array(arrayBuf));
+  } catch (e) {
+    if (!(e instanceof UnreadableImageError)) captureError(e, { route: "quotes/scan-drawing" });
+    return NextResponse.json(
+      { error: "Unsupported or unreadable image file." },
+      { status: 415 },
+    );
+  }
+  const mediaType = prepared.mediaType;
+  const base64 = prepared.data.toString("base64");
 
   const userTextParts: string[] = [];
   userTextParts.push(
@@ -153,7 +166,8 @@ export async function POST(request: NextRequest) {
 
   let claudeRes: Response;
   try {
-    claudeRes = await fetchWithTimeout(ANTHROPIC_URL, {
+    // One retry with backoff on 429 (rate limited) / 529 (overloaded).
+    claudeRes = await fetchWithOverloadRetry(ANTHROPIC_URL, {
       method: "POST",
       headers: {
         "x-api-key": apiKey,
@@ -190,7 +204,7 @@ export async function POST(request: NextRequest) {
           // prompt's "Output STRICT JSON only" instruction instead.
         ],
       }),
-    }, TIMEOUTS.llm);
+    }, TIMEOUTS.generation);
   } catch (err) {
     captureError(err, { route: "quotes/scan-drawing" });
     console.error("scan-drawing fetch failed", err);

@@ -2,13 +2,20 @@
 
 import { useState } from "react";
 import { Camera, CheckCircle, PaperPlaneTilt, X } from "@phosphor-icons/react";
+import { prepareRequestPhoto } from "@/lib/imagePrep";
+import {
+  MAX_REQUEST_PHOTOS as MAX_PHOTOS,
+  REQUEST_PHOTO_ACCEPT,
+  REQUEST_PHOTO_AI_NOTICE,
+  REQUEST_TOO_LARGE_MESSAGE,
+  addRequestPhotos,
+  requestPhotosTooLarge,
+} from "@/lib/quote-requests/requestPhotoPrep";
 
 const INPUT =
   "mt-1 block w-full rounded-sm border border-ink-600 bg-ink-900 px-3 py-2 text-sm text-white outline-none focus:border-brand";
 const LABEL = "font-mono text-xs uppercase tracking-[0.2em] text-ink-400";
 const MIN_DESCRIPTION = 20;
-const MAX_PHOTOS = 3;
-const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 
 export function RequestForm({ slug, business }: { slug: string; business: string }) {
   const [name, setName] = useState("");
@@ -26,28 +33,21 @@ export function RequestForm({ slug, business }: { slug: string; business: string
   const [asking, setAsking] = useState(false);
   const [photos, setPhotos] = useState<File[]>([]);
   const [photoNote, setPhotoNote] = useState("");
+  const [preparingPhotos, setPreparingPhotos] = useState(false);
 
-  function addPhotos(list: FileList | null) {
-    if (!list) return;
-    const next = [...photos];
-    let note = "";
-    for (const file of Array.from(list)) {
-      if (next.length >= MAX_PHOTOS) {
-        note = `Up to ${MAX_PHOTOS} photos.`;
-        break;
-      }
-      if (!/^image\/(jpeg|png|webp)$/i.test(file.type)) {
-        note = "Use JPEG, PNG or WebP photos.";
-        continue;
-      }
-      if (file.size > MAX_PHOTO_BYTES) {
-        note = "Each photo must be under 10 MB.";
-        continue;
-      }
-      next.push(file);
+  // Photos are compressed on the device (HEIC → JPEG, max 2000 px) as they
+  // are added, so three phone photos stay well under the upload limit.
+  async function addPhotos(list: FileList | null) {
+    const picked = list ? Array.from(list) : [];
+    if (picked.length === 0) return;
+    setPreparingPhotos(true);
+    try {
+      const { photos: next, note } = await addRequestPhotos(photos, picked, prepareRequestPhoto);
+      setPhotos(next);
+      setPhotoNote(note);
+    } finally {
+      setPreparingPhotos(false);
     }
-    setPhotos(next);
-    setPhotoNote(note);
   }
 
   async function loadQuestions() {
@@ -88,6 +88,7 @@ export function RequestForm({ slug, business }: { slug: string; business: string
 
   const canSubmit =
     state === "idle" &&
+    !preparingPhotos &&
     name.trim().length >= 2 &&
     description.trim().length >= MIN_DESCRIPTION &&
     (phone.trim().length > 0 || email.trim().length > 0);
@@ -95,6 +96,11 @@ export function RequestForm({ slug, business }: { slug: string; business: string
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmit) return;
+    const tooLarge = requestPhotosTooLarge(photos);
+    if (tooLarge) {
+      setError(tooLarge);
+      return;
+    }
     setState("sending");
     setError("");
     try {
@@ -123,7 +129,11 @@ export function RequestForm({ slug, business }: { slug: string; business: string
       const res = await fetch(`/api/requests/${encodeURIComponent(slug)}`, init);
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
-        setError(data.error || "Something went wrong. Please try again.");
+        setError(
+          res.status === 413 && photos.length > 0
+            ? REQUEST_TOO_LARGE_MESSAGE
+            : data.error || "Something went wrong. Please try again.",
+        );
         setState("idle");
         return;
       }
@@ -296,23 +306,35 @@ export function RequestForm({ slug, business }: { slug: string; business: string
           </ul>
         ) : null}
         {photos.length < MAX_PHOTOS ? (
-          <label className="mt-2 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-sm border border-ink-600 px-3 text-sm text-ink-200 hover:border-brand">
+          <label
+            className={`mt-2 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-sm border border-ink-600 px-3 text-sm text-ink-200 hover:border-brand ${preparingPhotos ? "pointer-events-none opacity-60" : ""}`}
+          >
             <Camera size={18} weight="bold" className="text-brand" />
-            Add a photo
+            {preparingPhotos ? "Preparing photo…" : "Add a photo"}
             <input
               type="file"
               data-testid="request-photos"
-              accept="image/jpeg,image/png,image/webp"
+              accept={REQUEST_PHOTO_ACCEPT}
               multiple
+              disabled={preparingPhotos}
               className="sr-only"
               onChange={(e) => {
-                addPhotos(e.target.files);
-                e.target.value = "";
+                const files = e.target.files;
+                void addPhotos(files).finally(() => {
+                  e.target.value = "";
+                });
               }}
             />
           </label>
         ) : null}
-        {photoNote ? <p className="mt-1 text-xs text-hivis">{photoNote}</p> : null}
+        {photoNote ? (
+          <p role="alert" className="mt-1 text-xs text-hivis">
+            {photoNote}
+          </p>
+        ) : null}
+        <p data-testid="request-photo-ai-notice" className="mt-2 text-xs text-ink-400">
+          {REQUEST_PHOTO_AI_NOTICE}
+        </p>
       </div>
 
       {/* Honeypot: off-screen, tab-skipped, autocomplete off. Bots fill it, people don't. */}

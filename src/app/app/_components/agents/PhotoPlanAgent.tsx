@@ -19,6 +19,10 @@ import {
   scanUploadSizeError,
 } from "@/lib/imageUpload";
 import type { PhotoPlanResult } from "@/lib/agents/photo-plan";
+import {
+  photoPlanErrorMessage,
+  photoPlanNetworkErrorMessage,
+} from "@/lib/agents/photoPlanErrors";
 
 /**
  * Photo / Plan Reading Agent — upload an image, get a description +
@@ -116,16 +120,19 @@ export function PhotoPlanAgent() {
         method: "POST",
         body: form,
       });
-      const json = (await res.json()) as
+      // A proxy error page isn't JSON — never let a parse error reach the screen.
+      const json = (await res.json().catch(() => null)) as
         | { ok: true; result: PhotoPlanResult }
-        | { error: string };
-      if (!res.ok || !("ok" in json)) {
-        setError(("error" in json && json.error) || `Request failed (${res.status})`);
-      } else {
+        | { error?: string; message?: string }
+        | null;
+      if (res.ok && json && "ok" in json && json.ok) {
         setResult(json.result);
+      } else {
+        // Plain sentence, never a raw code like "trial_expired".
+        setError(photoPlanErrorMessage(res.status, json));
       }
     } catch (err) {
-      setError((err as Error).message || "Network error");
+      setError(photoPlanNetworkErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
