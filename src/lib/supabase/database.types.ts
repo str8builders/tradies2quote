@@ -1031,6 +1031,7 @@ export type Database = {
           tax_label: string | null
           tax_rate: number | null
           trial_started_at: string | null
+          ui_new_look: boolean | null
           updated_at: string
         }
         Insert: {
@@ -1054,6 +1055,7 @@ export type Database = {
           tax_label?: string | null
           tax_rate?: number | null
           trial_started_at?: string | null
+          ui_new_look?: boolean | null
           updated_at?: string
         }
         Update: {
@@ -1077,6 +1079,7 @@ export type Database = {
           tax_label?: string | null
           tax_rate?: number | null
           trial_started_at?: string | null
+          ui_new_look?: boolean | null
           updated_at?: string
         }
         Relationships: []
