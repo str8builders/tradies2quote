@@ -16,7 +16,8 @@ import { isStripeConfigured, stripeClient } from "@/lib/stripe-client";
  * Order of operations (children before parents, auth user LAST):
  *   1. Best-effort cancel any live Stripe subscription so a deleted account
  *      can never keep being billed.
- *   2. Purge storage objects (avatars, quote PDFs, signatures).
+ *   2. Purge storage objects (avatars, logos, quote PDFs, photos, plans,
+ *      quote videos, signatures).
  *   3. Purge rows — quote children by quote_id first (they don't all cascade),
  *      then user_id-keyed tables, then quotes/profiles.
  *   4. auth.admin.deleteUser — only after the data purge succeeded, so a
@@ -107,18 +108,7 @@ export async function purgeAccount(userId: string): Promise<PurgeResult> {
   // ── 3. Storage purge (best-effort — orphaned bytes are not PII-critical
   //       once the DB rows referencing them are gone, but tidy anyway). ──
   try {
-    // Every bucket that stores this user's files, keyed the way uploads are
-    // written: `${userId}/…` (including nested `${userId}/${quoteId}/…` and
-    // `${userId}/${fileId}/…` folders) and signatures under `${quoteId}/…`.
-    const buckets: Array<{ bucket: string; prefixes: string[] }> = [
-      { bucket: "profile-avatars", prefixes: [userId] },
-      { bucket: "business-logos", prefixes: [userId] },
-      { bucket: "quote-pdfs", prefixes: [userId] },
-      { bucket: "quote-attachments", prefixes: [userId] },
-      { bucket: "plan-uploads", prefixes: [userId] },
-      { bucket: "signatures", prefixes: quoteIds },
-    ];
-    for (const { bucket, prefixes } of buckets) {
+    for (const { bucket, prefixes } of storagePurgeTargets(userId, quoteIds)) {
       for (const prefix of prefixes) {
         const paths = await listStoragePathsRecursive(admin.storage.from(bucket), prefix);
         for (let i = 0; i < paths.length; i += 100) {
@@ -213,6 +203,27 @@ export async function purgeAccount(userId: string): Promise<PurgeResult> {
   }
 
   return { ok: true };
+}
+
+/**
+ * Every bucket that stores this user's files, keyed the way uploads are
+ * written: `${userId}/…` (including nested `${userId}/${quoteId}/…` and
+ * `${userId}/${fileId}/…` folders) and signatures under `${quoteId}/…`.
+ * Quote videos and their posters live under `${userId}/${quoteId}/v{n}.*`.
+ */
+export function storagePurgeTargets(
+  userId: string,
+  quoteIds: string[],
+): Array<{ bucket: string; prefixes: string[] }> {
+  return [
+    { bucket: "profile-avatars", prefixes: [userId] },
+    { bucket: "business-logos", prefixes: [userId] },
+    { bucket: "quote-pdfs", prefixes: [userId] },
+    { bucket: "quote-attachments", prefixes: [userId] },
+    { bucket: "plan-uploads", prefixes: [userId] },
+    { bucket: "quote-videos", prefixes: [userId] },
+    { bucket: "signatures", prefixes: quoteIds },
+  ];
 }
 
 /** Minimal slice of the Supabase storage bucket API used for the purge. */
