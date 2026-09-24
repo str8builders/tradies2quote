@@ -26,6 +26,18 @@ export type Database = {
         Update: { quote_id?: string | null; client_id?: string | null; status?: string; error_message?: string | null; generated_at?: string | null; seen_at?: string | null }
         Relationships: []
       }
+      quote_videos: {
+        Row: { id: string; quote_id: string; user_id: string; quote_version: number; status: "queued" | "rendering" | "ready" | "failed"; storage_path: string | null; poster_path: string | null; error: string | null; attempts: number; created_at: string; updated_at: string; rendered_at: string | null }
+        Insert: { id?: string; quote_id: string; user_id: string; quote_version: number; status: "queued" | "rendering" | "ready" | "failed"; storage_path?: string | null; poster_path?: string | null; error?: string | null; attempts?: number; created_at?: string; updated_at?: string; rendered_at?: string | null }
+        Update: { status?: "queued" | "rendering" | "ready" | "failed"; storage_path?: string | null; poster_path?: string | null; error?: string | null; attempts?: number; updated_at?: string; rendered_at?: string | null }
+        Relationships: []
+      }
+      quote_video_requests: {
+        Row: { id: number; user_id: string; requested_at: string }
+        Insert: { user_id: string; requested_at?: string }
+        Update: { requested_at?: string }
+        Relationships: []
+      }
 
       agent_events: {
         Row: {
@@ -1646,6 +1658,8 @@ export type Database = {
       issue_team_code: { Args: { p_user: string; p_token_hash: string; p_code_hash: string }; Returns: Json }
       sync_stripe_subscription: { Args: { p_data: Json }; Returns: undefined }
       register_quote_photo: { Args: { p_data: Json }; Returns: Json }
+      request_quote_video: { Args: { p_quote_id: string }; Returns: Json }
+      claim_quote_video_job: { Args: never; Returns: Database["public"]["Tables"]["quote_videos"]["Row"][] }
       remove_quote_photo: { Args: { p_id: string; p_user: string }; Returns: undefined }
       accept_quote: {
         Args: {
