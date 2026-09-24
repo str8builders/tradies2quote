@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { friendlyAuthError } from "@/lib/auth/friendlyAuthError";
 
 export async function resetPasswordAction(formData: FormData) {
   const password = String(formData.get("password") ?? "");
@@ -19,7 +20,7 @@ export async function resetPasswordAction(formData: FormData) {
   const { error } = await supabase.auth.updateUser({ password });
 
   if (error) {
-    redirect(`/reset-password?error=${encodeURIComponent(error.message)}`);
+    redirect(`/reset-password?error=${encodeURIComponent(friendlyAuthError(error.message, "reset"))}`);
   }
 
   redirect("/app");

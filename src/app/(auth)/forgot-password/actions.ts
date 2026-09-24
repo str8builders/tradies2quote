@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { consumeFixedWindow } from "@/lib/rate-limit";
+import { friendlyAuthError } from "@/lib/auth/friendlyAuthError";
 
 export async function forgotPasswordAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
@@ -28,7 +29,7 @@ export async function forgotPasswordAction(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/forgot-password?error=${encodeURIComponent(error.message)}`);
+    redirect(`/forgot-password?error=${encodeURIComponent(friendlyAuthError(error.message, "forgot"))}`);
   }
 
   redirect(neutral);

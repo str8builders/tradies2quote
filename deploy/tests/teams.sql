@@ -1,7 +1,7 @@
 -- Run against an isolated restored database only. All fixtures roll back.
 \set ON_ERROR_STOP on
 begin;
-do $$ begin if current_database()<>'t2q_release_audit_20260913' then raise exception 'Isolated test database required'; end if; end $$;
+do $$ begin if current_database() not like 't2q_release_audit_%' then raise exception 'Isolated test database required'; end if; end $$;
 create function pg_temp.assert_true(ok boolean, label text) returns void language plpgsql as $$ begin if ok is distinct from true then raise exception 'FAIL: %',label; end if; raise notice 'PASS: %',label; end $$;
 create function pg_temp.assert_rejected(statement text, expected text) returns void language plpgsql as $$ begin begin execute statement; exception when others then if position(expected in sqlerrm)>0 then raise notice 'PASS: rejected %',expected; return; end if; raise; end; raise exception 'FAIL: statement was allowed: %',statement; end $$;
 insert into auth.users(id,email,email_confirmed_at,aud,role,created_at,updated_at)

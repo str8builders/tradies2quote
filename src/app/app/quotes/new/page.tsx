@@ -12,7 +12,22 @@ export const metadata: Metadata = {
   title: "New quote",
 };
 
-export default async function NewQuotePage() {
+/** Plain words for the errors `createDraftQuote` redirects back with. */
+const NEW_QUOTE_ERRORS: Record<string, string> = {
+  "missing-transcript":
+    "Tell us about the job first. Say it, type it or scan a plan, then tap Continue.",
+  "draft-failed":
+    "We couldn't start that quote. Check your internet connection and try again.",
+};
+
+export default async function NewQuotePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string | string[] }>;
+}) {
+  const { error: rawError } = await searchParams;
+  const errorKey = Array.isArray(rawError) ? rawError[0] : rawError;
+  const errorMessage = errorKey ? NEW_QUOTE_ERRORS[errorKey] : undefined;
   const { user } = await getCachedAuthUser();
 
   if (!user) {
@@ -68,6 +83,16 @@ export default async function NewQuotePage() {
             turn it into a quote.
           </p>
         </div>
+
+        {errorMessage ? (
+          <div
+            role="alert"
+            data-testid="new-quote-error"
+            className="mb-6 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-base text-red-200"
+          >
+            {errorMessage}
+          </div>
+        ) : null}
 
         <QuoteInputTabs
           needsAiConsent={needsAiConsent}
