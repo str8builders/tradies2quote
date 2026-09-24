@@ -1,0 +1,47 @@
+# Tradies2Quote quote video render worker (scripts/quote-video-worker.mjs).
+#
+# Install (as root, after migration 20260925_quote_videos.sql is applied and
+# the release containing the worker is active in /srv/t2q/app):
+#   cp /srv/t2q/app/deploy/t2q-video.service /etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now t2q-video.service
+#   journalctl -u t2q-video -f
+#
+# Chrome Headless Shell must already be on disk, because this unit keeps the
+# app directory read-only: after each release's `npm ci`, run as deploy
+#   cd /srv/t2q/app && node scripts/quote-video-worker.mjs --ensure-browser
+# or point T2Q_RENDER_BROWSER in app.env at a copy outside the release.
+[Unit]
+Description=Tradies2Quote quote video render worker
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=15min
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/srv/t2q/app
+EnvironmentFile=/srv/t2q/app.env
+# Chrome and fontconfig keep caches under $HOME; use the private /tmp.
+Environment=HOME=/tmp
+ExecStart=/usr/bin/node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON /srv/t2q/app/scripts/quote-video-worker.mjs
+Restart=on-failure
+RestartSec=30
+# SIGTERM cancels the render in flight and hands the job back to the queue.
+KillSignal=SIGTERM
+TimeoutStopSec=60
+# Batch work: the web app and the database always come first.
+Nice=10
+CPUWeight=25
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+# One render (Node + Chrome Headless Shell + ffmpeg) peaks near 1 GB; adjust to the server.
+MemoryMax=2G
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
