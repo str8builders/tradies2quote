@@ -47,6 +47,9 @@ import { QuoteVideoCard } from "./_components/QuoteVideoCard";
 import { adminClient } from "@/lib/supabase/admin";
 import { isQuoteLocked } from "@/lib/lifecycle/lock";
 import { loadQuoteVideoStatus, quoteVideoShareText } from "@/lib/quote-video/owner";
+import { isNewLookOn } from "@/lib/ui/newLook";
+import { JobPageV2 } from "./_v2/JobPageV2";
+import { jobPageLook } from "./_v2/look";
 
 export const metadata: Metadata = {
   title: "Quote preview",
@@ -56,10 +59,18 @@ type Params = { id: string };
 
 export default async function QuotePreviewPage({
   params,
+  searchParams,
 }: {
   params: Promise<Params>;
+  searchParams: Promise<{ view?: string | string[] }>;
 }) {
   const { id } = await params;
+  // Redesign phase 3: the new-look job page, only while the new-look switch
+  // is on. Off, everything below runs exactly as before.
+  if (await isNewLookOn()) {
+    const { view } = await searchParams;
+    if (jobPageLook(true, view) === "new") return <JobPageV2 id={id} />;
+  }
   const supabase = await createClient();
 
   const {

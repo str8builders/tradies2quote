@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ComponentType } from "react";
 import {
   ArrowClockwise,
   CircleNotch,
@@ -256,9 +256,11 @@ type Props = {
   initialStatus: QuoteVideoStatus;
   /** Message sent with the file, with the client's quote link once the quote has been sent. */
   shareText?: string;
+  /** How the card is drawn (the new-look job page passes its own); behaviour is the same. */
+  view?: ComponentType<QuoteVideoCardViewProps>;
 };
 
-export function QuoteVideoCard({ quoteId, initialStatus, shareText }: Props) {
+export function QuoteVideoCard({ quoteId, initialStatus, shareText, view: View = QuoteVideoCardView }: Props) {
   const [status, setStatus] = useState<QuoteVideoStatus>(initialStatus);
   const [requesting, setRequesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -351,7 +353,7 @@ export function QuoteVideoCard({ quoteId, initialStatus, shareText }: Props) {
   }
 
   return (
-    <QuoteVideoCardView
+    <View
       status={status}
       requesting={requesting}
       slow={slow}
