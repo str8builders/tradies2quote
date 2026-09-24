@@ -20,8 +20,8 @@ vi.mock("@/app/app/_components/TapeMeasureProgress", () => ({ TapeMeasureProgres
 
 import { QuoteInputTabs } from "./QuoteInputTabs";
 
-const render = (props: ComponentProps<typeof QuoteInputTabs>) =>
-  renderToStaticMarkup(createElement(QuoteInputTabs, props));
+const render = (props: NonNullable<ComponentProps<typeof QuoteInputTabs>>) =>
+  renderToStaticMarkup(<QuoteInputTabs {...props} />);
 
 describe("old new-quote flow (switch off) renders exactly as before", () => {
   it.each([

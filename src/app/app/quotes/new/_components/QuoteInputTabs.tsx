@@ -13,23 +13,16 @@ import { AiConsentModal } from "./AiConsentModal";
 import { TapeMeasureProgress } from "@/app/app/_components/TapeMeasureProgress";
 import { splitTranscript, hasHighlights } from "@/lib/highlightDimensions";
 import { startMicrophoneMeter } from "@/lib/microphone-level";
+import {
+  MAX_RECORDING_SECONDS as MAX_SECONDS,
+  MIN_TYPED_LENGTH as MIN_TEXT_LENGTH,
+  appendAnswersToTranscript,
+  pickMimeType,
+  requestClarifications,
+} from "../_lib/quote-input";
 
 type Tab = "voice" | "type" | "scan";
 type VoiceState = "idle" | "recording" | "processing" | "error";
-
-const MAX_SECONDS = 180;
-const MIN_TEXT_LENGTH = 20;
-
-function pickMimeType(): string | undefined {
-  if (typeof MediaRecorder === "undefined") return undefined;
-  const candidates = [
-    "audio/webm;codecs=opus",
-    "audio/webm",
-    "audio/mp4",
-    "audio/ogg;codecs=opus",
-  ];
-  return candidates.find((t) => MediaRecorder.isTypeSupported(t));
-}
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
@@ -594,22 +587,6 @@ function TranscriptReview({
  */
 type ContinueStep = "idle" | "cleaning" | "asking" | "submitting" | "error";
 
-function appendAnswersToTranscript(
-  base: string,
-  questions: Clarification[],
-  answers: ClarificationAnswer[],
-): string {
-  const lines: string[] = [];
-  for (const a of answers) {
-    if (a.answer === null) continue;
-    const q = questions.find((qq) => qq.id === a.questionId);
-    if (!q) continue;
-    lines.push(`- ${q.question} → ${a.answer}`);
-  }
-  if (lines.length === 0) return base;
-  return `${base}\n\n[Additional details confirmed by the tradie:]\n${lines.join("\n")}`;
-}
-
 function ContinueRow({ text, minLength }: { text: string; minLength: number }) {
   const ready = text.trim().length >= minLength;
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -627,34 +604,16 @@ function ContinueRow({ text, minLength }: { text: string; minLength: number }) {
   async function startContinue() {
     if (!ready || step !== "idle") return;
     setStep("cleaning");
-    try {
-      const res = await fetch("/api/quotes/cleanup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transcript: text }),
-        // Stalled cleanup must never strand the Continue button — a
-        // timeout lands in the catch below, which submits directly.
-        signal: AbortSignal.timeout(30_000),
-      });
-      if (!res.ok) {
-        // Cleanup endpoint refused (auth, validation, server) — fall
-        // through to direct submission. Generation pipeline still has
-        // its own cleanup inside.
-        submitForm(text);
-        return;
-      }
-      const data = (await res.json()) as { questions?: Clarification[] };
-      const qs = Array.isArray(data.questions) ? data.questions : [];
-      if (qs.length === 0) {
-        submitForm(text);
-        return;
-      }
-      setQuestions(qs);
-      setStep("asking");
-    } catch {
-      // Network / parse error — same fallback.
+    // Any clean-up failure (refusal, timeout, network, bad reply) comes back
+    // as no questions, so the job is submitted directly — the generation
+    // pipeline still has its own clean-up inside.
+    const qs = await requestClarifications(text);
+    if (qs.length === 0) {
       submitForm(text);
+      return;
     }
+    setQuestions(qs);
+    setStep("asking");
   }
 
   function handleModalComplete(answers: ClarificationAnswer[]) {
