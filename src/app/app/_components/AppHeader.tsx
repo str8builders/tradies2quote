@@ -1,6 +1,8 @@
 import { getCachedAuthUser } from "@/lib/supabase/auth";
 import { getCachedAvatarUrl } from "@/lib/supabase/profile";
 import { isOwnerEmail } from "@/lib/owner";
+import { isNewLookOn } from "@/lib/ui/newLook";
+import { LegacyTopBar } from "../_v2/shell/LegacyTopBar";
 import { AppHeaderClient } from "./AppHeaderClient";
 
 /**
@@ -20,6 +22,10 @@ import { AppHeaderClient } from "./AppHeaderClient";
  * Every existing call site (e.g. `<AppHeader context="Quotes" />`)
  * keeps working — this server component just renders the client
  * child with the resolved flags.
+ *
+ * Redesign phase 2 — in the new look (isNewLookOn()) the page is not
+ * redesigned yet, and the shell already has the tab bar / side rail, so
+ * this renders only a plain new-style top bar: title and a way back.
  */
 interface Props {
   /** Optional page label shown next to the logo on desktop only. */
@@ -27,6 +33,7 @@ interface Props {
 }
 
 export async function AppHeader({ context }: Props) {
+  if (await isNewLookOn()) return <LegacyTopBar context={context} />;
   // Wave 18.1/42 — perf — auth and avatar reads are cached per render,
   // so this header shares the same user/profile work with
   // `<MobileAppMenu>` and the page instead of issuing duplicate

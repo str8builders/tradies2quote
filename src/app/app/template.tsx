@@ -1,3 +1,13 @@
+import { isNewLookOn } from "@/lib/ui/newLook";
+
+/**
+ * New look (redesign phase 2): a 200 ms fade, opacity only — the kit's
+ * motion rule (transform/opacity, 250 ms or less, none for reduced motion).
+ * With no transform on the wrapper, fixed parts inside a page (toasts, a
+ * fixed save bar) stay pinned to the screen while the page comes in.
+ */
+const NEW_LOOK_ENTER = "animate-ui-fade-in motion-reduce:animate-none";
+
 /**
  * /app route-change transition (Wave 45 "dynamic app" pass).
  *
@@ -25,10 +35,11 @@
  * `transform: none`, so fixed positioning is back to the viewport at
  * rest, exactly like framer's transform removal was.
  */
-export default function AppTemplate({
+export default async function AppTemplate({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  if (await isNewLookOn()) return <div className={NEW_LOOK_ENTER}>{children}</div>;
   return <div className="t2q-page-enter">{children}</div>;
 }
