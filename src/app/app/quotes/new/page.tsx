@@ -5,8 +5,10 @@ import { canWrite, getCachedSubscriptionStatus } from "@/lib/subscription";
 import { createClient } from "@/lib/supabase/server";
 import { isNativeShellRequest } from "@/lib/native-shell";
 import { hasAiConsent } from "@/lib/ai-consent";
+import { isNewLookOn } from "@/lib/ui/newLook";
 import { AppHeader } from "../../_components/AppHeader";
 import { QuoteInputTabs } from "./_components/QuoteInputTabs";
+import { NewQuoteFlow } from "./_v2/NewQuoteFlow";
 
 export const metadata: Metadata = {
   title: "New quote",
@@ -49,9 +51,10 @@ export default async function NewQuotePage({
 
   // Guideline 5.1.2(i) — inside the iOS shell, require explicit AI-processing
   // consent before the first voice/scan/generate action. Web is unaffected.
-  const [nativeShell, consented] = await Promise.all([
+  const [nativeShell, consented, newLook] = await Promise.all([
     isNativeShellRequest(),
     (async () => hasAiConsent(await createClient(), user.id))(),
+    isNewLookOn(),
   ]);
   const needsAiConsent = nativeShell && !consented;
 
@@ -60,6 +63,23 @@ export default async function NewQuotePage({
   // input always works.
   const voiceEnabled = Boolean(process.env.OPENAI_API_KEY?.trim());
   const scanEnabled = Boolean(process.env.ANTHROPIC_API_KEY?.trim());
+
+  // Redesign (new look, behind the switch): the same gates and inputs above,
+  // new screens in ./_v2. Switched off, everything below is unchanged.
+  if (newLook) {
+    return (
+      <>
+        <AppHeader context="New quote" />
+        <NewQuoteFlow
+          errorKey={errorKey}
+          needsAiConsent={needsAiConsent}
+          voiceEnabled={voiceEnabled}
+          scanEnabled={scanEnabled}
+        />
+      </>
+    );
+  }
+
   const intro = [
     voiceEnabled ? "Talk it through" : null,
     "type it out",
