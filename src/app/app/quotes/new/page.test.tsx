@@ -46,6 +46,10 @@ vi.mock("./_components/QuoteInputTabs", () => ({
   QuoteInputTabs: (props: Record<string, unknown>) =>
     createElement("div", { "data-testid": "old-flow", "data-props": JSON.stringify(props) }),
 }));
+vi.mock("./_v2/NewQuoteFlow", () => ({
+  NewQuoteFlow: (props: Record<string, unknown>) =>
+    createElement("div", { "data-testid": "new-flow", "data-props": JSON.stringify(props) }),
+}));
 
 import NewQuotePage from "./page";
 
@@ -71,11 +75,13 @@ async function render(error?: string | string[]): Promise<string> {
   return renderToStaticMarkup(element);
 }
 
-function oldFlowProps(html: string): Record<string, unknown> {
-  const match = html.match(/data-testid="old-flow" data-props="([^"]*)"/);
-  expect(match, "old flow rendered").not.toBeNull();
+function flowProps(html: string, which: "old-flow" | "new-flow"): Record<string, unknown> {
+  const match = html.match(new RegExp(`data-testid="${which}" data-props="([^"]*)"`));
+  expect(match, `${which} rendered`).not.toBeNull();
   return JSON.parse(match![1].replace(/&quot;/g, '"'));
 }
+const oldFlowProps = (html: string) => flowProps(html, "old-flow");
+const newFlowProps = (html: string) => flowProps(html, "new-flow");
 
 describe("switch off: the old look, exactly as before", () => {
   it.each([
@@ -95,6 +101,63 @@ describe("switch off: the old look, exactly as before", () => {
     const html = await render();
     await expect(html).toMatchFileSnapshot("./__snapshots__/page.old.type-only.html");
     expect(oldFlowProps(html)).toEqual({ needsAiConsent: false, voiceEnabled: false, scanEnabled: false });
+  });
+
+  it("never shows the new flow", async () => {
+    expect(await render("draft-failed")).not.toContain('data-testid="new-flow"');
+  });
+});
+
+describe("switch on: the new look, behind the same gates", () => {
+  beforeEach(() => {
+    state.newLook = true;
+  });
+
+  it("renders the new flow instead of the tabs, with the header for wider screens", async () => {
+    const html = await render();
+    expect(html).not.toContain('data-testid="old-flow"');
+    expect(html).not.toContain("step 1 of 3");
+    expect(html).toContain('data-testid="app-header" data-context="New quote"');
+    expect(newFlowProps(html)).toEqual({ needsAiConsent: false, voiceEnabled: true, scanEnabled: true });
+  });
+
+  it("passes the page's error key on (the first of several)", async () => {
+    expect(newFlowProps(await render("draft-failed")).errorKey).toBe("draft-failed");
+    expect(newFlowProps(await render(["missing-transcript", "draft-failed"])).errorKey).toBe("missing-transcript");
+  });
+
+  it("offers the same inputs as the tabs would", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "");
+    expect(newFlowProps(await render())).toMatchObject({ voiceEnabled: false, scanEnabled: true });
+    vi.stubEnv("ANTHROPIC_API_KEY", "");
+    expect(newFlowProps(await render())).toMatchObject({ voiceEnabled: false, scanEnabled: false });
+  });
+
+  it("an expired trial still goes to the upgrade page first", async () => {
+    state.canWrite = false;
+    await expect(render()).rejects.toThrow("NEXT_REDIRECT /app/upgrade?from=new-quote");
+  });
+
+  it("signed out still goes to sign in", async () => {
+    state.user = null;
+    await expect(render()).rejects.toThrow("NEXT_REDIRECT /login");
+  });
+
+  it("the iOS AI-consent gate is decided exactly as for the tabs", async () => {
+    for (const [nativeShell, consented, needed] of [
+      [true, false, true],
+      [true, true, false],
+      [false, false, false],
+      [false, true, false],
+    ] as const) {
+      state.nativeShell = nativeShell;
+      state.consented = consented;
+      state.newLook = true;
+      const onNew = newFlowProps(await render()).needsAiConsent;
+      state.newLook = false;
+      const onOld = oldFlowProps(await render()).needsAiConsent;
+      expect([onNew, onOld]).toEqual([needed, needed]);
+    }
   });
 });
 
