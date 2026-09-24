@@ -42,9 +42,20 @@ type SaveResult =
   | { ok: true; materialsLearned?: number }
   | { error: string };
 
+export type SaveQuoteOptions = {
+  /**
+   * Teach the tradie's material library from this save (the default). The
+   * job page's price keypad passes `false` when "Remember for next time" is
+   * off: the quote, its totals and its version still save exactly as usual,
+   * only the library write is skipped. Anything other than `false` learns.
+   */
+  learnMaterials?: boolean;
+};
+
 export async function saveQuoteChanges(
   id: string,
   data: QuoteData,
+  options: SaveQuoteOptions = {},
 ): Promise<SaveResult> {
   const supabase = await createClient();
   const {
@@ -175,13 +186,17 @@ export async function saveQuoteChanges(
   // Stage 4.6 — feed user line edits into the user-scoped material library.
   // Replaces the Stage 2.5 syncEditedMaterialsToLibrary helper. Always
   // wrapped in try-friendly orchestrator that returns counts and never
-  // throws, so a learning failure cannot break a quote save.
-  const learn = await applyMaterialCorrections(
-    supabase,
-    user.id,
-    items,
-    prior?.line_items ?? [],
-  );
+  // throws, so a learning failure cannot break a quote save. Skipped only
+  // when the caller explicitly asks (price keypad, "Remember" off).
+  const learn =
+    options?.learnMaterials === false
+      ? { materialsLearned: 0 }
+      : await applyMaterialCorrections(
+          supabase,
+          user.id,
+          items,
+          prior?.line_items ?? [],
+        );
 
   // Wave 40 — log the AI-vs-tradie diff for the eval loop. Always
   // diffed against the frozen ai_snapshot, never against the previous
