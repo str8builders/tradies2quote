@@ -17,7 +17,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { getCachedAuthUser } from "@/lib/supabase/auth";
 import { formatCurrency } from "@/lib/quote-defaults";
-import type { QuoteData, QuoteStatus } from "@/lib/quote-types";
+import type { QuoteStatus } from "@/lib/quote-types";
 import { isOwnerEmail } from "@/lib/owner";
 import { STAGE_LABELS } from "@/lib/lifecycle/stages";
 import { AppHeader } from "./_components/AppHeader";
@@ -197,9 +197,14 @@ async function DashboardData({
       // Scheduled jobs with a date (quotes.scheduled_for) — drives the
       // dashboard calendar. Past + future so the tradie can page across
       // months; the calendar component buckets them by day.
+      // Wave 46 perf — narrowed from the full `quote_data` JSONB blob to
+      // just the two paths actually read below (job summary + client
+      // name), same reasoning as the /app/quotes list query.
       supabase
         .from("quotes")
-        .select("id, scheduled_for, total_amount, currency, quote_data, created_at")
+        .select(
+          "id, scheduled_for, total_amount, currency, created_at, job_summary:quote_data->>job_summary, client_name:quote_data->client->>name",
+        )
         .eq("user_id", userId)
         .eq("status", "scheduled")
         .is("deleted_at", null)
@@ -237,12 +242,11 @@ async function DashboardData({
   const statsCurrency = stats.currency;
 
   const scheduledJobs = (upcomingRows ?? []).map((q) => {
-    const qd = q.quote_data as QuoteData | null;
     return {
       id: q.id,
       date: ((q.scheduled_for as string | null) ?? "").slice(0, 10),
-      clientName: qd?.client?.name ?? "—",
-      jobSummary: (qd?.job_summary as string | undefined) ?? "",
+      clientName: (q.client_name as string | undefined) ?? "—",
+      jobSummary: (q.job_summary as string | undefined) ?? "",
       total: Number(q.total_amount) || 0,
       currency: (q.currency as string) ?? "NZD",
     };

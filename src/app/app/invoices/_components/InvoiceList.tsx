@@ -43,7 +43,6 @@ type Row = {
   sent_at: string | null;
   paid_at: string | null;
   quote_id: string;
-  invoice_data: unknown;
   clientName: string;
 };
 

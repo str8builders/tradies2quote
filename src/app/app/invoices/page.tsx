@@ -56,10 +56,13 @@ export default async function InvoicesPage({
   // Pull invoices + the linked quote's snapshot (for the client name).
   // The invoices.invoice_data jsonb also has the client name embedded,
   // but a normal lookup keeps the row shape predictable for the table.
+  // Wave 46 perf — was selecting the entire `invoice_data` JSONB snapshot
+  // for up to 200 rows just to read the client's name; narrowed to that
+  // one JSON path (InvoiceList never used the rest of invoice_data).
   let query = supabase
     .from("invoices")
     .select(
-      "id, invoice_number, status, total_amount, currency, due_date, created_at, sent_at, paid_at, quote_id, invoice_data",
+      "id, invoice_number, status, total_amount, currency, due_date, created_at, sent_at, paid_at, quote_id, client_name:invoice_data->client->>name",
     )
     .eq("user_id", user.id)
     .is("deleted_at", null)
@@ -190,25 +193,19 @@ export default async function InvoicesPage({
             </div>
           ) : (
             <InvoiceList
-              rows={rows.map((inv) => {
-                const snapshot = (inv.invoice_data ?? {}) as {
-                  client?: { name?: string };
-                };
-                return {
-                  id: inv.id,
-                  invoice_number: inv.invoice_number,
-                  status: inv.status,
-                  total_amount: inv.total_amount,
-                  currency: inv.currency,
-                  due_date: inv.due_date,
-                  created_at: inv.created_at,
-                  sent_at: inv.sent_at,
-                  paid_at: inv.paid_at,
-                  quote_id: inv.quote_id,
-                  invoice_data: inv.invoice_data,
-                  clientName: snapshot.client?.name?.trim() || "—",
-                };
-              })}
+              rows={rows.map((inv) => ({
+                id: inv.id,
+                invoice_number: inv.invoice_number,
+                status: inv.status,
+                total_amount: inv.total_amount,
+                currency: inv.currency,
+                due_date: inv.due_date,
+                created_at: inv.created_at,
+                sent_at: inv.sent_at,
+                paid_at: inv.paid_at,
+                quote_id: inv.quote_id,
+                clientName: (inv.client_name as string | null)?.trim() || "—",
+              }))}
             />
           )}
         </section>
