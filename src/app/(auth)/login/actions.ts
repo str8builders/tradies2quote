@@ -6,6 +6,7 @@ import { safeNextPath } from "@/lib/safe-redirect";
 import { consumeFixedWindow } from "@/lib/rate-limit";
 import { cookies } from "next/headers";
 import { WELCOME_SEEN_COOKIE } from "@/lib/welcome-cookie";
+import { friendlyAuthError } from "@/lib/auth/friendlyAuthError";
 
 export async function loginAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
@@ -20,7 +21,7 @@ export async function loginAction(formData: FormData) {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    redirect(`/login?error=${encodeURIComponent(error.message)}&next=${encodeURIComponent(next)}`);
+    redirect(`/login?error=${encodeURIComponent(friendlyAuthError(error.message, "login"))}&next=${encodeURIComponent(next)}`);
   }
 
   // A fresh sign-in is an entry: forget any earlier "seen" marker so /app's

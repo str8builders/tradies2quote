@@ -3,6 +3,7 @@
 import { safeNextPath } from "@/lib/safe-redirect";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { friendlyAuthError } from "@/lib/auth/friendlyAuthError";
 
 export async function signupAction(formData: FormData) {
   const next = safeNextPath(formData.get("next"));
@@ -35,7 +36,7 @@ export async function signupAction(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/signup?error=${encodeURIComponent(error.message)}${nextQuery}`);
+    redirect(`/signup?error=${encodeURIComponent(friendlyAuthError(error.message, "signup"))}${nextQuery}`);
   }
 
   // Supabase does NOT return an error for an already-registered email
