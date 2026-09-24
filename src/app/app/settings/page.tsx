@@ -34,6 +34,8 @@ import { getTeamContext } from "@/lib/team";
 import { QuoteRequestLinkCard } from "./_components/QuoteRequestLinkCard";
 import { ReplayTourButton } from "./_components/ReplayTourButton";
 import { DeleteAccountSection } from "./_components/DeleteAccountSection";
+import { NewLookSetting } from "./_components/NewLookSetting";
+import { getNewLookState } from "@/lib/ui/newLook";
 
 export const metadata: Metadata = {
   title: "Settings",
@@ -153,6 +155,11 @@ export default async function SettingsPage({
   } catch {
     /* never break the render */
   }
+
+  // New-look preview switch: owner-only while T2Q_NEW_LOOK_DEFAULT is off.
+  // Its own failure-tolerant read, so the profile query above keeps working
+  // before the ui_new_look migration is applied.
+  const newLook = await getNewLookState();
 
   // Inputs need string values. Falling back to NZ defaults for fresh
   // accounts keeps the form populated rather than blank.
@@ -275,6 +282,10 @@ export default async function SettingsPage({
           </Link>
           <ReplayTourButton />
         </div>
+
+        {newLook.canChoose ? (
+          <NewLookSetting initialChoice={newLook.choice} envDefault={newLook.envDefault} />
+        ) : null}
 
         {/* Wave 14 — Admin Agent checklist moved here from /app/agents
             (which is now owner-only). Every tradie sees their setup
