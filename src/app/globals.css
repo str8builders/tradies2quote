@@ -800,6 +800,35 @@ h1, h2, h3, h4, h5 {
   }
 }
 
+/* ─── Mobile account sheet entrance (Wave 46 — perf) ──────────────────────
+   Replaces MobileAppMenuClient's framer-motion AnimatePresence backdrop +
+   slide-up panel. Same reasoning as the splash/page-enter conversions below:
+   a plain keyframe animation on mount needs no JS and can't ship "invisible"
+   content. Enter-only, like `.t2q-page-enter` / `.t2q-stagger` — closing
+   unmounts immediately (the desktop account panel never had a close
+   animation either), so there's no exit-animation-vs-unmount-timing to get
+   wrong here. */
+@keyframes t2q-sheet-backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes t2q-sheet-panel-in {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.t2q-sheet-backdrop {
+  animation: t2q-sheet-backdrop-in 200ms ease both;
+}
+.t2q-sheet-panel {
+  animation: t2q-sheet-panel-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .t2q-sheet-backdrop,
+  .t2q-sheet-panel {
+    animation: none;
+  }
+}
+
 /* ─── Splash entrance animations (Wave 17 — perf) ─────────────────────────
    These replicate the framer-motion entrance that LoadingScreen.tsx used
    to drive. Doing it in CSS lets the splash drop framer-motion entirely
@@ -1212,7 +1241,9 @@ h1, h2, h3, h4, h5 {
 }
 /* Wave 45 — the active background/border/underline is painted by a
    framer-motion `layoutId` span inside the tab (AppHeaderClient) so it
-   SLIDES between tabs; the static rules keep only text colour. */
+   SLIDES between tabs; the static rules keep only text colour. Wave 46 —
+   that span is now lazy-loaded (AnimatedTabPill, next/dynamic ssr:false)
+   so framer-motion is off the initial /app bundle. */
 .t2q-nav-tab[aria-current="page"] {
   color: #FFFFFF;
 }
@@ -1316,7 +1347,9 @@ h1, h2, h3, h4, h5 {
 /* Wave 45 — the active pill (background/border/underline) is now painted
    by a framer-motion `layoutId` span inside the tab so it SLIDES between
    tabs (see MobileAppMenuClient). The static rule keeps only the text
-   emphasis; keep it in sync with the span's classes. */
+   emphasis; keep it in sync with the span's classes. Wave 46 — that span
+   is now lazy-loaded (AnimatedTabPill, next/dynamic ssr:false) so
+   framer-motion is off the initial /app bundle. */
 .t2q-bottomnav-tab[aria-current="page"] {
   color: #C2410C;
   font-weight: 800;

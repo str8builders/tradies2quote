@@ -1,13 +1,12 @@
 "use client";
 
 import { useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { AccountHub } from "./AccountHub";
 import { AccountButton } from "./AccountButton";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
-import { SPRING_SNAPPY } from "./motion";
 import type { Icon } from "@phosphor-icons/react";
 import {
   HouseLine,
@@ -16,6 +15,27 @@ import {
   Receipt,
   Package,
 } from "@phosphor-icons/react";
+
+/**
+ * Wave 46 perf — the sliding tab-highlight is the only framer-motion user
+ * left in this menu, so it's split into its own chunk and loaded only on
+ * the client. `loading` renders the same highlight WITHOUT the cross-tab
+ * slide (a plain static box) so there's no layout shift while the chunk
+ * downloads; see AnimatedTabPill.tsx for why this piece keeps framer-motion.
+ * The account sheet below (backdrop + slide-up panel) no longer needs
+ * framer-motion at all — it's driven by the `.t2q-sheet-*` CSS animations
+ * in globals.css.
+ */
+const BOTTOMNAV_PILL_CLASSNAME = "t2q-bottomnav-active absolute inset-0 rounded-[0.85rem]";
+const AnimatedTabPill = dynamic(
+  () => import("./AnimatedTabPill").then((m) => m.AnimatedTabPill),
+  {
+    ssr: false,
+    loading: () => (
+      <span aria-hidden="true" className={BOTTOMNAV_PILL_CLASSNAME} />
+    ),
+  },
+);
 
 /**
  * Client part of the mobile navigation.
@@ -62,7 +82,6 @@ function isActive(href: string, pathname: string) {
 export function MobileAppMenuClient({ isOwner, userEmail, avatarUrl }: Props) {
   const pathname = usePathname() ?? "";
   const [sheetOpen, setSheetOpen] = useState(false);
-  const reduce = useReducedMotion();
   // Scoped scroll-lock: while the account sheet is open the document must
   // not scroll behind the backdrop (iOS ignores overflow:hidden for touch
   // scrolling). Fully reverted + scroll position restored on close — the
@@ -81,12 +100,11 @@ export function MobileAppMenuClient({ isOwner, userEmail, avatarUrl }: Props) {
   // slides between tabs via framer's shared `layoutId`. The tab itself
   // never transforms (shell-contract ban on press movement); only this
   // decorative span moves. Reduced motion → the pill just swaps, no slide.
+  // Wave 46 — lazy-loaded; see AnimatedTabPill above.
   const pill = (
-    <motion.span
+    <AnimatedTabPill
       layoutId="t2q-bottomnav-pill"
-      aria-hidden="true"
-      transition={reduce ? { duration: 0 } : SPRING_SNAPPY}
-      className="t2q-bottomnav-active absolute inset-0 rounded-[0.85rem]"
+      className={BOTTOMNAV_PILL_CLASSNAME}
     />
   );
 
@@ -153,37 +171,33 @@ export function MobileAppMenuClient({ isOwner, userEmail, avatarUrl }: Props) {
         {TABS.slice(2).map(renderTab)}
       </nav>
 
-      <AnimatePresence>
-        {sheetOpen ? (
-          <motion.div
-            data-testid="account-sheet"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: reduce ? 0.1 : 0.2 }}
-            className="fixed inset-0 z-50 flex items-end bg-black/60 backdrop-blur-sm sm:hidden"
-            onClick={closeSheet}
+      {/* Wave 46 — converted from framer-motion's AnimatePresence to plain
+          CSS keyframe animations (`.t2q-sheet-backdrop` / `.t2q-sheet-panel`
+          in globals.css), matching the enter-only pattern already used for
+          the page-enter transition and dashboard stagger: the entrance
+          (backdrop fade + panel slide-up) is animated, honouring
+          prefers-reduced-motion in the stylesheet; closing unmounts
+          immediately, same as the desktop account panel below already did. */}
+      {sheetOpen ? (
+        <div
+          data-testid="account-sheet"
+          className="t2q-sheet-backdrop fixed inset-0 z-50 flex items-end bg-black/60 backdrop-blur-sm sm:hidden"
+          onClick={closeSheet}
+        >
+          <div
+            className="t2q-sheet-panel w-full"
+            onClick={(e) => e.stopPropagation()}
           >
-            {/* A short, non-overshooting entrance keeps the profile steady. */}
-            <motion.div
-              initial={reduce ? { y: 0 } : { y: "100%" }}
-              animate={{ y: 0 }}
-              exit={reduce ? { opacity: 0 } : { y: "100%" }}
-              transition={{ duration: reduce ? 0 : 0.22, ease: [0.22, 1, 0.36, 1] }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full"
-            >
-              <AccountHub
-                mode="sheet"
-                isOwner={isOwner}
-                userEmail={userEmail}
-                avatarUrl={avatarUrl}
-                onClose={closeSheet}
-              />
-            </motion.div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+            <AccountHub
+              mode="sheet"
+              isOwner={isOwner}
+              userEmail={userEmail}
+              avatarUrl={avatarUrl}
+              onClose={closeSheet}
+            />
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
