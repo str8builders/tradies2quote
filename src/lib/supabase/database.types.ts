@@ -734,6 +734,7 @@ export type Database = {
         Row: {
           active: boolean
           attributes: Json
+          barcode: string | null
           brand: string | null
           category: string | null
           compliance_notes: string | null
@@ -763,6 +764,7 @@ export type Database = {
         Insert: {
           active?: boolean
           attributes?: Json
+          barcode?: string | null
           brand?: string | null
           category?: string | null
           compliance_notes?: string | null
@@ -792,6 +794,7 @@ export type Database = {
         Update: {
           active?: boolean
           attributes?: Json
+          barcode?: string | null
           brand?: string | null
           category?: string | null
           compliance_notes?: string | null
