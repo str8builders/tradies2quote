@@ -9,7 +9,8 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/app/", "/api/"],
+        // /ui-kit is the redesign's parts kit: public for the owner, not for search.
+        disallow: ["/app/", "/api/", "/ui-kit"],
       },
     ],
     sitemap: `${siteUrl}/sitemap.xml`,
