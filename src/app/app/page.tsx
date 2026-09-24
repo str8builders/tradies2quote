@@ -30,6 +30,8 @@ import { SiteConditions } from "./_components/SiteConditions";
 import { T2QCALIcon } from "./_components/T2QCALIcon";
 import { RequestCodeCard } from "./_components/RequestCodeCard";
 import { LocalWeather } from "./_components/LocalWeather";
+import { isNewLookOn } from "@/lib/ui/newLook";
+import { NewHome } from "./_v2/home/NewHome";
 
 /** Priced library items before the "set your prices" banner stops showing. */
 const PRICED_LIBRARY_TARGET = 8;
@@ -70,6 +72,8 @@ export default async function DashboardPage() {
   // `<AppHeader>` and `<MobileAppMenu>` within this render.
   const { user } = await getCachedAuthUser();
   if (!user) redirect("/login");
+  // Redesign phase 2: the new-look Home ("what needs doing today").
+  if (await isNewLookOn()) return <NewHome userId={user.id} isOwner={isOwnerEmail(user.email)} />;
 
   const username = user.email?.split("@")[0] ?? "tradie";
   // Owner-only Debug link + Agents card visibility. Server-rendered,
