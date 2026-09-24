@@ -123,8 +123,9 @@ describe("calculateMaterialTakeoff", () => {
       numberOfDoors: 1,
       includeArchitraves: true,
     });
-    // 1 * (2.04*2 + 0.82) = 4.90; *1.1 = 5.39; ceil(5.39/4.8) = 2
-    expect(getMaterial(r, "architraves")?.quantity).toBe(2);
+    // Both lined faces (gibSides defaults to 2): 1 * (2.04*2 + 0.82) = 4.90
+    // per face; × 2 faces × 1.1 = 10.78; ceil(10.78/4.8) = 3
+    expect(getMaterial(r, "architraves")?.quantity).toBe(3);
   });
 
   it("invalid wall length emits warning", () => {

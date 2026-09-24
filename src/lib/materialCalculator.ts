@@ -84,6 +84,13 @@ export const DEFAULTS = {
   windowHeightM: 1.2,
 };
 
+/**
+ * Dwangs (nogs): NZ framing puts a row between studs at no more than
+ * 1.35 m centres up the stud, so a 2.4 m or 2.7 m wall takes one row and a
+ * 3.0 m wall takes two.
+ */
+export const MAX_DWANG_CENTRES_M = 1.35;
+
 function round2(n: number): number {
   return Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
 }
@@ -93,9 +100,9 @@ function round2(n: number): number {
  * floating-point computation can push a value like 22.0000000004 (which
  * is mathematically 22 but suffers from IEEE-754 noise) over the integer
  * boundary to 23. safeCeil rounds to 6dp first so only meaningful
- * fractions trigger the ceiling. Used by every formula in the deck,
- * cladding and subfloor calculators that mixes multiplication and
- * division of decimal metres.
+ * fractions trigger the ceiling. Used by EVERY round-up in this file —
+ * e.g. a 3.2 m wall needs 9.6 m of plate = exactly 2 × 4.8 m lengths, and
+ * 19 GIB sheets need 19 × 40 × 1.1 = 836 screws, not 3 lengths / 837.
  */
 function safeCeil(n: number): number {
   if (!Number.isFinite(n)) return 0;
@@ -186,26 +193,28 @@ export function calculateMaterialTakeoff(
 
   const baseStuds =
     studSpacingMm > 0
-      ? Math.ceil((safeWallLength * 1000) / studSpacingMm) + 1
+      ? safeCeil((safeWallLength * 1000) / studSpacingMm) + 1
       : 0;
   const openingStuds = numberOfDoors * 4 + numberOfWindows * 4;
   const studCount = baseStuds + openingStuds;
 
   const plateLengths =
     timberStockLengthM > 0
-      ? Math.ceil((safeWallLength * 3) / timberStockLengthM)
+      ? safeCeil((safeWallLength * 3) / timberStockLengthM)
       : 0;
+  // One row of dwangs per 1.35 m (max) of stud height: rows = bays − 1.
+  const dwangRows = Math.max(1, safeCeil(safeWallHeight / MAX_DWANG_CENTRES_M) - 1);
   const nogLengths =
     timberStockLengthM > 0
-      ? Math.ceil(safeWallLength / timberStockLengthM)
+      ? safeCeil((safeWallLength * dwangRows) / timberStockLengthM)
       : 0;
 
   const gibAreaM2 = Math.max(rawWallAreaM2 - doorAreaM2 - windowAreaM2, 0) * gibSides;
   const gibAreaWithWaste = gibAreaM2 * wasteMultiplier;
   const gibSheets =
     sheetAreaM2 > 0 ? safeCeil(gibAreaWithWaste / sheetAreaM2) : 0;
-  const gibScrews = Math.ceil(gibSheets * 40 * 1.1);
-  const adhesiveTubes = Math.ceil(gibSheets / 4);
+  const gibScrews = safeCeil(gibSheets * 40 * 1.1);
+  const adhesiveTubes = safeCeil(gibSheets / 4);
 
   const materials: MaterialTakeoffLine[] = [
     {
@@ -233,7 +242,10 @@ export function calculateMaterialTakeoff(
       category: "Framing",
       quantity: nogLengths,
       unit: "lengths",
-      formula: "ceil(wallLengthM / timberStockLengthM)",
+      // Constant text (like the other wall lines): the generate route joins
+      // calculator lines to the orchestrator's by formula string.
+      formula:
+        "ceil((wallLengthM * dwangRows) / timberStockLengthM), dwangRows = max(1, ceil(wallHeightM / 1.35) - 1)",
       priceMatchKey: "90x45-sg8-nogs",
     },
     {
@@ -294,7 +306,7 @@ export function calculateMaterialTakeoff(
       const insulationAreaWithWaste = insulationNetAreaM2 * wasteMultiplier;
       const insulationPacks =
         insulationPackCoverageM2 > 0
-          ? Math.ceil(insulationAreaWithWaste / insulationPackCoverageM2)
+          ? safeCeil(insulationAreaWithWaste / insulationPackCoverageM2)
           : 0;
       materials.push({
         id: "pink-batts",
@@ -327,11 +339,13 @@ export function calculateMaterialTakeoff(
   }
 
   if (includeSkirting) {
-    const skirtingLinearM = safeWallLength * gibSides;
+    // Skirting runs along every lined face and stops at each door opening.
+    const skirtingLinearM =
+      Math.max(safeWallLength - numberOfDoors * doorWidthM, 0) * gibSides;
     const skirtingWithWaste = skirtingLinearM * wasteMultiplier;
     const skirtingLengths =
       timberStockLengthM > 0
-        ? Math.ceil(skirtingWithWaste / timberStockLengthM)
+        ? safeCeil(skirtingWithWaste / timberStockLengthM)
         : 0;
     materials.push({
       id: "skirting",
@@ -340,18 +354,20 @@ export function calculateMaterialTakeoff(
       quantity: skirtingLengths,
       unit: "lengths",
       formula:
-        "ceil((wallLengthM * gibSides * wasteMultiplier) / timberStockLengthM)",
+        "ceil(((wallLengthM − doors × doorWidthM) × gibSides × wasteMultiplier) / timberStockLengthM)",
       priceMatchKey: "skirting",
     });
   }
 
   if (includeArchitraves) {
+    // Two legs + a head per door, on every lined face (an internal door in a
+    // wall lined both sides is architraved both sides).
     const architraveLinearM =
-      numberOfDoors * (doorHeightM * 2 + doorWidthM);
+      numberOfDoors * (doorHeightM * 2 + doorWidthM) * gibSides;
     const architraveWithWaste = architraveLinearM * wasteMultiplier;
     const architraveLengths =
       timberStockLengthM > 0
-        ? Math.ceil(architraveWithWaste / timberStockLengthM)
+        ? safeCeil(architraveWithWaste / timberStockLengthM)
         : 0;
     materials.push({
       id: "architraves",
@@ -360,7 +376,7 @@ export function calculateMaterialTakeoff(
       quantity: architraveLengths,
       unit: "lengths",
       formula:
-        "ceil((doors * ((doorHeightM * 2) + doorWidthM) * wasteMultiplier) / timberStockLengthM)",
+        "ceil((doors × ((doorHeightM × 2) + doorWidthM) × gibSides × wasteMultiplier) / timberStockLengthM)",
       priceMatchKey: "architraves",
     });
   }
@@ -500,7 +516,7 @@ function applyRatioGuard(
     if (!m) continue;
     const ceiling = Math.max(
       check.minAllowed ?? 0,
-      Math.ceil(check.cap * areaM2),
+      safeCeil(check.cap * areaM2),
     );
     if (m.quantity > ceiling) {
       const wasQty = m.quantity;
@@ -696,7 +712,7 @@ export function calculateDeckTakeoff(
   // resulting in qty 594 × $45/pack = $26K for a 20m² deck.
   const screwsPerPack = 500;
   const screwsTotal = safeCeil(deckAreaM2 * 30 * wasteMultiplier);
-  const screwPacks = Math.max(1, Math.ceil(screwsTotal / screwsPerPack));
+  const screwPacks = Math.max(1, safeCeil(screwsTotal / screwsPerPack));
   materials.push({
     id: "deck-screws",
     name: "Decking screws (stainless)",

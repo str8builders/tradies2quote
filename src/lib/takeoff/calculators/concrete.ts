@@ -47,7 +47,9 @@ export function runConcreteCalculator(ext: ExtractedExtraction): ScopeResult {
     explicitVolume !== null && explicitVolume > 0
       ? explicitVolume
       : concreteVolumeM3(length_m, width_m, thicknessMm);
-  const orderVolume = Math.ceil(volume * (1 + wastePct / 100) * 10) / 10;
+  // Round up to the 0.1 m³ delivery unit without float noise adding a tenth
+  // (6 m³ × 1.05 = 6.300000000000001 → 6.3, not 6.4).
+  const orderVolume = safeCeil(volume * (1 + wastePct / 100) * 10) / 10;
 
   const lines: TakeoffLine[] = [];
   lines.push({

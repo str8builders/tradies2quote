@@ -113,14 +113,27 @@ export type MaterialTakeoffResult = {
    - `netWallAreaM2 = max(wallAreaM2 - openingAreaM2, 0)`
 3. **Studs** — `baseStuds = ceil((wallLengthM * 1000) / studSpacingMm) + 1`; `openingStuds = numberOfDoors * 4 + numberOfWindows * 4`; `studCount = baseStuds + openingStuds`
 4. **Plates** — `plateLengths = ceil((wallLengthM * 3) / timberStockLengthM)` (3 rows: bottom + top + cap)
-5. **Nogs** — `nogLengths = ceil(wallLengthM / timberStockLengthM)`
+5. **Nogs (dwangs)** — one row per 1.35 m (max) of stud height: `dwangRows = max(1, ceil(wallHeightM / 1.35) - 1)` (2.4 m and 2.7 m walls → 1 row, 3.0 m → 2); `nogLengths = ceil((wallLengthM * dwangRows) / timberStockLengthM)`
 6. **GIB sheets** — `gibAreaM2 = netWallAreaM2 * gibSides`; `gibSheets = ceil((gibAreaM2 * (1 + wastePercent/100)) / (gibSheetWidthM * gibSheetHeightM))`
 7. **GIB screws** — `ceil(gibSheets * 40 * 1.1)` (estimate; round to nearest box in pricing)
 8. **GIB adhesive** — `ceil(gibSheets / 4)`
 9. **Insulation** — only if `includeInsulation`: `ceil((netWallAreaM2 * (1 + wastePercent/100)) / insulationPackCoverageM2)`
-10. **Skirting** — only if `includeSkirting`: `ceil((wallLengthM * gibSides * (1 + wastePercent/100)) / timberStockLengthM)`
-11. **Architraves** — only if `includeArchitraves`: `ceil((numberOfDoors * ((doorHeightM * 2) + doorWidthM) * (1 + wastePercent/100)) / timberStockLengthM)`
+10. **Skirting** — only if `includeSkirting`, every lined face, stopping at door openings: `ceil(((wallLengthM - numberOfDoors * doorWidthM) * gibSides * (1 + wastePercent/100)) / timberStockLengthM)`
+11. **Architraves** — only if `includeArchitraves`, on every lined face (an internal door in a wall lined both sides gets architraves both sides): `ceil((numberOfDoors * ((doorHeightM * 2) + doorWidthM) * gibSides * (1 + wastePercent/100)) / timberStockLengthM)`
 12. **Framing nails** — fixed 1 box allowance per small wall
+
+Every `ceil` above goes through `safeCeil` (round to 6 dp first) so float
+noise never adds a unit: a 3.2 m wall's 9.6 m of plate is exactly 2 × 4.8 m
+lengths, and 19 sheets need 836 screws, not 837.
+
+## Units (parser)
+
+`aiTakeoffParser.readDimension` is the one unit rule: an explicit mm / cm / m
+(m² / mm²) suffix wins; a bare length / width / height ≥ 100 is millimetres
+("2400 high" = 2.4 m); spacings come out in mm ("600 centres" = 600 mm). A
+value still outside its band after conversion (wall height 1.8–6 m, length
+0.1–200 m, spacing 100–1200 mm, …) is flagged for review and never reaches a
+calculator.
 
 ## Warnings
 
