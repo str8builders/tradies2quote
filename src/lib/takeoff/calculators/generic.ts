@@ -13,7 +13,7 @@ import type {
   ScopeResult,
   TakeoffLine,
 } from "../schemas";
-import { round2 } from "../normalise";
+import { round2, safeCeil } from "../normalise";
 
 export function runGenericCalculator(ext: ExtractedExtraction): ScopeResult {
   const dims = ext.dimensions;
@@ -45,7 +45,7 @@ export function runGenericCalculator(ext: ExtractedExtraction): ScopeResult {
   let confidence = 0.4;
   if (volume <= 0 && area > 0 && coverage > 0) {
     const lineal = area / (coverage / 1000) * (1 + wastePct / 100);
-    quantity = stock > 0 ? Math.ceil(lineal / stock - 1e-10) : round2(lineal);
+    quantity = stock > 0 ? safeCeil(lineal / stock) : round2(lineal);
     unit = stock > 0 ? "length" : "m";
     formula = `area=${area}m² ÷ coverage=${coverage}/1000m × (1+${wastePct}/100)`
       + (stock > 0 ? ` ÷ stock=${stock}m, rounded up = ${quantity}` : ` = ${quantity}m`);
@@ -63,7 +63,7 @@ export function runGenericCalculator(ext: ExtractedExtraction): ScopeResult {
   } else if (perimeter > 0 || len > 0) {
     const lm = perimeter || len;
     const order = lm * (1 + wastePct / 100);
-    quantity = stock > 0 ? Math.ceil(order / stock - 1e-10) : round2(order);
+    quantity = stock > 0 ? safeCeil(order / stock) : round2(order);
     unit = stock > 0 ? "length" : "m";
     formula = `length=${lm}m × (1+${wastePct}/100)` + (stock > 0 ? ` ÷ stock=${stock}m, rounded up = ${quantity}` : ` = ${quantity}`);
     confidence = 0.6;

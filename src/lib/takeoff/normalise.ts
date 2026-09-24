@@ -169,8 +169,9 @@ export function concreteVolumeM3(
   if (!Number.isFinite(widthM) || widthM <= 0) return 0;
   if (!Number.isFinite(thicknessMm) || thicknessMm <= 0) return 0;
   const raw = lengthM * widthM * (thicknessMm / 1000);
-  // Round up to nearest 0.1 m³.
-  return Math.ceil(raw * 10) / 10;
+  // Round up to nearest 0.1 m³ — through safeCeil, so float noise
+  // (2 × 1.5 × 0.1 = 0.30000000000000004) can't add a tenth.
+  return safeCeil(raw * 10) / 10;
 }
 
 /**

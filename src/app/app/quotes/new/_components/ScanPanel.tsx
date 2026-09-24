@@ -22,6 +22,11 @@ import {
   scanUploadSizeError,
 } from "@/lib/imageUpload";
 import type { ScannedPlan } from "@/lib/scan-drawing";
+import {
+  readDimension,
+  readNumberTokens,
+  readWallRunLine,
+} from "@/lib/aiTakeoffParser";
 
 type ScanState =
   | "idle"
@@ -33,13 +38,24 @@ type ScanState =
   | "error";
 
 const JOB_TYPES = ["Deck", "Fence", "Framing", "Concrete", "Roofing", "Other"] as const;
-type JobType = (typeof JOB_TYPES)[number];
+export type JobType = (typeof JOB_TYPES)[number];
+
+/**
+ * How long the phone waits for /api/quotes/scan-drawing. The route allows up
+ * to 140 s per model attempt plus one retry on 429/529, inside a 300 s
+ * maxDuration — the client must never give up before the server does.
+ */
+export const SCAN_TIMEOUT_MS = 300_000;
+/** After this long, say plainly that a big plan takes a while. */
+export const SCAN_SLOW_NOTICE_MS = 30_000;
+export const SCAN_SLOW_NOTICE =
+  "Still reading the drawing — large plans can take a couple of minutes.";
 
 const TIMBER_LENGTH_DEFAULT = 6;
 const TIMBER_LENGTH_MIN = 2.4;
 const TIMBER_LENGTH_MAX = 7.2;
 
-interface ScanResult {
+export interface ScanResult {
   buildType: string;
   summary: string;
   dimensions: string;
@@ -76,6 +92,7 @@ function planTypeForJob(
 function buildPlanMarker(
   planType: "deck" | "subfloor" | "cladding" | "wall",
   plan: ScannedPlan,
+  editedFields: readonly PlanField[] = [],
 ): string {
   const parts = [`type=${planType}`];
   // Enforce NZ convention: length ≥ width. The deck calculator runs
@@ -133,10 +150,405 @@ function buildPlanMarker(
   if (plan.window_count && plan.window_count > 0) {
     parts.push(`window_count=${plan.window_count}`);
   }
+  // Fields the tradie corrected on the review screen: the takeoff treats
+  // these as the tradie's own numbers (the loose DIMENSIONS-text
+  // cross-check never overrides them) and says so in the quote notes.
+  if (editedFields.length > 0) {
+    parts.push(`edited=${editedFields.join(",")}`);
+  }
   return "[T2Q_PLAN] " + parts.join(" ");
 }
 
-function buildFinalTranscript(
+// ─────────────────────────────────────────────────────────────────────────
+// Tradie corrections → plan marker.
+//
+// The review screen promises "edit any number we got wrong — the materials
+// list will use these". The takeoff reads the [T2Q_PLAN] marker FIRST, so a
+// correction only reaches the quantities if it is written into the marker.
+// It used to be built from the AI's plan alone: a wall run corrected 40 → 52 m
+// still framed 40 m, and a deck width corrected 4.8 → 5.4 m (under the
+// parser's 25% cross-check) stayed 4.8 m.
+//
+// applyDimensionEdits diffs the tradie's text against what the scan showed,
+// works out which plan field each changed line describes (its label first —
+// "Deck width", "TOTAL WALL RUN", "Studs at … centres", "Doors: 4" — else by
+// matching the old number to the plan's length / width) and writes the new
+// number in, whatever the size of the change. Lines about something else
+// (stairs, posts, rooms…) never touch the plan. A correction that can't be
+// right (a 54 m deck side) clears the field instead, so the takeoff flags it
+// for review rather than quoting either number.
+// ─────────────────────────────────────────────────────────────────────────
+
+type PlanField =
+  | "length_m"
+  | "width_m"
+  | "height_m"
+  | "wall_run_m"
+  | "exterior_wall_run_m"
+  | "interior_wall_run_m"
+  | "joist_spacing_mm"
+  | "stud_spacing_mm"
+  | "post_spacing_m"
+  | "post_count"
+  | "door_count"
+  | "window_count";
+
+export interface DimensionEdit {
+  field: PlanField;
+  from: number | null;
+  /** null = the corrected value can't be right, so the field is cleared. */
+  to: number | null;
+  line: string;
+}
+
+type NumberToken = ReturnType<typeof readNumberTokens>[number];
+
+type LineRole =
+  | { role: "run"; field: "wall_run_m" | "exterior_wall_run_m" | "interior_wall_run_m" }
+  | { role: "spacing"; field: "joist_spacing_mm" | "stud_spacing_mm" }
+  | { role: "postSpacing" }
+  | { role: "count"; field: "post_count" | "door_count" | "window_count" }
+  | { role: "height" }
+  | { role: "side"; field: "length_m" | "width_m" }
+  | { role: "footprint"; labelled: boolean }
+  | { role: "unlabelled" }
+  | { role: "other" };
+
+/** Plan footprint envelope — the same band the takeoff marker accepts. */
+const PLAN_EDGE_MIN_M = 1;
+const PLAN_EDGE_MAX_M = 30;
+
+const SPACING_WORDS_RE =
+  /(?:\b(?:centres?|centers?|crs|ctrs|cc|spacing|spaced|apart|at)\b|c\/c|@)/;
+/** Labels for things that aren't the plan footprint / walls themselves. */
+const OTHER_THING_RE =
+  /\b(?:stairs?|steps?|landings?|treads?|risers?|bearers?|piles?|boards?|decking|rails?|handrails?|balustrades?|bench(?:es)?|ramps?|paths?|beams?|lintels?|rafters?|purlins?|battens?|nogs?|noggins?|dwangs?|plates?|sheets?|thick(?:ness)?|depth|deep|footings?|holes?|pads?|pitch|eaves?|soffits?|fascias?|gutters?|roof|fences?|gates?|openings?|rooms?|bed(?:room)?s?|bath(?:room)?s?|kitchens?|lounges?|living|dining|garages?|laundr(?:y|ies)|wc|toilets?|ensuites?|halls?|hallways?|robes?|wardrobes?|offices?|studys?|stud(?:y|ies)|decks? height|areas?|perimeters?|volumes?)\b/;
+/** Words that only describe which edge a number is on. */
+const EDGE_WORDS_RE =
+  /\b(?:top|bottom|left|right|front|back|rear|sides?|edges?|north|south|east|west|approx(?:imately)?|about|overall|dimension|dims?|restated|in|metres|meters|mm|m|cm)\b/g;
+const PRIMARY_LABEL_RE =
+  /\b(?:overall|total|deck|floor|building|house|plan|footprint|outside|slab|bounding)\b/;
+const PAIR_RE = /\d(?:\.\d+)?\s*(?:mm|cm|m)?\s*(?:x|×|by|\*)\s*\d/i;
+
+function classifyDimensionLine(line: string): LineRole {
+  const run = readWallRunLine(line);
+  if (run) {
+    return {
+      role: "run",
+      field:
+        run.which === "exterior"
+          ? "exterior_wall_run_m"
+          : run.which === "interior"
+            ? "interior_wall_run_m"
+            : "wall_run_m",
+    };
+  }
+  // The words left once the numbers are gone.
+  let words = line.toLowerCase();
+  for (const t of readNumberTokens(line).reverse()) {
+    words = `${words.slice(0, t.index)} ${words.slice(t.index).replace(/^[\d.,]+\s*[a-z]*/, " ")}`;
+  }
+  const spacing = SPACING_WORDS_RE.test(words);
+  if (/\bjoists?\b/.test(words)) {
+    return spacing ? { role: "spacing", field: "joist_spacing_mm" } : { role: "other" };
+  }
+  if (/\bstuds?\b/.test(words) && spacing) {
+    return { role: "spacing", field: "stud_spacing_mm" };
+  }
+  if (/\b(?:stud|wall|ceiling)\s+heights?\b/.test(words)) return { role: "height" };
+  if (/\bposts?\b/.test(words)) {
+    return spacing ? { role: "postSpacing" } : { role: "count", field: "post_count" };
+  }
+  if (/\bdoors?\b/.test(words)) return { role: "count", field: "door_count" };
+  if (/\bwindows?\b/.test(words)) return { role: "count", field: "window_count" };
+  if (OTHER_THING_RE.test(words)) return { role: "other" };
+  if (/\b(?:height|high)\b/.test(words)) return { role: "height" };
+  const primary = PRIMARY_LABEL_RE.test(words);
+  if (PAIR_RE.test(line)) return { role: "footprint", labelled: primary };
+  if (/\b(?:length|long)\b/.test(words)) return { role: "side", field: "length_m" };
+  if (/\b(?:width|wide)\b/.test(words)) return { role: "side", field: "width_m" };
+  const leftover = words
+    .replace(EDGE_WORDS_RE, " ")
+    .replace(/[^a-z]+/g, " ")
+    .trim();
+  return leftover ? { role: "other" } : { role: "unlabelled" };
+}
+
+function tokenMetres(t: NumberToken): number | undefined {
+  return readDimension(t.num, t.unit, "length")?.value;
+}
+
+function sameToken(a: NumberToken, b: NumberToken): boolean {
+  return (
+    Number(a.num.replace(/,/g, "")) === Number(b.num.replace(/,/g, "")) &&
+    (a.unit ?? "").toLowerCase() === (b.unit ?? "").toLowerCase()
+  );
+}
+
+/** Index of the last number the tradie changed on this line, if any. */
+function changedIndex(orig: NumberToken[] | null, edit: NumberToken[]): number | undefined {
+  if (edit.length === 0) return undefined;
+  if (!orig || orig.length !== edit.length) return edit.length - 1;
+  let last: number | undefined;
+  for (let i = 0; i < edit.length; i++) {
+    if (!sameToken(orig[i], edit[i])) last = i;
+  }
+  return last;
+}
+
+function nearly(a: number, b: number): boolean {
+  return Math.abs(a - b) <= Math.max(0.01, 0.005 * Math.max(a, b));
+}
+
+/** Which footprint side (length_m / width_m) an old number was, by value. */
+function sideByValue(
+  plan: ScannedPlan | null,
+  metres: number | undefined,
+  claimed: Set<PlanField>,
+): "length_m" | "width_m" | undefined {
+  if (!plan || metres === undefined) return undefined;
+  const hits = (["length_m", "width_m"] as const).filter(
+    (f) => plan[f] > 0 && nearly(plan[f], metres),
+  );
+  // A square footprint matches both — take the one not already corrected
+  // (orientation doesn't matter: the marker orders length ≥ width).
+  return hits.find((f) => !claimed.has(f)) ?? hits[0];
+}
+
+function edgeOrNull(metres: number | undefined): number | null {
+  return metres !== undefined && metres >= PLAN_EDGE_MIN_M && metres <= PLAN_EDGE_MAX_M
+    ? metres
+    : null;
+}
+
+/** The plan edits one changed (or added) line implies. */
+function editsForLine(
+  plan: ScannedPlan | null,
+  orig: string | null,
+  edit: string,
+  claimed: Set<PlanField>,
+): DimensionEdit[] {
+  const role = classifyDimensionLine(edit);
+  const before = (field: PlanField): number | null =>
+    plan ? ((plan[field] as number | null) ?? null) : null;
+  const one = (field: PlanField, to: number | null): DimensionEdit[] => {
+    claimed.add(field);
+    return [{ field, from: before(field), to, line: edit }];
+  };
+
+  if (role.role === "other") return [];
+
+  if (role.role === "run") {
+    const e = readWallRunLine(edit)?.run;
+    if (!e) return [];
+    const o = orig ? readWallRunLine(orig)?.run : undefined;
+    let to = e.value;
+    if (o && e.stated !== undefined && o.stated !== undefined && nearly(e.stated, o.stated)) {
+      // Total left alone but the addends changed ("… + 12.0 = 40.0m"): the
+      // corrected addends are the run.
+      if (e.addendSum !== undefined && (o.addendSum === undefined || !nearly(e.addendSum, o.addendSum))) {
+        to = e.addendSum;
+      } else {
+        return [];
+      }
+    }
+    const plausible = readDimension(to, "m", "run")?.plausible ?? false;
+    return one(role.field, plausible ? to : null);
+  }
+
+  const origTokens = orig ? readNumberTokens(orig) : null;
+  const editTokens = readNumberTokens(edit);
+  const i = changedIndex(origTokens, editTokens);
+  if (i === undefined) return [];
+  const t = editTokens[i];
+
+  if (role.role === "spacing") {
+    const r = readDimension(t.num, t.unit, "spacing");
+    return one(role.field, r?.plausible ? r.value : null);
+  }
+  if (role.role === "postSpacing") {
+    const r = readDimension(t.num, t.unit, "span");
+    return one("post_spacing_m", r?.plausible ? r.value : null);
+  }
+  if (role.role === "count") {
+    // A count is a plain whole number — "Door 820 x 1980" is a size.
+    if (t.unit || PAIR_RE.test(edit)) return [];
+    const n = Number(t.num);
+    return Number.isInteger(n) && n >= 0 && n <= 200 ? one(role.field, n) : [];
+  }
+  if (role.role === "height") {
+    const r = readDimension(t.num, t.unit, "height");
+    return r ? one("height_m", r.value) : [];
+  }
+  if (role.role === "footprint") {
+    const pair = editTokens.slice(0, 2).map(tokenMetres);
+    const oldPair = (origTokens ?? []).slice(0, 2).map(tokenMetres);
+    const matchesPlan =
+      !!plan &&
+      oldPair.length === 2 &&
+      oldPair.every((v) => v !== undefined) &&
+      ((nearly(oldPair[0]!, plan.length_m) && nearly(oldPair[1]!, plan.width_m)) ||
+        (nearly(oldPair[0]!, plan.width_m) && nearly(oldPair[1]!, plan.length_m)));
+    if (!role.labelled && !matchesPlan) return [];
+    if (pair.length < 2 || pair.some((v) => v === undefined)) return [];
+    const a = edgeOrNull(pair[0]);
+    const b = edgeOrNull(pair[1]);
+    if (a === null || b === null) return [...one("length_m", null), ...one("width_m", null)];
+    return [
+      ...one("length_m", Math.max(a, b)),
+      ...one("width_m", Math.min(a, b)),
+    ];
+  }
+  // A single footprint side: matched by its OLD value first (the scan's
+  // labels don't always agree with the plan's length ≥ width order), then by
+  // the line's label.
+  const oldMetres = origTokens && origTokens.length === editTokens.length
+    ? tokenMetres(origTokens[i])
+    : undefined;
+  const field =
+    sideByValue(plan, oldMetres, claimed) ??
+    (role.role === "side" ? role.field : undefined);
+  if (!field) return [];
+  return one(field, edgeOrNull(tokenMetres(t)));
+}
+
+function blankPlan(): ScannedPlan {
+  return {
+    shape: "other",
+    width_m: 0,
+    length_m: 0,
+    regions: null,
+    wall_run_m: null,
+    exterior_wall_run_m: null,
+    interior_wall_run_m: null,
+    wall_thickness_mm: null,
+    stud_spacing_mm: null,
+    door_count: null,
+    window_count: null,
+    area_m2: null,
+    perimeter_m: null,
+    shape_label: null,
+    tri_base_m: null,
+    tri_height_m: null,
+    radius_m: null,
+    trap_a_m: null,
+    trap_b_m: null,
+    trap_h_m: null,
+    post_count: null,
+    post_spacing_m: null,
+    joist_spacing_mm: null,
+    joist_orientation: null,
+    height_m: null,
+  };
+}
+
+/** Pair the scanned lines with the tradie's lines (LCS on their wording). */
+function alignLines(a: string[], b: string[]): Array<[string | null, string]> {
+  const shape = (line: string) =>
+    line
+      .toLowerCase()
+      .replace(/\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/g, "#")
+      .replace(/\s+/g, " ");
+  const sa = a.map(shape);
+  const sb = b.map(shape);
+  const lcs: number[][] = Array.from({ length: a.length + 1 }, () =>
+    new Array<number>(b.length + 1).fill(0),
+  );
+  for (let i = a.length - 1; i >= 0; i--) {
+    for (let j = b.length - 1; j >= 0; j--) {
+      lcs[i][j] =
+        sa[i] === sb[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+    }
+  }
+  const pairs: Array<[string | null, string]> = [];
+  let pendingA: string[] = [];
+  let pendingB: string[] = [];
+  // Unmatched lines between two anchors were rewritten in place — pair them
+  // up in order; any extra edited lines are additions.
+  const flush = () => {
+    pendingB.forEach((line, k) => pairs.push([pendingA[k] ?? null, line]));
+    pendingA = [];
+    pendingB = [];
+  };
+  let i = 0;
+  let j = 0;
+  while (i < a.length && j < b.length) {
+    if (sa[i] === sb[j]) {
+      flush();
+      pairs.push([a[i], b[j]]);
+      i++;
+      j++;
+    } else if (lcs[i + 1][j] >= lcs[i][j + 1]) {
+      pendingA.push(a[i++]);
+    } else {
+      pendingB.push(b[j++]);
+    }
+  }
+  while (i < a.length) pendingA.push(a[i++]);
+  while (j < b.length) pendingB.push(b[j++]);
+  flush();
+  return pairs;
+}
+
+/**
+ * Write the tradie's corrections to the DIMENSIONS text into the scanned plan
+ * (see the section comment above). Returns the plan untouched — the same
+ * object — when nothing that maps onto the plan was changed.
+ */
+export function applyDimensionEdits(
+  plan: ScannedPlan | null,
+  original: string,
+  edited: string,
+): { plan: ScannedPlan | null; edits: DimensionEdit[] } {
+  const lines = (t: string) =>
+    t
+      .replace(/\r\n?/g, "\n")
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+  const a = lines(original);
+  const b = lines(edited);
+  if (a.join("\n") === b.join("\n")) return { plan, edits: [] };
+
+  const claimed = new Set<PlanField>();
+  const edits: DimensionEdit[] = [];
+  for (const [orig, edit] of alignLines(a, b)) {
+    if (orig === edit) continue;
+    edits.push(...editsForLine(plan, orig, edit, claimed));
+  }
+  if (edits.length === 0) return { plan, edits };
+
+  const next: ScannedPlan = { ...(plan ?? blankPlan()) };
+  for (const e of edits) {
+    if (e.field === "length_m" || e.field === "width_m") next[e.field] = e.to ?? 0;
+    else next[e.field] = e.to;
+  }
+  // A corrected footprint makes a composite shape's computed area stale.
+  if (claimed.has("length_m") || claimed.has("width_m")) {
+    if (next.shape_label) {
+      next.area_m2 = null;
+      next.perimeter_m = null;
+      next.shape_label = null;
+    }
+  }
+  // With no TOTAL line on screen, the total is exterior + interior — keep it
+  // in step with a corrected split.
+  const hasTotalLine = [...a, ...b].some(
+    (l) => readWallRunLine(l)?.which === "total",
+  );
+  if (
+    !hasTotalLine &&
+    (claimed.has("exterior_wall_run_m") || claimed.has("interior_wall_run_m")) &&
+    next.exterior_wall_run_m !== null &&
+    next.interior_wall_run_m !== null
+  ) {
+    next.wall_run_m =
+      Math.round((next.exterior_wall_run_m + next.interior_wall_run_m) * 100) / 100;
+  }
+  return { plan: next, edits };
+}
+
+export function buildFinalTranscript(
   jobType: JobType,
   timberLength: number,
   result: ScanResult,
@@ -151,6 +563,15 @@ function buildFinalTranscript(
   // without a calculator (Fence/Concrete/Roofing/Other) is fine —
   // the AI quote path handles those without a calculator anyway.
   const planType = planTypeForJob(jobType, result.buildType);
+  // Every correction the tradie made to the dimensions goes into the marker.
+  const reviewed = applyDimensionEdits(
+    result.plan,
+    result.dimensions,
+    editedDimensions,
+  );
+  const editedFields = [
+    ...new Set(reviewed.edits.filter((e) => e.to !== null).map((e) => e.field)),
+  ];
   if (planType) {
     // Always emit the classified type marker so detectTakeoffType routes off the
     // AI's drawing classification — even when geometry failed to parse. Without
@@ -160,7 +581,9 @@ function buildFinalTranscript(
     // downstream calculator then asks for the missing dimensions rather than
     // fabricating them.
     parts.push(
-      result.plan ? buildPlanMarker(planType, result.plan) : `[T2Q_PLAN] type=${planType}`,
+      reviewed.plan
+        ? buildPlanMarker(planType, reviewed.plan, editedFields)
+        : `[T2Q_PLAN] type=${planType}`,
     );
   }
   parts.push(`[T2Q_TIMBER] stock_length_m=${timberLength}`);
@@ -187,6 +610,49 @@ function buildFinalTranscript(
   return parts.join("\n\n");
 }
 
+/** Plain words for the machine codes the scan route can answer with. */
+const SCAN_ERROR_MESSAGES: Record<string, string> = {
+  trial_expired: "Your free trial has ended. Subscribe to keep scanning drawings.",
+  rate_limited:
+    "You've hit today's drawing-scan limit. It resets at midnight UTC — get in touch if you need more.",
+  ai_consent_required:
+    "Turn on AI features to scan drawings. Open a new quote to review and enable it.",
+  unauthorized: "Your session has expired. Sign in again to scan drawings.",
+};
+
+/**
+ * Message shown to the tradie when the scan route answers with an error.
+ * Known codes (`trial_expired`, …) get plain words; a sentence the route
+ * wrote for people is shown as-is; anything else — an unknown code, a
+ * server-configuration detail, an empty body — gets a generic message.
+ * A raw code is never shown.
+ */
+export function scanErrorMessage(status: number, body: unknown): string {
+  const data = (body && typeof body === "object" ? body : {}) as {
+    error?: unknown;
+    message?: unknown;
+  };
+  const code = typeof data.error === "string" ? data.error.trim() : "";
+  const known =
+    SCAN_ERROR_MESSAGES[code.toLowerCase()] ??
+    (status === 401
+      ? SCAN_ERROR_MESSAGES.unauthorized
+      : status === 402
+        ? SCAN_ERROR_MESSAGES.trial_expired
+        : status === 429
+          ? SCAN_ERROR_MESSAGES.rate_limited
+          : undefined);
+  if (known) return known;
+  if (status === 503) {
+    return "Drawing scan isn't available right now. Please try again later.";
+  }
+  const isSentence = (s: string) => /\s/.test(s) && !/[_{}<>]/.test(s);
+  if (code && isSentence(code)) return code;
+  const message = typeof data.message === "string" ? data.message.trim() : "";
+  if (message && isSentence(message)) return message;
+  return `Scan failed (${status}). Please try again.`;
+}
+
 export function ScanPanel({
   transcript,
   setTranscript,
@@ -206,6 +672,8 @@ export function ScanPanel({
   const [editedDimensions, setEditedDimensions] = useState<string>("");
   // Drives the tape-measure progress: true = scan finished, snap to 100%.
   const [scanComplete, setScanComplete] = useState(false);
+  // A big plan can take minutes — after SCAN_SLOW_NOTICE_MS say so plainly.
+  const [scanSlow, setScanSlow] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
@@ -215,6 +683,12 @@ export function ScanPanel({
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
+
+  useEffect(() => {
+    if (state !== "uploading") return;
+    const timer = setTimeout(() => setScanSlow(true), SCAN_SLOW_NOTICE_MS);
+    return () => clearTimeout(timer);
+  }, [state]);
 
   function parsedTimberLength(): number {
     const n = Number.parseFloat(timberLengthInput);
@@ -302,6 +776,7 @@ export function ScanPanel({
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(URL.createObjectURL(file));
     setScanComplete(false);
+    setScanSlow(false);
     setState("uploading");
 
     const timberLength = parsedTimberLength();
@@ -318,11 +793,11 @@ export function ScanPanel({
       const res = await fetch("/api/quotes/scan-drawing", {
         method: "POST",
         body: form,
-        signal: AbortSignal.timeout(90_000),
+        signal: AbortSignal.timeout(SCAN_TIMEOUT_MS),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(data.error || `Scan failed (${res.status}).`);
+        const data: unknown = await res.json().catch(() => ({}));
+        setError(scanErrorMessage(res.status, data));
         setState("error");
         return;
       }
@@ -361,8 +836,12 @@ export function ScanPanel({
       // hallucinated takeoff — steer the tradie to the quote importer
       // instead, while still letting them force the takeoff if they meant to.
       setState(documentType === "supplier_quote" ? "wrong-doc" : "review-dims");
-    } catch {
-      setError("Network error. Check your connection and try again.");
+    } catch (err) {
+      setError(
+        err instanceof Error && err.name === "TimeoutError"
+          ? "The drawing took too long to read. Try again, or crop the photo to the part you need."
+          : "Network error. Check your connection and try again.",
+      );
       setState("error");
     }
   }
@@ -492,6 +971,7 @@ export function ScanPanel({
           state={state}
           error={error}
           scanComplete={scanComplete}
+          scanSlow={scanSlow}
           previewUrl={previewUrl}
           jobType={jobType}
           setJobType={setJobType}
@@ -513,6 +993,7 @@ function ScanSetup({
   state,
   error,
   scanComplete,
+  scanSlow,
   previewUrl,
   jobType,
   setJobType,
@@ -528,6 +1009,7 @@ function ScanSetup({
   state: ScanState;
   error: string;
   scanComplete: boolean;
+  scanSlow: boolean;
   previewUrl: string | null;
   jobType: JobType | "";
   setJobType: (j: JobType) => void;
@@ -697,7 +1179,8 @@ function ScanSetup({
         {state === "idle" &&
           "JPEG, PNG, WebP, GIF or iPhone HEIC photos. Large phone photos are compressed before upload."}
         {state === "converting" && "Preparing photo…"}
-        {state === "uploading" && "Reading your drawing…"}
+        {state === "uploading" &&
+          (scanSlow ? SCAN_SLOW_NOTICE : "Reading your drawing…")}
         {state === "error" && (
           <span data-testid="scan-error" className="text-red-400">
             {error}
