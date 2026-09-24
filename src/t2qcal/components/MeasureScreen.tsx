@@ -10,9 +10,9 @@ import {ARTapeTool} from "./measure/ARTapeTool";
 type ToolId="ar"|"level"|"height"|"photo"|"room";
 const TOOLS:Array<{id:ToolId;name:string;summary:string;Icon:typeof Crosshair}>=[
   {id:"ar",name:"AR tape",summary:"Drop points on floors, walls and benches through the camera: 3D lengths, rise and floor areas.",Icon:Scan},
-  {id:"level",name:"Level & pitch",summary:"Sight a roof line for its pitch, or lay the phone on a member for tilt, fall and grade.",Icon:Crosshair},
+  {id:"level",name:"Level & plumb",summary:"Point the camera at a shelf, lintel or jamb: it finds the edge, reads it off level or plumb in mm per metre and locks by itself.",Icon:Crosshair},
   {id:"height",name:"Height & distance",summary:"Aim at the base, then the top: distance to a wall or pole and its height.",Icon:TreeEvergreen},
-  {id:"photo",name:"Measure a photo",summary:"Tap a door or sheet in the shot to correct the angle, then read true lengths, areas and angles.",Icon:Ruler},
+  {id:"photo",name:"Measure & lay out a photo",summary:"Tap or circle an object and its size is found for you. Lay studs, sheets or tiles over the photo and count what to buy.",Icon:Ruler},
   {id:"room",name:"Room scan (3D)",summary:"Aim at each floor corner: a plan, a 3D model, and the wall and floor quantities.",Icon:Cube},
 ];
 const LINKS=[{slug:"all-unit-converter",name:"All-unit converter",summary:"Convert your site measurements."},{slug:"pitch-angle",name:"Pitch, rise & angle",summary:"Move between angle, grade and pitch."},{slug:"equal-spacing",name:"Equal spacing",summary:"Centers, clear gaps and running marks."}];
