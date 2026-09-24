@@ -28,6 +28,7 @@ import { jobView } from "./job-view";
 import { withLines } from "./lines";
 import { LineList } from "./parts/LineList";
 import { QuoteVideoCardV2View } from "./parts/QuoteVideoCardV2View";
+import { InvoiceSheet } from "./sheets/InvoiceSheet";
 import { LineSheet } from "./sheets/LineSheet";
 import { PriceSheet } from "./sheets/PriceSheet";
 import { SendSheet, SentSheet } from "./sheets/SendSheet";
@@ -448,5 +449,50 @@ describe("quote video card in the new look", () => {
     const out = html(createElement(QuoteVideoCard, { quoteId: "q1", initialStatus: { kind: "none" } }));
     expect(out).toContain("t2q-card-pro");
     expect(out).toContain("Make a quote video");
+  });
+});
+
+describe("invoice sheet", () => {
+  const sheet = (patch: Partial<ComponentProps<typeof InvoiceSheet>> = {}) =>
+    html(
+      createElement(InvoiceSheet, {
+        quoteId: "q1",
+        invoice: null,
+        clientEmail: "sam@example.invalid",
+        firstName: "Sam",
+        total: 4830,
+        currency: "NZD",
+        blockers: [],
+        onSent: noop,
+        onClose: noop,
+        ...patch,
+      }),
+    );
+  const confirm = (markup: string) => tag(markup, 'data-testid="job-invoice-confirm"');
+
+  it("makes and emails the invoice to the client", () => {
+    const out = sheet();
+    expect(out).toContain("Send the invoice to Sam");
+    expect(out).toContain("to sam@example.invalid");
+    expect(out).toContain("$4,830.00");
+    expect(confirm(out)).not.toContain("disabled");
+  });
+
+  it("sends an existing draft", () => {
+    expect(sheet({ invoice: invoice("draft") })).toContain("INV-0012 is made but not sent yet.");
+  });
+
+  it("can't make one while the quote can't be invoiced", () => {
+    const out = sheet({ blockers: ["Quote total is 0 — set prices on the line items."] });
+    expect(out).toContain("This can&#x27;t be invoiced yet");
+    expect(confirm(out)).toContain("disabled");
+  });
+
+  it("with no email address: make it, then hand over the PDF", () => {
+    expect(sheet({ clientEmail: null })).toContain("Make the invoice");
+    const made = sheet({ clientEmail: null, invoice: invoice("draft") });
+    expect(made).toContain("Send it yourself");
+    expect(made).toContain("Download the invoice PDF");
+    expect(made).not.toContain("job-invoice-confirm");
   });
 });

@@ -44,7 +44,7 @@ import { TotalCard } from "./parts/TotalCard";
 import { applyPrice, priceSessionMessage, saveOptionsFor } from "./price-steps";
 import { draftBlocker, sentMessage, type SendChannel } from "./send-flow";
 import { ClientSheet } from "./sheets/ClientSheet";
-import { InvoiceSheet, sendInvoiceEmail, type InvoiceDone } from "./sheets/InvoiceSheet";
+import { InvoiceSheet, sendInvoiceEmail } from "./sheets/InvoiceSheet";
 import { LineSheet } from "./sheets/LineSheet";
 import { MoreToolsSheet } from "./sheets/MoreToolsSheet";
 import { PriceSheet } from "./sheets/PriceSheet";
@@ -247,9 +247,9 @@ function JobScreenInner(props: JobScreenProps) {
     toast.show(sentMessage(channel, first));
   }
 
-  function onInvoiceDone(what: InvoiceDone) {
+  function onInvoiceSent() {
     setSheet(null);
-    toast.show(what === "sent" ? `Invoice sent to ${who}` : "Invoice made. Download the PDF below to send it yourself.");
+    toast.show(`Invoice sent to ${who}`);
     router.refresh();
   }
 
@@ -575,7 +575,7 @@ function JobScreenInner(props: JobScreenProps) {
           total={current.total}
           currency={currency}
           blockers={props.invoiceBlockers}
-          onDone={onInvoiceDone}
+          onSent={onInvoiceSent}
           onClose={close}
         />
       ) : null}
