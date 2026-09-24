@@ -1,10 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { captureError } from "@/lib/observability";
 import { adminClient } from "@/lib/supabase/admin";
-import {
-  runCustomerChat,
-  type ChatMessage,
-} from "@/lib/agents/customer-chat";
+import { runCustomerChat } from "@/lib/agents/customer-chat";
+import { storedChatHistoryForAgent } from "@/lib/agents/customer-chat-history";
 import { moderateChatText } from "@/lib/moderation";
 import type { PublicQuotePayload, QuoteData } from "@/lib/quote-types";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
@@ -31,6 +29,9 @@ function clientIp(request: NextRequest): string | null {
  *     accepted, and expired quotes refuse chat.
  *   - Chat message length capped at 1000 chars.
  *   - Rate limit: 10 chat turns per public_token per UTC day.
+ *   - Conversation context is the server-stored chat_history only (capped);
+ *     any history the browser sends is ignored, so assistant turns cannot
+ *     be forged.
  *
  * Persistence: chat history lives in `quotes.quote_data.chat_history`
  * as an append-only JSON array. We chose this over the `quote_events`
@@ -62,7 +63,6 @@ type Params = { token: string };
 
 type ChatBody = {
   message?: unknown;
-  history?: unknown;
 };
 
 type ChatHistoryEntry = {
@@ -113,20 +113,6 @@ export async function POST(
       { status: 413 },
     );
   }
-
-  // Defensive narrowing of history.
-  const history: ChatMessage[] = Array.isArray(body.history)
-    ? (body.history as unknown[]).flatMap((item): ChatMessage[] => {
-        if (!item || typeof item !== "object") return [];
-        const obj = item as { role?: unknown; content?: unknown };
-        const role =
-          obj.role === "customer" || obj.role === "assistant" ? obj.role : null;
-        if (!role) return [];
-        const content = typeof obj.content === "string" ? obj.content : null;
-        if (!content) return [];
-        return [{ role, content }];
-      })
-    : [];
 
   const admin = adminClient();
 
@@ -197,6 +183,9 @@ export async function POST(
   )
     ? quoteData.chat_history
     : [];
+
+  // The model's context is what WE stored, never the browser's copy.
+  const history = storedChatHistoryForAgent(existingHistory);
 
   // Rate limit — count today's customer-side messages (UTC day).
   const startOfDayMs = (() => {

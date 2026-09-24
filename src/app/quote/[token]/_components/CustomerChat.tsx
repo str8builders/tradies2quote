@@ -17,9 +17,10 @@ import {
  *
  * Architecture:
  *   - This is a pure client component.
- *   - POSTs to /api/quote/[token]/chat with { message, history }
+ *   - POSTs to /api/quote/[token]/chat with { message }
  *   - The endpoint persists the conversation server-side in
- *     quote_data.chat_history so the tradie can review it later.
+ *     quote_data.chat_history so the tradie can review it later, and uses
+ *     that stored copy (never one sent from the browser) as the context.
  *   - History also lives in component state for instant rendering.
  *
  * UX notes:
@@ -46,8 +47,6 @@ type Props = {
   /** Customer's name from the quote, for personalised welcome. */
   clientName: string | null;
 };
-
-const MAX_HISTORY_FOR_API = 20;
 
 export function CustomerChat({ token, businessName, clientName }: Props) {
   const [open, setOpen] = useState(false);
@@ -130,22 +129,13 @@ export function CustomerChat({ token, businessName, clientName }: Props) {
     setInput("");
     setSending(true);
 
-    // Send up to N prior turns for context, but only the back-and-forth
-    // (skip the auto-welcome greeting — model doesn't need to see it).
-    const historyForApi = nextMessages
-      .slice(1) // drop welcome
-      .slice(-MAX_HISTORY_FOR_API);
-
     try {
       const res = await fetch(
         `/api/quote/${encodeURIComponent(token)}/chat`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            message: trimmed,
-            history: historyForApi.slice(0, -1), // exclude the message we just sent
-          }),
+          body: JSON.stringify({ message: trimmed }),
         },
       );
       const data = (await res.json().catch(() => ({}))) as {
