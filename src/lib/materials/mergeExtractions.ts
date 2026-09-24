@@ -15,10 +15,15 @@
  *     the merged figures against the lines, so a "carried forward" running
  *     total is caught there and flagged for review rather than trusted).
  *   - gst_inclusive: true if any page says so, else false if any page says
- *     false, else null.
+ *     false, else null. Pages that disagree add a visible warning.
  *   - status: the worst page wins (blocked > needs_review > ok).
  *   - notes / reasons / warnings: de-duplicated, prefixed "Photo n:" when
  *     there is more than one page.
+ *   - the same page added twice (identical extracted content) is counted
+ *     ONCE, with a visible warning. Summing both copies doubled every line
+ *     AND every printed total, so reconciliation still said "ok". Identical
+ *     photo files are also skipped on the device before upload (see
+ *     scanDedupe.ts); this catches a page photographed twice.
  */
 export type ScanPage = {
   supplier: string | null;
@@ -31,7 +36,8 @@ export type ScanPage = {
     quantity?: number | null;
     pieces?: number | null;
     price: number | null;
-    line_total?: number | null;
+    /** The line total exactly as printed (the extract route's field name). */
+    source_line_total?: number | null;
     sku: string | null;
     confidence: number;
     raw_text?: string | null;
@@ -61,47 +67,94 @@ function sumReported(values: Array<number | null | undefined>): number | null {
   return Math.round(reported.reduce((a, b) => a + b, 0) * 100) / 100;
 }
 
-function prefixed(pages: ScanPage[], pick: (p: ScanPage) => string[] | undefined): string[] {
+type Entry = { page: ScanPage; photo: number };
+
+function prefixed(entries: Entry[], multi: boolean, pick: (p: ScanPage) => string[] | undefined): string[] {
   const out: string[] = [];
-  pages.forEach((page, i) => {
+  for (const { page, photo } of entries) {
     for (const text of pick(page) ?? []) {
-      const line = pages.length > 1 ? `Photo ${i + 1}: ${text}` : text;
+      const line = multi ? `Photo ${photo}: ${text}` : text;
       if (!out.includes(line)) out.push(line);
     }
-  });
+  }
   return out;
+}
+
+/**
+ * What a page SAYS — quote number, every line's numbers and the printed
+ * totals — ignoring model noise (confidence, raw_text, notes). Two photos of
+ * the same page read the same; two different pages practically never do.
+ */
+export function pageFingerprint(page: ScanPage): string | null {
+  if (page.items.length === 0) return null;
+  const norm = (v: string | null | undefined) => (v ?? "").trim().toLowerCase();
+  return JSON.stringify([
+    norm(page.quote_number),
+    page.items.map((it) => [norm(it.name), norm(it.unit), it.quantity ?? null, it.price ?? null, it.source_line_total ?? null]),
+    page.subtotal ?? null,
+    page.gst ?? null,
+    page.total ?? null,
+  ]);
 }
 
 export function mergeExtractions(pages: ScanPage[]): ScanPage {
   if (pages.length === 0) throw new Error("No scan results to merge.");
   if (pages.length === 1) return pages[0];
-  const items = pages.flatMap((p) => p.items);
+
+  const firstPhotoByFingerprint = new Map<string, number>();
+  const entries: Entry[] = [];
+  const duplicateNotes: string[] = [];
+  pages.forEach((page, i) => {
+    const photo = i + 1;
+    const fingerprint = pageFingerprint(page);
+    const first = fingerprint ? firstPhotoByFingerprint.get(fingerprint) : undefined;
+    if (first !== undefined) {
+      duplicateNotes.push(
+        `Photo ${photo} is the same page as photo ${first} — its lines were only counted once.`,
+      );
+      return;
+    }
+    if (fingerprint) firstPhotoByFingerprint.set(fingerprint, photo);
+    entries.push({ page, photo });
+  });
+
+  const kept = entries.map((e) => e.page);
+  const items = kept.flatMap((p) => p.items);
   const rowFailures: NonNullable<ScanPage["row_failures"]> = [];
   let offset = 0;
-  for (const page of pages) {
+  for (const page of kept) {
     for (const f of page.row_failures ?? []) rowFailures.push({ ...f, index: f.index + offset });
     offset += page.items.length;
   }
-  const gstVotes = pages.map((p) => p.gst_inclusive);
-  const status = pages.reduce<"ok" | "needs_review" | "blocked">((worst, p) => {
+  const gstVotes = kept.map((p) => p.gst_inclusive);
+  const gstNotes =
+    gstVotes.includes(true) && gstVotes.includes(false)
+      ? [
+          `The photos disagree on whether prices include GST (${entries
+            .filter((e) => e.page.gst_inclusive !== null)
+            .map((e) => `photo ${e.photo}: ${e.page.gst_inclusive ? "including" : "excluding"}`)
+            .join(", ")}). Check the “Prices include GST” setting.`,
+        ]
+      : [];
+  const status = kept.reduce<"ok" | "needs_review" | "blocked">((worst, p) => {
     const s = p.extraction_status ?? "ok";
     return STATUS_RANK[s] > STATUS_RANK[worst] ? s : worst;
   }, "ok");
   return {
-    supplier: firstText(pages.map((p) => p.supplier)),
-    quote_number: firstText(pages.map((p) => p.quote_number)),
-    currency: firstText(pages.map((p) => p.currency)),
+    supplier: firstText(kept.map((p) => p.supplier)),
+    quote_number: firstText(kept.map((p) => p.quote_number)),
+    currency: firstText(kept.map((p) => p.currency)),
     gst_inclusive: gstVotes.includes(true) ? true : gstVotes.includes(false) ? false : null,
     items,
-    subtotal: sumReported(pages.map((p) => p.subtotal)),
-    gst: sumReported(pages.map((p) => p.gst)),
-    total: sumReported(pages.map((p) => p.total)),
-    notes: prefixed(pages, (p) => p.notes),
+    subtotal: sumReported(kept.map((p) => p.subtotal)),
+    gst: sumReported(kept.map((p) => p.gst)),
+    total: sumReported(kept.map((p) => p.total)),
+    notes: prefixed(entries, true, (p) => p.notes),
     extraction_status: status,
-    extraction_reasons: prefixed(pages, (p) => p.extraction_reasons),
+    extraction_reasons: prefixed(entries, true, (p) => p.extraction_reasons),
     row_failures: rowFailures,
-    warnings: prefixed(pages, (p) => p.warnings),
-    attempts: pages.reduce((n, p) => n + (p.attempts ?? 1), 0),
+    warnings: [...duplicateNotes, ...gstNotes, ...prefixed(entries, true, (p) => p.warnings)],
+    attempts: kept.reduce((n, p) => n + (p.attempts ?? 1), 0),
   };
 }
 

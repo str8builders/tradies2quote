@@ -18,7 +18,11 @@ export type ExtractedSupplierItem = {
   name: string;
   /** Normalised unit (each, m, m², sheet, length, bag, …). */
   unit: string;
-  /** Unit price as shown (GST handling is decided at review time). Null = not found. */
+  /**
+   * Unit price as shown, at full precision (never rounded to the cent —
+   * 0.125 × 1000 must stay $125). Negative for a printed discount / credit
+   * line. GST handling is decided at review time. Null = not found.
+   */
   price: number | null;
   /** Supplier SKU / product code if printed. */
   sku: string | null;
@@ -93,7 +97,7 @@ export type ParseResult =
       value: SupplierQuoteExtraction;
       /** Rows rejected as malformed (visible, not silently dropped). */
       rowFailures: RowFailure[];
-      /** Non-fatal notes (e.g. de-dupe drops) — visible, not silent. */
+      /** Non-fatal notes (e.g. possible duplicate rows) — visible, not silent. */
       warnings: string[];
     }
   | { ok: false; errors: string[] };
@@ -169,6 +173,17 @@ function clampConfidence(v: unknown): number {
 
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 
+/**
+ * Clean binary floating-point noise off a unit price WITHOUT rounding it to
+ * the cent (11.5 / 1.15 → 10, 0.05 / 1.15 → 0.04347826087). Line totals are
+ * money and are rounded to cents; unit prices are not — rounding them first
+ * is what turned 10,000 × $0.05 into $460 instead of $500.
+ */
+export function preciseUnitPrice(n: number): number {
+  if (!Number.isFinite(n) || n === 0) return 0;
+  return Number(n.toPrecision(10));
+}
+
 // Intentional "no price" markers — NOT a misread, so they read as ABSENT
 // (kept row, null value), never a malformed rejection.
 const NON_PRICE_MARKERS = new Set([
@@ -225,7 +240,10 @@ export function parseSupplierQuoteExtraction(raw: unknown): ParseResult {
   const obj = raw as Record<string, unknown>;
 
   const rawItems = Array.isArray(obj.items) ? obj.items : [];
-  const seen = new Set<string>();
+  // Row signature → the 1-based position it was first read at. Identical
+  // rows are KEPT (a quote can genuinely list the same item twice — two
+  // deliveries, two discounts) but flagged so the tradie can check.
+  const seen = new Map<string, number>();
   const items: ExtractedSupplierItem[] = [];
   const rowFailures: RowFailure[] = [];
   const warnings: string[] = [];
@@ -268,9 +286,18 @@ export function parseSupplierQuoteExtraction(raw: unknown): ParseResult {
     }
 
     const unit = normaliseUnit(r.unit);
-    const price =
-      priceC.kind === "number" ? Math.max(0, round2(priceC.value)) : null;
-    const quantity = qtyC.kind === "number" ? Math.max(0, qtyC.value) : null;
+    // Prices keep their full precision and their sign: a printed discount or
+    // credit is a real line, not a misread to zero out.
+    let price = priceC.kind === "number" ? priceC.value : null;
+    let quantity = qtyC.kind === "number" ? qtyC.value : null;
+    // A credit printed as a negative QUANTITY ("-2 × 12.40 = -24.80") is
+    // normalised to a positive quantity and a negative price, so every
+    // downstream "quantity > 0" rule still holds and qty × price still
+    // equals the printed line total.
+    if (quantity != null && quantity < 0) {
+      quantity = -quantity;
+      if (price != null) price = -price;
+    }
     const pieces =
       piecesC.kind === "number" && piecesC.value > 0
         ? Math.round(piecesC.value)
@@ -281,13 +308,18 @@ export function parseSupplierQuoteExtraction(raw: unknown): ParseResult {
       typeof r.sku === "string" && r.sku.trim() ? r.sku.trim() : null;
     const confidence = clampConfidence(r.confidence);
 
-    // De-dupe identical name+unit rows — recorded as a VISIBLE warning.
-    const key = `${name.toLowerCase()}|${unit}`;
-    if (seen.has(key)) {
-      warnings.push(`Dropped duplicate row "${name}" (${unit}).`);
-      return;
+    // Identical rows are kept (never silently dropped) — the printed
+    // subtotal reconciliation catches a row the model read twice — but the
+    // tradie gets a visible note to check it.
+    const key = [name.toLowerCase(), unit, quantity, price, source_line_total].join("|");
+    const firstRow = seen.get(key);
+    if (firstRow !== undefined) {
+      warnings.push(
+        `Possible duplicate: row ${items.length + 1} ("${name}") reads the same as row ${firstRow}. Both are kept — untick one if the quote doesn't list it twice.`,
+      );
+    } else {
+      seen.set(key, items.length + 1);
     }
-    seen.add(key);
 
     items.push({
       name,
@@ -461,9 +493,12 @@ export function chooseBestExtraction(
 }
 
 /**
- * Convert a displayed price to the ex-GST value we store in the library.
- * Mirrors the supplier-capture form's convention (default_unit_price is
- * always ex-GST). `rate` is the GST fraction (NZ = 0.15).
+ * Convert a displayed MONEY AMOUNT (a line total or document total) to ex-GST,
+ * rounded to the cent. `rate` is the GST fraction (NZ = 0.15).
+ *
+ * Do not use this for unit prices: rounding a unit price before multiplying
+ * compounds the error across the quantity (10,000 × $0.05 incl → $460).
+ * Use `unitPriceExGst` for those.
  */
 export function toExGst(
   price: number,
@@ -472,4 +507,17 @@ export function toExGst(
 ): number {
   const ex = inclusive ? price / (1 + rate) : price;
   return Math.round(ex * 100) / 100;
+}
+
+/**
+ * Convert a displayed UNIT price to ex-GST at full precision (the library's
+ * `default_unit_price` and quote unit prices are ex-GST). Only floating-point
+ * noise is removed — see `preciseUnitPrice`.
+ */
+export function unitPriceExGst(
+  price: number,
+  inclusive: boolean,
+  rate = 0.15,
+): number {
+  return preciseUnitPrice(inclusive ? price / (1 + rate) : price);
 }

@@ -7,17 +7,12 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { NZ_DEFAULTS } from "@/lib/quote-defaults";
+import { preciseUnitPrice, unitPriceExGst } from "@/lib/materials/quoteExtraction";
 import {
-  buildMirrorQuoteLines,
-  computeQuoteTotals,
-} from "@/lib/materials/estimateToQuote";
-import {
-  toExGst,
-  type ExtractedSupplierItem,
-  type SupplierQuoteExtraction,
-} from "@/lib/materials/quoteExtraction";
-import { validateSupplierQuote } from "@/lib/materials/quoteValidation";
-import type { QuoteData } from "@/lib/quote-types";
+  buildScanQuote,
+  type ScanQuoteLine as ScanQuoteLineInput,
+  type ScanQuoteMeta,
+} from "@/lib/materials/scanToQuote";
 import type { ActionResult } from "./_state";
 
 // `ActionResult` and `ACTION_INITIAL` live in `./_state.ts` — Next 16
@@ -34,9 +29,38 @@ function readOptional(form: FormData, key: string): string | null {
 }
 
 function parsePrice(raw: string): number | null {
+  if (raw.trim() === "") return null;
   const n = Number(raw);
   if (!Number.isFinite(n) || n < 0) return null;
-  return Math.round(n * 100) / 100;
+  // Full precision — a 12.5c fixing must not be saved as 13c.
+  return preciseUnitPrice(n);
+}
+
+type ServerClient = Awaited<ReturnType<typeof createClient>>;
+
+/** The tradie's tax rate as a fraction (profile stores a percentage). */
+async function profileTaxFraction(supabase: ServerClient, userId: string): Promise<number> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("tax_rate")
+    .eq("id", userId)
+    .maybeSingle();
+  const pct = Number(data?.tax_rate ?? NZ_DEFAULTS.tax_rate);
+  return Number.isFinite(pct) && pct >= 0 ? pct / 100 : NZ_DEFAULTS.tax_rate / 100;
+}
+
+/**
+ * Library prices are stored ex-GST. When the tradie says the price they
+ * typed (or the file they imported) includes GST, convert it once, here.
+ */
+async function toStoredPrice(
+  supabase: ServerClient,
+  userId: string,
+  price: number,
+  includesGst: boolean,
+): Promise<number> {
+  if (!includesGst) return price;
+  return unitPriceExGst(price, true, await profileTaxFraction(supabase, userId));
 }
 
 export async function createMaterial(
@@ -57,12 +81,18 @@ export async function createMaterial(
   if (!name) return { error: "Name is required." };
   if (!unit) return { error: "Unit is required." };
   if (price === null) return { error: "Default price must be a non-negative number." };
+  const storedPrice = await toStoredPrice(
+    supabase,
+    user.id,
+    price,
+    formData.get("price_includes_gst") === "on",
+  );
 
   const { error } = await supabase.from("materials").insert({
     user_id: user.id,
     name,
     unit,
-    default_unit_price: price,
+    default_unit_price: storedPrice,
     supplier: readOptional(formData, "supplier"),
     supplier_url: readOptional(formData, "supplier_url"),
     notes: readOptional(formData, "notes"),
@@ -101,13 +131,19 @@ export async function updateMaterial(
   if (!name) return { error: "Name is required." };
   if (!unit) return { error: "Unit is required." };
   if (price === null) return { error: "Default price must be a non-negative number." };
+  const storedPrice = await toStoredPrice(
+    supabase,
+    user.id,
+    price,
+    formData.get("price_includes_gst") === "on",
+  );
 
   const { error } = await supabase
     .from("materials")
     .update({
       name,
       unit,
-      default_unit_price: price,
+      default_unit_price: storedPrice,
       supplier: readOptional(formData, "supplier"),
       supplier_url: readOptional(formData, "supplier_url"),
       notes: readOptional(formData, "notes"),
@@ -158,14 +194,19 @@ export async function deleteMaterial(
 type ImportRow = {
   name: string;
   unit: string;
-  default_unit_price: number;
+  /** Null = the file gave no price (blank / POA). Never overwrites a price. */
+  default_unit_price: number | null;
   supplier: string | null;
   supplier_url: string | null;
   notes: string | null;
 };
 
+const textOrNull = (v: unknown): string | null =>
+  typeof v === "string" && v.trim() ? v.trim() : null;
+
 export async function importMaterials(
   rows: ImportRow[],
+  options: { pricesIncludeGst?: boolean } = {},
 ): Promise<{ inserted: number; updated: number; failed: number; error?: string }> {
   const supabase = await createClient();
   const {
@@ -176,6 +217,40 @@ export async function importMaterials(
   if (!Array.isArray(rows) || rows.length === 0) {
     return { inserted: 0, updated: 0, failed: 0, error: "No rows to import." };
   }
+
+  // Defensive server-side validation — never trust the client's parse.
+  let failed = 0;
+  const clean: ImportRow[] = [];
+  for (const r of rows) {
+    const name = textOrNull(r?.name);
+    const unit = textOrNull(r?.unit);
+    const price = r?.default_unit_price;
+    const priceOk =
+      price === null ||
+      (typeof price === "number" && Number.isFinite(price) && price >= 0);
+    if (!name || !unit || !priceOk) {
+      failed++;
+      continue;
+    }
+    clean.push({
+      name,
+      unit,
+      default_unit_price: price,
+      supplier: textOrNull(r.supplier),
+      supplier_url: textOrNull(r.supplier_url),
+      notes: textOrNull(r.notes),
+    });
+  }
+  if (clean.length === 0) {
+    return { inserted: 0, updated: 0, failed, error: "No valid rows to import." };
+  }
+
+  // Library prices are ex-GST: convert once when the file's prices include it.
+  const taxFraction = options.pricesIncludeGst
+    ? await profileTaxFraction(supabase, user.id)
+    : 0;
+  const stored = (p: number | null) =>
+    p === null ? null : unitPriceExGst(p, options.pricesIncludeGst === true, taxFraction);
 
   const { data: existing, error: selErr } = await supabase
     .from("materials")
@@ -197,31 +272,26 @@ export async function importMaterials(
     byName.set(m.name.trim().toLowerCase(), m.id);
   }
 
-  const toInsert: Array<ImportRow & { user_id: string }> = [];
+  const toInsert: ImportRow[] = [];
   const toUpdate: Array<{ id: string; row: ImportRow }> = [];
-  for (const r of rows) {
-    const key = r.name.trim().toLowerCase();
-    const matchId = byName.get(key);
-    if (matchId) {
-      toUpdate.push({ id: matchId, row: r });
-    } else {
-      toInsert.push({ ...r, user_id: user.id });
-    }
+  for (const r of clean) {
+    const matchId = byName.get(r.name.toLowerCase());
+    if (matchId) toUpdate.push({ id: matchId, row: r });
+    else toInsert.push(r);
   }
 
   let inserted = 0;
   let updated = 0;
-  let failed = 0;
 
   if (toInsert.length > 0) {
     const { data, error } = await supabase
       .from("materials")
       .insert(
         toInsert.map((r) => ({
-          user_id: r.user_id,
+          user_id: user.id,
           name: r.name,
           unit: r.unit,
-          default_unit_price: r.default_unit_price,
+          default_unit_price: stored(r.default_unit_price),
           supplier: r.supplier,
           supplier_url: r.supplier_url,
           notes: r.notes,
@@ -238,16 +308,19 @@ export async function importMaterials(
   }
 
   for (const u of toUpdate) {
+    // Only the fields this file actually carries — a re-import must never
+    // wipe the row's price, supplier, link or notes with blanks.
+    const patch: Record<string, unknown> = { unit: u.row.unit };
+    if (u.row.default_unit_price !== null) {
+      patch.default_unit_price = stored(u.row.default_unit_price);
+      patch.is_ai_estimated = false;
+    }
+    if (u.row.supplier) patch.supplier = u.row.supplier;
+    if (u.row.supplier_url) patch.supplier_url = u.row.supplier_url;
+    if (u.row.notes) patch.notes = u.row.notes;
     const { error } = await supabase
       .from("materials")
-      .update({
-        unit: u.row.unit,
-        default_unit_price: u.row.default_unit_price,
-        supplier: u.row.supplier,
-        supplier_url: u.row.supplier_url,
-        notes: u.row.notes,
-        is_ai_estimated: false,
-      })
+      .update(patch)
       .eq("id", u.id)
       .eq("user_id", user.id);
     if (error) {
@@ -293,16 +366,17 @@ export async function importSupplierQuoteItems(
     return { inserted: 0, updated: 0, failed: 0, error: "No rows to import." };
   }
   // Defensive server-side validation — the UI already enforces this, but
-  // never trust the client. Drop rows with no name or a bad price.
+  // never trust the client. Drop rows with no name or no price above zero:
+  // a library price is never overwritten with $0 or a discount.
   const clean = rows
     .map((r) => ({
       name: typeof r.name === "string" ? r.name.trim() : "",
       unit: typeof r.unit === "string" && r.unit.trim() ? r.unit.trim() : "each",
-      default_unit_price: Math.max(0, Number(r.default_unit_price) || 0),
+      default_unit_price: preciseUnitPrice(Number(r.default_unit_price)),
       sku: typeof r.sku === "string" && r.sku.trim() ? r.sku.trim() : null,
       notes: typeof r.notes === "string" && r.notes.trim() ? r.notes.trim() : null,
     }))
-    .filter((r) => r.name.length > 0);
+    .filter((r) => r.name.length > 0 && r.default_unit_price > 0);
   if (clean.length === 0) {
     return { inserted: 0, updated: 0, failed: 0, error: "No valid rows to import." };
   }
@@ -369,19 +443,22 @@ export async function importSupplierQuoteItems(
   }
 
   for (const u of toUpdate) {
+    // Only what the scan carried: keep the row's supplier, SKU and the
+    // tradie's own notes when the scan didn't read them.
+    const patch: Record<string, unknown> = {
+      unit: u.row.unit,
+      default_unit_price: u.row.default_unit_price,
+      is_ai_estimated: true,
+      price_source: "supplier_import",
+      price_confidence: "medium",
+      gst_included: false,
+    };
+    if (supplierName) patch.supplier = supplierName;
+    if (u.row.sku) patch.sku = u.row.sku;
+    if (u.row.notes) patch.notes = u.row.notes;
     const { error } = await supabase
       .from("materials")
-      .update({
-        unit: u.row.unit,
-        default_unit_price: u.row.default_unit_price,
-        supplier: supplierName,
-        sku: u.row.sku,
-        notes: u.row.notes ?? "From scanned supplier quote — confirm price.",
-        is_ai_estimated: true,
-        price_source: "supplier_import",
-        price_confidence: "medium",
-        gst_included: false,
-      })
+      .update(patch)
       .eq("id", u.id)
       .eq("user_id", user.id);
     if (error) failed++;
@@ -409,33 +486,13 @@ export async function importSupplierQuoteItems(
 // can fill in the client + edit from there.
 // ───────────────────────────────────────────────────────────────────────
 
-export type ScanQuoteLine = {
-  name: string;
-  unit: string;
-  quantity: number;
-  price: number;
-  /** Printed line total as scanned — carried through for reconciliation. */
-  line_total?: number | null;
-};
+export type ScanQuoteLine = ScanQuoteLineInput;
 
 export async function createQuoteFromScan(
   lines: ScanQuoteLine[],
-  meta: {
-    supplier: string | null;
-    gstInclusive: boolean;
-    /** Printed document totals as scanned (read-only source) for reconciliation. */
-    subtotal?: number | null;
-    gst?: number | null;
-    total?: number | null;
+  meta: ScanQuoteMeta & {
     /** Tradie's explicit "create anyway" override for a flagged mismatch. */
     acknowledge?: boolean;
-    /** #2 — strict-extraction verdict from the scan route (provenance). */
-    extractionStatus?: "ok" | "needs_review" | "blocked";
-    extractionReasons?: string[];
-    /** Ops — rows the strict parser rejected (persisted for the review queue). */
-    rowFailures?: Array<{ index: number; reason: string; raw_text: string | null }>;
-    /** Ops — how many AI passes ran (1 = no retry). For the retry-rate metric. */
-    extractionAttempts?: number;
     idempotencyKey?: string;
   },
 ): Promise<{ id?: string; error?: string; blocked?: boolean }> {
@@ -460,51 +517,13 @@ export async function createQuoteFromScan(
   const taxLabel = profileRow?.tax_label ?? NZ_DEFAULTS.tax_label;
   const taxRate = Number(profileRow?.tax_rate ?? NZ_DEFAULTS.tax_rate);
 
-  // Map the reviewed rows into the extractor's item shape so the mirror
-  // builder is the single source of the pass-through rules.
-  const items: ExtractedSupplierItem[] = lines
-    .map((l) => ({
-      name: typeof l.name === "string" ? l.name.trim() : "",
-      unit: typeof l.unit === "string" && l.unit.trim() ? l.unit.trim() : "each",
-      price:
-        Number.isFinite(Number(l.price)) && Number(l.price) > 0
-          ? Math.round(Number(l.price) * 100) / 100
-          : null,
-      sku: null,
-      quantity:
-        Number.isFinite(Number(l.quantity)) && Number(l.quantity) > 0
-          ? Number(l.quantity)
-          : null,
-      pieces: null,
-      source_line_total:
-        Number.isFinite(Number(l.line_total)) && Number(l.line_total) > 0
-          ? Math.round(Number(l.line_total) * 100) / 100
-          : null,
-      raw_text: null,
-      confidence: 1,
-    }))
-    .filter((i) => i.name.length > 0);
-  if (items.length === 0) {
-    return { error: "No valid lines to turn into a quote." };
-  }
+  // Deterministic reconciliation + the 1:1 mirror — the server is the
+  // authority for money. Unit prices keep full precision and the check
+  // compares the raw printed values like with like (see scanToQuote.ts).
+  const built = buildScanQuote(lines, meta, { currency, taxLabel, taxRate });
+  if (!built.ok) return { error: built.error };
+  const { validation, lineItems, quoteData } = built.value;
 
-  // Deterministic reconciliation — the server is the authority for money.
-  // Block creation when the scanned totals don't reconcile with the lines,
-  // unless the tradie has explicitly acknowledged the mismatch.
-  const extraction: SupplierQuoteExtraction = {
-    supplier: meta?.supplier ?? null,
-    quote_number: null,
-    currency,
-    gst_inclusive: meta?.gstInclusive ?? false,
-    items,
-    subtotal: meta?.subtotal ?? null,
-    gst: meta?.gst ?? null,
-    total: meta?.total ?? null,
-    notes: [],
-  };
-  const validation = validateSupplierQuote(extraction, {
-    taxRate: taxRate / 100,
-  });
   console.log("[import-quote] validation", {
     userId: user.id,
     severity: validation.severity,
@@ -517,6 +536,8 @@ export async function createQuoteFromScan(
       total: meta?.total ?? null,
     },
   });
+  // Block creation when the scanned totals don't reconcile with the lines,
+  // unless the tradie has explicitly acknowledged the mismatch.
   if (validation.blocking && !meta?.acknowledge) {
     return {
       blocked: true,
@@ -525,74 +546,7 @@ export async function createQuoteFromScan(
     };
   }
 
-  const lineItems = buildMirrorQuoteLines(items, {
-    gstInclusive: meta?.gstInclusive ?? false,
-    taxRate: taxRate / 100,
-  });
-
-  // markup 0 — a faithful mirror; total equals the supplier quote total.
-  const totals = computeQuoteTotals(lineItems, {
-    default_markup_pct: 0,
-    tax_rate: taxRate,
-  });
-
-  const supplierName =
-    typeof meta?.supplier === "string" && meta.supplier.trim()
-      ? meta.supplier.trim()
-      : null;
-
-  const quoteData: QuoteData = {
-    client: { name: "To be confirmed", address: null, email: null, phone: null, contact: null },
-    job_summary: supplierName
-      ? `Imported from ${supplierName} supplier quote`
-      : "Imported from supplier quote",
-    line_items: lineItems,
-    materials_subtotal: totals.materials_subtotal,
-    labour_subtotal: totals.labour_subtotal,
-    markup_pct: 0,
-    markup_amount: totals.markup_amount,
-    subtotal_before_tax: totals.subtotal_before_tax,
-    tax_amount: totals.tax_amount,
-    total: totals.total,
-    currency,
-    tax_label: taxLabel,
-    tax_rate: taxRate,
-    terms: "",
-    notes: [],
-    // Read-only supplier source totals (ex-GST basis, matching the quote)
-    // so the Review Quote editor can reconcile against the scanned quote.
-    supplier_source: {
-      supplier: supplierName,
-      subtotal:
-        meta?.subtotal != null
-          ? toExGst(meta.subtotal, meta?.gstInclusive ?? false, taxRate / 100)
-          : null,
-      gst: meta?.gst ?? null,
-      total: meta?.total ?? null,
-      // PHASE 2 — raw printed document totals, EXACTLY as scanned and
-      // never GST-converted, so the source can never be silently
-      // overwritten and Review Quote can diff source vs computed.
-      gst_inclusive: meta?.gstInclusive ?? false,
-      source_subtotal: meta?.subtotal ?? null,
-      source_gst: meta?.gst ?? null,
-      source_total: meta?.total ?? null,
-      source_discount: null,
-      source_freight: null,
-      source_adjustments: null,
-      // Deterministic reconciliation verdict (computed above on the RAW
-      // extraction, GST-aware), frozen onto the quote so the pre-send gate
-      // can hard-block a critical mismatch.
-      reconciliation_status: validation.reconciliation_status,
-      reconciliation_reasons: validation.reconciliation_reasons,
-      // #2 — strict-extraction verdict (scan-time provenance for the trace).
-      extraction_status: meta?.extractionStatus,
-      extraction_reasons: meta?.extractionReasons,
-      // Ops — rejected rows + attempt count, persisted so the owner
-      // extraction-review queue + metrics can read them without re-scanning.
-      row_failures: meta?.rowFailures ?? [],
-      extraction_attempts: meta?.extractionAttempts ?? 1,
-    },
-  };
+  const supplierName = quoteData.supplier_source?.supplier ?? null;
 
   const { data, error } = await supabase
     .from("quotes")
@@ -605,7 +559,7 @@ export async function createQuoteFromScan(
       status: "draft",
       quote_data: quoteData,
       ai_snapshot: quoteData,
-      total_amount: totals.total,
+      total_amount: quoteData.total,
       currency,
     })
     .select("id")

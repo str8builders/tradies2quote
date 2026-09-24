@@ -318,9 +318,11 @@ export function remapCsvWithPreset(text: string, preset: SupplierPreset): string
           values.unit = value;
           break;
         case "default_unit_price":
-          // Strip currency symbols + commas before handing to the
-          // existing numeric parser. Keep the minus / dot intact.
-          values.default_unit_price = value.replace(/[^\d.\-]/g, "");
+          // Passed through as written: the shared parser (parseCsvPrice)
+          // decides decimal comma vs thousands, POA/blank (no price) and
+          // accounting negatives. Stripping here turned "12,50" into 1250,
+          // "POA" into $0 and "(5.00)" into +$5.
+          values.default_unit_price = value;
           break;
         case "supplier_url":
           values.supplier_url = value;

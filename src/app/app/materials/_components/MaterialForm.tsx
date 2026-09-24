@@ -50,11 +50,11 @@ export function MaterialForm({ mode, initial }: Props) {
             required
           />
           <Field
-            label="Default price"
+            label="Default price (ex GST)"
             name="default_unit_price"
             type="number"
             inputMode="decimal"
-            step="0.01"
+            step="any"
             min="0"
             defaultValue={
               initial?.default_unit_price !== null && initial?.default_unit_price !== undefined
@@ -64,6 +64,15 @@ export function MaterialForm({ mode, initial }: Props) {
             required
           />
         </div>
+        <label className="-mt-1 flex min-h-11 cursor-pointer items-center gap-2 text-sm text-ink-200">
+          <input
+            type="checkbox"
+            name="price_includes_gst"
+            data-testid="material-price-includes-gst"
+            className="h-4 w-4 accent-brand"
+          />
+          This price includes GST — save it ex-GST
+        </label>
         <Field
           label="Supplier"
           name="supplier"

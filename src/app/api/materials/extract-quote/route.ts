@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
+import { aiConsentGate } from "@/lib/ai-consent";
+import { prepareImageForAi, UnreadableImageError } from "@/lib/aiImage";
 import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
 import { isOwnerEmail } from "@/lib/owner";
 import {
@@ -28,7 +30,12 @@ import { fetchWithTimeout, TIMEOUTS } from "@/lib/fetchTimeout";
  *
  *   200 { supplier, currency, gst_inclusive, items[], notes[] }
  *   400 bad/missing image · 401 unauth · 402 trial expired
- *   413 too big · 415 wrong type · 429 daily limit · 502/503 upstream
+ *   403 AI consent required (iOS app) · 413 too big · 415 wrong type
+ *   429 daily limit · 502/503 upstream
+ *
+ * Each item carries the line total printed on the quote as
+ * `source_line_total`. The photo is re-encoded (EXIF/GPS dropped) before it
+ * is sent to the model.
  *
  * The AI only extracts. The write happens later via the
  * `importSupplierQuoteItems` server action, after the human confirms.
@@ -46,6 +53,11 @@ const MODEL = "claude-sonnet-5";
 // A quote can list 30-40 lines; each JSON row is ~40 tokens. 8192 keeps
 // headroom so a long quote doesn't truncate mid-array.
 const MAX_TOKENS = 8192;
+// Sonnet 5 thinks adaptively INSIDE max_tokens and inside the 80 s budget.
+// Reading printed numbers off a photo is transcription, not reasoning — low
+// effort keeps the thinking from eating the cap (truncated JSON on dense
+// quotes) or the timeout. Same knob src/lib/agents/runtime.ts uses.
+const EFFORT = "low";
 
 // Daily AI cap per user — same in-memory pattern as /api/suppliers/extract.
 // Cheap (no DB write), per-instance, owner-bypassed for dogfooding.
@@ -126,6 +138,8 @@ Hard rules:
 - Capture the printed summary amounts in "subtotal", "gst" and "total". Do NOT include subtotal/GST/total/rounding rows as product items in "items".
 - Do NOT invent products or numbers. If you cannot read a value, use null and add a note — never guess.
 - Keep a freight/delivery line as an item only if it's a real chargeable line.
+- A discount or credit printed as its own row IS an item: give it a NEGATIVE "price" and "line_total" exactly as printed (e.g. -25.00). Never drop it or make it positive.
+- If the same product is printed on two rows, return BOTH rows — never merge or de-duplicate lines.
 - Use NZ trade vocabulary.`;
 
 export async function POST(request: NextRequest) {
@@ -136,6 +150,11 @@ export async function POST(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  // Guideline 5.1.2(i) — no supplier-quote photo goes to Anthropic without
+  // recorded consent (iOS shell only; web unaffected).
+  const consentGate = await aiConsentGate(supabase, user.id);
+  if (consentGate) return consentGate;
 
   const sub = await getSubscriptionStatus({
     userId: user.id,
@@ -214,14 +233,25 @@ export async function POST(request: NextRequest) {
   }
 
   const arrayBuf = await image.arrayBuffer();
-  const mediaType = sniffPreparedImageMime(new Uint8Array(arrayBuf));
-  if (!mediaType) {
+  if (!sniffPreparedImageMime(new Uint8Array(arrayBuf))) {
     return NextResponse.json(
       { error: "Unsupported or unreadable image file." },
       { status: 415 },
     );
   }
-  const base64 = Buffer.from(arrayBuf).toString("base64");
+  // Never forward camera metadata (EXIF/GPS) to the AI provider.
+  let prepared: Awaited<ReturnType<typeof prepareImageForAi>>;
+  try {
+    prepared = await prepareImageForAi(new Uint8Array(arrayBuf));
+  } catch (e) {
+    if (!(e instanceof UnreadableImageError)) captureError(e, { route: "materials/extract-quote" });
+    return NextResponse.json(
+      { error: "Unsupported or unreadable image file." },
+      { status: 415 },
+    );
+  }
+  const mediaType = prepared.mediaType;
+  const base64 = prepared.data.toString("base64");
 
   type RouteAttempt = {
     value: SupplierQuoteExtraction;
@@ -252,6 +282,7 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({
           model: MODEL,
           max_tokens: MAX_TOKENS,
+          output_config: { effort: EFFORT },
           system: SYSTEM_PROMPT,
           messages: [
             {

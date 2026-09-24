@@ -3,26 +3,42 @@
 import { useCallback, useEffect, useState } from "react";
 import { Camera, Trash } from "@phosphor-icons/react";
 type Photo = { id: string; name: string };
+/**
+ * Where the photo list is read, and where (if anywhere) it can be changed.
+ * The public quote-link route `/api/quote/[token]/photos` is GET-only;
+ * uploads and removals exist only on the owner's `/api/quotes/[id]/photos`.
+ */
+export function quotePhotoEndpoints({ quoteId, token }: { quoteId?: string; token?: string }): { list: string; manage: string | null } {
+  if (token) return { list: `/api/quote/${encodeURIComponent(token)}/photos`, manage: null };
+  const owner = `/api/quotes/${encodeURIComponent(quoteId ?? "")}/photos`;
+  return { list: owner, manage: owner };
+}
 export function QuotePhotos({ quoteId, token }: { quoteId?: string; token?: string }) {
-  const endpoint = token ? `/api/quote/${encodeURIComponent(token)}/photos` : `/api/quotes/${quoteId}/photos`;
+  const { list: endpoint, manage } = quotePhotoEndpoints({ quoteId, token });
   const [photos, setPhotos] = useState<Photo[]>([]); const [canEdit, setCanEdit] = useState(false);
   const [enabled, setEnabled] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
   const load = useCallback(async (signal?: AbortSignal) => {
-    const res = await fetch(endpoint, { signal }); const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Photos could not be loaded.");
-    setPhotos(data.photos); setCanEdit(data.canEdit === true); setEnabled(data.enabled === true);
-  }, [endpoint]);
+    const res = await fetch(endpoint, { signal }); const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      // The public link answers 404 (no body) once a quote stops being live: just show no photos.
+      if (token && res.status === 404) { setPhotos([]); return; }
+      throw new Error(data.error || "Photos could not be loaded.");
+    }
+    setPhotos(Array.isArray(data.photos) ? data.photos : []); setCanEdit(manage !== null && data.canEdit === true); setEnabled(data.enabled === true);
+  }, [endpoint, manage, token]);
   // Refresh state follows an asynchronous API response; this is external data synchronisation.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { const controller = new AbortController(); load(controller.signal).catch((e) => { if (!controller.signal.aborted) setError(e.message); }); return () => controller.abort(); }, [load]);
   async function upload(file: File) {
+    if (!manage) return; // the public link is read-only
     setBusy(true); setError("");
-    try { const body = new FormData(); body.set("photo", file); const res = await fetch(endpoint, { method: "POST", body }); const data = await res.json(); if (!res.ok) throw new Error(data.error); await load(); }
+    try { const body = new FormData(); body.set("photo", file); const res = await fetch(manage, { method: "POST", body }); const data = await res.json().catch(() => ({})); if (!res.ok) throw new Error(data.error || "Photo could not be saved."); await load(); }
     catch (e) { setError(e instanceof Error ? e.message : "Photo could not be saved."); } finally { setBusy(false); }
   }
   async function remove(id: string) {
+    if (!manage) return; // the public link is read-only
     setBusy(true); setError("");
-    try { const res = await fetch(endpoint, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }); const data = await res.json(); if (!res.ok) throw new Error(data.error); await load(); }
+    try { const res = await fetch(manage, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }); const data = await res.json().catch(() => ({})); if (!res.ok) throw new Error(data.error || "Photo could not be removed."); await load(); }
     catch (e) { setError(e instanceof Error ? e.message : "Photo could not be removed."); } finally { setBusy(false); }
   }
   if (token && !photos.length && !error) return null;

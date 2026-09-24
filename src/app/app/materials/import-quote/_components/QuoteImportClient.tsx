@@ -16,13 +16,16 @@ import {
   Warning,
   X,
 } from "@phosphor-icons/react";
-import { toExGst } from "@/lib/materials/quoteExtraction";
+import { preciseUnitPrice, unitPriceExGst } from "@/lib/materials/quoteExtraction";
 import type { SupplierQuoteExtraction } from "@/lib/materials/quoteExtraction";
 import { validateSupplierQuote } from "@/lib/materials/quoteValidation";
-import { formatCurrency, round2 } from "@/lib/quote-defaults";
+import { formatCurrency } from "@/lib/quote-defaults";
 import { TapeMeasureProgress } from "@/app/app/_components/TapeMeasureProgress";
 import { prepareScanImage } from "@/lib/scanImage";
-import { mergeExtractions, photoSetLabel } from "@/lib/materials/mergeExtractions";
+import { mergeExtractions, photoSetLabel, type ScanPage } from "@/lib/materials/mergeExtractions";
+import { buildReviewRows, type ScanReviewRow } from "@/lib/materials/scanReview";
+import { createPhotoDeduper } from "@/lib/materials/scanDedupe";
+import { ScanGstNote } from "./ScanGstNote";
 import {
   MAX_SCAN_UPLOAD_BYTES,
   detectImageMime,
@@ -46,51 +49,21 @@ type Phase =
   | "done"
   | "error";
 
-type ReviewRow = {
-  id: string;
-  include: boolean;
-  name: string;
-  unit: string;
-  quantity: string; // kept as string for the input; parsed on use
-  price: string; // kept as string for the input; parsed on save
-  sku: string | null;
-  /** Printed line total as scanned — read-only SOURCE for reconciliation. */
-  sourceLineTotal: number | null;
-  lowConfidence: boolean;
-  /** Exactly what the scanner read for this row — provenance for spot-checks. */
-  rawText: string | null;
-};
+type ReviewRow = ScanReviewRow;
 
-type ExtractResponse = {
-  supplier: string | null;
-  quote_number?: string | null;
-  currency: string | null;
-  gst_inclusive: boolean | null;
-  items: Array<{
-    name: string;
-    unit: string;
-    quantity?: number | null;
-    pieces?: number | null;
-    price: number | null;
-    line_total?: number | null;
-    sku: string | null;
-    confidence: number;
-    raw_text?: string | null;
-  }>;
-  subtotal?: number | null;
-  gst?: number | null;
-  total?: number | null;
-  notes: string[];
-  extraction_status?: "ok" | "needs_review" | "blocked";
-  extraction_reasons?: string[];
-  row_failures?: Array<{ index: number; reason: string; raw_text: string | null }>;
-  warnings?: string[];
-  /** Ops layer — how many AI passes ran (1 = no retry). */
-  attempts?: number;
-};
+/** One page as /api/materials/extract-quote returns it (the printed line
+ *  total arrives as `source_line_total`). */
+type ExtractResponse = ScanPage;
 
 /** Photos per scan. Each one is a separate vision call, so keep it modest. */
 export const MAX_SCAN_PHOTOS = 6;
+
+/** A usable price: above zero, or negative on a printed discount line. */
+function validRowPrice(r: ReviewRow): boolean {
+  if (r.price.trim() === "") return false;
+  const p = Number(r.price);
+  return Number.isFinite(p) && (p > 0 || (r.credit && p < 0));
+}
 
 export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: string; /** Fraction, e.g. 0.15. The tradie's configured rate, not a fixed GST. */ taxRate?: number }) {
   const router = useRouter();
@@ -114,6 +87,9 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
   const [error, setError] = useState<string>("");
   const [supplier, setSupplier] = useState<string>("");
   const [gstInclusive, setGstInclusive] = useState<boolean>(false);
+  // What the scan itself read: true / false, or null when it couldn't tell
+  // (then the prices are treated as ex-GST and the review says so).
+  const [gstDetected, setGstDetected] = useState<boolean | null>(null);
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [notes, setNotes] = useState<string[]>([]);
   // Document-level SOURCE totals as scanned (read-only) — reconciled against
@@ -231,6 +207,10 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
       const pages: ExtractResponse[] = [];
       const preparedFiles: File[] = [];
       const preparedUrls: string[] = [];
+      // The same photo added twice is skipped before upload (hash of the
+      // prepared bytes) — scanning both doubled every line and total.
+      const dedupe = createPhotoDeduper();
+      const skippedNotes: string[] = [];
       // On any early exit, drop the object URLs minted for already-prepared photos.
       const abandonPrepared = () => { for (const url of preparedUrls) if (!previewsRef.current.includes(url)) URL.revokeObjectURL(url); };
       for (let i = 0; i < raws.length; i++) {
@@ -269,6 +249,11 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
           return;
         }
         controller.signal.throwIfAborted();
+        const samePhoto = await dedupe.check(f, i + 1);
+        if (samePhoto !== null) {
+          skippedNotes.push(`Photo ${i + 1} is the same photo as photo ${samePhoto}, so it was skipped.`);
+          continue;
+        }
         preparedFiles.push(f);
         preparedUrls.push(f === raw ? previewsRef.current[i] : URL.createObjectURL(f));
         temporaryUrls.push(preparedUrls[preparedUrls.length-1]);
@@ -290,9 +275,10 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
       filesRef.current = preparedFiles;
       setPreviewList(preparedUrls);
       setFileName(photoSetLabel(preparedFiles));
-      const data = mergeExtractions(pages) as ExtractResponse;
+      const data = mergeExtractions(pages);
       setSupplier(data.supplier ?? "");
       setGstInclusive(data.gst_inclusive === true);
+      setGstDetected(data.gst_inclusive ?? null);
       setNotes(data.notes ?? []);
       setSrcSubtotal(data.subtotal ?? null);
       setSrcGst(data.gst ?? null);
@@ -303,31 +289,12 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
         status: data.extraction_status ?? "ok",
         reasons: data.extraction_reasons ?? [],
         rowFailures: data.row_failures ?? [],
-        warnings: data.warnings ?? [],
+        warnings: [...skippedNotes, ...(data.warnings ?? [])],
         attempts: data.attempts ?? 1,
       });
-      setRows(
-        data.items.map((it) => ({
-          id: crypto.randomUUID(),
-          include: it.price !== null && it.price > 0,
-          name: it.name,
-          unit: it.unit,
-          quantity:
-            it.quantity != null
-              ? String(it.quantity)
-              : it.pieces != null
-                ? String(it.pieces)
-                : "",
-          price: it.price !== null ? String(it.price) : "",
-          sku: it.sku,
-          sourceLineTotal: it.line_total ?? null,
-          // Raised from 0.6 → 0.8: in pursuit of "1000% correct" we'd rather
-          // flag a few extra lines for a 2-second eyeball than let a quiet
-          // misread (smudged digit, derived unit price) through.
-          lowConfidence: it.confidence < 0.8,
-          rawText: it.raw_text ?? null,
-        })),
-      );
+      // Low-confidence threshold is 0.8: we'd rather flag a few extra lines
+      // for a 2-second eyeball than let a quiet misread through.
+      setRows(buildReviewRows(data.items, () => crypto.randomUUID()));
       setPhase("review");
     } catch (e) {
       setError(e instanceof Error?e.message:"Network error. Please try again.");
@@ -382,8 +349,9 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
       items: createableV.map((r) => ({
         name: r.name.trim(),
         unit: r.unit.trim() || "each",
+        // Full precision; a discount line keeps its negative price.
         price:
-          Number.isFinite(Number(r.price)) && Number(r.price) > 0
+          r.price.trim() !== "" && Number.isFinite(Number(r.price)) && Number(r.price) !== 0
             ? Number(r.price)
             : null,
         sku: r.sku,
@@ -408,19 +376,20 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
     return { validation: report, lineCheckById: map };
   }, [rows, supplier, currency, gstInclusive, srcSubtotal, srcGst, srcTotal, taxRate]);
 
-  const reviewEntries = useMemo(() => rows.map(r => ({ id: r.id, value: r, label: r.name, search: [r.name, r.sku, r.rawText].join(" "), amount: Number(r.price) || 0, attention: !!lineCheckById.get(r.id)?.checks.some(check=>check.severity!=="ok") || r.lowConfidence || !r.name.trim() || !(Number(r.price) > 0) || !(Number(r.quantity) > 0) })), [rows,lineCheckById]);
+  const reviewEntries = useMemo(() => rows.map(r => ({ id: r.id, value: r, label: r.name, search: [r.name, r.sku, r.rawText].join(" "), amount: Number(r.price) || 0, attention: !!lineCheckById.get(r.id)?.checks.some(check=>check.severity!=="ok") || r.lowConfidence || !r.name.trim() || !validRowPrice(r) || !(Number(r.quantity) > 0) })), [rows,lineCheckById]);
   const review = useReviewTable(reviewEntries);
 
   // Block quote creation while an error-level mismatch is unacknowledged.
   const blocked = validation.blocking && !acknowledged;
 
-  /** Snap a line's unit price so its line total equals the printed source. */
+  /** Snap a line's unit price so its line total equals the printed source.
+   *  Full precision — rounding to the cent can't reconcile 1000 × $0.125. */
   function applySupplierValue(id: string) {
     const r = rows.find((x) => x.id === id);
     if (!r || r.sourceLineTotal == null) return;
     const qty = Number(r.quantity);
     if (!Number.isFinite(qty) || qty <= 0) return;
-    patchRow(id, { price: String(round2(r.sourceLineTotal / qty)) });
+    patchRow(id, { price: String(preciseUnitPrice(r.sourceLineTotal / qty)) });
   }
 
   async function save() {
@@ -433,7 +402,8 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
     const payload: SupplierQuoteRow[] = includable.map((r) => ({
       name: r.name.trim(),
       unit: r.unit.trim() || "each",
-      default_unit_price: toExGst(Number(r.price), gstInclusive, taxRate),
+      // Library prices are ex-GST unit prices at full precision.
+      default_unit_price: unitPriceExGst(Number(r.price), gstInclusive, taxRate),
       sku: r.sku,
       notes: null,
     }));
@@ -535,6 +505,7 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
               setResult(null);
               setFileName("");
               setSupplier("");
+              setGstDetected(null);
               setNotes([]);
               setExtraction(null);
               clearPhotos();
@@ -750,6 +721,7 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
                 <span className="text-sm text-ink-200">Prices include GST</span>
               </label>
             </div>
+            <ScanGstNote detected={gstDetected} inclusive={gstInclusive} />
             {notes.length > 0 && (
               <ul className="mt-3 space-y-1 rounded-sm border border-hivis/30 bg-hivis/5 p-3">
                 <li className="font-mono text-[10px] uppercase tracking-[0.2em] text-hivis">
@@ -819,8 +791,7 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
           <fieldset disabled={phase !== "review"}>
           <ul className="space-y-2" data-testid="quote-import-rows">
             {review.rows.map(({value: r}) => {
-              const priceNum = Number(r.price);
-              const badPrice = !Number.isFinite(priceNum) || priceNum <= 0;
+              const badPrice = !validRowPrice(r);
               return (
                 <li
                   key={r.id}
@@ -866,8 +837,8 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
                           </span>
                           <input
                             type="number"
-                            step="0.01"
-                            min="0"
+                            step="any"
+                            min={r.credit ? undefined : "0"}
                             value={r.price}
                             onChange={(e) => patchRow(r.id, { price: e.target.value })}
                             aria-label="Unit price"
@@ -896,7 +867,14 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
                       </div>
                       {badPrice && r.include && (
                         <p className="mt-1 text-[11px] text-red-300">
-                          Add a price above zero, or untick this line.
+                          {r.credit
+                            ? "Add the discount amount, or untick this line."
+                            : "Add a price above zero, or untick this line."}
+                        </p>
+                      )}
+                      {r.credit && (
+                        <p className="mt-1 text-[11px] text-ink-400" data-testid="quote-import-credit">
+                          Discount line — it goes on the quote, not into your price library.
                         </p>
                       )}
                       {r.rawText && (

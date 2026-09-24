@@ -18,12 +18,20 @@ import type { QuoteLineItem } from "./quote-types";
  *   - skip non-material lines (labour / other never become catalogue rows)
  *   - skip empty descriptions
  *   - skip prices that are not finite or are <= 0
- *   - skip lines whose (description, unit, unit_price) match the prior
- *     line at the same index OR the prior line with the same library_id —
- *     that's a no-op edit, no correction needed
+ *   - find the line's PRIOR version by identity, never by position:
+ *       1. the prior line with the same library_id, else
+ *       2. the prior line with the same description (trimmed,
+ *          case-insensitive), each prior line used at most once.
+ *     Position is NOT identity: deleting or adding a line shifts every line
+ *     after it, which paired unrelated materials and saved one as an alias
+ *     of the other (e.g. "GIB Standard 13mm" learned as "Pine 90x45").
+ *   - skip lines whose (description, unit, unit_price) match that prior
+ *     version — a no-op edit, no correction needed
  *   - otherwise:
  *       canonicalName = trimmed description
- *       originalText  = prior description IFF it differs (case-insensitive)
+ *       originalText  = the prior description IFF the line was matched by
+ *                       library_id and its description changed — the only
+ *                       case where a rename is known, not guessed
  *       unit          = item.unit (default 'each')
  *       unitPrice     = item.unit_price
  *
@@ -46,13 +54,18 @@ export async function applyMaterialCorrections(
 ): Promise<ApplyCorrectionsResult> {
   if (!userId) return { materialsLearned: 0, failed: 0 };
 
-  // Prefer matching prior↔new by library_id when both have it. Falls back
-  // to positional index match (which works because the QuoteEditor doesn't
-  // support reorder).
+  // Match prior↔new by identity: library_id first, then description.
   const priorByLibraryId = new Map<string, QuoteLineItem>();
+  const priorByDescription = new Map<string, QuoteLineItem[]>();
   for (const p of priorItems) {
     if (p.library_id) priorByLibraryId.set(p.library_id, p);
+    const key = descriptionKey(p);
+    if (!key) continue;
+    const list = priorByDescription.get(key) ?? [];
+    list.push(p);
+    priorByDescription.set(key, list);
   }
+  const used = new Set<QuoteLineItem>();
 
   let learned = 0;
   let failed = 0;
@@ -69,12 +82,16 @@ export async function applyMaterialCorrections(
     const priorByLib = item.library_id
       ? priorByLibraryId.get(item.library_id)
       : undefined;
-    const prior: QuoteLineItem | null =
-      priorByLib ?? priorItems[i] ?? null;
+    const priorByDesc = priorByLib
+      ? undefined
+      : (priorByDescription.get(descriptionKey(item)) ?? []).find((p) => !used.has(p));
+    const prior: QuoteLineItem | null = priorByLib ?? priorByDesc ?? null;
+    if (prior) used.add(prior);
 
     if (prior && lineItemMaterialFieldsEquivalent(prior, item)) continue;
 
-    const priorDesc = (prior?.description ?? "").trim();
+    // An alias is only recorded for a rename we can prove (same library row).
+    const priorDesc = (priorByLib?.description ?? "").trim();
     const originalText =
       priorDesc && priorDesc.toLowerCase() !== description.toLowerCase()
         ? priorDesc
@@ -101,6 +118,10 @@ export async function applyMaterialCorrections(
   }
 
   return { materialsLearned: learned, failed };
+}
+
+function descriptionKey(item: QuoteLineItem): string {
+  return (item.description ?? "").trim().toLowerCase();
 }
 
 /**

@@ -1,4 +1,5 @@
-// Client-only image prep shared by the avatar and business-logo uploads.
+// Client-only image prep shared by the avatar and business-logo uploads, and
+// the photos a client attaches to a public quote request.
 //
 // The problem this solves is the same one `scanImage.ts` solves for AI scans,
 // generalised for profile/branding images:
@@ -108,4 +109,17 @@ export async function prepareLogoImage(file: File): Promise<File> {
   const target: EncodeMime =
     detectImageMime(base) === "image/png" ? "image/png" : "image/jpeg";
   return reencode(base, 1024, target, 0.92);
+}
+
+/**
+ * Prepare a photo a client attaches to a public quote request: HEIC → JPEG,
+ * then fit inside a 2000 px box and JPEG-compress. The server keeps at most
+ * 2000 px anyway (normaliseQuotePhoto), so nothing useful is lost — and three
+ * phone photos land around 1–2 MB in total instead of up to 30 MB, well
+ * under the request-body limit that used to cut the upload off. Re-encoding
+ * also drops the photo's EXIF/GPS on the device.
+ */
+export async function prepareRequestPhoto(file: File): Promise<File> {
+  const base = isHeic(file) ? await heicToJpeg(file) : file;
+  return reencode(base, 2000, "image/jpeg", 0.82);
 }

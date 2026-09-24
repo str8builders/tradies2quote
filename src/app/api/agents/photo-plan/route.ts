@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
+import { aiConsentGate } from "@/lib/ai-consent";
+import { prepareImageForAi, UnreadableImageError } from "@/lib/aiImage";
 import {
   MAX_IMAGE_BYTES,
   PHOTO_PLAN_AGENT_NAME,
@@ -34,8 +36,9 @@ export const maxDuration = 60;
  *
  * Returns: { description, items, reviewFlags, quoteNote }
  *
- * Auth gated. Never writes to the database. Image bytes are forwarded
- * to OpenAI Vision in-memory and discarded after the response.
+ * Auth gated (and AI-consent gated in the iOS app). Never writes to the
+ * database. The image is re-encoded in memory (EXIF/GPS dropped), forwarded
+ * to OpenAI Vision and discarded after the response.
  */
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -45,6 +48,11 @@ export async function POST(req: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  // Guideline 5.1.2(i) — no site photo goes to OpenAI without recorded
+  // consent (iOS shell only; web unaffected).
+  const consentGate = await aiConsentGate(supabase, user.id);
+  if (consentGate) return consentGate;
 
   // Same spend gates as /api/quotes/generate — this route forwards images
   // to OpenAI Vision, so an expired trial or a scripted loop costs money.
@@ -115,18 +123,26 @@ export async function POST(req: NextRequest) {
   const hintRaw = form.get("hint");
   const hint = typeof hintRaw === "string" ? hintRaw : null;
 
-  // Convert the image to base64 in-memory. Buffer is more efficient
-  // than the regular btoa() path for binary data and is available in
-  // the Node runtime.
   const arrayBuf = await file.arrayBuffer();
-  const sniffedMediaType = sniffPreparedImageMime(new Uint8Array(arrayBuf));
-  if (!sniffedMediaType) {
+  if (!sniffPreparedImageMime(new Uint8Array(arrayBuf))) {
     return NextResponse.json(
       { error: "Unsupported or unreadable image file." },
       { status: 415 },
     );
   }
-  const imageBase64 = Buffer.from(arrayBuf).toString("base64");
+  // Re-encode in memory so no camera metadata (EXIF/GPS) reaches OpenAI.
+  let prepared: Awaited<ReturnType<typeof prepareImageForAi>>;
+  try {
+    prepared = await prepareImageForAi(new Uint8Array(arrayBuf));
+  } catch (e) {
+    if (!(e instanceof UnreadableImageError)) captureError(e, { route: "/api/agents/photo-plan" });
+    return NextResponse.json(
+      { error: "Unsupported or unreadable image file." },
+      { status: 415 },
+    );
+  }
+  const sniffedMediaType = prepared.mediaType;
+  const imageBase64 = prepared.data.toString("base64");
 
   // ONE run id for the whole invocation: the shared runtime owns the
   // run.start/run.finish pair, so the route only closes the row when the

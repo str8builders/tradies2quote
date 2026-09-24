@@ -19,7 +19,8 @@
 //   blocked        — explicit zero-quantity recovery state.
 //
 // STRIP RULES (logged, never silent):
-//   1. structurally invalid lines (non-finite / negative quantity or price)
+//   1. structurally invalid lines (non-finite / negative quantity or price;
+//      a negative price is kept only for a printed supplier credit line)
 //   2. machine-origin deck/insulation-family lines on a job with no
 //      matching scope license (a leak-through past the generation guards).
 //      User-confirmed lines are NEVER stripped (rule 3: user confirmation
@@ -53,7 +54,16 @@ export function classifyLineProvenance(
 ): LineProvenance | "invalid" {
   const qty = Number(it.quantity);
   const price = Number(it.unit_price);
-  if (!Number.isFinite(qty) || !Number.isFinite(price) || qty < 0 || price < 0) {
+  // A negative price is only valid as a discount / credit the supplier quote
+  // itself printed (a negative printed line total mirrored 1:1).
+  const supplierCredit =
+    it.source_line_total != null && Number(it.source_line_total) < 0;
+  if (
+    !Number.isFinite(qty) ||
+    !Number.isFinite(price) ||
+    qty < 0 ||
+    (price < 0 && !supplierCredit)
+  ) {
     return "invalid";
   }
   if (it.takeoff_status === "blocked") return "blocked";

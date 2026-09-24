@@ -250,6 +250,63 @@ describe("buildMirrorQuoteLines — faithful ITM mirror", () => {
     expect(lines[0].line_total).toBe(20);
   });
 
+  // GST-inclusive scans: the ex-GST figures must come from the printed LINE
+  // TOTALS, not from a unit price rounded to the cent first.
+  const printed = (
+    name: string,
+    quantity: number,
+    price: number,
+    lineTotal: number,
+  ): ExtractedSupplierItem => ({
+    ...supplierItem(name, "each", quantity, price),
+    source_line_total: lineTotal,
+  });
+  const mirrorTotal = (items: ExtractedSupplierItem[]) =>
+    computeQuoteTotals(
+      buildMirrorQuoteLines(items, { gstInclusive: true, taxRate: 0.15 }),
+      { default_markup_pct: 0, tax_rate: 15 },
+    ).total;
+
+  it("10,000 × $0.05 incl GST mirrors to $500.00, not $460", () => {
+    expect(mirrorTotal([printed("Staples", 10_000, 0.05, 500)])).toBe(500);
+  });
+
+  it("100 × $9.99 incl GST mirrors to $999.00 (±1c GST rounding), not $999.35", () => {
+    expect(Math.abs(mirrorTotal([printed("Hinge", 100, 9.99, 999)]) - 999)).toBeLessThanOrEqual(0.01);
+  });
+
+  it("10 × $10 incl GST: the live line equals the supplier's ex-GST line total ($86.96, not $87.00)", () => {
+    const [line] = buildMirrorQuoteLines([printed("Bracket", 10, 10, 100)], {
+      gstInclusive: true,
+      taxRate: 0.15,
+    });
+    expect(line.source_line_total).toBe(86.96);
+    expect(line.line_total).toBe(86.96);
+    expect(Math.round(line.quantity * line.unit_price * 100) / 100).toBe(86.96);
+  });
+
+  it("keeps sub-cent unit prices exact (ex-GST quote: 1000 × $0.125 = $125)", () => {
+    const [line] = buildMirrorQuoteLines(
+      [{ ...supplierItem("Nails", "each", 1000, 0.125), source_line_total: 125 }],
+      { gstInclusive: false },
+    );
+    expect(line.unit_price).toBe(0.125);
+    expect(line.line_total).toBe(125);
+  });
+
+  it("carries a supplier discount line through as a negative line", () => {
+    const lines = buildMirrorQuoteLines(
+      [
+        { ...supplierItem("Decking", "m", 50, 10), source_line_total: 500 },
+        { ...supplierItem("Trade discount", "each", 1, -25), source_line_total: -25 },
+      ],
+      { gstInclusive: false },
+    );
+    expect(lines[1]).toMatchObject({ unit_price: -25, line_total: -25, source_line_total: -25, is_missing_price: false, price_source: "supplier_import" });
+    const t = computeQuoteTotals(lines, { default_markup_pct: 0, tax_rate: 15 });
+    expect(t.materials_subtotal).toBe(475);
+  });
+
   it("with markup 0, the quote total mirrors the supplier total (+GST)", () => {
     const lines = buildMirrorQuoteLines(
       [

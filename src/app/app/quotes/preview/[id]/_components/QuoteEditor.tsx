@@ -23,6 +23,7 @@ import {
   validUntilDate,
 } from "@/lib/quote-defaults";
 import { validateSupplierQuote } from "@/lib/materials/quoteValidation";
+import { preciseUnitPrice } from "@/lib/materials/quoteExtraction";
 import type {
   DimensionConfirmation,
   LibraryMaterial,
@@ -195,13 +196,15 @@ export function QuoteEditor({
     );
   }, [hasSupplierSource, supplierSource, items, currency, taxRate]);
 
-  /** Snap a line's unit price so its line total matches the supplier source. */
+  /** Snap a line's unit price so its line total matches the supplier source.
+   *  Full precision: a cent-rounded unit price can't reproduce the source
+   *  total (10,000 × $0.0435 is not 10,000 × $0.04). */
   function applySupplierLineValue(idx: number) {
     const it = items[idx];
     if (!it || it.source_line_total == null) return;
     const qty = Number(it.quantity);
     if (!Number.isFinite(qty) || qty <= 0) return;
-    updateItem(idx, { unit_price: round2(it.source_line_total / qty) });
+    updateItem(idx, { unit_price: preciseUnitPrice(it.source_line_total / qty) });
   }
 
   function updateItem(idx: number, patch: Partial<QuoteLineItem>) {

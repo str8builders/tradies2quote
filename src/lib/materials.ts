@@ -260,13 +260,112 @@ export type CsvParseResult = {
   valid: Array<{
     name: string;
     unit: string;
-    default_unit_price: number;
+    /** Null = the file gave no price (blank / POA): import without one and
+     *  never overwrite an existing library price with nothing. */
+    default_unit_price: number | null;
     supplier: string | null;
     supplier_url: string | null;
     notes: string | null;
   }>;
   invalid: Array<{ row: number; reason: string; raw: string }>;
 };
+
+/** The review-screen statement of how CSV prices are treated for GST. */
+export function csvGstStatement(pricesIncludeGst: boolean, taxRate: number): string {
+  const pct = Math.round(taxRate * 1000) / 10;
+  return pricesIncludeGst
+    ? `Prices include GST — each is divided by ${(1 + taxRate).toFixed(pct % 1 === 0 ? 2 : 3)} and saved ex-GST (${pct}% GST).`
+    : "Prices are treated as excluding GST and saved as written. Tick the box above if the file's prices include GST.";
+}
+
+export type CsvPrice =
+  | { kind: "price"; value: number }
+  | { kind: "missing" }
+  | { kind: "invalid"; reason: string };
+
+// Cells that mean "no price here" rather than a misread.
+const NO_PRICE_MARKERS = new Set([
+  "",
+  "-",
+  "—",
+  "–",
+  "poa",
+  "p.o.a.",
+  "por",
+  "tbc",
+  "tba",
+  "n/a",
+  "na",
+  "call",
+  "ask",
+  "price on application",
+  "price on request",
+]);
+
+/** "1,234,567" / "1.234.567" — separators every 3 digits. */
+function groupedEvery3(digits: string, sep: string): boolean {
+  const parts = digits.split(sep);
+  return (
+    parts.length > 1 &&
+    /^\d{1,3}$/.test(parts[0]) &&
+    parts.slice(1).every((p) => /^\d{3}$/.test(p))
+  );
+}
+
+/**
+ * Read one price cell from a CSV export.
+ *
+ *   "12.50", "$1,234.50", "NZ$ 12"  → the number
+ *   "12,50", "1.234,50"             → decimal comma → 12.50 / 1234.50
+ *   "1,250"                         → NZ thousands separator → 1250
+ *   "", "POA", "TBC", "-"           → missing (import with no price)
+ *   "(5.00)", "-5"                  → invalid (a negative price)
+ *   "12,5000", "12.4O"              → invalid (ambiguous / unreadable)
+ *
+ * Prices keep full precision — 0.125 stays 0.125.
+ */
+export function parseCsvPrice(raw: string): CsvPrice {
+  const text = (raw ?? "").replace(/\u00a0/g, " ").trim();
+  if (NO_PRICE_MARKERS.has(text.toLowerCase())) return { kind: "missing" };
+  let cleaned = text
+    .replace(/\b(?:nzd|aud|usd|cad|gbp|eur)\b/gi, "")
+    .replace(/(?:nz|au|us|ca|a|c)?\$/gi, "")
+    .replace(/[£€\s']/g, "");
+  if (cleaned === "") return { kind: "missing" };
+  if (/^\(.*\)$/.test(cleaned) || /^-|-$/.test(cleaned)) {
+    return { kind: "invalid", reason: `Negative price "${text}" — a price can't be below zero` };
+  }
+  cleaned = cleaned.replace(/^\+/, "");
+  if (!/^[\d.,]+$/.test(cleaned) || !/\d/.test(cleaned)) {
+    return { kind: "invalid", reason: `Invalid price "${text}"` };
+  }
+  const lastComma = cleaned.lastIndexOf(",");
+  const lastDot = cleaned.lastIndexOf(".");
+  let normalised: string | null;
+  if (lastComma >= 0 && lastDot >= 0) {
+    // Both present: whichever comes last is the decimal separator.
+    normalised =
+      lastComma > lastDot
+        ? cleaned.replace(/\./g, "").replace(",", ".")
+        : cleaned.replace(/,/g, "");
+    if ((normalised.match(/\./g) ?? []).length > 1) normalised = null;
+  } else if (lastComma >= 0) {
+    const decimals = cleaned.length - lastComma - 1;
+    if (groupedEvery3(cleaned, ",")) normalised = cleaned.replace(/,/g, "");
+    else if (cleaned.indexOf(",") === lastComma && decimals >= 1 && decimals <= 2) {
+      normalised = cleaned.replace(",", "."); // "12,50" → 12.50
+    } else normalised = null;
+  } else if (cleaned.indexOf(".") !== lastDot) {
+    normalised = groupedEvery3(cleaned, ".") ? cleaned.replace(/\./g, "") : null;
+  } else {
+    normalised = cleaned;
+  }
+  const value = normalised === null ? Number.NaN : Number(normalised);
+  if (!Number.isFinite(value)) {
+    return { kind: "invalid", reason: `Invalid price "${text}"` };
+  }
+  return { kind: "price", value: Number(value.toPrecision(12)) };
+}
 
 export function parseMaterialsCsv(text: string): CsvParseResult {
   const lines = text.replace(/\r\n/g, "\n").split("\n").filter((l) => l.trim().length > 0);
@@ -311,22 +410,18 @@ export function parseMaterialsCsv(text: string): CsvParseResult {
       invalid.push({ row: i + 1, reason: "Missing unit", raw: lines[i] });
       continue;
     }
-    // Strip currency symbols and thousands separators so merchant
-    // exports like "1,234.50" or "$12.00" parse instead of being
-    // silently rejected. NZ/AU/UK/US/CA all use "." as the decimal.
-    const price = Number(priceRaw.replace(/[$£€,\s]/g, ""));
-    if (!Number.isFinite(price) || price < 0) {
-      invalid.push({
-        row: i + 1,
-        reason: `Invalid price "${priceRaw}"`,
-        raw: lines[i],
-      });
+    // Currency symbols, thousands separators and decimal commas are
+    // understood; a blank / POA cell imports with no price (never $0) and
+    // a negative or unreadable one is rejected with the reason shown.
+    const price = parseCsvPrice(priceRaw);
+    if (price.kind === "invalid") {
+      invalid.push({ row: i + 1, reason: price.reason, raw: lines[i] });
       continue;
     }
     valid.push({
       name,
       unit,
-      default_unit_price: Math.round(price * 100) / 100,
+      default_unit_price: price.kind === "price" ? price.value : null,
       supplier: supplier || null,
       supplier_url: supplier_url || null,
       notes: notes || null,

@@ -244,6 +244,32 @@ describe("assessQuoteTakeoffSafety — supplier source fidelity (phase 4)", () =
     const a = assessQuoteTakeoffSafety(qd({ line_items: [li()] }));
     expect(a.can_send).toBe(true);
   });
+
+  it("does NOT false-block when a supplier line had no printed line total", () => {
+    const a = assessQuoteTakeoffSafety(
+      qd({
+        line_items: [
+          li({ quantity: 10, unit_price: 20, line_total: 200, source_line_total: 200, source_description: "Pine", source_unit_price: 20 }),
+          // printed with a unit price but no line total
+          li({ description: "GIB", quantity: 2, unit_price: 50, line_total: 100, source_line_total: null, source_description: "GIB", source_unit_price: 50 }),
+        ],
+        supplier_source: { supplier: "ITM", subtotal: 300, gst: 45, total: 345 },
+      }),
+    );
+    expect(a.block_reasons.filter((r) => /supplier/i.test(r))).toEqual([]);
+  });
+
+  it("still HARD-blocks when a fully-sourced supplier line is deleted", () => {
+    const a = assessQuoteTakeoffSafety(
+      qd({
+        line_items: [
+          li({ quantity: 10, unit_price: 20, line_total: 200, source_line_total: 200, source_description: "Pine", source_unit_price: 20 }),
+        ],
+        supplier_source: { supplier: "ITM", subtotal: 300, gst: 45, total: 345 },
+      }),
+    );
+    expect(a.block_reasons.join(" ")).toMatch(/missing|duplicated|supplier subtotal/i);
+  });
 });
 
 describe("assessQuoteTakeoffSafety — AI-supplied quantity (phase 7)", () => {
