@@ -51,7 +51,7 @@ export function StatusRail({
   const progress = railProgress(position);
   const last = states.length - 1;
   return (
-    <div className={cx("@container relative font-ui-sans", className)} data-position={position}>
+    <div className={cx("@container relative w-full font-ui-sans", className)} data-position={position}>
       {/* The line runs between the first and last dot centres (dots are 36 px). */}
       <div
         aria-hidden="true"
