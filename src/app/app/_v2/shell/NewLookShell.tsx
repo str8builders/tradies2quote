@@ -47,7 +47,7 @@ export function NewLookShell({ outdoor, children }: { outdoor: boolean; children
       <div
         aria-hidden="true"
         data-testid="status-bar-strip"
-        className="pointer-events-none fixed inset-x-0 top-0 z-50 h-[env(safe-area-inset-top)] bg-ui-bg"
+        className="pointer-events-none fixed inset-x-0 top-0 z-50 h-[env(safe-area-inset-top)] bg-ui-chrome"
       />
       <AppContent
         banners={

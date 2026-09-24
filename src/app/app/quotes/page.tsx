@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { quoteNumber } from "@/lib/quote-defaults";
 import type { QuoteStatus } from "@/lib/quote-types";
 import { STAGE_LABELS, STAGES } from "@/lib/lifecycle/stages";
+import { isNewLookOn } from "@/lib/ui/newLook";
+import { jobsFilterForQuoteStage, jobsHref } from "../_v2/lib/job-board";
 import { AppHeader } from "../_components/AppHeader";
 import {
   QuotesListClient,
@@ -59,6 +61,8 @@ export default async function QuotesPage({
   if (!user) redirect("/login");
 
   const { stage: stageRaw } = await searchParams;
+  // Redesign: quotes and invoices are one Jobs list in the new look.
+  if (await isNewLookOn()) redirect(jobsHref(jobsFilterForQuoteStage(stageRaw)));
   const stageFilter = parseStage(stageRaw);
 
   // Wave 46 perf — this used to select the whole `quote_data` JSONB blob

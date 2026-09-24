@@ -45,6 +45,7 @@ export const UI_COLOR_NAMES = [
   "info-soft",
   "focus",
   "scrim",
+  "chrome",
 ] as const;
 
 export type UiColorName = (typeof UI_COLOR_NAMES)[number];
@@ -92,6 +93,10 @@ export const UI_THEMES: Readonly<Record<UiMode, UiTheme>> = {
       "info-soft": "#132A45",
       focus: "#FFEA00",
       scrim: "rgba(0, 0, 0, 0.6)",
+      // Backdrop behind the phone's status bar. The installed iPhone app uses
+      // a "black-translucent" status bar (white clock and battery), so this
+      // stays dark in outdoor mode too.
+      chrome: "#111110",
     },
     shadows: {
       card: "inset 0 1px 0 0 rgba(255, 255, 255, 0.04), 0 12px 28px -18px rgba(0, 0, 0, 0.8)",
@@ -129,6 +134,7 @@ export const UI_THEMES: Readonly<Record<UiMode, UiTheme>> = {
       "info-soft": "#DDE8FB",
       focus: "#000000",
       scrim: "rgba(0, 0, 0, 0.5)",
+      chrome: "#111110",
     },
     shadows: {
       card: "0 1px 2px 0 rgba(0, 0, 0, 0.12)",

@@ -137,6 +137,7 @@
   --color-ui-info-soft: var(--ui-info-soft);
   --color-ui-focus: var(--ui-focus);
   --color-ui-scrim: var(--ui-scrim);
+  --color-ui-chrome: var(--ui-chrome);
 
   --shadow-ui-card: var(--ui-shadow-card);
   --shadow-ui-raised: var(--ui-shadow-raised);
@@ -172,6 +173,7 @@
   --ui-info-soft: #132A45;
   --ui-focus: #FFEA00;
   --ui-scrim: rgba(0, 0, 0, 0.6);
+  --ui-chrome: #111110;
   --ui-shadow-card: inset 0 1px 0 0 rgba(255, 255, 255, 0.04), 0 12px 28px -18px rgba(0, 0, 0, 0.8);
   --ui-shadow-raised: 0 18px 40px -16px rgba(0, 0, 0, 0.85);
   --ui-shadow-sheet: 0 -24px 48px -16px rgba(0, 0, 0, 0.75);
@@ -209,6 +211,7 @@
   --ui-info-soft: #DDE8FB;
   --ui-focus: #000000;
   --ui-scrim: rgba(0, 0, 0, 0.5);
+  --ui-chrome: #111110;
   --ui-shadow-card: 0 1px 2px 0 rgba(0, 0, 0, 0.12);
   --ui-shadow-raised: 0 8px 20px -8px rgba(0, 0, 0, 0.35);
   --ui-shadow-sheet: 0 -8px 24px -8px rgba(0, 0, 0, 0.3);
