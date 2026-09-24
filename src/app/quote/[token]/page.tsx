@@ -14,6 +14,8 @@ import { CustomerChat } from "./_components/CustomerChat";
 import { getQuoteDepositInfo } from "@/lib/payments";
 import { PayDepositButton } from "./_components/PayDepositButton";
 import { classifyPublicQuote, isRichPreviewEligible } from "@/lib/quote-public-view";
+import { loadPublicQuoteVideo } from "@/lib/quote-video/public";
+import { QuoteVideoPlayer } from "./_components/QuoteVideoPlayer";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -201,8 +203,19 @@ export default async function PublicQuotePage({
     .maybeSingle();
   const chatEnabled = chatRow?.chat_disabled !== true;
 
+  // The tradie's quote video, only while it was made from this exact version
+  // of the quote (null otherwise, or on any failure — never blocks the page).
+  const video = await loadPublicQuoteVideo(admin, { id: quote.id, version: quote.version });
+
   return (
     <PageShell>
+      {video ? (
+        <QuoteVideoPlayer
+          videoUrl={video.videoUrl}
+          posterUrl={video.posterUrl}
+          businessName={quote.business_name}
+        />
+      ) : null}
       <PublicQuoteSummary token={token} quote={quote} />
       <QuotePhotos token={token} />
       <AcceptForm token={token} quote={quote} />
