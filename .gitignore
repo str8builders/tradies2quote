@@ -49,5 +49,8 @@ next-env.d.ts
 # Generated from the pinned PDF.js package before dev/build
 /public/t2qcal/vendor/pdfjs/
 
+# Barcode scanner's ZXing .wasm, copied from node_modules before dev/build
+/public/vendor/zxing/
+
 # Marketing video renders for sharing (scripts/render-marketing.mjs); not served by the site
 /marketing-media/

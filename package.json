@@ -17,8 +17,8 @@
     "release:check": "node deploy/check-release.mjs",
     "release:test": "node --test deploy/test-release.mjs",
     "render:marketing": "node scripts/render-marketing.mjs",
-    "prebuild": "node scripts/prepare-pdf-assets.mjs",
-    "predev": "node scripts/prepare-pdf-assets.mjs"
+    "prebuild": "node scripts/prepare-pdf-assets.mjs && node scripts/copy-zxing-wasm.mjs",
+    "predev": "node scripts/prepare-pdf-assets.mjs && node scripts/copy-zxing-wasm.mjs"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.1",
@@ -38,6 +38,7 @@
     "@supabase/supabase-js": "^2.105.3",
     "@tanstack/react-table": "8.21.3",
     "@uppy/core": "6.0.1",
+    "barcode-detector": "3.2.2",
     "dexie": "4.4.6",
     "driver.js": "^1.4.0",
     "framer-motion": "^12.38.0",
