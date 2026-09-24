@@ -13,7 +13,10 @@ export interface TopBarProps {
   leading?: ReactNode;
   /** One action on the right. */
   action?: ReactNode;
-  /** Pad for the notch. Turn off where the page shell already does. */
+  /**
+   * Pad for the notch. Turn off where the page shell already does (the /app
+   * shell): the bar then sticks just below the notch instead of under it.
+   */
   safeArea?: boolean;
   className?: string;
 }
@@ -31,9 +34,9 @@ export function TopBar({
   return (
     <header
       className={cx(
-        "sticky top-0 z-20 border-b border-ui-line bg-ui-bg",
+        "sticky z-20 border-b border-ui-line bg-ui-bg",
         UI_TEXT,
-        safeArea && "pt-[env(safe-area-inset-top)]",
+        safeArea ? "top-0 pt-[env(safe-area-inset-top)]" : "top-[env(safe-area-inset-top)]",
         className,
       )}
     >

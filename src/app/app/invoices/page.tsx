@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { Receipt } from "@phosphor-icons/react/dist/ssr";
 import { createClient } from "@/lib/supabase/server";
 import type { InvoiceStatus } from "@/lib/types/invoice";
+import { isNewLookOn } from "@/lib/ui/newLook";
+import { jobsFilterForInvoiceStatus, jobsHref } from "../_v2/lib/job-board";
 import { AppHeader } from "../_components/AppHeader";
 import { InvoiceList } from "./_components/InvoiceList";
 
@@ -45,6 +47,8 @@ export default async function InvoicesPage({
   searchParams: Promise<{ status?: string }>;
 }) {
   const { status: statusRaw } = await searchParams;
+  // Redesign phase 2: invoices are folded into Jobs in the new look.
+  if (await isNewLookOn()) redirect(jobsHref(jobsFilterForInvoiceStatus(statusRaw)));
   const statusFilter = parseStatus(statusRaw);
 
   const supabase = await createClient();

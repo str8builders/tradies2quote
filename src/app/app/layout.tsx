@@ -12,6 +12,8 @@ import { OnboardingTourGate } from "./_components/OnboardingTourGate";
 import { TopProgressBar } from "./_components/TopProgressBar";
 import { TrialBanner } from "./_components/TrialBanner";
 import { BetaNoticeBanner } from "./_components/BetaNoticeBanner";
+import { isNewLookOn } from "@/lib/ui/newLook";
+import { NewLookShell } from "./_v2/shell/NewLookShell";
 
 /**
  * Visual layout for /app/* routes.
@@ -51,10 +53,16 @@ import { BetaNoticeBanner } from "./_components/BetaNoticeBanner";
  * The route-level `loading.tsx` next to this file now returns null —
  * no more brand splash between tabs.
  *
- * Auth gating is unchanged. This layout does NOT call
- * `supabase.auth.getUser()`, does NOT redirect, does NOT fetch data.
- * Auth still happens in `src/proxy.ts` and as defense-in-depth at the
- * top of each `/app/*` page's server component.
+ * Auth gating is unchanged. This layout does NOT redirect and does NOT
+ * fetch page data. Auth still happens in `src/proxy.ts` and as
+ * defense-in-depth at the top of each `/app/*` page's server component.
+ *
+ * Redesign phase 2 — when `isNewLookOn()` is true for the signed-in user
+ * the whole shell is <NewLookShell> (./_v2/shell): bottom tab bar on
+ * phones, side rail from `sm`, no welcome video, tour or old menu. The
+ * check shares the request's cached auth read (TrialBanner already makes
+ * it) and costs a profile read only for people allowed to choose. With the
+ * switch off, everything below renders exactly as before.
  */
 export default async function AppLayout({
   children,
@@ -68,6 +76,7 @@ export default async function AppLayout({
   // first paint is already right. Only ui- tokens react to it, so existing
   // screens look the same either way (see src/lib/ui/outdoor.ts).
   const outdoor = isOutdoorCookieValue(cookieStore.get(OUTDOOR_COOKIE)?.value);
+  if (await isNewLookOn()) return <NewLookShell outdoor={outdoor}>{children}</NewLookShell>;
   return (
     // Dark shell — the app now runs the website's native ink + brand
     // palette (the `[data-theme="light"]` override sheet in globals.css
