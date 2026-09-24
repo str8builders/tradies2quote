@@ -8,6 +8,7 @@ import {
   isOutdoorCookieValue,
   outdoorCookieString,
   parseOutdoorCookie,
+  readOutdoorMode,
 } from "./outdoor";
 
 describe("outdoor mode cookie", () => {
@@ -78,5 +79,17 @@ describe("applyOutdoorAttribute", () => {
 
   it("is harmless on a page without a contrast root", () => {
     expect(applyOutdoorAttribute({ querySelectorAll: () => [] }, true)).toBe(0);
+  });
+});
+
+describe("readOutdoorMode", () => {
+  const root = (value: string | null) => ({ getAttribute: () => value });
+  it("reads the page's contrast root first", () => {
+    expect(readOutdoorMode({ querySelector: () => root("outdoor"), cookie: "" })).toBe(true);
+    expect(readOutdoorMode({ querySelector: () => root(null), cookie: "t2q-outdoor=1" })).toBe(false);
+  });
+  it("falls back to the cookie on a page without a root", () => {
+    expect(readOutdoorMode({ querySelector: () => null, cookie: "t2q-outdoor=1" })).toBe(true);
+    expect(readOutdoorMode({ querySelector: () => null, cookie: "" })).toBe(false);
   });
 });

@@ -75,6 +75,21 @@ export function applyOutdoorAttribute(doc: ContrastDocumentLike, on: boolean): n
   return roots.length;
 }
 
+/** Fired on window after the setting changes, so every toggle on the page agrees. */
+export const OUTDOOR_CHANGE_EVENT = "t2q-outdoor-change";
+
+export interface OutdoorReadableDocument {
+  querySelector(selector: string): { getAttribute(name: string): string | null } | null;
+  cookie: string;
+}
+
+/** The setting as the page shows it now: the first contrast root, else the cookie. */
+export function readOutdoorMode(doc: OutdoorReadableDocument): boolean {
+  const root = doc.querySelector(`[${CONTRAST_ROOT_ATTRIBUTE}]`);
+  if (root) return root.getAttribute(CONTRAST_ATTRIBUTE) === OUTDOOR_CONTRAST;
+  return parseOutdoorCookie(doc.cookie);
+}
+
 /** Browser-only: store the setting and repaint the page. Never throws. */
 export function setOutdoorMode(on: boolean): void {
   try {
@@ -85,6 +100,7 @@ export function setOutdoorMode(on: boolean): void {
   }
   try {
     applyOutdoorAttribute(document, on);
+    window.dispatchEvent(new Event(OUTDOOR_CHANGE_EVENT));
   } catch {
     /* Not in a browser. */
   }
