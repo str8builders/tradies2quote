@@ -13,6 +13,8 @@ import { SupplierShortcuts } from "./_components/SupplierShortcuts";
 import { MaterialsList } from "./_components/MaterialsList";
 import { MaterialsListSkeleton } from "./_components/MaterialsListSkeleton";
 import { ScanBarcodeButton } from "./_components/ScanBarcodeButton";
+import { isNewLookOn } from "@/lib/ui/newLook";
+import { PricesScreen } from "./_newlook/PricesScreen";
 
 export const metadata: Metadata = {
   title: "Materials",
@@ -30,6 +32,9 @@ export default async function MaterialsPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  // Redesign phase 5: the new look is "Your prices". Off: unchanged below.
+  if (await isNewLookOn()) return <PricesScreen userId={user.id} />;
 
   return (
     <div className="min-h-screen text-white">

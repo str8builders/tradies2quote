@@ -35,7 +35,8 @@ import { QuoteRequestLinkCard } from "./_components/QuoteRequestLinkCard";
 import { ReplayTourButton } from "./_components/ReplayTourButton";
 import { DeleteAccountSection } from "./_components/DeleteAccountSection";
 import { NewLookSetting } from "./_components/NewLookSetting";
-import { getNewLookState } from "@/lib/ui/newLook";
+import { getNewLookState, isNewLookOn } from "@/lib/ui/newLook";
+import { SettingsHubPage } from "./_newlook/SettingsHubPage";
 
 export const metadata: Metadata = {
   title: "Settings",
@@ -63,6 +64,10 @@ export default async function SettingsPage({
 }: {
   searchParams: Promise<{ stripe?: string }>;
 }) {
+  // Redesign phase 5: the new look splits this page into four short ones
+  // behind a hub. With the switch off, everything below runs as before.
+  if (await isNewLookOn()) return <SettingsHubPage searchParams={searchParams} />;
+
   // Wave 18.1 — perf — `getCachedAuthUser` shares one auth roundtrip
   // with the surrounding `<AppHeader>` + `<MobileAppMenu>`.
   const { user } = await getCachedAuthUser();
