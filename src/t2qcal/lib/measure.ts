@@ -274,3 +274,15 @@ export function closureError(first:P2,again:P2,perimeterM:number):{mm:number;per
   const m=Math.hypot(again.x-first.x,again.y-first.y);
   return {mm:m*1000,percent:m/perimeterM*100};
 }
+
+/**
+ * The reverse of rectifyFromRectangle: millimetres on the measured plane back
+ * to photo pixels, for drawing layouts onto the photo. `ok` is false for plane
+ * points that fall behind the camera (beyond the horizon of a floor shot).
+ */
+export function unrectifyFromRectangle(corners:P2[],widthMm:number,heightMm:number):((p:P2)=>P2&{ok:boolean})|null{
+  if(corners.length!==4||!(widthMm>0)||!(heightMm>0)||!isConvexQuad(corners))return null;
+  const src:P2[]=[{x:0,y:0},{x:widthMm,y:0},{x:widthMm,y:heightMm},{x:0,y:heightMm}];
+  const h=solveHomography(src,corners);if(!h)return null;
+  return (p:P2)=>{const w=h[6]*p.x+h[7]*p.y+1;return {x:(h[0]*p.x+h[1]*p.y+h[2])/w,y:(h[3]*p.x+h[4]*p.y+h[5])/w,ok:w>1e-6};};
+}
