@@ -3,6 +3,7 @@ import { computeQuoteTotals, moneyEquals, round2 } from "./quote-defaults";
 import {
   classifyLineProvenance,
   licensedFamiliesForDescription,
+  licensingEvidence,
   t2qcalLicensedFamily,
 } from "./reviewGuard";
 import { materialFamilyForDescription } from "./takeoff/license";
@@ -64,6 +65,20 @@ export type TakeoffSafetyAssessment = {
  */
 function hasSendableQuantity(items: QuoteLineItem[]): boolean {
   return items.some((it) => (Number(it.quantity) || 0) > 0);
+}
+
+/**
+ * A line (any type) with a real quantity that would quote at $0 — no price,
+ * or still flagged price-pending. Shared by the send gate and the editor's
+ * "Missing price" badge so both always agree.
+ */
+export function isUnpricedLine(
+  it: Pick<QuoteLineItem, "quantity" | "unit_price" | "is_missing_price">,
+): boolean {
+  return (
+    (Number(it.quantity) || 0) > 0 &&
+    (it.is_missing_price === true || (Number(it.unit_price) || 0) <= 0)
+  );
 }
 
 function lineLabels(items: QuoteLineItem[], max = 3): string {
@@ -185,7 +200,7 @@ export function assessQuoteContradictions(
   }
 
   const licensed = licensedFamiliesForDescription(
-    description ?? quote_data.job_summary,
+    licensingEvidence(quote_data, description),
   );
   const unlicensed = (family: "deck" | "insulation") =>
     items.filter((it) => {
@@ -339,23 +354,20 @@ export function assessQuoteTakeoffSafety(
     }
   }
 
-  // BETA SAFETY — unpriced material guard. A material line with no price (or
-  // $0) quotes that material at $0 and silently undercharges the job. This is
-  // the common gap when a calculated / library-unmatched material has no
-  // stored price. Flag it as a caution so the tradie must acknowledge before
-  // sending rather than shipping a $0 line unnoticed — never a silent send.
-  // Quantity-0 lines (e.g. blocked takeoffs) are excluded; the block path
-  // already handles those. A flag, not a hard block: a $0 line can be a
-  // deliberate allowance, so the tradie can acknowledge and proceed.
-  const unpriced = items.filter(
-    (it) =>
-      it.type === "material" &&
-      (Number(it.quantity) || 0) > 0 &&
-      (it.is_missing_price === true || (Number(it.unit_price) || 0) <= 0),
-  );
+  // BETA SAFETY — unpriced line guard, for EVERY line type. A material,
+  // labour or other line with no price (or $0) quotes that work at $0 and
+  // silently undercharges the job. Generation leaves AI-priced "other" lines
+  // and unstated day/lot labour price-pending, and changing a line's unit
+  // clears its price, so this is not a materials-only gap. Flag it as a
+  // caution so the tradie must acknowledge before sending rather than
+  // shipping a $0 line unnoticed — never a silent send. Quantity-0 lines
+  // (e.g. blocked takeoffs) are excluded; the block path already handles
+  // those. A flag, not a hard block: a $0 line can be a deliberate
+  // allowance, so the tradie can acknowledge and proceed.
+  const unpriced = items.filter(isUnpricedLine);
   if (unpriced.length > 0) {
     warning_reasons.push(
-      `${unpriced.length} material line(s) have no price set and will quote at $0: ${lineLabels(unpriced)}. Add a price or confirm it's intentional before sending.`,
+      `${unpriced.length} line(s) have no price set and will quote at $0: ${lineLabels(unpriced)}. Add a price or confirm it's intentional before sending.`,
     );
   }
 

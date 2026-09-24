@@ -402,6 +402,18 @@ export type QuoteData = {
    * drawings (no friction). Server-side only — never in PublicQuotePayload.
    */
   dimension_confirmation?: DimensionConfirmation | null;
+  /**
+   * Independent verification of the generated quote (deterministic checks
+   * always; the LLM critic when QUOTE_VERIFY_ENABLED) — a VerificationReport
+   * from `src/lib/agents/verify/quoteVerify.ts`, written once at generation
+   * and rendered in the review page's "Quote Review Agent" section.
+   *
+   * Same privacy contract as `compliance_review`: server-side only, NEVER
+   * projected by `get_quote_by_token` (not in PublicQuotePayload). Typed
+   * `unknown` to keep quote-types dependency-free; narrow with
+   * `parseVerificationReport`.
+   */
+  verification?: unknown;
 };
 
 export type SupplierSource = {

@@ -5,6 +5,7 @@ import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
 import { cleanTranscript } from "@/lib/transcriptCleanup";
 import { loadUserVocab } from "@/lib/transcript/vocab";
+import { reportSummaryFailureToMonitor } from "@/lib/transcript/summaryMonitoring";
 import {
   buildClarificationsWithOptions,
   type Clarification,
@@ -117,6 +118,8 @@ export async function POST(request: NextRequest) {
   // deterministic regex + glossary pass produced.
   const cleaned = await cleanTranscript(transcript, {
     vocab,
+    // A failed summary still degrades to null, but is reported (PII-free).
+    onSummaryFailure: reportSummaryFailureToMonitor,
   });
 
   // Merge the regex-pass clarifications with the LLM summary's

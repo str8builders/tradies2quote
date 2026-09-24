@@ -842,3 +842,38 @@ describe("enrichLineItemsWithCatalogue — upstream user_library price is author
     expect(out.is_missing_price).toBe(true);
   });
 });
+
+// ─── Audit 2026-09-24, item 4 — never change the unit without converting ──
+describe("enrichLineItemsWithCatalogue — units", () => {
+  it("a per-sheet catalogue price is NOT applied to an m² line; unit + quantity untouched", async () => {
+    const matcher = vi.fn().mockResolvedValue(
+      matchedResult(
+        sampleHit({ id: "gib-sheet", unit: "sheet", price: 30, match_score: 0.9 }),
+      ),
+    );
+    const items = [
+      baseItem({ description: "GIB Standard 10mm", quantity: 40, unit: "m²", unit_price: 0 }),
+    ];
+    const [out] = await enrichLineItemsWithCatalogue(items, { enabled: true, matcher });
+    expect(out.unit).toBe("m²"); // never silently switched to "sheet"
+    expect(out.quantity).toBe(40);
+    expect(out.unit_price).toBe(0); // $30 × 40 = $1,200 never happens
+    expect(out.is_missing_price).toBe(true);
+    expect(out.price_source).toBe("missing_price");
+    expect(out.material_id).toBe("gib-sheet"); // still linked for the tradie
+    expect(out.warnings?.join(" ")).toMatch(/per sheet/);
+  });
+
+  it("a convertible unit applies the CONVERTED price and keeps the line's unit", async () => {
+    const matcher = vi.fn().mockResolvedValue(
+      matchedResult(sampleHit({ id: "angle", unit: "mm", price: 0.05, match_score: 0.9 })),
+    );
+    const items = [baseItem({ description: "Aluminium angle", quantity: 3, unit: "m" })];
+    const [out] = await enrichLineItemsWithCatalogue(items, { enabled: true, matcher });
+    expect(out.unit).toBe("m");
+    expect(out.quantity).toBe(3);
+    expect(out.unit_price).toBe(50); // $0.05/mm → $50/m
+    expect(out.line_total).toBe(150);
+    expect(out.is_missing_price).toBe(false);
+  });
+});

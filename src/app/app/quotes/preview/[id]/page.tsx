@@ -28,6 +28,8 @@ import { ComplianceAgent } from "../../../_components/agents/ComplianceAgent";
 import { FollowupAgent } from "../../../_components/agents/FollowupAgent";
 import { VoiceCleanupAgent } from "../../../_components/agents/VoiceCleanupAgent";
 import { ForgottenCostsAgent } from "../../../_components/agents/ForgottenCostsAgent";
+import { VerificationPanel } from "../../../_components/agents/VerificationPanel";
+import { parseVerificationReport } from "@/lib/agents/verify/report";
 import { QuoteGenerator } from "./_components/QuoteGenerator";
 import { QuoteEditor } from "./_components/QuoteEditor";
 import { guardQuoteForReview } from "@/lib/reviewGuard";
@@ -456,6 +458,21 @@ export default async function QuotePreviewPage({
                   profile={profile ?? null}
                   expiresAt={quote.expires_at ?? null}
                 />
+                {/* Verification report frozen at generation (deterministic
+                    checks + the critic when enabled). Hidden for legacy
+                    quotes or a malformed payload. */}
+                {(() => {
+                  const report = parseVerificationReport(quoteData.verification);
+                  if (!report) return null;
+                  return (
+                    <div className="mt-3" data-testid="quote-review-verification">
+                      <p className="mb-2 text-xs text-ink-400">
+                        Checked when this quote was generated — later edits are not re-checked.
+                      </p>
+                      <VerificationPanel report={report} />
+                    </div>
+                  );
+                })()}
               </CollapsibleSection>
 
               <CollapsibleSection

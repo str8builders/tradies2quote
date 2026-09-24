@@ -173,6 +173,18 @@ export async function POST(request: NextRequest) {
       ? await transcribeRes.text().catch(() => "")
       : "no response";
     console.error("Transcription error", transcribeRes?.status, detail);
+    // Report to the internal monitor with the upstream STATUS only — the
+    // provider's error body is not forwarded.
+    const upstreamStatus = transcribeRes?.status;
+    captureError(
+      new Error(
+        `Transcription upstream returned HTTP ${upstreamStatus ?? "no response"}`,
+      ),
+      {
+        route: "/api/quotes/transcribe",
+        ...(upstreamStatus ? { httpStatus: upstreamStatus } : {}),
+      },
+    );
     return NextResponse.json(
       { error: "Transcription failed. Please try again." },
       { status: 502 },

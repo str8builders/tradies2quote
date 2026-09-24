@@ -94,8 +94,8 @@ const SECTIONS: ReadonlyArray<Section> = [
         body: (
           <>
             Business name, phone, address, GST number, default labour rate
-            ($/hour), default markup % on materials. These flow through to
-            every quote.
+            ($/hour), default markup % on materials and other items. These
+            flow through to every quote.
           </>
         ),
       },
@@ -692,7 +692,7 @@ const SECTIONS: ReadonlyArray<Section> = [
       {
         label: "Country / Currency / Tax label / Tax rate",
         body:
-          "Country drives default tax label + rate (NZ: GST 15%, AU: GST 10%, UK: VAT 20%). You can override per-account if you bill in a different currency.",
+          "Country drives the default tax label + rate (NZ: GST 15%, AU: GST 10%, UK: VAT 20%, US: Tax — set your rate, CA: Tax 5%). A blank rate uses your country's default. You can override the rate per-account.",
       },
       {
         label: "Default labour rate ($/hour)",
@@ -700,9 +700,9 @@ const SECTIONS: ReadonlyArray<Section> = [
           "What T2Q assigns to labour line items in generated quotes. You can override per-line in the editor — the default is just the starting point.",
       },
       {
-        label: "Default materials markup %",
+        label: "Markup on materials and other items %",
         body:
-          "Applied to the materials subtotal to compute the markup amount. Shows as its own line on the customer's PDF. Set to 0 if you want to bake markup into individual unit prices instead.",
+          "Applied to the materials + other-items subtotal (never labour) to compute the markup amount. Shows as its own line on the customer's PDF. Set to 0 if you want to bake markup into individual unit prices instead.",
       },
     ],
     deepLink: { label: "Open Settings", href: "/app/settings" },

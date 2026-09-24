@@ -1,5 +1,10 @@
 import type { LibraryMaterial, QuoteLineItem } from "./quote-types";
 import {
+  convertUnitPrice,
+  normaliseLibraryUnit,
+  unitsCompatible,
+} from "./units";
+import {
   GENERIC_PRESET,
   getSupplierPreset,
   remapCsvWithPreset,
@@ -34,14 +39,46 @@ const STOP_WORDS = new Set([
   "by",
 ]);
 
+/** A length written with its unit (5.4m, 2400mm, 90cm) — compared in metres. */
+const LENGTH_TOKEN_RE = /^(\d+(?:\.\d+)?)(mm|cm|lm|m)$/;
+/** Size/length tokens a description can name: 5.4m (canonical) or 100x100. */
+const DIMENSION_TOKEN_RE =
+  /^\d+(?:\.\d+)?m$|^\d+(?:\.\d+)?x\d+(?:\.\d+)?(?:x\d+(?:\.\d+)?)?$/;
+
+function canonicalLength(value: number, unit: string): string {
+  const metres =
+    unit === "mm" ? value / 1000 : unit === "cm" ? value / 100 : value;
+  return `${Number(metres.toFixed(4))}m`;
+}
+
+/**
+ * Tokenise a material name for matching. Decimals and dimensions survive as
+ * ONE token ("5.4m", "100x100", "h3.2") — splitting on "." used to turn
+ * "5.4m" and "2.4m" into the same "4m" token, so a 5.4 m post matched the
+ * 2.4 m library row. Lengths are compared in metres so "5400mm" = "5.4m".
+ */
 function normaliseTokens(s: string): Set<string> {
-  return new Set(
-    s
-      .toLowerCase()
-      .replace(/[^\w\s]/g, " ")
-      .split(/\s+/)
-      .filter((t) => t.length >= 2 && !STOP_WORDS.has(t)),
-  );
+  const text = s
+    .toLowerCase()
+    .replace(/×/g, "x")
+    .replace(/²/g, "2")
+    .replace(/³/g, "3")
+    // "100 x 100" → "100x100": a spaced section is still one size.
+    .replace(/(\d)\s*x\s*(?=\d)/g, "$1x")
+    // "5.4 m" → "5.4m": a length keeps its unit attached.
+    .replace(/(\d)\s+(mm|cm|lm|m|m2|m3|kg)\b/g, "$1$2")
+    // A "." between digits is a decimal point; every other "." is
+    // punctuation. (No look-behind — this also runs in older Safari.)
+    .replace(/(\d)\.(?=\d)/g, "$1\u0001")
+    .replace(/[^a-z0-9\u0001\s]/g, " ")
+    .replace(/\u0001/g, ".");
+  const tokens = new Set<string>();
+  for (const raw of text.split(/\s+/)) {
+    if (raw.length < 2 || STOP_WORDS.has(raw)) continue;
+    const len = raw.match(LENGTH_TOKEN_RE);
+    tokens.add(len ? canonicalLength(Number(len[1]), len[2]) : raw);
+  }
+  return tokens;
 }
 
 export function matchToLibrary(
@@ -51,23 +88,46 @@ export function matchToLibrary(
   return matchToLibraryScored(description, library)?.item ?? null;
 }
 
+export type LibraryMatch = {
+  item: LibraryMaterial;
+  /** Number of library-name tokens that all appeared in the description. */
+  specificity: number;
+  /** Every size/length the description names is also in the library name. */
+  exactDimensions: boolean;
+  /** An equally good candidate carries a different price or unit. */
+  ambiguous: boolean;
+};
+
 /**
  * Like matchToLibrary, but also reports HOW specific the winning match
  * was (the number of library-name tokens that all appeared in the
  * description). A specificity of 1 is a single generic token ("screws")
  * — fine for linking, too weak to auto-apply the library PRICE.
+ *
+ * Ranking: more matched tokens, then (when the line's unit is given) a
+ * unit-compatible row, then a priced row, then the tradie's most used /
+ * most recent row, then name — deterministic whatever the library order.
+ * Equally ranked rows that disagree on price or unit mark the match
+ * `ambiguous` so no price is auto-applied from it.
  */
 export function matchToLibraryScored(
   description: string,
   library: LibraryMaterial[],
-): { item: LibraryMaterial; specificity: number } | null {
+  opts: { unit?: string | null } = {},
+): LibraryMatch | null {
   if (!description || library.length === 0) return null;
   const descTokens = normaliseTokens(description);
   if (descTokens.size === 0) return null;
+  const hasLineUnit = typeof opts.unit === "string" && opts.unit.trim() !== "";
 
-  let best: LibraryMaterial | null = null;
-  let bestSpecificity = 0;
-
+  type Candidate = {
+    item: LibraryMaterial;
+    tokens: Set<string>;
+    specificity: number;
+    unitOk: boolean;
+    priced: boolean;
+  };
+  const candidates: Candidate[] = [];
   for (const item of library) {
     const libTokens = normaliseTokens(item.name);
     if (libTokens.size === 0) continue;
@@ -78,13 +138,100 @@ export function matchToLibraryScored(
         break;
       }
     }
-    if (allFound && libTokens.size > bestSpecificity) {
-      best = item;
-      bestSpecificity = libTokens.size;
-    }
+    if (!allFound) continue;
+    candidates.push({
+      item,
+      tokens: libTokens,
+      specificity: libTokens.size,
+      unitOk: hasLineUnit && unitsCompatible(item.unit, opts.unit),
+      priced:
+        item.default_unit_price !== null && Number(item.default_unit_price) > 0,
+    });
   }
+  if (candidates.length === 0) return null;
 
-  return best ? { item: best, specificity: bestSpecificity } : null;
+  const rankKey = (c: Candidate) =>
+    `${c.specificity}|${c.unitOk ? 1 : 0}|${c.priced ? 1 : 0}`;
+  candidates.sort(
+    (a, b) =>
+      b.specificity - a.specificity ||
+      Number(b.unitOk) - Number(a.unitOk) ||
+      Number(b.priced) - Number(a.priced) ||
+      (Number(b.item.usage_count) || 0) - (Number(a.item.usage_count) || 0) ||
+      (b.item.last_used_at ?? "").localeCompare(a.item.last_used_at ?? "") ||
+      a.item.name.localeCompare(b.item.name) ||
+      a.item.id.localeCompare(b.item.id),
+  );
+  const best = candidates[0];
+  const priceOf = (c: Candidate) =>
+    c.item.default_unit_price === null ? null : Number(c.item.default_unit_price);
+  const unitOf = (c: Candidate) => normaliseLibraryUnit(c.item.unit);
+  const bestUnit = unitOf(best);
+  const ambiguous = candidates.some((c) => {
+    if (c === best || rankKey(c) !== rankKey(best)) return false;
+    const u = unitOf(c);
+    return (
+      priceOf(c) !== priceOf(best) ||
+      u?.dimension !== bestUnit?.dimension ||
+      u?.factor !== bestUnit?.factor
+    );
+  });
+  const exactDimensions = [...descTokens]
+    .filter((t) => DIMENSION_TOKEN_RE.test(t))
+    .every((t) => best.tokens.has(t));
+
+  return {
+    item: best.item,
+    specificity: best.specificity,
+    exactDimensions,
+    ambiguous,
+  };
+}
+
+/**
+ * The tradie's OWN library price for a line, converted to the line's unit —
+ * or `unitPrice: null` when it must not be auto-applied. A price is applied
+ * only when the match is specific (≥ 2 tokens), names every size/length the
+ * line names, is unambiguous, carries a real price, and the units match or
+ * convert exactly ($30/sheet is never applied to m²). The match itself is
+ * still returned so the line can keep its library link.
+ */
+export function libraryPriceForLine(
+  line: { description: string; unit: string | null | undefined },
+  library: LibraryMaterial[],
+): { match: LibraryMatch; unitPrice: number | null } | null {
+  const match = matchToLibraryScored(line.description, library, {
+    unit: line.unit,
+  });
+  if (!match) return null;
+  const price = match.item.default_unit_price;
+  const unitPrice =
+    match.specificity >= 2 &&
+    match.exactDimensions &&
+    !match.ambiguous &&
+    price !== null &&
+    Number(price) > 0
+      ? convertUnitPrice(Number(price), match.item.unit, line.unit)
+      : null;
+  return { match, unitPrice };
+}
+
+/**
+ * Re-derive the library price a line claims to carry from the library row
+ * it links to. Returns null when the link, the row's price or the unit
+ * doesn't hold up — used so a stored "user_library" tag is never trusted on
+ * its own.
+ */
+export function verifiedLibraryUnitPrice(
+  line: { library_id?: string | null; unit: string | null | undefined },
+  library: LibraryMaterial[],
+): number | null {
+  if (!line.library_id) return null;
+  const row = library.find((m) => m.id === line.library_id);
+  if (!row || row.default_unit_price === null) return null;
+  const price = Number(row.default_unit_price);
+  if (!(price > 0)) return null;
+  return convertUnitPrice(price, row.unit, line.unit);
 }
 
 export function formatLibraryForPrompt(

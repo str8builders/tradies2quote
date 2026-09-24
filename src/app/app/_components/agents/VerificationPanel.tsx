@@ -1,3 +1,5 @@
+"use client";
+
 import { CheckCircle, Warning } from "@phosphor-icons/react";
 import type { VerificationReport } from "@/lib/agents/verify/quoteVerify";
 

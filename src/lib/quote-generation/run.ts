@@ -7,12 +7,13 @@ import { DEFAULT_NZ_CONTRACT_TERMS } from "@/lib/default-contract";
 import {
   NZ_DEFAULTS,
   clampMarkupPct,
-  clampTaxRate,
   computeQuoteTotals,
+  resolveTaxLabel,
+  resolveTaxRate,
   round2,
 } from "@/lib/quote-defaults";
 import { buildQuotePrompt, type PastQuoteSummary } from "@/lib/quote-prompt";
-import { matchToLibrary, matchToLibraryScored } from "@/lib/materials";
+import { libraryPriceForLine, matchToLibrary } from "@/lib/materials";
 import {
   canRunCalculator,
   parseTakeoffDescription,
@@ -34,8 +35,15 @@ import {
 } from "@/lib/takeoff";
 import { legacyScopeCoverage } from "@/lib/takeoff/legacyCoverage";
 import { scopeFamilyForType, guardLinesForScope } from "@/lib/takeoff/scopeFamily";
-import { cleanTranscript } from "@/lib/transcriptCleanup";
+import {
+  applyDeterministicCorrections,
+  cleanTranscript,
+} from "@/lib/transcriptCleanup";
 import { loadUserVocab } from "@/lib/transcript/vocab";
+import { reportSummaryFailureToMonitor } from "@/lib/transcript/summaryMonitoring";
+import { aiTermsToNotes, sanitiseModelQuote } from "./model-output";
+import { applyPricingPolicy, extractStatedAmounts } from "./pricing";
+import { verifyGeneratedQuote } from "./verification";
 import type {
   LibraryMaterial,
   QuoteData,
@@ -252,8 +260,10 @@ async function runQuotePipeline(
   if (qErr || !quote) {
     return fail(404, { error: "Quote not found" });
   }
-  const transcript = (quote.voice_transcript ?? "").trim();
-  if (!transcript) {
+  // The RAW transcript stays exactly as recorded/typed (quotes.voice_transcript
+  // is never rewritten here, and it is stored as transcript.raw for audit).
+  const rawTranscript = (quote.voice_transcript ?? "").trim();
+  if (!rawTranscript) {
     return fail(400, { error: "Quote has no transcript" });
   }
   // Wave 47 — "already generated" means a REAL payload (has a line_items
@@ -273,6 +283,8 @@ async function runQuotePipeline(
     .eq("id", userId)
     .maybeSingle();
 
+  // Tax label + rate default from the business country (NZ/AU "GST", UK
+  // "VAT", US/CA "Tax") — a blank rate is never silently NZ's 15%.
   const profile: QuoteProfile = profileRow
     ? {
         business_name: profileRow.business_name,
@@ -283,8 +295,16 @@ async function runQuotePipeline(
         default_markup_pct: clampMarkupPct(
           profileRow.default_markup_pct ?? NZ_DEFAULTS.default_markup_pct,
         ),
-        tax_label: profileRow.tax_label ?? NZ_DEFAULTS.tax_label,
-        tax_rate: clampTaxRate(profileRow.tax_rate ?? NZ_DEFAULTS.tax_rate),
+        tax_label: resolveTaxLabel(
+          profileRow.tax_label,
+          profileRow.country,
+          profileRow.currency,
+        ),
+        tax_rate: resolveTaxRate(
+          profileRow.tax_rate,
+          profileRow.country,
+          profileRow.currency,
+        ),
         currency: profileRow.currency ?? NZ_DEFAULTS.currency,
       }
     : NZ_DEFAULTS;
@@ -343,6 +363,20 @@ async function runQuotePipeline(
     .filter(
       (q): q is PastQuoteSummary => q !== null && q.jobSummary.length > 0,
     );
+
+  // Deterministic voice cleanup (no LLM) BEFORE anything reads the job:
+  // spoken measurements → digits ("four point eight metres" → "4.8 metres"),
+  // H-classes, GIB/Pink Batts spellings, "90 by 45" → "90x45", plus the
+  // tradie's own vocabulary. The model prompt, the takeoff calculators and
+  // the compliance review all quote from THIS text — the takeoff regexes
+  // need digits, so a spoken deck size used to reach the calculator as
+  // "missing dimensions". Scan marker lines are passed through untouched.
+  const vocab = await loadUserVocab(db, userId, {
+    includeRecentQuotes: true,
+  });
+  const transcript =
+    applyDeterministicCorrections(rawTranscript, vocab).cleanedTranscript.trim() ||
+    rawTranscript;
 
   const parsedTakeoff = parseTakeoffDescription(transcript);
   const useCalculator = canRunCalculator(parsedTakeoff);
@@ -481,9 +515,9 @@ async function runQuotePipeline(
           "This job was too long to quote in one go. Shorten the description or split it into separate quotes.",
       });
   }
-  let parsed: QuoteData;
+  let modelJson: unknown;
   try {
-    parsed = parseModelJsonObject<QuoteData>(text);
+    modelJson = parseModelJsonObject<unknown>(text);
   } catch (e) {
     captureError(e, { route: "quotes/generate" });
     console.error(
@@ -497,46 +531,37 @@ async function runQuotePipeline(
     return fail(502, { error: "Quote response was malformed. Please try again." });
   }
 
-  parsed.currency = profile.currency;
-  parsed.tax_label = profile.tax_label;
-  parsed.tax_rate = profile.tax_rate;
-  parsed.markup_pct = profile.default_markup_pct;
-  parsed.notes = Array.isArray(parsed.notes) ? parsed.notes : [];
-  // Sanitise the model's line items: coerce `description`/`unit` to
-  // strings (the matcher lowercases description and would throw on a
-  // missing one) and clamp negative quantities/prices to 0 so a stray
-  // negative can't silently drag the quote total below the real cost.
-  parsed.line_items = (
-    Array.isArray(parsed.line_items) ? parsed.line_items : []
-  ).map((it) => ({
-    ...it,
-    type:
-      it.type === "labour"
-        ? "labour"
-        : it.type === "other"
-          ? "other"
-          : "material",
-    description:
-      typeof it.description === "string"
-        ? it.description
-        : String(it.description ?? ""),
-    unit: typeof it.unit === "string" ? it.unit : "",
-    quantity: Math.max(0, Number(it.quantity) || 0),
-    unit_price: Math.max(0, Number(it.unit_price) || 0),
-  }));
-  parsed.client = parsed.client ?? {
-    name: "To be confirmed",
-    address: null,
-    contact: null,
+  // WHITELIST the model's output (see model-output.ts): only client /
+  // job_summary / notes / terms text and each line's type, description,
+  // quantity, unit and unit_price are read. Negative quantities/prices
+  // clamp to 0. Every provenance flag (price_source, library_id, takeoff
+  // status…), total, tax and currency is set by the server below — a
+  // prompt-injected "price_source":"user_library" can't smuggle a price
+  // through the AI-prices-off pass any more.
+  const model = sanitiseModelQuote(modelJson);
+  const parsed: QuoteData = {
+    client: model.client,
+    job_summary: model.job_summary,
+    line_items: model.line_items,
+    materials_subtotal: 0,
+    labour_subtotal: 0,
+    markup_pct: profile.default_markup_pct,
+    markup_amount: 0,
+    subtotal_before_tax: 0,
+    tax_amount: 0,
+    total: 0,
+    currency: profile.currency,
+    tax_label: profile.tax_label,
+    tax_rate: profile.tax_rate,
+    // The quote ALWAYS carries the tradie's contract terms (the default
+    // template until `profiles.default_terms` exists) — the model's short
+    // terms used to replace the whole 2.8k-char template. Its job-specific
+    // conditions become review notes the tradie can copy into Terms.
+    // When `profiles.default_terms` lands as a configurable field
+    // (post-launch), prefer that over the hardcoded default.
+    terms: DEFAULT_NZ_CONTRACT_TERMS,
+    notes: [...model.notes, ...aiTermsToNotes(model.aiTerms)],
   };
-  // Coerce + fall back to the default NZ tradie contract template if the
-  // AI returned nothing usable. Tradies can edit/replace per quote via
-  // the Terms section in the editor; this just makes sure every quote
-  // ships with a defensible starter contract instead of an empty box.
-  // When `profiles.default_terms` lands as a configurable field
-  // (post-launch), prefer that over the hardcoded default.
-  const aiTerms = typeof parsed.terms === "string" ? parsed.terms.trim() : "";
-  parsed.terms = aiTerms.length > 0 ? aiTerms : DEFAULT_NZ_CONTRACT_TERMS;
 
   const usedLibraryIds = new Set<string>();
   const calculatorItems: QuoteLineItem[] = [];
@@ -813,21 +838,21 @@ async function runQuotePipeline(
     const qty = Number(it.quantity) || 0;
     let price = Number(it.unit_price) || 0;
     if (it.type === "material") {
-      const scored = matchToLibraryScored(it.description, library);
-      const match = scored?.item ?? null;
-      if (match && scored) {
+      // A STRONG match to a library row the tradie priced themselves is
+      // trustworthy enough to keep through the PRICES_OFF pass below — it's
+      // their number, not an AI guess. libraryPriceForLine only returns a
+      // price for a specific (≥2 tokens), dimension-exact, unambiguous match
+      // whose unit matches or converts exactly to this line's unit ($30/sheet
+      // is never applied to 40 m²). Weaker matches keep the link, unpriced.
+      const hit = libraryPriceForLine(it, library);
+      const match = hit?.match.item ?? null;
+      if (match && hit) {
         it.library_id = match.id;
         it.is_ai_estimated = false;
-        if (match.default_unit_price !== null) {
-          price = Number(match.default_unit_price);
-          // A STRONG match (≥2 specific tokens) to a library row the
-          // tradie priced themselves is trustworthy enough to keep
-          // through the PRICES_OFF pass below — it's their number, not
-          // an AI guess. Single-token matches ("screws") stay unpriced.
-          if (scored.specificity >= 2 && price > 0) {
-            it.price_source = "user_library";
-            it.price_confidence = "high";
-          }
+        if (hit.unitPrice !== null && hit.unitPrice > 0) {
+          price = hit.unitPrice;
+          it.price_source = "user_library";
+          it.price_confidence = "high";
         }
         usedLibraryIds.add(match.id);
       } else {
@@ -965,30 +990,31 @@ async function runQuotePipeline(
     });
   }
 
-  // Stage 6 — transcript cleanup. Runs AFTER the matcher + compliance so
-  // the cleaned transcript and summary reflect what the engine actually
-  // saw. Failure modes: cleanTranscript() never throws — it returns a
-  // CleanedTranscript with `fallback: 'summary_failed'` if the LLM call
-  // errors, and the deterministic regex pass still applies. The route
-  // therefore always has SOMETHING to persist into quote_data.transcript.
+  // Stage 6 — transcript layers for audit + the review panel. The
+  // deterministic pass already ran at the top (its output is what the model
+  // and calculators quoted from); cleanTranscript re-derives the same
+  // cleaned text + corrections from the RAW transcript and adds the
+  // optional LLM summary. Failure modes: cleanTranscript() never throws —
+  // it returns a CleanedTranscript with `fallback: 'summary_failed'` if the
+  // LLM call errors, and the deterministic regex pass still applies. The
+  // route therefore always has SOMETHING to persist into
+  // quote_data.transcript.
   //
   // The transcript field is server-side only — `get_quote_by_token`
   // does not project it (PublicQuotePayload has no transcript field) and
   // the runtime test in `src/lib/transcriptCleanup.public.test.ts`
   // confirms the projection.
-  const vocab = await loadUserVocab(db, userId, {
-    includeRecentQuotes: true,
-  });
   // TRANSCRIPT_SUMMARY=off skips the second model call (the structured
   // job summary). On the CPU-only local model that call adds minutes to
   // every quote; with a hosted model it is cheap and should stay on.
-  const cleaned = await cleanTranscript(transcript, {
+  const cleaned = await cleanTranscript(rawTranscript, {
     vocab,
     summaryDisabled:
       process.env.TRANSCRIPT_SUMMARY?.trim().toLowerCase() === "off",
+    onSummaryFailure: reportSummaryFailureToMonitor,
   });
   parsed.transcript = {
-    raw: transcript,
+    raw: rawTranscript,
     cleaned: cleaned.cleanedTranscript,
     summary: cleaned.summary,
     corrections: cleaned.corrections,
@@ -1031,45 +1057,28 @@ async function runQuotePipeline(
   }
 
   // ───────────────────────────────────────────────────────────────────────
-  // AI PRICES OFF — material lines the model priced itself are emitted
-  // with NO pre-filled price: AI-guessed numbers never reach a customer.
+  // AI PRICES OFF — lines the model priced itself are emitted with NO
+  // pre-filled price: AI-guessed numbers never reach a customer.
   //
-  // Two sources of REAL prices survive this pass, because they're the
-  // tradie's own numbers, not guesses:
-  //   1. LABOUR at profiles.default_labour_rate.
-  //   2. MATERIALS strongly matched (specificity ≥ 2) to a library row
-  //      with a price — tagged price_source="user_library" above. The
-  //      library is fed by the tradie's own entries and scanned supplier
-  //      quotes, so this is the "real supplier pricing source" the old
-  //      comment was waiting for. Weak matches stay unpriced.
+  // Only the tradie's own numbers survive (see pricing.ts):
+  //   1. LABOUR — a rate stated in the tradie's own transcript (any unit:
+  //      "2 days @ $600", "$2,500 fixed"), else profiles.default_labour_rate
+  //      on HOUR lines only; a day line may keep a whole day at their own
+  //      hourly rate. Other unstated day/lot labour is left price-pending.
+  //      The public request form's text is the CUSTOMER's words, so a rate
+  //      "stated" there is never trusted.
+  //   2. MATERIALS strongly matched to a priced library row (tagged
+  //      user_library above) — re-verified against that library row, so a
+  //      provenance tag alone can never carry a price through.
+  // Everything else is price-pending and the send gate flags every $0 line.
   // ───────────────────────────────────────────────────────────────────────
   const PRICES_OFF = true;
   if (PRICES_OFF) {
-    const labourRate = Number(profile.default_labour_rate) || 0;
-    for (const it of parsed.line_items) {
-      if (it.type === "labour" && labourRate > 0) {
-        it.unit_price = labourRate;
-        it.line_total = round2((Number(it.quantity) || 0) * labourRate);
-        it.is_ai_estimated = false;
-        it.is_missing_price = false;
-        continue;
-      }
-      if (
-        it.type === "material" &&
-        it.price_source === "user_library" &&
-        it.price_confidence === "high" &&
-        Number(it.unit_price) > 0
-      ) {
-        it.line_total = round2((Number(it.quantity) || 0) * Number(it.unit_price));
-        it.is_ai_estimated = false;
-        it.is_missing_price = false;
-        continue;
-      }
-      it.unit_price = 0;
-      it.line_total = 0;
-      it.is_ai_estimated = false;
-      it.is_missing_price = true;
-    }
+    applyPricingPolicy(parsed.line_items, {
+      library,
+      hourlyRate: Number(profile.default_labour_rate) || 0,
+      statedAmounts: asAdmin ? [] : extractStatedAmounts(transcript),
+    });
   }
 
   const totals = computeQuoteTotals(
@@ -1083,6 +1092,13 @@ async function runQuotePipeline(
   parsed.subtotal_before_tax = totals.subtotal_before_tax;
   parsed.tax_amount = totals.tax_amount;
   parsed.total = totals.total;
+
+  // Independent verification — deterministic checks always, the LLM critic
+  // when QUOTE_VERIFY_ENABLED=true. Advisory: it never edits the quote and a
+  // failure never fails generation. Stored server-side on quote_data
+  // (never projected by get_quote_by_token) for the review page.
+  const verification = await verifyGeneratedQuote(parsed, transcript);
+  if (verification) parsed.verification = verification;
 
   if (parsed.line_items.length > 0) {
     // Two rapid POSTs for the same quote can both pass the early

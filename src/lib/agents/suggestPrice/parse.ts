@@ -19,6 +19,7 @@ import {
   type EvidenceRankItem,
   type EvidenceSourceType,
 } from "./types";
+import { round2 } from "@/lib/quote-defaults";
 
 const STATUSES: SuggestStatus[] = ["suggested", "needs_manual_pricing", "no_safe_match"];
 const CONFIDENCES: SuggestConfidence[] = ["high", "medium", "low", "none"];
@@ -37,7 +38,7 @@ function strOrNull(v: unknown): string | null {
 }
 function posPriceOrNull(v: unknown): number | null {
   const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
-  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
+  return Number.isFinite(n) && n > 0 ? round2(n) : null;
 }
 function strArray(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];

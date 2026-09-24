@@ -49,4 +49,65 @@ describe("applyLineEdit", () => {
     expect(next.quantity_source).toBe("calculator");
     expect(next.formula).toBe(line.formula);
   });
+
+  // ─── Audit 2026-09-24, item 2 — a rename must never wipe a price ───────
+  const labour: QuoteLineItem = {
+    type: "labour", description: "Labour", quantity: 10, unit: "hour",
+    unit_price: 75, line_total: 750, is_missing_price: false,
+  };
+
+  it("renaming a labour line keeps its price (10 h × $75 stays $75)", () => {
+    const next = applyLineEdit(labour, { description: "Labour — frame and line walls" });
+    expect(next.unit_price).toBe(75);
+    expect(next.is_missing_price).toBe(false);
+    expect(next.price_source).toBeUndefined();
+  });
+
+  it("renaming a manual material keeps its price and library link", () => {
+    const manual: QuoteLineItem = {
+      type: "material", description: "Pine 90x45", quantity: 12, unit: "m",
+      unit_price: 6.5, line_total: 78, library_id: "lib-1",
+      price_source: "user_library", price_confidence: "high",
+    };
+    const next = applyLineEdit(manual, { description: "Pine 90x45 H1.2" });
+    expect(next.unit_price).toBe(6.5);
+    expect(next.library_id).toBe("lib-1");
+  });
+
+  it("changing the UNIT resets the price (a per-hour rate means nothing per day)", () => {
+    const next = applyLineEdit(labour, { unit: "day" });
+    expect(next.unit_price).toBe(0);
+    expect(next.is_missing_price).toBe(true);
+  });
+
+  it("renaming a CALCULATOR-sourced line still resets its price", () => {
+    const next = applyLineEdit(line, { description: "Different decking profile" });
+    expect(next.unit_price).toBe(0);
+    expect(next.is_missing_price).toBe(true);
+    expect(next.library_id).toBeNull();
+  });
+
+  it("typing a unit price clears is_missing_price (not only Suggest Price)", () => {
+    const pending: QuoteLineItem = {
+      type: "other", description: "Skip bin", quantity: 1, unit: "each",
+      unit_price: 0, line_total: 0, is_missing_price: true, price_source: "missing_price",
+    };
+    const next = applyLineEdit(pending, { unit_price: 450 });
+    expect(next.unit_price).toBe(450);
+    expect(next.is_missing_price).toBe(false);
+    expect(next.price_source).toBeUndefined();
+  });
+
+  it("typing $0 marks the line missing again", () => {
+    const next = applyLineEdit(labour, { unit_price: 0 });
+    expect(next.is_missing_price).toBe(true);
+  });
+
+  it("an explicit is_missing_price in the patch (Suggest Price) is respected", () => {
+    const pending: QuoteLineItem = { ...labour, unit_price: 0, is_missing_price: true };
+    const next = applyLineEdit(pending, { unit_price: 80, is_missing_price: false });
+    expect(next.unit_price).toBe(80);
+    expect(next.is_missing_price).toBe(false);
+  });
 });
+

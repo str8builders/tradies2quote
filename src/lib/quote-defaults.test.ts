@@ -9,8 +9,11 @@ import {
   formatCurrency,
   gstInclusiveBreakdown,
   moneyEquals,
+  resolveTaxLabel,
+  resolveTaxRate,
   round2,
   splitDisplaySubtotals,
+  taxDefaultsFor,
 } from "./quote-defaults";
 
 // ─── round2 ──────────────────────────────────────────────────────────────
@@ -152,9 +155,10 @@ describe("computeQuoteTotals", () => {
   });
 
   it("uses SUM-OF-ROUNDED so visible lines tie out to the subtotal", () => {
-    // 2.5 * 19.99 = 49.97499… (float) → each visible line rounds to 49.97.
-    // Sum-of-rounded = 49.97 + 49.97 = 99.94 (what the line items add up to).
-    // Round-of-sum would be round2(99.94999…) = 99.95 — the old mismatch bug.
+    // 2.5 * 19.99 = 49.975 exactly → each visible line rounds half-up to
+    // 49.98 (the double 49.97499… used to show 49.97). Sum-of-rounded =
+    // 49.98 + 49.98 = 99.96 (what the line items add up to). Round-of-sum
+    // would be round2(99.95) = 99.95 — the old mismatch bug.
     const t = computeQuoteTotals(
       [
         { type: "material", quantity: 2.5, unit_price: 19.99 },
@@ -163,9 +167,9 @@ describe("computeQuoteTotals", () => {
       0,
       0,
     );
-    expect(round2(2.5 * 19.99)).toBe(49.97); // each line as shown
-    expect(t.materials_subtotal).toBe(99.94); // 49.97 + 49.97, ties out to lines
-    expect(t.total).toBe(99.94);
+    expect(round2(2.5 * 19.99)).toBe(49.98); // each line as shown
+    expect(t.materials_subtotal).toBe(99.96); // 49.98 + 49.98, ties out to lines
+    expect(t.total).toBe(99.96);
     expect(round2(2.5 * 19.99 + 2.5 * 19.99)).toBe(99.95); // round-of-sum differs
   });
 
@@ -333,5 +337,130 @@ describe("computeQuoteTotals hostile inputs", () => {
     );
     expect(t.materials_subtotal).toBe(10.01);
     expect(t.total).toBe(10.01);
+  });
+});
+
+// ─── round2: exact half-up (audit 2026-09-24, item 8) ────────────────────
+// Plain Math.round(n * 100) / 100 rounded a half-cent DOWN whenever the
+// double sat a hair below it. The shared helper must be exact half-up.
+
+/** Exact decimal half-up reference: "7.125" × "19.999" → cents, via BigInt. */
+function refLineCents(qty: string, price: string): number {
+  const scale = (v: string) => {
+    const [i, f = ""] = v.split(".");
+    return BigInt(i + f.padEnd(3, "0")); // value × 1000, exact
+  };
+  const product = scale(qty) * scale(price); // value × 1e6
+  return Number((product + BigInt(5000)) / BigInt(10000)); // → cents, half-up
+}
+
+describe("round2 — exact half-up", () => {
+  it("15% GST on $1.50 is $0.23 (0.225 rounds up, not down)", () => {
+    expect(round2(1.5 * 0.15)).toBe(0.23);
+    const t = computeQuoteTotals([{ type: "material", quantity: 1, unit_price: 1.5 }], 0, 15);
+    expect(t.tax_amount).toBe(0.23);
+    expect(t.total).toBe(1.73);
+  });
+
+  it("1 × $1.005 is $1.01 on every surface that rounds a line", () => {
+    expect(round2(1.005)).toBe(1.01);
+    expect(round2(1 * 1.005)).toBe(1.01);
+    const t = computeQuoteTotals([{ type: "material", quantity: 1, unit_price: 1.005 }], 0, 0);
+    expect(t.materials_subtotal).toBe(1.01);
+    expect(splitDisplaySubtotals([{ type: "material", quantity: 1, unit_price: 1.005 }]).materials).toBe(1.01);
+    expect(addGst(1.005, 0).exclusive).toBe(1.01);
+  });
+
+  it("rounds negatives symmetrically (half away from zero) and zero stays 0", () => {
+    expect(round2(-1.005)).toBe(-1.01);
+    expect(round2(-0.025)).toBe(-0.03);
+    expect(Object.is(round2(0), 0)).toBe(true);
+    expect(Object.is(round2(-0), 0)).toBe(true);
+  });
+
+  it("sweep: every half-cent midpoint up to $2,000 rounds UP", () => {
+    const wrong: number[] = [];
+    for (let k = 0; k < 200_000; k++) {
+      const midpoint = (2 * k + 1) / 200; // k.5 cents
+      if (round2(midpoint) !== (k + 1) / 100) wrong.push(k);
+    }
+    expect(wrong).toEqual([]);
+  });
+
+  it("sweep: qty × price lines match an exact decimal half-up reference", () => {
+    const quantities = ["0.25", "1", "1.5", "2.5", "3", "7.125", "12.75"];
+    const wrong: string[] = [];
+    for (const q of quantities) {
+      for (let milli = 1; milli <= 20_000; milli++) {
+        const price = (milli / 1000).toFixed(3);
+        const expected = refLineCents(q, price) / 100;
+        if (round2(Number(q) * Number(price)) !== expected) {
+          wrong.push(`${q} × ${price}`);
+        }
+      }
+    }
+    expect(wrong.slice(0, 5)).toEqual([]);
+  });
+
+  it("sweep: tax on whole-cent subtotals matches exact half-up at 15/10/20/12.5%", () => {
+    const wrong: string[] = [];
+    for (const rate of [15, 10, 20, 12.5]) {
+      for (let cents = 0; cents <= 50_000; cents++) {
+        const subtotal = cents / 100;
+        // exact: cents × rate / 100 → cents, half-up (rate has ≤1 decimal)
+        const exactTenths = BigInt(cents) * BigInt(Math.round(rate * 10)); // cents × rate × 10
+        const expected = Number((exactTenths + BigInt(500)) / BigInt(1000)) / 100;
+        const t = computeQuoteTotals([{ type: "labour", quantity: 1, unit_price: subtotal }], 0, rate);
+        if (t.tax_amount !== expected) wrong.push(`${subtotal} @ ${rate}%`);
+      }
+    }
+    expect(wrong.slice(0, 5)).toEqual([]);
+  });
+});
+
+// ─── Tax defaults by country (audit 2026-09-24, item 9) ──────────────────
+describe("tax label / rate defaults by business country", () => {
+  it("defaults: NZ GST 15, AU GST 10, UK VAT 20, US Tax 0, CA Tax 5", () => {
+    expect(taxDefaultsFor("NZ")).toEqual({ tax_label: "GST", tax_rate: 15 });
+    expect(taxDefaultsFor("AU")).toEqual({ tax_label: "GST", tax_rate: 10 });
+    expect(taxDefaultsFor("UK")).toEqual({ tax_label: "VAT", tax_rate: 20 });
+    expect(taxDefaultsFor("GB")).toEqual({ tax_label: "VAT", tax_rate: 20 });
+    expect(taxDefaultsFor("US")).toEqual({ tax_label: "Tax", tax_rate: 0 });
+    expect(taxDefaultsFor("CA")).toEqual({ tax_label: "Tax", tax_rate: 5 });
+  });
+
+  it("falls back to the currency's country, then NZ", () => {
+    expect(taxDefaultsFor(null, "GBP").tax_label).toBe("VAT");
+    expect(taxDefaultsFor("", "CAD").tax_label).toBe("Tax");
+    expect(taxDefaultsFor(undefined, undefined)).toEqual({ tax_label: "GST", tax_rate: 15 });
+  });
+
+  it("a UK/US/CA profile never prints the column-default 'GST'", () => {
+    expect(resolveTaxLabel("GST", "UK", "GBP")).toBe("VAT");
+    expect(resolveTaxLabel("GST", "US", "USD")).toBe("Tax");
+    expect(resolveTaxLabel("GST", "CA", "CAD")).toBe("Tax");
+    expect(resolveTaxLabel(null, "UK")).toBe("VAT");
+    expect(resolveTaxLabel("  ", "AU")).toBe("GST");
+    expect(resolveTaxLabel("VAT", "NZ")).toBe("GST");
+    expect(resolveTaxLabel("GST", "NZ")).toBe("GST");
+  });
+
+  it("keeps a label the tradie set themselves", () => {
+    expect(resolveTaxLabel("HST", "CA")).toBe("HST");
+    expect(resolveTaxLabel("Sales tax", "US")).toBe("Sales tax");
+  });
+
+  it("a blank rate uses the country default — never a silent NZ 15%", () => {
+    expect(resolveTaxRate(null, "UK")).toBe(20);
+    expect(resolveTaxRate(undefined, "US")).toBe(0);
+    expect(resolveTaxRate("", "AU")).toBe(10);
+    expect(resolveTaxRate("junk", "CA")).toBe(5);
+    expect(resolveTaxRate(null, null, "GBP")).toBe(20);
+  });
+
+  it("an explicit rate (including 0) is kept, still clamped", () => {
+    expect(resolveTaxRate(12.5, "UK")).toBe(12.5);
+    expect(resolveTaxRate(0, "UK")).toBe(0);
+    expect(resolveTaxRate(155, "NZ")).toBe(MAX_TAX_RATE);
   });
 });

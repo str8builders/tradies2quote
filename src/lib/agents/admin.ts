@@ -129,13 +129,13 @@ export function runAdminAgent(
 
   out.push({
     id: "markup_pct",
-    label: "Default materials markup",
+    label: "Default markup (materials + other items)",
     status:
       (profile?.default_markup_pct ?? 0) > 0 ? "complete" : "warn",
     detail:
       (profile?.default_markup_pct ?? 0) > 0
-        ? `Adding ${profile?.default_markup_pct}% to materials.`
-        : "Quotes will show materials at cost. Most tradies mark up 15–25%.",
+        ? `Adding ${profile?.default_markup_pct}% to materials and other items.`
+        : "Quotes will show materials and other items at cost. Most tradies mark up 15–25%.",
     fixHref: "/app/settings",
     fixLabel: "Open Settings",
   });
