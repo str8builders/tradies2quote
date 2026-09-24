@@ -314,6 +314,15 @@ describe("content parts", () => {
     expect(out).toMatch(/<h1 [^>]*>Deck at 14 Rata St<\/h1>/);
   });
 
+  it("TopBar owns the notch, or sticks just below it where the shell owns it", () => {
+    const own = tag(html(<TopBar title="Jobs" />), "<header");
+    expect(own).toContain("top-0 pt-[env(safe-area-inset-top)]");
+    const shell = tag(html(<TopBar title="Jobs" safeArea={false} />), "<header");
+    expect(shell).toContain("top-[env(safe-area-inset-top)]");
+    expect(shell).not.toContain("top-0");
+    expect(shell).not.toContain("pt-[env(safe-area-inset-top)]");
+  });
+
   it("BottomActionBar sticks to the bottom clear of the home indicator", () => {
     const out = html(
       <BottomActionBar hint="Next: book the job">
