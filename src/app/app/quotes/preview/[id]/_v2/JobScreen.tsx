@@ -77,18 +77,19 @@ type SaveOutcome = { ok: true } | { error: string };
 const REFRESH_AFTER_SAVE_MS = 1500;
 
 /**
- * Where toasts sit: clear of the bottom bar, which on phones docks above the
- * app's floating tab bar (the shell contract's 5.3rem + inset, see
- * docs/mobile-shell-contract.md). Buttons in the bar: 0, 1 or 2.
+ * Where toasts sit: clear of the bottom bar. The job page is a focused route
+ * (FOCUSED_ROUTES in _v2/lib/app-nav.ts), so the app's tab bar is hidden here
+ * and the bar sits on the bottom edge; only the home-indicator inset is added
+ * (env() is 0 on desktop). Buttons in the bar: 0, 1 or 2.
  */
 export function toastOffsetClass(buttons: 0 | 1 | 2): string {
   switch (buttons) {
     case 0:
-      return "[--job-toast:6rem] sm:[--job-toast:1.5rem]";
+      return "[--job-toast:calc(1.5rem+env(safe-area-inset-bottom))]";
     case 1:
-      return "[--job-toast:10.75rem] sm:[--job-toast:5.75rem]";
+      return "[--job-toast:calc(5.75rem+env(safe-area-inset-bottom))]";
     default:
-      return "[--job-toast:14.25rem] sm:[--job-toast:9.25rem]";
+      return "[--job-toast:calc(9.25rem+env(safe-area-inset-bottom))]";
   }
 }
 
@@ -123,7 +124,7 @@ export function JobScreen(props: JobScreenProps) {
   return (
     <div
       className={cx(
-        "flex min-h-[calc(100dvh-5.8rem-env(safe-area-inset-bottom)-env(safe-area-inset-top))] flex-col sm:min-h-dvh",
+        "flex min-h-[calc(100dvh-env(safe-area-inset-top))] flex-col sm:min-h-dvh",
         toastOffsetClass(barButtonCount(layout)),
       )}
     >
@@ -454,15 +455,12 @@ function JobScreenInner(props: JobScreenProps) {
       </div>
 
       {main || secondary ? (
-        <BottomActionBar
-          safeArea
-          className="max-sm:bottom-[calc(5.3rem+env(safe-area-inset-bottom))] max-sm:pb-3"
-        >
+        <BottomActionBar safeArea>
           {secondary}
           {main}
         </BottomActionBar>
       ) : view.position === "complete" ? (
-        <BottomActionBar safeArea className="max-sm:bottom-[calc(5.3rem+env(safe-area-inset-bottom))] max-sm:pb-3">
+        <BottomActionBar safeArea>
           <p className="flex min-h-14 items-center justify-center gap-2 font-semibold text-ui-ok">
             <CheckCircle aria-hidden="true" weight="fill" className="text-[1.5rem]" />
             Paid. Nice work.

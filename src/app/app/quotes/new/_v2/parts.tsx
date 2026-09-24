@@ -53,9 +53,9 @@ export interface FlowFrameProps {
 
 /**
  * One new-look screen inside the /app shell: a top bar that stays under the
- * notch, the content, and the action bar docked just above the floating
- * bottom navigation on phones (5.3rem + the home-indicator inset, the same
- * docking line as the quote page's sticky bar; see docs/mobile-shell-contract.md).
+ * notch, the content, and the action bar on the bottom edge. New quote is a
+ * focused route (FOCUSED_ROUTES in _v2/lib/app-nav.ts), so the app's tab bar
+ * is hidden here; the bar pads for the home indicator itself.
  */
 export function FlowFrame({
   title,
@@ -104,8 +104,8 @@ export function FlowFrame({
         {children}
       </main>
       {actions ? (
-        <div className="sticky bottom-[calc(5.3rem_+_env(safe-area-inset-bottom))] z-20 mt-auto sm:bottom-0">
-          <BottomActionBar safeArea={false} hint={hint}>
+        <div className="sticky bottom-0 z-20 mt-auto">
+          <BottomActionBar safeArea hint={hint}>
             {actions}
           </BottomActionBar>
         </div>

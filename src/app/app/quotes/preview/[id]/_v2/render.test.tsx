@@ -264,12 +264,13 @@ describe("the bottom bar and toasts", () => {
     expect(barButtonCount(view("draft"))).toBe(1);
     expect(barButtonCount(view("sent"))).toBe(2);
     expect(barButtonCount(view("completed", invoice("paid")))).toBe(0);
-    expect(toastOffsetClass(2)).toContain("[--job-toast:14.25rem]");
+    expect(toastOffsetClass(2)).toContain("[--job-toast:calc(9.25rem+env(safe-area-inset-bottom))]");
   });
 
-  it("docks above the app's tab bar on phones (the shell contract's 5.3rem + inset)", () => {
+  it("sits on the bottom edge: the job page is a focused route, so the tab bar is hidden", () => {
     const out = screen();
-    expect(out).toContain("max-sm:bottom-[calc(5.3rem+env(safe-area-inset-bottom))]");
+    expect(out).not.toContain("5.3rem");
+    expect(out).toContain("pb-[max(env(safe-area-inset-bottom),0.75rem)]");
   });
 });
 
