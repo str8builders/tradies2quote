@@ -3,14 +3,37 @@
 import "../premium.css";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { AccountHub } from "./AccountHub";
 import { AccountButton } from "./AccountButton";
 import { T2QCALIcon } from "./T2QCALIcon";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion, useReducedMotion } from "framer-motion";
 import { isWeatherImpactEnabled } from "@/lib/weather-impact/feature-flag";
-import { SPRING_SNAPPY } from "./motion";
+
+/**
+ * Wave 46 perf — the sliding tab-highlight is the only framer-motion user
+ * left on this header, so it's split into its own chunk and loaded only on
+ * the client. `loading` renders the same highlight WITHOUT the cross-tab
+ * slide (a plain static box) so there's no layout shift while the chunk
+ * downloads; see AnimatedTabPill.tsx for why this piece keeps framer-motion.
+ */
+const HEADER_PILL_CLASSNAME =
+  "absolute inset-0 rounded-[10px] border border-[rgba(255,160,109,0.2)] bg-[rgba(255,160,109,0.08)]";
+const HEADER_PILL_STYLE = { boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.04)" };
+const AnimatedTabPill = dynamic(
+  () => import("./AnimatedTabPill").then((m) => m.AnimatedTabPill),
+  {
+    ssr: false,
+    loading: () => (
+      <span
+        aria-hidden="true"
+        className={HEADER_PILL_CLASSNAME}
+        style={HEADER_PILL_STYLE}
+      />
+    ),
+  },
+);
 
 /**
  * Client part of the shared `/app/*` header.
@@ -70,7 +93,6 @@ export function AppHeaderClient({
   avatarUrl,
 }: Props) {
   const pathname = usePathname() ?? "";
-  const reduce = useReducedMotion();
   const visibleTabs = TABS.filter((t) => isTabVisible(t, isOwner));
 
   // Avatar dropdown state — desktop only. Close on outside-click and
@@ -167,14 +189,14 @@ export function AppHeaderClient({
                 >
                   {/* Wave 45 — active highlight + underline slide between
                       tabs via shared layoutId (the static CSS rule keeps
-                      only the text colour). */}
+                      only the text colour). Wave 46 — the animated span is
+                      lazy-loaded (see AnimatedTabPill above); the static
+                      loading fallback shows the same box immediately. */}
                   {active ? (
-                    <motion.span
+                    <AnimatedTabPill
                       layoutId="t2q-header-tab-pill"
-                      aria-hidden="true"
-                      transition={reduce ? { duration: 0 } : SPRING_SNAPPY}
-                      className="absolute inset-0 rounded-[10px] border border-[rgba(255,160,109,0.2)] bg-[rgba(255,160,109,0.08)]"
-                      style={{ boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.04)" }}
+                      className={HEADER_PILL_CLASSNAME}
+                      style={HEADER_PILL_STYLE}
                     />
                   ) : null}
                   {tab.href === "/t2qcal/calculators" && <T2QCALIcon size={24} />}

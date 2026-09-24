@@ -13,7 +13,7 @@ import {
 } from "@/lib/agents/admin";
 import { logAgentEvent } from "@/lib/agent-monitor/logger";
 import { isStripeConfigured } from "@/lib/stripe-client";
-import { getSubscriptionStatus } from "@/lib/subscription";
+import { getCachedSubscriptionStatus } from "@/lib/subscription";
 import { AppHeader } from "../_components/AppHeader";
 import { AdminChecklistPanel } from "../_components/agents/AdminChecklistPanel";
 import { SettingsForm, type SettingsInitial } from "./_components/SettingsForm";
@@ -67,7 +67,18 @@ export default async function SettingsPage({
   // AdminChecklistPanel can flag setup gaps (business name, labour
   // rate, GST, clients without contact). Same RLS pattern the
   // settings form already uses — auth.uid() owns the rows.
-  const [{ data: profile }, { data: clientsRows }] = await Promise.all([
+  //
+  // Wave 46 perf — `getTeamContext` (3-4 sequential Supabase round trips)
+  // used to be awaited INSIDE the Promise.all array, as an argument to the
+  // clients query's `.eq(...)`. That await suspends this whole async
+  // function before the array literal — and therefore `Promise.all` itself
+  // — is ever evaluated, so the profile fetch never even started until
+  // getTeamContext fully resolved. Resolving it in parallel with the
+  // independent profile fetch, then firing the (genuinely dependent)
+  // clients query after, removes that serialization. `getTeamContext` is
+  // `React.cache`-wrapped, so this doesn't add a duplicate round trip for
+  // any other call on this request.
+  const [{ data: profile }, teamContext] = await Promise.all([
     supabase
       .from("profiles")
       .select(
@@ -75,11 +86,12 @@ export default async function SettingsPage({
       )
       .eq("id", user.id)
       .maybeSingle(),
-    supabase
-      .from("clients")
-      .select("id, email, phone")
-      .eq("user_id", (await getTeamContext(user.id)).clientOwnerId),
+    getTeamContext(user.id),
   ]);
+  const { data: clientsRows } = await supabase
+    .from("clients")
+    .select("id, email, phone")
+    .eq("user_id", teamContext.clientOwnerId);
 
   const adminProfile: AdminProfileSnapshot | null = profile
     ? {
@@ -298,12 +310,16 @@ export default async function SettingsPage({
         {!(await isNativeShellRequest()) ? (
           <HideInNativeApp>
             <SubscriptionPanel
-              status={await getSubscriptionStatus({
-                userId: user.id,
-                // eslint-disable-next-line react-hooks/purity -- server component, one-shot per request
-                signedUpAt: new Date(user.created_at ?? Date.now()),
-                email: user.email,
-              })}
+              // Wave 46 perf — `<TrialBanner>` (mounted in the same request
+              // via the /app layout) already asks this exact question
+              // through the `React.cache`-wrapped accessor; matching its
+              // call shape here lets React dedupe instead of firing a
+              // second, uncached billing read.
+              status={await getCachedSubscriptionStatus(
+                user.id,
+                user.created_at ?? null,
+                user.email,
+              )}
               stripeConfigured={isStripeConfigured()}
             />
           </HideInNativeApp>

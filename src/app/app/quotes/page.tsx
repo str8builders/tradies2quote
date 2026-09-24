@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { quoteNumber } from "@/lib/quote-defaults";
-import type { QuoteData, QuoteStatus } from "@/lib/quote-types";
+import type { QuoteStatus } from "@/lib/quote-types";
 import { STAGE_LABELS, STAGES } from "@/lib/lifecycle/stages";
 import { AppHeader } from "../_components/AppHeader";
 import {
@@ -61,10 +61,19 @@ export default async function QuotesPage({
   const { stage: stageRaw } = await searchParams;
   const stageFilter = parseStage(stageRaw);
 
+  // Wave 46 perf — this used to select the whole `quote_data` JSONB blob
+  // (pricing breakdown, terms, every line item, AI meta…) for up to 100
+  // rows just to read the job summary and client name below. PostgREST's
+  // JSON-path select lets Postgres do that narrowing instead of shipping
+  // the full document over the wire.
+  // `line_items` is kept as the JSON array (rather than indexing to its
+  // first element in the select string) so this only relies on the
+  // well-established `column->path` / `column->>path` PostgREST syntax —
+  // the fallback below still reads only its first description client-side.
   let query = supabase
     .from("quotes")
     .select(
-      "id, status, total_amount, currency, quote_data, created_at, archived_at",
+      "id, status, total_amount, currency, created_at, archived_at, job_summary:quote_data->>job_summary, client_name:quote_data->client->>name, line_items:quote_data->line_items",
     )
     .eq("user_id", user.id)
     .is("deleted_at", null);
@@ -89,17 +98,17 @@ export default async function QuotesPage({
     .limit(PAGE_FETCH_LIMIT);
 
   const list: QuoteListRow[] = (rows ?? []).map((q) => {
-    const qd = q.quote_data as QuoteData | null;
+    const lineItems = q.line_items as Array<{ description?: string }> | null;
     const jobSummary =
-      (qd?.job_summary as string | undefined) ??
-      (qd?.line_items?.[0]?.description as string | undefined) ??
+      (q.job_summary as string | undefined) ??
+      (lineItems?.[0]?.description as string | undefined) ??
       "";
     return {
       id: q.id,
       status: (q.status ?? "draft") as QuoteStatus,
       total: Number(q.total_amount) || 0,
       currency: (q.currency as string) ?? "NZD",
-      clientName: qd?.client?.name ?? "—",
+      clientName: (q.client_name as string | undefined) ?? "—",
       jobSummary,
       number: quoteNumber(q.id, q.created_at),
       created_at: q.created_at,
