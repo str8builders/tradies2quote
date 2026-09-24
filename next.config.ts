@@ -44,6 +44,12 @@ const nextConfig: NextConfig = {
       { source: "/wallpaper/:path*", headers: [mediaCache] },
       { source: "/screens/:path*", headers: [mediaCache] },
       { source: "/logo-horizontal.webp", headers: [mediaCache] },
+      // Barcode scanner's ZXing reader. The path carries the library version
+      // (scripts/copy-zxing-wasm.mjs), so a file never changes in place.
+      {
+        source: "/vendor/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
       {
         source: "/(.*)",
         headers: [
