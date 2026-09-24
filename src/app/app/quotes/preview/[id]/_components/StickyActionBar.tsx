@@ -11,6 +11,7 @@ import {
   Warning,
 } from "@phosphor-icons/react";
 import type { QuoteStatus } from "@/lib/quote-types";
+import { isQuoteLocked } from "@/lib/lifecycle/lock";
 import { buildSmsHref, deviceCanSendSms } from "@/lib/smsDeepLink";
 
 /**
@@ -124,7 +125,8 @@ export function StickyActionBar({
     opened: boolean;
   } | null>(null);
 
-  const isAccepted = status === "accepted";
+  // Save stays disabled for every post-acceptance stage, not just "accepted".
+  const isAccepted = isQuoteLocked(status);
   // Resending a job that is scheduled, underway or done would drag it back to "sent".
   const isUnderway = status === "scheduled" || status === "in_progress" || status === "completed";
   const isSentOrViewed = status === "sent" || status === "viewed";

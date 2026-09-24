@@ -14,6 +14,8 @@ import type {
   CleanedTranscript,
   TranscriptSummary,
 } from "@/lib/transcriptCleanup";
+import type { QuoteStatus } from "@/lib/quote-types";
+import { isQuoteLocked } from "@/lib/lifecycle/lock";
 
 /**
  * ChatGPT-style transcript panel — sits above the quote editor on the
@@ -44,15 +46,38 @@ export type TranscriptPanelData = {
 type Props = {
   quoteId: string;
   transcript: TranscriptPanelData;
+  /** Regenerate is offered for drafts only; accepted quotes are read-only. */
+  status?: QuoteStatus;
+  /** Current line count, quoted in the regenerate confirmation. */
+  lineCount?: number;
 };
 
-export function TranscriptPanel({ quoteId, transcript }: Props) {
+/** The confirmation shown before regenerating wipes the current lines. */
+export function regenerateWarning(lineCount?: number): string {
+  const lines =
+    typeof lineCount === "number" && lineCount > 0
+      ? `all ${lineCount} current line${lineCount === 1 ? "" : "s"}`
+      : "all current lines";
+  return `Regenerating replaces ${lines} and the total with a new quote built from this transcript. Any edits you made to the lines are lost.`;
+}
+
+export function TranscriptPanel({
+  quoteId,
+  transcript,
+  status = "draft",
+  lineCount,
+}: Props) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [editedText, setEditedText] = useState(transcript.cleaned);
   const [pending, setPending] = useState<"save" | "regen" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<"raw" | "cleaned" | null>(null);
+  const [confirmingRegen, setConfirmingRegen] = useState(false);
+  // Regenerating wipes every line, so it is a drafts-only action (the
+  // route answers 409 otherwise); accepted quotes are read-only throughout.
+  const canRegenerate = status === "draft";
+  const readOnly = isQuoteLocked(status);
 
   const onCopy = async (which: "raw" | "cleaned") => {
     const text = which === "raw" ? transcript.raw : transcript.cleaned;
@@ -91,7 +116,8 @@ export function TranscriptPanel({ quoteId, transcript }: Props) {
   };
 
   const onRegenerate = async () => {
-    if (!editedText.trim()) return;
+    if (!editedText.trim() || !canRegenerate) return;
+    setConfirmingRegen(false);
     setError(null);
     setPending("regen");
     try {
@@ -168,9 +194,16 @@ export function TranscriptPanel({ quoteId, transcript }: Props) {
         onCancel={() => {
           setEditedText(transcript.cleaned);
           setEditing(false);
+          setConfirmingRegen(false);
         }}
         onSave={onSave}
         onRegenerate={onRegenerate}
+        readOnly={readOnly}
+        canRegenerate={canRegenerate}
+        confirmingRegen={confirmingRegen}
+        onAskRegenerate={() => setConfirmingRegen(true)}
+        onCancelRegenerate={() => setConfirmingRegen(false)}
+        regenWarning={regenerateWarning(lineCount)}
       />
 
       {/* Card 3 — AI understood (summary) */}
@@ -230,7 +263,7 @@ function RawCard({
   );
 }
 
-function CleanedCard({
+export function CleanedCard({
   text,
   editing,
   pending,
@@ -243,6 +276,12 @@ function CleanedCard({
   onCancel,
   onSave,
   onRegenerate,
+  readOnly = false,
+  canRegenerate = true,
+  confirmingRegen = false,
+  onAskRegenerate,
+  onCancelRegenerate,
+  regenWarning = regenerateWarning(),
 }: {
   text: string;
   editing: boolean;
@@ -256,6 +295,15 @@ function CleanedCard({
   onCancel: () => void;
   onSave: () => void;
   onRegenerate: () => void;
+  /** Accepted (or later) quote — no editing at all. */
+  readOnly?: boolean;
+  /** Draft only — regenerating replaces every line. */
+  canRegenerate?: boolean;
+  /** The "this replaces your lines" confirmation is open. */
+  confirmingRegen?: boolean;
+  onAskRegenerate?: () => void;
+  onCancelRegenerate?: () => void;
+  regenWarning?: string;
 }) {
   return (
     <div
@@ -305,8 +353,47 @@ function CleanedCard({
         <p className="whitespace-pre-wrap text-sm text-white">{text}</p>
       )}
 
+      {confirmingRegen && editing && canRegenerate && (
+        <div
+          role="alertdialog"
+          aria-label="Replace the quote lines?"
+          data-testid="transcript-regenerate-confirm"
+          className="mt-3 rounded-sm border border-hivis/40 bg-hivis/10 p-3 text-sm text-hivis"
+        >
+          <p>{regenWarning}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              data-testid="transcript-regenerate-confirm-yes"
+              onClick={onRegenerate}
+              disabled={pending !== null}
+              className="inline-flex min-h-[44px] items-center gap-1 rounded-sm border border-brand bg-brand px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-950 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <ArrowsClockwise size={12} weight="bold" />
+              Replace the lines
+            </button>
+            <button
+              type="button"
+              data-testid="transcript-regenerate-confirm-no"
+              onClick={onCancelRegenerate}
+              disabled={pending !== null}
+              className="inline-flex min-h-[44px] items-center gap-1 rounded-sm border border-ink-700 bg-ink-800 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-200 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Keep current quote
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="mt-3 flex flex-wrap gap-2">
-        {!editing ? (
+        {readOnly ? (
+          <p
+            data-testid="transcript-read-only"
+            className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-500"
+          >
+            {"// quote accepted — transcript is read-only"}
+          </p>
+        ) : !editing ? (
           <button
             type="button"
             data-testid="transcript-edit"
@@ -327,16 +414,25 @@ function CleanedCard({
             >
               {pending === "save" ? "Saving…" : "Save"}
             </button>
-            <button
-              type="button"
-              data-testid="transcript-regenerate"
-              onClick={onRegenerate}
-              disabled={pending !== null || text.trim().length === 0}
-              className="inline-flex items-center gap-1 rounded-sm border border-brand bg-brand/10 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-brand hover:bg-brand/20 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <ArrowsClockwise size={12} weight="bold" />
-              {pending === "regen" ? "Regenerating…" : "Regenerate quote"}
-            </button>
+            {canRegenerate ? (
+              <button
+                type="button"
+                data-testid="transcript-regenerate"
+                onClick={onAskRegenerate ?? onRegenerate}
+                disabled={pending !== null || confirmingRegen || text.trim().length === 0}
+                className="inline-flex items-center gap-1 rounded-sm border border-brand bg-brand/10 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-brand hover:bg-brand/20 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ArrowsClockwise size={12} weight="bold" />
+                {pending === "regen" ? "Regenerating…" : "Regenerate quote"}
+              </button>
+            ) : (
+              <span
+                data-testid="transcript-regenerate-unavailable"
+                className="inline-flex items-center px-1 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-500"
+              >
+                Regenerate is for drafts only
+              </span>
+            )}
             <button
               type="button"
               data-testid="transcript-cancel"

@@ -25,10 +25,21 @@ const ERROR_MESSAGES: Record<string, string> = {
   signature_upload_failed: "Could not save your signature. Please try again.",
   expired: "Sorry — this quote has expired.",
   already_accepted: "This quote has already been accepted.",
+  quote_changed: "This quote was updated — please review the latest version.",
+  declined: "This quote is no longer available to accept.",
+  not_available: "This quote is no longer available to accept.",
   not_found: "Quote not found.",
   accept_failed: "Something went wrong. Please try again.",
   invalid_body: "Could not read the form. Please reload and try again.",
 };
+
+/** The accept request: the form fields plus the revision and total shown. */
+export function acceptRequestBody(
+  quote: Pick<PublicQuotePayload, "version" | "total">,
+  fields: { name: string; email: string; signature: string | null; accepted: boolean },
+) {
+  return JSON.stringify({ ...fields, version: quote.version, total: quote.total });
+}
 
 export function AcceptForm({ token, quote }: Props) {
   const router = useRouter();
@@ -47,7 +58,7 @@ export function AcceptForm({ token, quote }: Props) {
       const res = await fetch(`/api/quote/${token}/accept`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name, email, signature, accepted }),
+        body: acceptRequestBody(quote, { name, email, signature, accepted }),
       });
       if (res.ok) {
         router.refresh();
@@ -56,6 +67,12 @@ export function AcceptForm({ token, quote }: Props) {
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       setError(ERROR_MESSAGES[data.error ?? ""] ?? "Could not accept quote.");
       setSubmitting(false);
+      if (data.error === "quote_changed") {
+        // Reload the quote in place (keeping name and email) and make the
+        // customer tick acceptance again against the revised figures.
+        setAccepted(false);
+        router.refresh();
+      }
     } catch {
       setError("Network error. Please try again.");
       setSubmitting(false);

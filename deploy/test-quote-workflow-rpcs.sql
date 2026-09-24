@@ -3,7 +3,7 @@ begin;
 do $$
 declare
   audit_id uuid := '9a809b06-4eee-4363-9c11-8fc8b871926a';
-  owner_id uuid; target text; first_invoice uuid; second_invoice uuid; before_data jsonb;
+  owner_id uuid; target text; first_invoice uuid; second_invoice uuid; before_data jsonb; before_version integer;
 begin
   if current_database() not like 't2q_release_audit_%' then
     raise exception 'This test requires an isolated release audit database';
@@ -37,9 +37,21 @@ begin
     perform public.transition_quote_lifecycle(audit_id, 'completed');
     raise exception 'Skipped lifecycle states';
   exception when sqlstate '22023' then null; end;
+  select version into before_version from public.quotes where id = audit_id;
   foreach target in array array['sent', 'accepted', 'scheduled', 'in_progress', 'completed'] loop
     if public.transition_quote_lifecycle(audit_id, target) <> target then raise exception 'Transition failed'; end if;
+    -- 24 Sep: from acceptance on, the priced content the invoice bills is locked.
+    if target <> 'sent' then
+      begin
+        update public.quotes set quote_data = jsonb_set(quote_data, '{line_items,0,unit_price}', '999'),
+          total_amount = 999 where id = audit_id;
+        raise exception 'Quote repriced while %', target;
+      exception when sqlstate '55000' then null; end;
+    end if;
   end loop;
+  if (select version from public.quotes where id = audit_id) <> before_version then
+    raise exception 'Lifecycle transitions changed the quote version';
+  end if;
   if exists(select 1 from public.quotes where id = audit_id and
     (sent_at is null or accepted_at is null or started_at is null or completed_at is null)) then
     raise exception 'Lifecycle timestamps missing';
@@ -80,4 +92,4 @@ begin
   end if;
 end $$;
 rollback;
-\echo Quote workflow ownership, lifecycle, invoice snapshot/idempotency and chat checks passed.
+\echo Quote workflow ownership, lifecycle, post-acceptance lock, invoice snapshot/idempotency and chat checks passed.

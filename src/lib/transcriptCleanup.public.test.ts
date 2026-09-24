@@ -115,6 +115,7 @@ describe("Stage 6 transcript privacy", () => {
       accepted_at: null,
       accepted_name: null,
       accepted_quote_version: 1,
+      version: 1,
       currency: fullQuoteData.currency,
       has_pdf: false,
       has_signature: false,

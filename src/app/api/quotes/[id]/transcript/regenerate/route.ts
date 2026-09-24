@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
+import { captureError } from "@/lib/observability";
+import { regenerateRefusalMessage } from "@/lib/lifecycle/lock";
 
 /**
  * Regenerate a quote from an edited cleaned transcript.
@@ -27,6 +29,12 @@ import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
  * route writes to. The public RPC does not return it. The post-regen
  * transcript object is built by /api/quotes/generate and lives inside
  * quote_data — same privacy contract as before.
+ *
+ * Drafts only (audit 2026-09-24). Regenerating wipes every line and the
+ * total, so a quote the client has already been sent — or has accepted,
+ * or that is scheduled/underway/invoiced — answers 409 instead. The write
+ * itself is conditional on `status = 'draft'` so a send racing this
+ * request cannot be wiped either.
  */
 
 export const runtime = "nodejs";
@@ -86,7 +94,7 @@ export async function POST(
   // mutating. RLS handles this too, but spell it out for clarity.
   const { data: quote, error } = await supabase
     .from("quotes")
-    .select("id, user_id")
+    .select("id, user_id, status")
     .eq("id", id)
     .single();
   if (error || !quote) {
@@ -95,8 +103,14 @@ export async function POST(
   if (quote.user_id !== user.id) {
     return NextResponse.json({ error: "Quote not found" }, { status: 404 });
   }
+  if ((quote.status ?? "draft") !== "draft") {
+    return NextResponse.json(
+      { error: regenerateRefusalMessage(quote.status), code: "not_draft" },
+      { status: 409 },
+    );
+  }
 
-  const { error: uErr } = await supabase
+  const { data: cleared, error: uErr } = await supabase
     .from("quotes")
     .update({
       voice_transcript: cleaned,
@@ -105,12 +119,25 @@ export async function POST(
       quote_data: null,
       total_amount: null,
     })
-    .eq("id", quote.id);
+    .eq("id", quote.id)
+    .eq("user_id", user.id)
+    // Re-checked in the write itself: a send landing between the read
+    // above and this update must not be wiped.
+    .eq("status", "draft")
+    .select("id");
   if (uErr) {
     console.error("[transcript] regenerate prep update failed", uErr);
+    captureError(uErr, { route: "quotes/transcript/regenerate" });
     return NextResponse.json(
       { error: "Failed to clear existing quote for regeneration" },
       { status: 500 },
+    );
+  }
+  if (!cleared || cleared.length === 0) {
+    return NextResponse.json(
+      // The status moved on between the read and the write (e.g. sent).
+      { error: regenerateRefusalMessage("sent"), code: "not_draft" },
+      { status: 409 },
     );
   }
 

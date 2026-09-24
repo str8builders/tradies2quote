@@ -1320,6 +1320,7 @@ export type Database = {
           follow_up_sent_at: string | null
           id: string
           pdf_path: string | null
+          pdf_version: number | null
           public_token: string | null
           quote_data: Json | null
           scheduled_for: string | null
@@ -1331,6 +1332,7 @@ export type Database = {
           status: Database["public"]["Enums"]["quote_status"]
           total_amount: number | null
           user_id: string
+          version: number
           viewed_at: string | null
           voice_transcript: string | null
         }
@@ -1355,6 +1357,7 @@ export type Database = {
           follow_up_sent_at?: string | null
           id?: string
           pdf_path?: string | null
+          pdf_version?: number | null
           public_token?: string | null
           quote_data?: Json | null
           scheduled_for?: string | null
@@ -1366,6 +1369,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["quote_status"]
           total_amount?: number | null
           user_id: string
+          version?: number
           viewed_at?: string | null
           voice_transcript?: string | null
         }
@@ -1390,6 +1394,7 @@ export type Database = {
           follow_up_sent_at?: string | null
           id?: string
           pdf_path?: string | null
+          pdf_version?: number | null
           public_token?: string | null
           quote_data?: Json | null
           scheduled_for?: string | null
@@ -1401,6 +1406,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["quote_status"]
           total_amount?: number | null
           user_id?: string
+          version?: number
           viewed_at?: string | null
           voice_transcript?: string | null
         }
