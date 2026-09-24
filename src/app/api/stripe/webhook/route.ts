@@ -15,7 +15,22 @@ export async function POST(request: NextRequest) {
   const stripe = stripeClient();
   let event: Stripe.Event;
   try { event = stripe.webhooks.constructEvent(await request.text(), sig, secret); }
-  catch (error) { captureError(error, { route: "stripe/webhook" }); return NextResponse.json({ error: "bad_signature" }, { status: 400 }); }
+  catch (error) {
+    // Two causes look identical here: a forged or test request (rejected, as it
+    // should be) or a signing secret in app.env that no longer matches the
+    // Stripe endpoint. Stripe's dashboard tells them apart — real failed
+    // deliveries are listed on the endpoint; forged requests never are. The
+    // 12–20 Sep 2026 reports were forged/test requests (every Stripe delivery
+    // to this endpoint returned 200).
+    captureError(
+      new Error(
+        "Stripe webhook signature rejected: a forged/test request, or STRIPE_WEBHOOK_SECRET no longer matches the endpoint (check the endpoint's failed deliveries in Stripe).",
+        { cause: error },
+      ),
+      { route: "stripe/webhook" },
+    );
+    return NextResponse.json({ error: "bad_signature" }, { status: 400 });
+  }
   const admin = adminClient();
   const ledger = await admin.from("stripe_webhook_events").select("event_id").eq("event_id", event.id).maybeSingle();
   if (ledger.error) return NextResponse.json({ error: "ledger_unavailable" }, { status: 500 });

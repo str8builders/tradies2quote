@@ -72,5 +72,9 @@ describe('Stripe durable acknowledgement', () => {
     mock.construct.mockImplementation(() => { throw new Error('invalid signature'); });
     expect((await POST(request())).status).toBe(400);
     expect(mock.from).not.toHaveBeenCalled();
+    // The report names both possible causes so the digest reader knows where to look.
+    const reported = mock.capture.mock.calls.at(-1)?.[0] as Error;
+    expect(reported.message).toMatch(/forged\/test request/);
+    expect(reported.message).toMatch(/STRIPE_WEBHOOK_SECRET/);
   });
 });

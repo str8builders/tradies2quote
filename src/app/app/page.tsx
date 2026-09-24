@@ -31,6 +31,9 @@ import { T2QCALIcon } from "./_components/T2QCALIcon";
 import { RequestCodeCard } from "./_components/RequestCodeCard";
 import { LocalWeather } from "./_components/LocalWeather";
 
+/** Priced library items before the "set your prices" banner stops showing. */
+const PRICED_LIBRARY_TARGET = 8;
+
 export const metadata: Metadata = {
   title: "Dashboard",
 };
@@ -185,15 +188,15 @@ async function DashboardData({
         .select("business_name, address, request_slug")
         .eq("id", userId)
         .maybeSingle(),
-      // Wave 41 — count of the tradie's own materials. Drives the
-      // "Quick start your library" banner: zero items means every
-      // future quote will pay the AI-estimate tax for prices, so we
-      // nudge them toward the bulk-seed page before they generate
-      // their first one.
+      // Count of the tradie's own PRICED materials. Generated quotes never
+      // guess prices (count-first design), so a material line stays blank
+      // until the library has that item's price. Drives the "set your
+      // prices" banner below until the library covers the everyday items.
       supabase
         .from("materials")
         .select("id", { count: "exact", head: true })
-        .eq("user_id", userId),
+        .eq("user_id", userId)
+        .gt("default_unit_price", 0),
       // Scheduled jobs with a date (quotes.scheduled_for) — drives the
       // dashboard calendar. Past + future so the tradie can page across
       // months; the calendar component buckets them by day.
@@ -224,7 +227,11 @@ async function DashboardData({
     !profile?.business_name ||
     (typeof profile.business_name === "string" &&
       profile.business_name.trim().length === 0);
-  const libraryEmpty = (materialsCount ?? 0) === 0;
+  const pricedMaterials = materialsCount ?? 0;
+  const libraryEmpty = pricedMaterials === 0;
+  // Keep nudging until the everyday items are priced; two saved prices
+  // still leave most material lines blank on a new quote.
+  const libraryThin = pricedMaterials < PRICED_LIBRARY_TARGET;
 
   // Client requests from the public request link that still sit as drafts.
   const { count: openRequestCount } = await supabase
@@ -347,7 +354,7 @@ async function DashboardData({
           in 60 seconds. Without this nudge, fresh accounts ship every
           early quote with AI-estimated prices (amber stripe on every
           material line) — a confidence killer for first impressions. */}
-      {libraryEmpty ? (
+      {libraryThin ? (
         <StaggerIn index={0}>
         <Link
           href="/app/materials/quick-start"
@@ -362,11 +369,14 @@ async function DashboardData({
           </span>
           <div className="min-w-0 flex-1">
             <p className="font-display text-sm uppercase tracking-tight text-white">
-              Boost quote accuracy in 60 seconds.
+              {libraryEmpty
+                ? "Set your prices once. It takes a few minutes."
+                : `${pricedMaterials} of your prices saved. Add a few more.`}
             </p>
             <p className="mt-0.5 text-xs text-ink-300 sm:text-sm">
-              Add the materials you use every week so future quotes pull
-              your real prices instead of T2Q estimates.
+              Materials on a new quote stay blank until they have your
+              price. Add the ones you use every week and every quote after
+              that fills them in for you.
             </p>
           </div>
           <span className="hidden items-center gap-1 font-mono text-[10px] uppercase tracking-[0.25em] text-emerald-300 sm:inline-flex">
@@ -451,8 +461,8 @@ async function DashboardData({
               label="Material library"
               tone="blue"
               icon={<Stack size={19} weight="duotone" />}
-              value={libraryEmpty ? "Needs setup" : `${materialsCount ?? 0} items`}
-              detail={libraryEmpty ? "Add common materials" : "Real prices ready for quotes"}
+              value={libraryEmpty ? "Needs setup" : `${pricedMaterials} priced`}
+              detail={libraryThin ? "Add your everyday materials" : "Your prices fill in automatically"}
             />
           </div>
         </div>
