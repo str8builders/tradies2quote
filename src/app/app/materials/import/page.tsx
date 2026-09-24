@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { NZ_DEFAULTS } from "@/lib/quote-defaults";
 import { ImportClient } from "./_components/ImportClient";
 
 export const metadata: Metadata = {
@@ -14,6 +15,14 @@ export default async function ImportMaterialsPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("tax_rate")
+    .eq("id", user.id)
+    .maybeSingle();
+  // Stored as a percentage (15 = 15 %); the client works in fractions.
+  const taxRate = Number(profile?.tax_rate ?? NZ_DEFAULTS.tax_rate) / 100;
 
   return (
     <div className="min-h-screen text-white">
@@ -54,7 +63,7 @@ export default async function ImportMaterialsPage() {
           </div>
         </div>
 
-        <ImportClient />
+        <ImportClient taxRate={taxRate} />
       </main>
     </div>
   );

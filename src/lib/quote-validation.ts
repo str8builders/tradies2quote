@@ -263,6 +263,11 @@ export function assessQuoteTakeoffSafety(
   // don't false-block.
   const SUPPLIER_TOL = 0.02;
   const sourcedLines = items.filter((it) => it.source_line_total != null);
+  // Every line mirrored off the supplier document, including rows the
+  // supplier printed without a line total (they carry source_description).
+  const supplierLines = items.filter(
+    (it) => it.source_line_total != null || it.source_description != null,
+  );
   if (sourcedLines.length > 0) {
     const changed = sourcedLines.filter((it) => {
       const live = round2(
@@ -277,8 +282,16 @@ export function assessQuoteTakeoffSafety(
     }
     const supplierSubtotal = quote_data?.supplier_source?.subtotal ?? null;
     if (supplierSubtotal != null) {
+      // A supplier row with no printed line total counts at its live value,
+      // so it isn't mistaken for a missing line.
       const sourcedSum = round2(
-        sourcedLines.reduce((s, it) => s + (it.source_line_total as number), 0),
+        supplierLines.reduce(
+          (s, it) =>
+            s +
+            (it.source_line_total ??
+              round2((Number(it.quantity) || 0) * (Number(it.unit_price) || 0))),
+          0,
+        ),
       );
       if (Math.abs(sourcedSum - supplierSubtotal) > SUPPLIER_TOL) {
         block_reasons.push(

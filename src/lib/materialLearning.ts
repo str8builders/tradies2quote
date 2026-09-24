@@ -93,20 +93,24 @@ export async function saveMaterialCorrection(
     );
   }
 
-  const baseFields = {
+  // Only the fields this correction actually carries. A quote-save
+  // correction knows the name, unit and price — it must not wipe the
+  // library row's supplier, category, brand or attributes with blanks.
+  const now = new Date().toISOString();
+  const baseFields: Record<string, unknown> = {
     name: trimmedName,
     normalized_name: normalized,
-    category: correction.category ?? null,
-    brand: correction.brand ?? null,
-    supplier: correction.supplier ?? null,
     unit: correction.unit,
     default_unit_price: correction.unitPrice,
-    attributes: correction.attributes ?? {},
     price_source: "user_library",
     price_confidence: "high",
-    price_last_checked_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    price_last_checked_at: now,
+    updated_at: now,
   };
+  if (correction.category !== undefined) baseFields.category = correction.category;
+  if (correction.brand !== undefined) baseFields.brand = correction.brand;
+  if (correction.supplier !== undefined) baseFields.supplier = correction.supplier;
+  if (correction.attributes !== undefined) baseFields.attributes = correction.attributes;
 
   let materialId: string;
   let inserted: boolean;
@@ -132,6 +136,10 @@ export async function saveMaterialCorrection(
         country: "NZ",
         active: true,
         gst_included: true,
+        category: null,
+        brand: null,
+        supplier: null,
+        attributes: {},
         ...baseFields,
       })
       .select("id")

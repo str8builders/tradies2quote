@@ -20,8 +20,9 @@ import {
   type SupplierPresetId,
 } from "@/lib/supplier-presets";
 import { importMaterials } from "../../actions";
+import { csvGstStatement } from "@/lib/materials";
 
-export function ImportClient() {
+export function ImportClient({ taxRate = 0.15 }: { /** Fraction, e.g. 0.15. */ taxRate?: number }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [parsed, setParsed] = useState<CsvParseResult | null>(null);
@@ -38,6 +39,9 @@ export function ImportClient() {
   // wave. Switching the preset re-runs the parser on the already-loaded
   // file so the user can flip presets without re-uploading.
   const [presetId, setPresetId] = useState<SupplierPresetId>("generic");
+  // Library prices are ex-GST. Default: the file's prices exclude GST and
+  // are saved as-is; ticked, they're converted once on import.
+  const [pricesIncludeGst, setPricesIncludeGst] = useState(false);
   const lastTextRef = useRef<string>("");
   const activePreset =
     SUPPLIER_PRESETS.find((p) => p.id === presetId) ?? SUPPLIER_PRESETS[0];
@@ -82,7 +86,7 @@ export function ImportClient() {
     if (!parsed || parsed.valid.length === 0) return;
     setError("");
     startTransition(async () => {
-      const res = await importMaterials(parsed.valid);
+      const res = await importMaterials(parsed.valid, { pricesIncludeGst });
       if (res.error) {
         setError(res.error);
         return;
@@ -302,6 +306,31 @@ export function ImportClient() {
             />
           </div>
 
+          <label className="mt-4 flex min-h-11 cursor-pointer items-center gap-2 text-sm text-ink-200">
+            <input
+              type="checkbox"
+              checked={pricesIncludeGst}
+              onChange={(e) => setPricesIncludeGst(e.target.checked)}
+              disabled={isPending || !!result}
+              data-testid="csv-prices-include-gst"
+              className="h-4 w-4 accent-brand"
+            />
+            Prices in this file include GST
+          </label>
+          <p data-testid="csv-gst-basis" className="mt-1 text-xs text-ink-300">
+            {csvGstStatement(pricesIncludeGst, taxRate)}
+          </p>
+          {(() => {
+            const unpriced = parsed.valid.filter((r) => r.default_unit_price === null).length;
+            if (unpriced === 0) return null;
+            return (
+              <p data-testid="csv-unpriced" className="mt-2 text-xs text-hivis">
+                {unpriced} row{unpriced === 1 ? " has" : "s have"} no price (blank or POA) —
+                imported without one. Existing library prices are kept.
+              </p>
+            );
+          })()}
+
           {parsed.invalid.length > 0 && (
             <ul className="mt-4 max-h-48 overflow-auto rounded-sm border border-hivis/40 bg-hivis/5 p-3 text-xs text-hivis">
               {parsed.invalid.map((r, i) => (
@@ -329,7 +358,9 @@ export function ImportClient() {
                       <td className="px-3 py-2 text-white">{r.name}</td>
                       <td className="px-3 py-2 text-ink-300">{r.unit}</td>
                       <td className="px-3 py-2 text-right tabular-nums text-white">
-                        {r.default_unit_price.toFixed(2)}
+                        {r.default_unit_price === null
+                          ? "—"
+                          : formatCsvPrice(r.default_unit_price)}
                       </td>
                       <td className="px-3 py-2 text-ink-300">{r.supplier ?? "—"}</td>
                     </tr>
@@ -389,6 +420,11 @@ export function ImportClient() {
       )}
     </div>
   );
+}
+
+/** Two decimals, but never hide a sub-cent price (0.125 stays 0.125). */
+function formatCsvPrice(n: number): string {
+  return Number.isInteger(n * 100) ? n.toFixed(2) : String(n);
 }
 
 function Stat({

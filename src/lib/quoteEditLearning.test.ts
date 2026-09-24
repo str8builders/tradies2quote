@@ -173,7 +173,7 @@ describe("applyMaterialCorrections — change detection", () => {
     expect(result.materialsLearned).toBe(1);
   });
 
-  it("saves with alias when description was renamed", async () => {
+  it("learns a renamed line under its new name but never guesses an alias from its position", async () => {
     const prior = material({
       description: "gib aqua",
       unit: "sheet",
@@ -195,10 +195,36 @@ describe("applyMaterialCorrections — change detection", () => {
       USER_A,
       expect.objectContaining({
         canonicalName: "GIB Aqualine 13mm 2400x1200",
-        originalText: "gib aqua",
+        originalText: undefined,
       }),
     );
     expect(result.materialsLearned).toBe(1);
+  });
+
+  it("deleting a line doesn't make the next line an alias of the deleted one", async () => {
+    const prior = [
+      material({ description: "Pine 90x45 H1.2", unit: "length", unit_price: 12 }),
+      material({ description: "GIB Standard 13mm", unit: "sheet", unit_price: 30 }),
+    ];
+    // The tradie removes the pine line and re-prices the GIB.
+    const next = [material({ description: "GIB Standard 13mm", unit: "sheet", unit_price: 32 })];
+    await applyMaterialCorrections(fakeSupabase, USER_A, next, prior);
+    expect(saveMaterialCorrection).toHaveBeenCalledTimes(1);
+    expect(saveMaterialCorrection).toHaveBeenCalledWith(
+      fakeSupabase,
+      USER_A,
+      expect.objectContaining({ canonicalName: "GIB Standard 13mm", unitPrice: 32, originalText: undefined }),
+    );
+  });
+
+  it("an unchanged line that moved up after a deletion is not re-learned", async () => {
+    const prior = [
+      material({ description: "Pine 90x45 H1.2", unit: "length", unit_price: 12 }),
+      material({ description: "GIB Standard 13mm", unit: "sheet", unit_price: 30 }),
+    ];
+    const next = [material({ description: "GIB Standard 13mm", unit: "sheet", unit_price: 30 })];
+    await applyMaterialCorrections(fakeSupabase, USER_A, next, prior);
+    expect(saveMaterialCorrection).not.toHaveBeenCalled();
   });
 
   it("matches by library_id (rename detected even if positions differ)", async () => {

@@ -194,6 +194,20 @@ describe("saveMaterialCorrection — user-scoped update path", () => {
     // Insert path NOT taken
     expect(m.insertChain.insert).not.toHaveBeenCalled();
   });
+
+  it("only writes the fields the correction carries — keeps the row's supplier, category, brand and attributes", async () => {
+    const m = mockSupabase({ existing: { id: "existing-user-id" } });
+    await saveMaterialCorrection(m.supabase, USER_A, {
+      canonicalName: "Pine 90x45 H1.2",
+      unit: "length",
+      unitPrice: 12.4,
+    });
+    const patch = m.updateChain.update.mock.calls[0][0] as Record<string, unknown>;
+    expect(patch).toMatchObject({ unit: "length", default_unit_price: 12.4 });
+    for (const kept of ["supplier", "category", "brand", "attributes", "notes"]) {
+      expect(patch, kept).not.toHaveProperty(kept);
+    }
+  });
 });
 
 describe("saveMaterialCorrection — alias creation", () => {

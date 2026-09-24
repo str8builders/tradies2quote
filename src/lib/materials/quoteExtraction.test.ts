@@ -78,16 +78,21 @@ describe("parseSupplierQuoteExtraction", () => {
     expect(r.value.items).toHaveLength(0);
   });
 
-  it("dedupes identical name+unit rows", () => {
+  it("keeps a genuinely repeated row (same name + unit, e.g. two deliveries)", () => {
     const r = parseSupplierQuoteExtraction({
       items: [
-        { name: "GIB 13mm 2.4x1.2", unit: "sheet", price: 22 },
-        { name: "gib 13mm 2.4x1.2", unit: "sheet", price: 22 },
+        { name: "GIB 13mm 2.4x1.2", unit: "sheet", quantity: 10, price: 22, line_total: 220 },
+        { name: "90x45 H1.2", unit: "length", quantity: 5, price: 12.4, line_total: 62 },
+        { name: "gib 13mm 2.4x1.2", unit: "sheet", quantity: 4, price: 22, line_total: 88 },
       ],
+      subtotal: 370,
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.value.items).toHaveLength(1);
+    // Both GIB rows are real lines on the quote — dropping one lost $88.
+    expect(r.value.items).toHaveLength(3);
+    expect(r.value.items.map((i) => i.source_line_total)).toEqual([220, 62, 88]);
+    expect(r.warnings).toEqual([]);
   });
 
   it("clamps confidence and defaults a missing one", () => {
@@ -103,13 +108,41 @@ describe("parseSupplierQuoteExtraction", () => {
     expect(r.value.items[1].confidence).toBe(0.6);
   });
 
-  it("normalises negative prices to zero", () => {
+  it("keeps a discount / credit line with its negative sign", () => {
     const r = parseSupplierQuoteExtraction({
-      items: [{ name: "Weird", unit: "each", price: -10 }],
+      items: [
+        { name: "Decking 140x32", unit: "m", quantity: 50, price: 10, line_total: 500 },
+        { name: "Trade discount", unit: "each", quantity: 1, price: -25, line_total: -25 },
+        { name: "Trade discount", unit: "each", quantity: 1, price: -25, line_total: -25 },
+      ],
+      subtotal: 450,
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.value.items[0].price).toBe(0);
+    expect(r.value.items).toHaveLength(3);
+    expect(r.value.items[1].price).toBe(-25);
+    expect(r.value.items[1].source_line_total).toBe(-25);
+    expect(r.value.items[2].price).toBe(-25);
+  });
+
+  it("normalises a negative-quantity credit to a positive quantity and a negative price", () => {
+    const r = parseSupplierQuoteExtraction({
+      items: [{ name: "Return: 90x45 stud", unit: "length", quantity: -2, price: 12.4, line_total: -24.8 }],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.items[0]).toMatchObject({ quantity: 2, price: -12.4, source_line_total: -24.8 });
+  });
+
+  it("keeps the unit price exactly as read — $0.125 × 1000 is $125, not $130", () => {
+    const r = parseSupplierQuoteExtraction({
+      items: [{ name: "Nails 90mm", unit: "each", quantity: 1000, price: 0.125, line_total: 125 }],
+      subtotal: 125,
+      total: 143.75,
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.items[0].price).toBe(0.125);
   });
 
   it("treats a non-boolean gst_inclusive as null", () => {
@@ -199,16 +232,16 @@ describe("parseSupplierQuoteExtraction — strict rows", () => {
     expect(r.rowFailures.some((f) => /name/i.test(f.reason))).toBe(true);
   });
 
-  it("surfaces a dedupe drop as a visible warning (not silent)", () => {
+  it("keeps two identical rows and flags them visibly (never silently drops a line)", () => {
     const r = parseSupplierQuoteExtraction({
       items: [
-        { name: "GIB 13mm", unit: "sheet", price: 22 },
-        { name: "gib 13mm", unit: "sheet", price: 22 },
+        { name: "GIB 13mm", unit: "sheet", quantity: 2, price: 22, line_total: 44 },
+        { name: "gib 13mm", unit: "sheet", quantity: 2, price: 22, line_total: 44 },
       ],
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.value.items).toHaveLength(1);
+    expect(r.value.items).toHaveLength(2);
     expect(r.warnings.join(" ")).toMatch(/duplicate/i);
   });
 });

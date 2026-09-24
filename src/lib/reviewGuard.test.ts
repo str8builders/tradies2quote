@@ -51,6 +51,21 @@ function qd(items: QuoteLineItem[], o: Partial<QuoteData> = {}): QuoteData {
   };
 }
 
+describe("supplier discount / credit lines", () => {
+  it("keeps a negative line the supplier quote itself printed (a trade discount)", () => {
+    const discount = li({ description: "Trade discount", quantity: 1, unit_price: -25, line_total: -25, source_line_total: -25, source_unit_price: -25 });
+    expect(classifyLineProvenance(discount)).toBe("supplier");
+    const r = guardQuoteForReview(qd([li(), discount]));
+    expect(r.stripped).toEqual([]);
+    expect(r.data.line_items).toHaveLength(2);
+  });
+
+  it("still strips a negative price with no supplier evidence", () => {
+    expect(classifyLineProvenance(li({ unit_price: -25 }))).toBe("invalid");
+    expect(classifyLineProvenance(li({ unit_price: -25, source_line_total: 20 }))).toBe("invalid");
+  });
+});
+
 describe("classifyLineProvenance", () => {
   it("maps every provenance correctly", () => {
     expect(classifyLineProvenance(li({ quantity_source: "calculator" }))).toBe("calculated");

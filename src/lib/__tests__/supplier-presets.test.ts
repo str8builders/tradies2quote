@@ -166,7 +166,7 @@ describe("remapCsvWithPreset", () => {
     expect(lines[2]).toContain("SKU: MIT-SCR-75");
   });
 
-  it("strips currency symbols + commas from price", () => {
+  it("passes the price cell through intact so the shared parser reads it", () => {
     const csv = [
       "Description,Unit,Trade Price",
       `Plywood sheet,sheet,"$ 1,250.50"`,
@@ -175,10 +175,14 @@ describe("remapCsvWithPreset", () => {
       csv,
       getSupplierPreset("bunnings-powerpass"),
     );
-    const lines = remapped.split("\n");
-    // 1250.50 survives, currency symbol + thousands comma stripped.
-    expect(lines[1]).toContain("1250.50");
-    expect(lines[1]).not.toContain("$");
+    // Kept as written (quoted, because of the comma) — stripping it here
+    // turned a decimal comma into thousands and "POA" into $0.
+    expect(remapped.split("\n")[1]).toContain('"$ 1,250.50"');
+    // …and the currency symbol + thousands comma are understood on parse.
+    expect(
+      parseMaterialsCsvWithPreset(csv, "bunnings-powerpass").valid[0]
+        .default_unit_price,
+    ).toBe(1250.5);
   });
 
   it("PlaceMakers + ITM presets set the supplier field", () => {

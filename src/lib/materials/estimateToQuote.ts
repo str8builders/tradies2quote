@@ -17,7 +17,12 @@
 // COST, not the tradie's sell price); unmatched lines are $0 + "needs price".
 // ─────────────────────────────────────────────────────────────────────────
 
-import { toExGst, type ExtractedSupplierItem } from "./quoteExtraction";
+import {
+  preciseUnitPrice,
+  toExGst,
+  unitPriceExGst,
+  type ExtractedSupplierItem,
+} from "./quoteExtraction";
 import type {
   LibraryMaterial,
   QuoteLineItem,
@@ -163,13 +168,47 @@ export type MirrorQuoteOptions = {
   taxRate?: number;
 };
 
+/** A printed line total "agrees" with qty × price within this many dollars. */
+const LINE_AGREEMENT_TOLERANCE = 0.02;
+
+/**
+ * The ex-GST unit price for one mirrored supplier line, at full precision.
+ *
+ * GST-inclusive quotes: when the printed line total agrees with qty × price,
+ * the ex-GST figure is derived from the LINE TOTAL (total ÷ (1 + rate) ÷ qty)
+ * so the quote's line total is exactly the printed line total ex-GST, rounded
+ * once. Converting and rounding the unit price first is what produced
+ * 10,000 × $0.05 → $460, 100 × $9.99 → $999.35 and 10 × $10 → $87.00 (vs the
+ * supplier's $86.96). Exclusive quotes keep the printed price as-is.
+ */
+function mirrorUnitPriceExGst(
+  price: number,
+  quantity: number,
+  printedLineTotal: number | null,
+  gstInclusive: boolean,
+  taxRate: number,
+): number {
+  if (price === 0) return 0;
+  if (!gstInclusive) return preciseUnitPrice(price);
+  if (
+    printedLineTotal != null &&
+    quantity > 0 &&
+    Math.abs(round2(quantity * price) - printedLineTotal) <= LINE_AGREEMENT_TOLERANCE
+  ) {
+    return preciseUnitPrice(printedLineTotal / (1 + taxRate) / quantity);
+  }
+  return unitPriceExGst(price, true, taxRate);
+}
+
 /**
  * Faithful 1:1 mirror of a scanned supplier (ITM) quote → quote lines.
  *
  * Unlike `buildQuoteLinesFromEstimate`, this is a pure pass-through:
  *   - quantity is exactly as scanned (no waste, no stock-length rounding),
  *   - price is exactly as scanned (only converted to ex-GST so the quote's
- *     own GST line reconstructs the supplier total),
+ *     own GST line reconstructs the supplier total — never rounded to the
+ *     cent, see `mirrorUnitPriceExGst`),
+ *   - a printed discount / credit line stays a negative line,
  *   - no library substitution.
  * Combined with markup = 0 at the caller, the quote total equals the
  * supplier quote total — "nothing changes in the numbers".
@@ -187,8 +226,15 @@ export function buildMirrorQuoteLines(
       // Quantity drives the line total; prefer the printed quantity (in the
       // unit the price is per), falling back to the piece count.
       const quantity = Math.max(0, it.quantity ?? it.pieces ?? 0);
-      const rawPrice = it.price != null && it.price > 0 ? it.price : 0;
-      const unit_price = rawPrice > 0 ? toExGst(rawPrice, gstInclusive, taxRate) : 0;
+      const rawPrice =
+        it.price != null && Number.isFinite(it.price) ? it.price : 0;
+      const unit_price = mirrorUnitPriceExGst(
+        rawPrice,
+        quantity,
+        it.source_line_total,
+        gstInclusive,
+        taxRate,
+      );
       const line: QuoteLineItem = {
         type: "material",
         description: it.name.trim(),
@@ -200,7 +246,7 @@ export function buildMirrorQuoteLines(
         is_ai_estimated: false,
         is_missing_price: unit_price === 0,
         is_calculated_takeoff: false,
-        price_source: unit_price > 0 ? "supplier_import" : "missing_price",
+        price_source: unit_price !== 0 ? "supplier_import" : "missing_price",
         // Printed line total in the quote's ex-GST basis, kept as the
         // read-only supplier source for the Review Quote reconciliation.
         source_line_total:
