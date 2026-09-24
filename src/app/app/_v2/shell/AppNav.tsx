@@ -28,6 +28,7 @@ function NavLink({ tab, current }: { tab: AppTab; current: boolean }) {
     return (
       <Link
         href={tab.href}
+        prefetch
         aria-label={tab.name}
         aria-current={current ? "page" : undefined}
         data-testid="app-nav-new"
@@ -54,6 +55,7 @@ function NavLink({ tab, current }: { tab: AppTab; current: boolean }) {
   return (
     <Link
       href={tab.href}
+      prefetch
       aria-current={current ? "page" : undefined}
       data-testid={`app-nav-${tab.id}`}
       className={cx(
@@ -81,8 +83,10 @@ function NavLink({ tab, current }: { tab: AppTab; current: boolean }) {
  * notch.
  *
  * The current tab is marked with aria-current and a filled icon, not colour
- * alone. On focused routes (the new-quote flow, the job page) the phone bar
- * steps aside for the screen's own bottom action bar; the rail stays.
+ * alone. Tabs prefetch in full, like the old bottom nav, so a tap on site
+ * lands at once. On focused routes (the new-quote flow, the job page) the
+ * phone bar steps aside for the screen's own bottom action bar; the rail
+ * stays.
  */
 export function AppNav() {
   const pathname = usePathname();
