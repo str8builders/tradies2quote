@@ -42,4 +42,17 @@ describe("parseScale", () => {
     expect(parseScale("").confidence).toBe(0);
     expect(parseScale("garbage text").confidence).toBe(0);
   });
+
+  // Audit 2026-09-24: dates and clock times are not scales.
+  it("does not read a date or a time as a ratio", () => {
+    expect(parseScale("1:20/08/2026").confidence).toBe(0);
+    expect(parseScale("1:20.08.2026").confidence).toBe(0);
+    expect(parseScale("1:30 pm").confidence).toBe(0);
+    expect(parseScale("1:30:00").confidence).toBe(0);
+  });
+
+  it("still parses a ratio at the end of a sentence or before a sheet size", () => {
+    expect(parseScale("Drawn at 1:100.").mm_per_drawing_unit).toBe(100);
+    expect(parseScale("1:50 @ A3").mm_per_drawing_unit).toBe(50);
+  });
 });

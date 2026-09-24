@@ -37,7 +37,10 @@ const COMMON_METRIC = new Set([5, 10, 20, 25, 50, 100, 200, 500, 1000]);
  * Parse a metric ratio scale like "1:100" or "1 : 50".
  */
 function parseMetricRatio(text: string): ParsedScale | null {
-  const m = text.match(/\b1\s*[:：]\s*(\d{1,4})\b/);
+  // Not when the "ratio" is really a date or a clock time: 1:20/08/2026,
+  // 1:20.08.26, 1:30:00, 1:30 pm. A ratio at a sentence end ("1:100.") or
+  // before a sheet size ("1:50 @ A3") still parses.
+  const m = text.match(/\b1\s*[:：]\s*(\d{1,4})\b(?![/.:]\d)(?!\s*[ap]\.?\s?m\b)/i);
   if (!m) return null;
   const denom = Number(m[1]);
   if (!Number.isFinite(denom) || denom <= 0) return null;
