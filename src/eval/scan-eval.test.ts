@@ -160,10 +160,14 @@ describe.skipIf(!ENABLED)("drawing-scan shape-reading eval", () => {
         );
 
         const shapeOk = !!plan && shapeMatches(plan.shape, c.expect);
+        // A line (fence, boundary run) has no area: the pipeline reports none,
+        // which is the right answer when the case expects 0 m².
         const areaOk =
           !!plan &&
-          plan.area_m2 != null &&
-          withinPct(plan.area_m2, c.expect.area_m2, c.expect.areaTolerancePct ?? 10);
+          (c.expect.area_m2 === 0
+            ? plan.area_m2 == null || plan.area_m2 === 0
+            : plan.area_m2 != null &&
+              withinPct(plan.area_m2, c.expect.area_m2, c.expect.areaTolerancePct ?? 10));
         let perimeterOk: boolean | null = null;
         if (c.expect.perimeter_m != null) {
           perimeterOk =
