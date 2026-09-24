@@ -4,7 +4,11 @@ import { redirect } from "next/navigation";
 import { ArrowRight, BookOpen, SignOut } from "@phosphor-icons/react/dist/ssr";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedAuthUser } from "@/lib/supabase/auth";
-import { NZ_DEFAULTS } from "@/lib/quote-defaults";
+import {
+  NZ_DEFAULTS,
+  resolveTaxLabel,
+  resolveTaxRate,
+} from "@/lib/quote-defaults";
 import {
   runAdminAgent,
   summarizeAdmin,
@@ -149,11 +153,19 @@ export default async function SettingsPage({
     payment_instructions: profile?.payment_instructions ?? "",
     country: (profile?.country ?? NZ_DEFAULTS.country) || "NZ",
     currency: (profile?.currency ?? NZ_DEFAULTS.currency) || "NZD",
-    tax_label: (profile?.tax_label ?? NZ_DEFAULTS.tax_label) || "GST",
+    // Label + blank rate default from the business country (NZ/AU GST,
+    // UK VAT, US/CA Tax) — the same resolution quote generation uses.
+    tax_label: resolveTaxLabel(
+      profile?.tax_label,
+      profile?.country,
+      profile?.currency,
+    ),
     tax_rate:
       typeof profile?.tax_rate === "number"
         ? String(profile.tax_rate)
-        : String(NZ_DEFAULTS.tax_rate),
+        : String(
+            resolveTaxRate(null, profile?.country, profile?.currency),
+          ),
     default_labour_rate:
       typeof profile?.default_labour_rate === "number"
         ? String(profile.default_labour_rate)

@@ -15,6 +15,7 @@
  * No I/O, no Anthropic, no Supabase. Deterministic and testable.
  */
 import type { QuoteData } from "@/lib/quote-types";
+import { round2 } from "@/lib/quote-defaults";
 
 export type VariationLineType = "labour" | "material" | "other";
 
@@ -58,10 +59,6 @@ export interface VariationDraft {
   approvalText: string;
   /** Any blocking validation messages. Empty array = good to draft. */
   blockers: string[];
-}
-
-function round2(n: number): number {
-  return Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
 }
 
 function formatMoney(n: number, currency: string): string {

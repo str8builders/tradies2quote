@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Check, FloppyDisk, Warning } from "@phosphor-icons/react";
 import { saveSettings } from "../actions";
+import { resolveTaxLabel, taxDefaultsFor } from "@/lib/quote-defaults";
 import {
   SAVE_SETTINGS_INITIAL,
   type SaveSettingsState,
@@ -54,7 +55,12 @@ export function SettingsForm({ initial }: Props) {
   // (the page revalidates and the new initial flows back in).
   const [form, setForm] = useState({ ...initial });
 
-  const taxLabel = (initial.tax_label || "GST").trim();
+  // Follows the selected country (NZ/AU GST, UK VAT, US/CA Tax) unless the
+  // profile carries its own label — the same rule quote generation uses.
+  const taxLabel = resolveTaxLabel(initial.tax_label, form.country, form.currency);
+  const taxRatePlaceholder = String(
+    taxDefaultsFor(form.country, form.currency).tax_rate,
+  );
 
   function setField<K extends keyof SettingsInitial>(key: K) {
     return (
@@ -211,7 +217,7 @@ export function SettingsForm({ initial }: Props) {
             onChange={setField("tax_rate")}
             data-testid="settings-tax-rate"
             className={INPUT_CLASS}
-            placeholder="15"
+            placeholder={taxRatePlaceholder}
           />
         </Field>
         <Field id="default_labour_rate" label="Default labour rate (per hour)">
@@ -231,7 +237,12 @@ export function SettingsForm({ initial }: Props) {
             placeholder="75"
           />
         </Field>
-        <Field id="default_markup_pct" label="Materials markup (%)">
+        {/* Markup is charged on the materials AND "other" items subtotal
+            (never labour) — the label says exactly what the maths does. */}
+        <Field
+          id="default_markup_pct"
+          label="Markup on materials and other items (%)"
+        >
           <input
             id="default_markup_pct"
             name="default_markup_pct"

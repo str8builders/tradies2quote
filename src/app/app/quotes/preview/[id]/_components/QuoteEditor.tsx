@@ -37,6 +37,8 @@ import {
   type DimensionEdit,
 } from "@/lib/dimensionConfirmation";
 import { matchToLibrary } from "@/lib/materials";
+import { isUnpricedLine } from "@/lib/quote-validation";
+import { convertUnitPrice } from "@/lib/units";
 import {
   lineConfidence,
   confidenceTally,
@@ -386,9 +388,11 @@ export function QuoteEditor({
   function handlePhotoPlanItems(detected: PhotoPlanItem[]) {
     const newItems: QuoteLineItem[] = detected.map((d) => {
       const match = matchToLibrary(d.label, library);
+      // Only a price per "each" (or an exact conversion) fits a 1 × each
+      // line — a per-m or per-sheet library price stays unapplied.
       const unit_price =
         match && match.default_unit_price !== null
-          ? Number(match.default_unit_price)
+          ? (convertUnitPrice(Number(match.default_unit_price), match.unit, "each") ?? 0)
           : 0;
       return {
         type: "material",
@@ -399,7 +403,7 @@ export function QuoteEditor({
         line_total: round2(unit_price),
         library_id: match?.id ?? null,
         is_ai_estimated: true,
-        is_missing_price: !match,
+        is_missing_price: unit_price <= 0,
         quantity_source: "ai",
         quantity_confirmed: false,
         takeoff_status: "assumed",
@@ -1369,7 +1373,7 @@ function ItemsSection({
   addLabel: string;
   disabled?: boolean;
 }) {
-  const entries = useMemo(() => rows.map(row => ({id: String(row.i), value: row, label: row.it.description, search: row.it.description, amount: row.it.unit_price, attention: !!row.it.is_missing_price || row.it.takeoff_status === "blocked" || row.it.is_ai_estimated === true})), [rows]);
+  const entries = useMemo(() => rows.map(row => ({id: String(row.i), value: row, label: row.it.description, search: row.it.description, amount: row.it.unit_price, attention: !!row.it.is_missing_price || isUnpricedLine(row.it) || row.it.takeoff_status === "blocked" || row.it.is_ai_estimated === true})), [rows]);
   const review = useReviewTable(entries);
   return (
     <section
@@ -1428,18 +1432,29 @@ function ItemsSection({
               data-confidence={confidence}
               className={`rounded-sm border border-ink-700 bg-ink-900 p-2 ${confidenceClass}`}
             >
-              {showBadges && (
+              {showBadges ? (
                 <ItemBadge
                   isCalculatedTakeoff={!!it.is_calculated_takeoff}
                   isLibrary={!!libMaterial}
                   isAi={!!it.is_ai_estimated && !libMaterial && !it.is_missing_price}
-                  isMissingPrice={!!it.is_missing_price}
+                  isMissingPrice={!!it.is_missing_price || isUnpricedLine(it)}
                   takeoffStatus={it.takeoff_status}
                   takeoffFlags={it.takeoff_flags}
                   supplierUrl={libMaterial?.supplier_url ?? null}
                   supplierName={libMaterial?.supplier ?? null}
                 />
-              )}
+              ) : isUnpricedLine(it) ? (
+                // Labour / other rows carry no provenance badges, but a $0
+                // line must never look finished — same rule as the send gate.
+                <ItemBadge
+                  isCalculatedTakeoff={false}
+                  isLibrary={false}
+                  isAi={false}
+                  isMissingPrice
+                  supplierUrl={null}
+                  supplierName={null}
+                />
+              ) : null}
               {it.takeoff_status === "blocked" && (
                 <p
                   data-testid={`blocked-guide-${i}`}
@@ -1738,7 +1753,7 @@ function ItemBadge({
         <span
           data-testid="badge-missing-price"
           className="inline-flex items-center gap-1 rounded-sm border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-red-300"
-          title="No matching item in your materials library — set a unit price or add this material to your library"
+          title="No price set — this line quotes at $0. Enter a unit price (or confirm it's intentional before sending)."
         >
           Missing price
         </span>

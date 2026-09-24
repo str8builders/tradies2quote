@@ -16,6 +16,7 @@
 // Soft everywhere: a critic failure never blocks a quote.
 // ─────────────────────────────────────────────────────────────────────────
 import "server-only";
+import { round2 } from "@/lib/quote-defaults";
 import { runStructuredAgent, type ParseResult } from "../runtime";
 import type { GeneratedQuote } from "../quote-generation";
 
@@ -40,13 +41,13 @@ export function quoteVerifyEnabledFromEnv(): boolean {
   return process.env.QUOTE_VERIFY_ENABLED === "true";
 }
 
-const round2 = (n: number): number =>
-  Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
 const near = (a: number, b: number, tol = 0.05): boolean => Math.abs(a - b) <= tol;
 
 /**
  * Pure, deterministic checks. Free and always run. Recomputes the maths
- * independently of how the quote was built.
+ * independently of how the quote was built — at the quote's own tax rate,
+ * with any markup charged on top of the line totals added back, and without
+ * reporting lines that are deliberately price-pending as mistakes.
  */
 export function verifyQuoteDeterministic(quote: GeneratedQuote): VerificationIssue[] {
   const issues: VerificationIssue[] = [];
@@ -60,29 +61,39 @@ export function verifyQuoteDeterministic(quote: GeneratedQuote): VerificationIss
     return issues; // nothing else to check
   }
 
+  const taxLabel = quote.taxLabel?.trim() || "GST";
+  const taxRate = Number.isFinite(quote.gstRate) ? quote.gstRate : 0.15;
+  const markup = Number.isFinite(quote.markupAmount) ? Number(quote.markupAmount) : 0;
   const sumLines = round2(quote.lineItems.reduce((s, l) => s + l.lineTotal, 0));
-  if (!near(quote.subtotal, sumLines)) {
+  const expectedSubtotal = round2(sumLines + markup);
+  if (!near(quote.subtotal, expectedSubtotal)) {
     issues.push({
       code: "subtotal_mismatch",
       severity: "error",
-      message: `Subtotal ${quote.subtotal} doesn't equal the sum of line totals (${sumLines}).`,
+      message:
+        markup !== 0
+          ? `Subtotal ${quote.subtotal} doesn't equal the line totals plus markup (${expectedSubtotal}).`
+          : `Subtotal ${quote.subtotal} doesn't equal the sum of line totals (${sumLines}).`,
     });
   }
-  if (!near(quote.gstAmount, round2(quote.subtotal * 0.15))) {
+  if (!near(quote.gstAmount, round2(quote.subtotal * taxRate))) {
     issues.push({
       code: "gst_mismatch",
       severity: "error",
-      message: `GST ${quote.gstAmount} isn't 15% of the subtotal.`,
+      message: `${taxLabel} ${quote.gstAmount} isn't ${round2(taxRate * 100)}% of the subtotal.`,
     });
   }
   if (!near(quote.total, round2(quote.subtotal + quote.gstAmount))) {
     issues.push({
       code: "total_mismatch",
       severity: "error",
-      message: `Total ${quote.total} doesn't equal subtotal + GST.`,
+      message: `Total ${quote.total} doesn't equal subtotal + ${taxLabel}.`,
     });
   }
-  if (quote.total <= 0) {
+  // A $0 total on a quote whose lines are still price-pending is the
+  // expected draft state (the tradie prices them), not a mistake.
+  const pricePending = quote.lineItems.some((l) => l.pricePending === true);
+  if (quote.total <= 0 && !pricePending) {
     issues.push({
       code: "zero_total",
       severity: "error",
@@ -91,7 +102,10 @@ export function verifyQuoteDeterministic(quote: GeneratedQuote): VerificationIss
   }
 
   // Zero/negative prices — the prompt forbids them, but verify anyway.
-  const zeroLines = quote.lineItems.filter((l) => l.unitPrice <= 0);
+  // Price-pending lines are blank by design and surface in the editor.
+  const zeroLines = quote.lineItems.filter(
+    (l) => l.unitPrice <= 0 && l.pricePending !== true,
+  );
   for (const l of zeroLines) {
     issues.push({
       code: "zero_price",
@@ -154,6 +168,7 @@ Look for:
 - INVENTED WORK: lines that weren't asked for in the brief.
 
 Rules:
+- Lines shown as "price pending" have no price YET by design — the tradie prices them before sending. Never flag a price-pending line (or a low/zero total caused by pending prices) as a missing or zero price; still check its quantity, unit and scope.
 - Only flag things you're reasonably confident about. Don't invent problems.
 - "error" = would produce a wrong or unsendable quote. "warning" = worth a human glance.
 - If the quote is sound, return scope_covered true and an empty issues array.
@@ -207,16 +222,25 @@ export function parseCritic(input: unknown): ParseResult<CriticResult> {
   };
 }
 
-function quoteToBrief(quote: GeneratedQuote): string {
-  const lines = quote.lineItems.map(
-    (l) =>
-      `- ${l.description} — ${l.quantity} ${l.unit} @ $${l.unitPrice} = $${l.lineTotal} [${l.category}]`,
+export function quoteToBrief(quote: GeneratedQuote): string {
+  const lines = quote.lineItems.map((l) =>
+    l.pricePending === true
+      ? `- ${l.description} — ${l.quantity} ${l.unit} @ price pending [${l.category}]`
+      : `- ${l.description} — ${l.quantity} ${l.unit} @ $${l.unitPrice} = $${l.lineTotal} [${l.category}]`,
   );
+  const markup = Number(quote.markupAmount) || 0;
   return [
     `Job: ${quote.jobName}`,
     `Lines:`,
     ...lines,
-    `Subtotal $${quote.subtotal} · GST $${quote.gstAmount} · Total $${quote.total}`,
+    [
+      markup !== 0 ? `Markup $${markup}` : null,
+      `Subtotal $${quote.subtotal}`,
+      `${quote.taxLabel?.trim() || "GST"} $${quote.gstAmount}`,
+      `Total $${quote.total}`,
+    ]
+      .filter(Boolean)
+      .join(" · "),
   ].join("\n");
 }
 

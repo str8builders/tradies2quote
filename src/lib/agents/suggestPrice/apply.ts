@@ -9,6 +9,7 @@
 // ─────────────────────────────────────────────────────────────────────────
 
 import type { QuoteLineItem } from "../../quote-types";
+import { round2 } from "../../quote-defaults";
 
 /** Whether the on-demand "Suggest price" control should show for this line. */
 export function canSuggestPrice(item: QuoteLineItem, enabled: boolean): boolean {
@@ -37,5 +38,5 @@ export function normalizeSuggestedMaterial(input: {
     typeof input.unit === "string" && input.unit.trim()
       ? input.unit.trim()
       : "each";
-  return { name, unit, default_unit_price: Math.round(price * 100) / 100 };
+  return { name, unit, default_unit_price: round2(price) };
 }

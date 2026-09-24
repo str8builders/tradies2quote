@@ -131,6 +131,27 @@ export function licensedFamiliesForDescription(
 }
 
 /**
+ * The evidence licences are judged on: the caller's description (raw voice
+ * transcript / scan text, else the job summary) PLUS the cleaned transcript
+ * generation actually quoted from (`quote_data.transcript.cleaned`).
+ * Generation runs the deterministic voice cleanup before licensing scopes
+ * ("pink bats" → "Pink Batts"), so the review + send guards must see the
+ * same words or they would strip/block lines generation legitimately made.
+ */
+export function licensingEvidence(
+  data: Pick<QuoteData, "job_summary" | "transcript"> | null | undefined,
+  description: string | null | undefined,
+): string {
+  const base = description ?? data?.job_summary ?? "";
+  const transcript = data?.transcript as { cleaned?: unknown } | null | undefined;
+  const cleaned =
+    transcript && typeof transcript === "object" && typeof transcript.cleaned === "string"
+      ? transcript.cleaned
+      : "";
+  return cleaned && cleaned !== base ? `${base}\n${cleaned}` : base;
+}
+
+/**
  * Guard a quote for the review surface. Returns the sanitized data plus
  * what was stripped/normalized so the caller can log and surface it.
  * Never mutates the input.
@@ -143,7 +164,7 @@ export function guardQuoteForReview(
     ? data.line_items
     : [];
   const licensed = licensedFamiliesForDescription(
-    opts.description ?? data.job_summary,
+    licensingEvidence(data, opts.description),
   );
   const kept: QuoteLineItem[] = [];
   const stripped: StrippedLine[] = [];

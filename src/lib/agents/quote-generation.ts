@@ -25,6 +25,7 @@ import {
 } from "@/lib/tradieBrain";
 import { getRelevantMemories } from "@/lib/tradieBrain/retrieve";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { round2 } from "@/lib/quote-defaults";
 import {
   verifyQuote,
   quoteVerifyEnabledFromEnv,
@@ -46,16 +47,29 @@ export interface GeneratedQuoteLineItem {
   /** Quantity × unit price, post-markup for materials. NZD ex GST. */
   lineTotal: number;
   category: LineItemCategory;
+  /**
+   * The line deliberately has no price yet (the production pipeline leaves
+   * AI-guessed prices blank for the tradie to fill). Verification must not
+   * report it as a zero-price / zero-total mistake.
+   */
+  pricePending?: boolean;
 }
 
 export interface GeneratedQuote {
   jobName: string;
   clientName: string;
   lineItems: GeneratedQuoteLineItem[];
-  /** Sum of every line total. NZD ex GST. */
+  /** Sum of every line total (plus `markupAmount` when set). NZD ex GST. */
   subtotal: number;
-  /** 0.15 always for NZ. */
+  /**
+   * Markup charged ON TOP of the line totals (the production pipeline keeps
+   * markup out of line totals). Absent/0 when markup is inside the lines.
+   */
+  markupAmount?: number;
+  /** Tax rate as a fraction — 0.15 for NZ GST. */
   gstRate: number;
+  /** Printed tax name ("GST", "VAT", "Tax"). Defaults to GST in messages. */
+  taxLabel?: string;
   gstAmount: number;
   total: number;
   /** Short assumption strings. */
@@ -183,10 +197,6 @@ const QUOTE_TOOL = {
     },
   },
 };
-
-function round2(n: number): number {
-  return Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
-}
 
 function pickCategory(value: unknown): LineItemCategory {
   return typeof value === "string" &&

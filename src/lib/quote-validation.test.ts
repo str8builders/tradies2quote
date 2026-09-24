@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  assessQuoteContradictions,
   assessQuoteTakeoffSafety,
+  isUnpricedLine,
   normalizePhone,
   validateQuoteForSending,
   validateQuoteForSmsSending,
 } from "./quote-validation";
+import { guardQuoteForReview, licensedFamiliesForDescription } from "./reviewGuard";
 import { computeQuoteTotals } from "./quote-defaults";
 import type {
   DimensionConfirmation,
@@ -429,7 +432,10 @@ describe("assessQuoteTakeoffSafety — unpriced material guard", () => {
     expect(a.requires_acknowledgement).toBe(false);
   });
 
-  it("does NOT flag a $0 non-material line (labour/other allowance)", () => {
+  // Audit 2026-09-24 (item 2): the guard covers EVERY line type. A $0
+  // labour/other line is still sendable (it can be a deliberate allowance)
+  // but only after the same acknowledgement as a $0 material.
+  it("flags a $0 other line too — acknowledgeable, never a hard block", () => {
     const a = assessQuoteTakeoffSafety(
       qd({
         line_items: [
@@ -438,7 +444,33 @@ describe("assessQuoteTakeoffSafety — unpriced material guard", () => {
         ],
       }),
     );
-    expect(a.requires_acknowledgement).toBe(false);
+    expect(a.can_send).toBe(true);
+    expect(a.requires_acknowledgement).toBe(true);
+    expect(a.warning_reasons.join(" ")).toMatch(/1 line\(s\) have no price set.*Disposal/);
+  });
+
+  it("flags a labour line whose price was wiped (10 h at $0)", () => {
+    const a = assessQuoteTakeoffSafety(
+      qd({
+        line_items: [
+          li({ unit_price: 50, line_total: 50 }),
+          li({ type: "labour", description: "Labour", unit: "hour", quantity: 10, unit_price: 0, line_total: 0 }),
+        ],
+      }),
+    );
+    expect(a.requires_acknowledgement).toBe(true);
+    expect(a.warning_reasons.join(" ")).toMatch(/Labour/);
+  });
+
+  it("a price-pending labour line (is_missing_price) is flagged", () => {
+    const a = assessQuoteTakeoffSafety(
+      qd({
+        line_items: [
+          li({ type: "labour", description: "Labour — 2 days", unit: "day", quantity: 2, unit_price: 0, line_total: 0, is_missing_price: true }),
+        ],
+      }),
+    );
+    expect(a.requires_acknowledgement).toBe(true);
   });
 
   it("does NOT double-flag a blocked takeoff line (qty 0) as unpriced", () => {
@@ -580,5 +612,65 @@ describe("validateQuoteForSmsSending — takeoff gate", () => {
       args({ line_items: [li({ takeoff_status: "assumed" })] }, true),
     );
     expect(r.ok).toBe(true);
+  });
+});
+
+describe("validateQuoteForSending — unpriced labour/other (audit item 2)", () => {
+  const data = qd({
+    line_items: [
+      li({ unit_price: 50, line_total: 50 }),
+      li({ type: "labour", description: "Labour", unit: "hour", quantity: 10, unit_price: 0, line_total: 0 }),
+    ],
+  });
+
+  it("needs an acknowledgement before a $0 labour line can be sent", () => {
+    const r = validateQuoteForSending({ status: "draft", total_amount: 57.5, quote_data: data });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toBe("takeoff_unconfirmed");
+    expect(
+      validateQuoteForSending({ status: "draft", total_amount: 57.5, quote_data: data, acknowledged: true }).ok,
+    ).toBe(true);
+  });
+
+  it("isUnpricedLine: real quantity at $0 or price-pending, any type", () => {
+    expect(isUnpricedLine({ quantity: 10, unit_price: 0 })).toBe(true);
+    expect(isUnpricedLine({ quantity: 1, unit_price: 20, is_missing_price: true })).toBe(true);
+    expect(isUnpricedLine({ quantity: 0, unit_price: 0 })).toBe(false);
+    expect(isUnpricedLine({ quantity: 2, unit_price: 75 })).toBe(false);
+  });
+});
+
+// Audit item 6 follow-through: generation licenses scopes off the CLEANED
+// transcript, so the review + send guards must read it too.
+describe("licensing evidence includes the cleaned transcript", () => {
+  const raw = "Put pink bats in the ceiling of the garage";
+  const cleaned = "Put Pink Batts in the ceiling of the garage";
+  const insulationLine = li({
+    description: "Pink Batts R3.2 ceiling insulation",
+    unit: "pack",
+    quantity: 10,
+    unit_price: 0,
+    line_total: 0,
+    is_calculated_takeoff: true,
+    quantity_source: "calculator",
+  });
+
+  it("scenario check: only the cleaned words license insulation", () => {
+    expect(licensedFamiliesForDescription(raw).has("insulation")).toBe(false);
+    expect(licensedFamiliesForDescription(cleaned).has("insulation")).toBe(true);
+  });
+
+  it("the review guard keeps a line the cleaned transcript licensed", () => {
+    const data = qd({ line_items: [insulationLine], transcript: { raw, cleaned } });
+    expect(guardQuoteForReview(data, { description: raw }).stripped).toEqual([]);
+    // Legacy quote (no cleaned layer) behaves exactly as before.
+    const legacy = qd({ line_items: [insulationLine] });
+    expect(guardQuoteForReview(legacy, { description: raw }).stripped).toHaveLength(1);
+  });
+
+  it("the send gate's contradiction check agrees", () => {
+    const data = qd({ line_items: [insulationLine], transcript: { raw, cleaned } });
+    expect(assessQuoteContradictions(data, raw)).toEqual([]);
+    expect(assessQuoteContradictions(qd({ line_items: [insulationLine] }), raw)).toHaveLength(1);
   });
 });

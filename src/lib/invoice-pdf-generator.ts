@@ -175,7 +175,11 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
   if (profile.email) headerLines.push(profile.email);
   if (profile.phone) headerLines.push(profile.phone);
   if (profile.address) headerLines.push(profile.address);
-  if (profile.gst_number) headerLines.push(`GST: ${profile.gst_number}`);
+  // The tax registration line uses the document's own tax name (VAT for a
+  // UK invoice), never a hard-coded "GST".
+  if (profile.gst_number) {
+    headerLines.push(`${snapshot.tax_label?.trim() || "GST"}: ${profile.gst_number}`);
+  }
   for (const line of headerLines) {
     y = drawText(line, MARGIN_X, y, { color: MUTED, size: 9, maxWidth: 280, lineHeight: 12 }) - 2;
   }

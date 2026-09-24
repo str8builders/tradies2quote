@@ -16,7 +16,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedAuthUser } from "@/lib/supabase/auth";
-import { formatCurrency } from "@/lib/quote-defaults";
+import { formatCurrency, round2 } from "@/lib/quote-defaults";
 import type { QuoteData, QuoteStatus } from "@/lib/quote-types";
 import { isOwnerEmail } from "@/lib/owner";
 import { STAGE_LABELS } from "@/lib/lifecycle/stages";
@@ -776,9 +776,9 @@ function computeLifecycleStats(
   return {
     totalQuotes: rows.length,
     thisMonth,
-    totalAmount: Math.round(totalAmount * 100) / 100,
-    thisMonthAmount: Math.round(thisMonthAmount * 100) / 100,
-    acceptedAmount: Math.round(acceptedAmount * 100) / 100,
+    totalAmount: round2(totalAmount),
+    thisMonthAmount: round2(thisMonthAmount),
+    acceptedAmount: round2(acceptedAmount),
     currency,
     byStage,
   };

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   parseCritic,
+  quoteToBrief,
   verifyQuote,
   verifyQuoteDeterministic,
 } from "../quoteVerify";
+import { parseVerificationReport } from "../report";
 import type { GeneratedQuote } from "../../quote-generation";
 
 function quote(over: Partial<GeneratedQuote> = {}): GeneratedQuote {
@@ -168,5 +170,129 @@ describe("verifyQuote (orchestrator)", () => {
   it("reports not-ok when there's an error-severity issue", async () => {
     const report = await verifyQuote({ quote: quote({ lineItems: [] }), runCritic: false });
     expect(report.ok).toBe(false);
+  });
+});
+
+// ─── Audit 2026-09-24, item 7 — checks judge the quote on its own terms ──
+describe("verifyQuoteDeterministic — real rate, markup, price-pending", () => {
+  // UK: VAT 20%, markup 20% on £500 of materials = £100 on top of the lines.
+  const uk = (over: Partial<GeneratedQuote> = {}) =>
+    quote({
+      lineItems: [
+        { description: "Timber", quantity: 10, unit: "m", unitPrice: 50, lineTotal: 500, category: "materials" },
+        { description: "Labour", quantity: 8, unit: "hour", unitPrice: 60, lineTotal: 480, category: "labour" },
+      ],
+      markupAmount: 100,
+      subtotal: 1080, // 500 + 100 markup + 480
+      gstRate: 0.2,
+      taxLabel: "VAT",
+      gstAmount: 216,
+      total: 1296,
+      ...over,
+    });
+
+  it("uses the quote's own tax rate (20% VAT is not a 'GST isn't 15%' error)", () => {
+    expect(verifyQuoteDeterministic(uk())).toEqual([]);
+  });
+
+  it("still catches a wrong tax amount, naming the right tax", () => {
+    const issues = verifyQuoteDeterministic(uk({ gstAmount: 162, total: 1242 }));
+    const gst = issues.find((i) => i.code === "gst_mismatch");
+    expect(gst?.message).toMatch(/^VAT 162 isn't 20% of the subtotal/);
+  });
+
+  it("adds markup charged on top of the line totals before comparing the subtotal", () => {
+    expect(verifyQuoteDeterministic(uk()).some((i) => i.code === "subtotal_mismatch")).toBe(false);
+    // Without the markup the same subtotal WOULD be a mismatch.
+    const noMarkup = verifyQuoteDeterministic(uk({ markupAmount: undefined }));
+    expect(noMarkup.some((i) => i.code === "subtotal_mismatch")).toBe(true);
+  });
+
+  it("price-pending lines raise no zero_price / zero_total findings", () => {
+    const issues = verifyQuoteDeterministic(
+      quote({
+        lineItems: [
+          { description: "GIB sheets", quantity: 12, unit: "sheet", unitPrice: 0, lineTotal: 0, category: "materials", pricePending: true },
+          { description: "Skip bin", quantity: 1, unit: "each", unitPrice: 0, lineTotal: 0, category: "sundries", pricePending: true },
+        ],
+        subtotal: 0,
+        gstAmount: 0,
+        total: 0,
+      }),
+    );
+    expect(issues.filter((i) => i.code === "zero_price" || i.code === "zero_total")).toEqual([]);
+  });
+
+  it("a $0 line that is NOT price-pending is still flagged", () => {
+    const issues = verifyQuoteDeterministic(
+      quote({
+        lineItems: [
+          { description: "Priced", quantity: 1, unit: "each", unitPrice: 100, lineTotal: 100, category: "materials" },
+          { description: "Forgot", quantity: 1, unit: "each", unitPrice: 0, lineTotal: 0, category: "materials" },
+          { description: "Pending", quantity: 1, unit: "each", unitPrice: 0, lineTotal: 0, category: "materials", pricePending: true },
+        ],
+        subtotal: 100,
+        gstAmount: 15,
+        total: 115,
+      }),
+    );
+    const zero = issues.filter((i) => i.code === "zero_price").map((i) => i.message);
+    expect(zero).toHaveLength(1);
+    expect(zero[0]).toMatch(/Forgot/);
+  });
+});
+
+describe("critic brief — price-pending lines are named as such", () => {
+  const pendingQuote = quote({
+    lineItems: [
+      { description: "GIB sheets", quantity: 12, unit: "sheet", unitPrice: 0, lineTotal: 0, category: "materials", pricePending: true },
+      { description: "Labour", quantity: 8, unit: "hour", unitPrice: 85, lineTotal: 680, category: "labour" },
+    ],
+    markupAmount: 0,
+    subtotal: 680,
+    gstAmount: 102,
+    total: 782,
+  });
+
+  it("quoteToBrief prints '@ price pending' instead of '@ $0 = $0'", () => {
+    const brief = quoteToBrief(pendingQuote);
+    expect(brief).toContain("GIB sheets — 12 sheet @ price pending [materials]");
+    expect(brief).not.toContain("@ $0");
+    expect(brief).toContain("Labour — 8 hour @ $85 = $680 [labour]");
+  });
+
+  it("the critic request carries the price-pending brief and the rule (same token cap)", async () => {
+    let body: { max_tokens?: number; system?: Array<{ text: string }>; messages?: Array<{ content: Array<{ text: string }> }> } = {};
+    const fetchImpl = (async (_url: string, init?: RequestInit) => {
+      body = JSON.parse(String(init?.body ?? "{}"));
+      return criticResponse({ scope_covered: true, issues: [] });
+    }) as unknown as typeof fetch;
+    const report = await verifyQuote({
+      quote: pendingQuote,
+      transcript: "Line the garage",
+      runCritic: true,
+      apiKey: "key",
+      fetchImpl,
+    });
+    expect(report.checkedBy).toEqual(["deterministic", "critic"]);
+    expect(body.max_tokens).toBe(1024);
+    expect(body.messages?.[0].content[0].text).toContain("@ price pending");
+    expect(body.system?.[0].text).toMatch(/price pending/);
+  });
+});
+
+describe("parseVerificationReport (stored quote_data.verification)", () => {
+  it("round-trips a real report", async () => {
+    const report = await verifyQuote({ quote: quote(), runCritic: false });
+    expect(parseVerificationReport(JSON.parse(JSON.stringify(report)))).toEqual(report);
+  });
+
+  it("rejects malformed / legacy payloads", () => {
+    expect(parseVerificationReport(null)).toBeNull();
+    expect(parseVerificationReport({ ok: "yes", issues: [], checkedBy: ["deterministic"] })).toBeNull();
+    expect(parseVerificationReport({ ok: true, issues: [], checkedBy: [] })).toBeNull();
+    expect(
+      parseVerificationReport({ ok: true, issues: [{ message: "x", severity: "bogus" }, { nope: 1 }], checkedBy: ["deterministic", "hacker"] }),
+    ).toEqual({ ok: true, issues: [{ code: "check", severity: "warning", message: "x" }], checkedBy: ["deterministic"] });
   });
 });

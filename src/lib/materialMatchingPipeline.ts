@@ -1,6 +1,7 @@
 import "server-only";
 import { matchMaterial, type MaterialMatch } from "./materialMatcher";
 import { round2 } from "./quote-defaults";
+import { convertUnitPrice } from "./units";
 import type {
   PriceConfidence,
   PriceSource,
@@ -22,11 +23,15 @@ import type {
  *   enabled = true (Supabase dev branch + worktree only):
  *     for each `material` line item:
  *       a) call materialMatcher with the description
- *       b) if matched: set material_id, library_id (mirror), price_match_key,
+ *       b) if matched AND the catalogue unit converts exactly to the line's
+ *          unit: set material_id, library_id (mirror), price_match_key,
  *          price_source ('user_library' or 'catalogue_seed'), price_confidence
  *          (high|medium|low from match_score), is_missing_price=false,
  *          is_ai_estimated=false; override unit_price with the catalogue
- *          price; recompute line_total.
+ *          price (converted to the line's unit — the line's unit and
+ *          quantity never change); recompute line_total. A match whose unit
+ *          doesn't convert (per sheet vs m²) is treated as missing_price
+ *          with a row warning.
  *       c) if missing_price: keep description + AI's unit_price as a
  *          suggestion, set price_source='missing_price', is_missing_price=true,
  *          is_ai_estimated=true.
@@ -90,9 +95,19 @@ export async function enrichLineItemsWithCatalogue(
 
     const result = await match({ description: item.description });
 
-    if (result.status === "matched") {
+    // The catalogue price is per the CATALOGUE row's unit. It may only be
+    // applied when that converts exactly to the line's own unit — the line
+    // keeps its unit and quantity (switching the unit without converting
+    // the quantity turned 40 m² into 40 sheets). Anything else stays
+    // price-pending with the reason on the row.
+    const convertedPrice =
+      result.status === "matched" && result.hit.price != null
+        ? convertUnitPrice(result.hit.price, result.hit.unit, item.unit)
+        : null;
+
+    if (result.status === "matched" && convertedPrice !== null) {
       const hit = result.hit;
-      const newPrice = hit.price ?? item.unit_price;
+      const newPrice = convertedPrice;
       const qty = Number(item.quantity) || 0;
       out.push({
         ...item,
@@ -105,8 +120,26 @@ export async function enrichLineItemsWithCatalogue(
         is_missing_price: false,
         is_ai_estimated: false,
         unit_price: newPrice,
-        unit: hit.unit ?? item.unit,
         line_total: round2(qty * newPrice),
+      });
+    } else if (result.status === "matched") {
+      const hit = result.hit;
+      out.push({
+        ...item,
+        material_id: hit.id,
+        library_id: item.library_id ?? null,
+        price_match_key:
+          result.normalized.normalized || item.description.toLowerCase(),
+        price_source: "missing_price",
+        price_confidence: "low",
+        is_missing_price: true,
+        is_ai_estimated: true,
+        warnings: [
+          ...(item.warnings ?? []),
+          `Catalogue price is per ${hit.unit || "each"} but this line is in ${
+            item.unit || "no unit"
+          } — enter the price for this unit.`,
+        ],
       });
     } else {
       // result.status === "missing_price" — never invent a price.

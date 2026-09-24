@@ -34,6 +34,90 @@ export const NZ_DEFAULTS: QuoteProfile = {
   currency: "NZD",
 };
 
+/**
+ * Tax label + rate a business gets when its profile leaves them unset,
+ * keyed by the business country. There is no settings field for the label,
+ * so without this every UK/US/CA document printed "GST", and a blank rate
+ * silently became NZ's 15%. US sales tax varies by state (0 until the
+ * tradie sets it); Canada defaults to the federal 5% GST.
+ */
+export type TaxDefaults = { tax_label: string; tax_rate: number };
+
+export const COUNTRY_TAX_DEFAULTS: Readonly<Record<"NZ" | "AU" | "UK" | "US" | "CA", TaxDefaults>> = {
+  NZ: { tax_label: "GST", tax_rate: 15 },
+  AU: { tax_label: "GST", tax_rate: 10 },
+  UK: { tax_label: "VAT", tax_rate: 20 },
+  US: { tax_label: "Tax", tax_rate: 0 },
+  CA: { tax_label: "Tax", tax_rate: 5 },
+};
+
+const CURRENCY_COUNTRY: Record<string, keyof typeof COUNTRY_TAX_DEFAULTS> = {
+  NZD: "NZ",
+  AUD: "AU",
+  GBP: "UK",
+  USD: "US",
+  CAD: "CA",
+};
+
+/** The business's tax country: its country when known, else inferred from its currency, else NZ. */
+export function taxCountryFor(
+  country?: string | null,
+  currency?: string | null,
+): keyof typeof COUNTRY_TAX_DEFAULTS {
+  const c = (country ?? "").trim().toUpperCase();
+  if (c === "GB") return "UK";
+  if (c in COUNTRY_TAX_DEFAULTS) return c as keyof typeof COUNTRY_TAX_DEFAULTS;
+  return CURRENCY_COUNTRY[(currency ?? "").trim().toUpperCase()] ?? "NZ";
+}
+
+export function taxDefaultsFor(
+  country?: string | null,
+  currency?: string | null,
+): TaxDefaults {
+  return COUNTRY_TAX_DEFAULTS[taxCountryFor(country, currency)];
+}
+
+/** Labels that are only ever a country default, never a tradie's own choice. */
+const GENERIC_TAX_LABELS = new Set(["GST", "VAT", "TAX"]);
+
+/**
+ * The tax label to print. A blank label, or a generic default label that
+ * belongs to another country (the column's "GST" on a UK profile), becomes
+ * the business country's label; any other stored label (e.g. "HST") is kept.
+ */
+export function resolveTaxLabel(
+  storedLabel: string | null | undefined,
+  country?: string | null,
+  currency?: string | null,
+): string {
+  const fallback = taxDefaultsFor(country, currency).tax_label;
+  const stored = (storedLabel ?? "").trim();
+  if (!stored) return fallback;
+  if (
+    GENERIC_TAX_LABELS.has(stored.toUpperCase()) &&
+    stored.toUpperCase() !== fallback.toUpperCase()
+  ) {
+    return fallback;
+  }
+  return stored;
+}
+
+/** A blank / non-numeric stored rate falls back to the country default (never NZ's 15% for everyone). */
+export function resolveTaxRate(
+  storedRate: unknown,
+  country?: string | null,
+  currency?: string | null,
+): number {
+  const blank =
+    storedRate === null ||
+    storedRate === undefined ||
+    (typeof storedRate === "string" && storedRate.trim() === "") ||
+    !Number.isFinite(Number(storedRate));
+  return clampTaxRate(
+    blank ? taxDefaultsFor(country, currency).tax_rate : storedRate,
+  );
+}
+
 const CURRENCY_LOCALE: Record<string, string> = {
   NZD: "en-NZ",
   AUD: "en-AU",
@@ -89,8 +173,21 @@ export function validUntilDate(createdAt: string | Date, days = 30): Date {
   return d;
 }
 
+/**
+ * THE round-to-cents helper — every money surface (generation, the editor,
+ * the save action, the send gate, PDFs via stored totals) goes through it.
+ *
+ * Exact half-up (half away from zero): the value is scaled to cents and the
+ * binary floating-point noise is stripped by re-reading it at 15 significant
+ * digits before rounding. Plain `Math.round(n * 100) / 100` rounds the
+ * half-cent DOWN whenever the double sits a hair below it — 15% GST on $1.50
+ * (0.22499999999999998) gave $0.22 and a typed $1.005 gave $1.00.
+ */
 export function round2(n: number): number {
-  return Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
+  if (!Number.isFinite(n) || n === 0) return 0;
+  const cents = Number((Math.abs(n) * 100).toPrecision(15));
+  const rounded = Math.round(cents) / 100;
+  return n < 0 ? -rounded : rounded;
 }
 
 /**

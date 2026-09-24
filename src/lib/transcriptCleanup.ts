@@ -622,7 +622,41 @@ const callHostedSummary: AnthropicCallable = async ({ apiKey, system, user, mode
   return payload.content?.filter((block) => block.type === "text").map((block) => block.text ?? "").join("\n") ?? "";
 };
 
+/**
+ * A swallowed summary failure, WITHOUT personal data: the stage, the
+ * error's class name and the provider's HTTP status (parsed from our own
+ * "HTTP 503"-style messages). The error message, transcript and model text
+ * are never included — a parse error can quote the model's reply, which
+ * quotes the job.
+ */
+export type SummaryFailureReport = {
+  stage: "call" | "parse";
+  httpStatus?: number;
+  errorName: string;
+};
+
+function summaryFailure(
+  stage: SummaryFailureReport["stage"],
+  e: unknown,
+): SummaryFailureReport {
+  const status =
+    e instanceof Error ? /\bHTTP (\d{3})\b/.exec(e.message)?.[1] : undefined;
+  return {
+    stage,
+    ...(status ? { httpStatus: Number(status) } : {}),
+    errorName: e instanceof Error ? e.name : typeof e,
+  };
+}
+
 export type BuildSummaryOptions = {
+  /**
+   * Called whenever the summary fails and degrades to null, so the failure
+   * is never silent. Server callers pass `reportSummaryFailureToMonitor`
+   * (src/lib/transcript/summaryMonitoring.ts → the internal error monitor).
+   * Injected rather than imported because this module is also bundled in
+   * the browser (the Voice Cleanup agent) and the monitor is server-only.
+   */
+  onSummaryFailure?: (report: SummaryFailureReport) => void;
   apiKey?: string;
   /** Defaults to the selected provider's model. */
   model?: string;
@@ -658,14 +692,17 @@ export async function buildSummary(
       // bounded at 768; the hosted model gets headroom for its reasoning.
       maxTokens: local ? 768 : 2048,
     });
-  } catch {
+  } catch (e) {
+    // Degrade to "no summary" as before, but never silently (PII-free).
+    options.onSummaryFailure?.(summaryFailure("call", e));
     return null;
   }
 
   let parsed: unknown;
   try {
     parsed = parseModelJsonObject<unknown>(raw);
-  } catch {
+  } catch (e) {
+    options.onSummaryFailure?.(summaryFailure("parse", e));
     return null;
   }
 
@@ -743,6 +780,7 @@ export async function cleanTranscript(
   } catch (err) {
     fallback = "summary_failed";
     fallbackReason = err instanceof Error ? err.message : String(err);
+    options.onSummaryFailure?.(summaryFailure("call", err));
   }
 
   // Combined confidence: summary's confidence (or 0.5 fallback) discounted
