@@ -43,6 +43,10 @@ import {
   type TranscriptPanelData,
 } from "./_components/TranscriptPanel";
 import { CustomerChatPanel } from "./_components/CustomerChatPanel";
+import { QuoteVideoCard } from "./_components/QuoteVideoCard";
+import { adminClient } from "@/lib/supabase/admin";
+import { isQuoteLocked } from "@/lib/lifecycle/lock";
+import { loadQuoteVideoStatus, quoteVideoShareText } from "@/lib/quote-video/owner";
 
 export const metadata: Metadata = {
   title: "Quote preview",
@@ -66,7 +70,7 @@ export default async function QuotePreviewPage({
   const { data: quote, error } = await supabase
     .from("quotes")
     .select(
-      "id, voice_transcript, quote_data, created_at, status, public_token, pdf_path, sent_at, viewed_at, accepted_at, expires_at, chat_disabled",
+      "id, voice_transcript, quote_data, created_at, status, public_token, pdf_path, sent_at, viewed_at, accepted_at, expires_at, chat_disabled, version",
     )
     .eq("id", id)
     .single();
@@ -166,6 +170,18 @@ export default async function QuotePreviewPage({
     is_ai_estimated: !!r.is_ai_estimated,
     last_used_at: r.last_used_at,
   }));
+
+  // Quote video card: only while the quote is still an offer the client can
+  // accept. Hidden if the status cannot be read (e.g. the migration is not
+  // applied yet) rather than offering a button that cannot work.
+  let videoStatus: Awaited<ReturnType<typeof loadQuoteVideoStatus>> | null = null;
+  if (quoteData && !isQuoteLocked(quote.status)) {
+    try {
+      videoStatus = await loadQuoteVideoStatus(supabase, adminClient(), user.id, quote.id);
+    } catch {
+      videoStatus = null;
+    }
+  }
 
   /* --------------------------------------------------------------------
    * Agent observability — fire-and-forget logs to the external monitor
@@ -413,6 +429,20 @@ export default async function QuotePreviewPage({
               invoiceExists={existingInvoice !== null}
             />
             </CollapsibleSection>
+
+            {videoStatus?.ok ? (
+              <QuoteVideoCard
+                // A new quote version remounts the card with fresh (stale) status.
+                key={quote.version}
+                quoteId={quote.id}
+                initialStatus={videoStatus.status}
+                shareText={quoteVideoShareText({
+                  status: quote.status,
+                  publicToken: quote.public_token ?? null,
+                  appUrl: process.env.NEXT_PUBLIC_APP_URL || "https://tradies2quote.com",
+                })}
+              />
+            ) : null}
 
             {/* Wave 14 — Invoice draft card. Self-hides unless the
                 quote is `completed`. The card's id="agent-invoice"
