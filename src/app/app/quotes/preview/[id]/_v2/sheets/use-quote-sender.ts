@@ -28,7 +28,8 @@ export function useQuoteSender({
 }: {
   quoteId: string;
   saveFirst: SaveFirst;
-  onSent: (channel: SendChannel) => void;
+  /** "route": the send route sent it. "device": the tradie's own Messages app did. */
+  onSent: (channel: SendChannel, via: "route" | "device") => void;
 }) {
   const [state, setState] = useState<SenderState>({ phase: "idle" });
 
@@ -52,7 +53,7 @@ export function useQuoteSender({
       switch (outcome.kind) {
         case "sent":
           setState({ phase: "idle" });
-          onSent(channel);
+          onSent(channel, "route");
           return;
         case "device":
           setState({ phase: "device", to: outcome.to, body: outcome.body, clientName: outcome.clientName, opened: false });
@@ -95,7 +96,7 @@ export function useQuoteSender({
   function finishText() {
     markTextSent();
     setState({ phase: "idle" });
-    onSent("sms");
+    onSent("sms", "device");
   }
 
   function reset() {

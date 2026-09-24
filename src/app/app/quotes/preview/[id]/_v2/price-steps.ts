@@ -99,6 +99,20 @@ export function canRemember(line: QuoteLineItem): boolean {
   return line.type === "material";
 }
 
+/**
+ * Whether this save teaches the library: a material follows the switch;
+ * labour and other lines never reach the library, so their save keeps the
+ * classic default.
+ */
+export function learnForPrice(line: QuoteLineItem, remember: boolean): boolean {
+  return canRemember(line) ? remember : true;
+}
+
+/** saveQuoteChanges' options for a save: none (the default) unless learning is off. */
+export function saveOptionsFor(learn: boolean): { learnMaterials: false } | undefined {
+  return learn ? undefined : { learnMaterials: false };
+}
+
 /** The toast after the last step. */
 export function priceSessionMessage(session: PriceSession): string {
   const { saved, remembered } = session;

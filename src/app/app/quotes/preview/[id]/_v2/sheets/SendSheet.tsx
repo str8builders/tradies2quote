@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import { ChatCircleText, EnvelopeSimple } from "@phosphor-icons/react/dist/ssr";
+import { ChatCircleText, EnvelopeSimple, LinkSimple } from "@phosphor-icons/react/dist/ssr";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
@@ -11,6 +11,7 @@ import { BUSINESS_NAME_REQUIRED } from "@/lib/business-name";
 import type { QuoteData } from "@/lib/quote-types";
 import { deviceCanSendSms } from "@/lib/smsDeepLink";
 import { channelAddress, checkSend, preferredChannel, type SendChannel, type SendCheck } from "../send-flow";
+import { CopyButton } from "./clipboard";
 import { DeviceHandoff, FixButton, OpenMessagesLink, SenderNotice, type FixActions } from "./sender-parts";
 import { useQuoteSender, type SenderState } from "./use-quote-sender";
 
@@ -68,6 +69,47 @@ function ChannelRow({
   );
 }
 
+/** After it has gone: say so, and offer the client's link to share another way. */
+export function SentSheet({
+  who,
+  channel,
+  publicLink,
+  onDone,
+}: {
+  who: string;
+  channel: SendChannel;
+  /** Null until the refresh after sending brings it in. */
+  publicLink: string | null;
+  onDone: () => void;
+}) {
+  return (
+    <BottomSheet
+      open
+      onClose={onDone}
+      title={`Sent to ${who}`}
+      description={channel === "email" ? "They'll get an email with the quote." : "They'll get a text with the quote."}
+      footer={
+        <Button fullWidth data-testid="job-send-done" onClick={onDone}>
+          Done
+        </Button>
+      }
+    >
+      <div className="space-y-4">
+        <p>The link lets them see the quote and accept it. Copy it to send another way too.</p>
+        {publicLink ? (
+          <CopyButton text={publicLink} variant="secondary" icon={<LinkSimple weight="bold" />} failHint="Couldn't copy the link.">
+            Copy the link
+          </CopyButton>
+        ) : (
+          <Button variant="secondary" fullWidth loading loadingLabel="Getting the link…">
+            Copy the link
+          </Button>
+        )}
+      </div>
+    </BottomSheet>
+  );
+}
+
 export interface SendSheetProps {
   quoteId: string;
   firstName: string | null;
@@ -79,8 +121,13 @@ export interface SendSheetProps {
   smsEnabled: boolean;
   /** "resend" after a no: same routes, different words. */
   mode: "send" | "resend";
+  /** The client's working link; arrives with the refresh after sending. */
+  publicLink: string | null;
   saveFirst: () => Promise<{ ok: true } | { error: string }>;
+  /** It has gone: refresh the job (status, link). */
   onSent: (channel: SendChannel) => void;
+  /** The tradie is finished with the sheet. */
+  onDone: (channel: SendChannel) => void;
   onClose: () => void;
   onFixClient: () => void;
   onFixLines?: () => void;
@@ -96,7 +143,17 @@ export function SendSheet(props: SendSheetProps) {
   const { quoteId, firstName, data, hasBusinessName, onClose } = props;
   const canText = useCanText(props.smsEnabled);
   const [acknowledged, setAcknowledged] = useState(false);
-  const sender = useQuoteSender({ quoteId, saveFirst: props.saveFirst, onSent: props.onSent });
+  const [sent, setSent] = useState<SendChannel | null>(null);
+  const sender = useQuoteSender({
+    quoteId,
+    saveFirst: props.saveFirst,
+    onSent: (channel, via) => {
+      props.onSent(channel);
+      // A text from the tradie's own phone ends in Messages; the rest show the link.
+      if (via === "device") props.onDone(channel);
+      else setSent(channel);
+    },
+  });
 
   const input = { status: props.status, data, description: props.description };
   const email = checkSend("email", input);
@@ -119,12 +176,17 @@ export function SendSheet(props: SendSheetProps) {
   const actions: FixActions = { quoteId, onFixClient: props.onFixClient, onFixLines: props.onFixLines };
   const who = firstName ?? "your client";
 
+  if (sent) {
+    return <SentSheet who={who} channel={sent} publicLink={props.publicLink} onDone={() => props.onDone(sent)} />;
+  }
+
   if (sender.state.phase === "device") {
     const device = sender.state;
     return (
       <BottomSheet
         open
-        onClose={onClose}
+        // Once Messages has opened the quote is marked sent: closing = done.
+        onClose={device.opened ? sender.finishText : onClose}
         title={device.opened ? "Did it send?" : `Text ready for ${firstName ?? device.clientName}`}
         footer={
           device.opened ? (

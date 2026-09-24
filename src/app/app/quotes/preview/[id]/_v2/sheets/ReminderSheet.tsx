@@ -40,7 +40,7 @@ export function ReminderSheet(props: ReminderSheetProps) {
   const toast = useToast();
   const canText = useCanText(false);
   const [acknowledged, setAcknowledged] = useState(false);
-  const sender = useQuoteSender({ quoteId, saveFirst: props.saveFirst, onSent: props.onSent });
+  const sender = useQuoteSender({ quoteId, saveFirst: props.saveFirst, onSent: (channel) => props.onSent(channel) });
   const who = firstName ?? "your client";
   const message = reminder ? reminderText(reminder.body, publicLink) : null;
   const phone = textableNumber(data.client?.phone);
@@ -53,7 +53,8 @@ export function ReminderSheet(props: ReminderSheetProps) {
     return (
       <BottomSheet
         open
-        onClose={onClose}
+        // Once Messages has opened the quote is marked sent: closing = done.
+        onClose={device.opened ? sender.finishText : onClose}
         title={device.opened ? "Did it send?" : `Text ready for ${firstName ?? device.clientName}`}
         footer={
           device.opened ? (
@@ -101,8 +102,11 @@ export function ReminderSheet(props: ReminderSheetProps) {
               href={buildSmsHref(phone, message)}
               data-testid="job-remind-text"
               onClick={() => {
-                toast.show(`Reminder ready in Messages for ${who}`, { tone: "info" });
-                onClose();
+                // Let the tap open Messages first, then tidy the sheet away.
+                window.setTimeout(() => {
+                  toast.show(`Reminder ready in Messages for ${who}`, { tone: "info" });
+                  onClose();
+                }, 400);
               }}
               className={buttonClasses({ fullWidth: true })}
             >

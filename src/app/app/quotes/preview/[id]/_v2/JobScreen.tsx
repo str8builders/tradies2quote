@@ -41,7 +41,7 @@ import { JobTopBar } from "./parts/JobTopBar";
 import { LineList } from "./parts/LineList";
 import { QuoteVideoCardV2View } from "./parts/QuoteVideoCardV2View";
 import { TotalCard } from "./parts/TotalCard";
-import { applyPrice, priceSessionMessage } from "./price-steps";
+import { applyPrice, priceSessionMessage, saveOptionsFor } from "./price-steps";
 import { draftBlocker, sentMessage, type SendChannel } from "./send-flow";
 import { ClientSheet } from "./sheets/ClientSheet";
 import { InvoiceSheet, sendInvoiceEmail, type InvoiceDone } from "./sheets/InvoiceSheet";
@@ -205,11 +205,7 @@ function JobScreenInner(props: JobScreenProps) {
     setClient(nextClient);
     let result: Awaited<ReturnType<typeof saveQuoteChanges>>;
     try {
-      result = await saveQuoteChanges(
-        quoteId,
-        withLines(props.data, nextLines, nextClient),
-        learn ? undefined : { learnMaterials: false },
-      );
+      result = await saveQuoteChanges(quoteId, withLines(props.data, nextLines, nextClient), saveOptionsFor(learn));
     } catch {
       result = { error: "network" };
     }
@@ -246,10 +242,9 @@ function JobScreenInner(props: JobScreenProps) {
     return { ok: true };
   }
 
-  function onSent(channel: SendChannel) {
+  function onSendDone(channel: SendChannel) {
     setSheet(null);
     toast.show(sentMessage(channel, first));
-    router.refresh();
   }
 
   function onInvoiceDone(what: InvoiceDone) {
@@ -485,8 +480,10 @@ function JobScreenInner(props: JobScreenProps) {
           hasBusinessName={props.hasBusinessName}
           smsEnabled={props.smsEnabled}
           mode={status === "declined" ? "resend" : "send"}
+          publicLink={props.publicLink}
           saveFirst={saveFirst}
-          onSent={onSent}
+          onSent={() => router.refresh()}
+          onDone={onSendDone}
           onClose={close}
           onFixClient={openClient}
           onFixLines={fixLines}

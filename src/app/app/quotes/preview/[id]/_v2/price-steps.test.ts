@@ -6,11 +6,13 @@ import {
   applyPrice,
   canRemember,
   currentPriceStep,
+  learnForPrice,
   previewLineTotal,
   priceQuestion,
   priceSessionDone,
   priceSessionMessage,
   priceUnitLabel,
+  saveOptionsFor,
   startPriceSession,
   typedPrice,
 } from "./price-steps";
@@ -105,6 +107,14 @@ describe("keypad words", () => {
   it("offers Remember only for materials (only they go into the library)", () => {
     expect(canRemember(lines[1])).toBe(true);
     expect(canRemember(lines[2])).toBe(false);
+  });
+
+  it("'Remember' off skips library learning for that save; everything else keeps the default", () => {
+    expect(learnForPrice(lines[1], false)).toBe(false);
+    expect(saveOptionsFor(learnForPrice(lines[1], false))).toEqual({ learnMaterials: false });
+    expect(saveOptionsFor(learnForPrice(lines[1], true))).toBeUndefined();
+    // Labour never reaches the library, so its save is a normal one.
+    expect(saveOptionsFor(learnForPrice(lines[2], false))).toBeUndefined();
   });
 
   it("sums up what happened", () => {

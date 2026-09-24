@@ -15,6 +15,7 @@ import {
   advancePriceSession,
   canRemember,
   currentPriceStep,
+  learnForPrice,
   previewLineTotal,
   priceQuestion,
   priceSessionDone,
@@ -64,7 +65,7 @@ export function PriceSheet({ lines, startAt, currency, onSavePrice, onDone, onCl
   async function saveAndNext() {
     const price = typedPrice(typed);
     if (!step || !line || price === null || busy) return;
-    const learn = canRemember(line) ? remember : true;
+    const learn = learnForPrice(line, remember);
     setBusy(true);
     const result = await onSavePrice(step.index, price, learn);
     setBusy(false);

@@ -1,8 +1,11 @@
-import type { ReactNode } from "react";
-import type { LibraryPick } from "@/app/app/materials/_components/BarcodeScanViews";
+import type { ComponentProps, ReactNode } from "react";
+import type { ScanBarcodeButton } from "@/app/app/materials/_components/ScanBarcodeButton";
 import type { QuoteData } from "@/lib/quote-types";
 import type { QuoteVideoStatus } from "@/lib/quote-video/status";
 import type { JobInvoiceState, JobViewInput } from "./job-view";
+
+/** A library item the barcode scanner can add (ScanBarcodeButton's own prop type). */
+export type LibraryPick = NonNullable<ComponentProps<typeof ScanBarcodeButton>["library"]>[number];
 
 /** An invoice as the job page shows it (server-computed dates, no clock on the phone). */
 export interface JobInvoice extends JobInvoiceState {

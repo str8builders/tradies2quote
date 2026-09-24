@@ -30,7 +30,7 @@ import { LineList } from "./parts/LineList";
 import { QuoteVideoCardV2View } from "./parts/QuoteVideoCardV2View";
 import { LineSheet } from "./sheets/LineSheet";
 import { PriceSheet } from "./sheets/PriceSheet";
-import { SendSheet } from "./sheets/SendSheet";
+import { SendSheet, SentSheet } from "./sheets/SendSheet";
 import type { JobInvoice, JobScreenProps } from "./types";
 
 const html = (el: ReactElement) => renderToStaticMarkup(el);
@@ -281,8 +281,10 @@ const sendProps = (patch: Partial<ComponentProps<typeof SendSheet>> = {}): Compo
   hasBusinessName: true,
   smsEnabled: false,
   mode: "send",
+  publicLink: null,
   saveFirst: ok,
   onSent: noop,
+  onDone: noop,
   onClose: noop,
   onFixClient: noop,
   ...patch,
@@ -346,6 +348,16 @@ describe("send sheet gating (the classic send gate, before the tap)", () => {
 
   it("after a no, the same sheet sends it again", () => {
     expect(send({ mode: "resend", status: "declined" })).toContain("Send it to Sam again");
+  });
+
+  it("once it has gone, offers the client's link to copy (it arrives with the refresh)", () => {
+    const withLink = html(createElement(SentSheet, { who: "Sam", channel: "email", publicLink: "https://t2q.test/quote/abc", onDone: noop }));
+    expect(withLink).toContain("Sent to Sam");
+    expect(withLink).toContain("Copy the link");
+    expect(withLink).toContain('data-testid="job-send-done"');
+    const waiting = html(createElement(SentSheet, { who: "Sam", channel: "sms", publicLink: null, onDone: noop }));
+    expect(waiting).toContain("Getting the link…");
+    expect(waiting).toContain("They&#x27;ll get a text with the quote.");
   });
 });
 
