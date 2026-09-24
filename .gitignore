@@ -54,3 +54,6 @@ next-env.d.ts
 
 # Marketing video renders for sharing (scripts/render-marketing.mjs); not served by the site
 /marketing-media/
+
+# Kit screenshots (scripts/ui-screens.mjs); for review, not served by the site
+/ui-screens/
