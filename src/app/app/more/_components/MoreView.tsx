@@ -3,6 +3,7 @@ import {
   AddressBook,
   Bug,
   Calculator,
+  CalendarBlank,
   ChatCircleDots,
   CreditCard,
   Gauge,
@@ -28,6 +29,7 @@ import { NewLookRow } from "./NewLookRow";
 const ICON: Readonly<Record<MoreItemId, Icon>> = {
   clients: AddressBook,
   prices: Tag,
+  calendar: CalendarBlank,
   business: Storefront,
   rates: SlidersHorizontal,
   payments: CreditCard,

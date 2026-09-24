@@ -16,6 +16,7 @@ describe("More menu (data)", () => {
     expect(groups.flatMap((g) => g.items.map((i) => [i.label, i.href]))).toEqual([
       ["Clients", "/app/clients"],
       ["Prices", "/app/materials"],
+      ["Calendar", "/app/calendar"],
       ["Business details", "/app/settings/business"],
       ["Rates and quotes", "/app/settings/rates"],
       ["Payments", "/app/settings/payments"],
@@ -56,6 +57,7 @@ describe("MoreView", () => {
     expect(hrefs(out)).toEqual([
       "/app/clients",
       "/app/materials",
+      "/app/calendar",
       "/app/settings/business",
       "/app/settings/rates",
       "/app/settings/payments",
@@ -65,7 +67,7 @@ describe("MoreView", () => {
       "/help",
       "/app/beta",
     ]);
-    expect(out.match(/min-h-16/g)?.length).toBeGreaterThanOrEqual(10);
+    expect(out.match(/min-h-16/g)?.length).toBeGreaterThanOrEqual(11);
   });
 
   it("outdoor mode, explained in one line, showing this device's setting", () => {

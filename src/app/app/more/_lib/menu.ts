@@ -10,6 +10,7 @@
 export type MoreItemId =
   | "clients"
   | "prices"
+  | "calendar"
   | "business"
   | "rates"
   | "payments"
@@ -42,6 +43,7 @@ const BUSINESS: MoreGroup = {
   items: [
     { id: "clients", label: "Clients", caption: "Saved contacts", href: "/app/clients" },
     { id: "prices", label: "Prices", caption: "Your price list", href: "/app/materials" },
+    { id: "calendar", label: "Calendar", caption: "Booked jobs and day notes", href: "/app/calendar" },
     {
       id: "business",
       label: "Business details",
