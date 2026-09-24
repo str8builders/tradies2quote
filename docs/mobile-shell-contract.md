@@ -127,3 +127,33 @@ Geometry contract (mobile-shell-contract.test.ts asserts the starred rows):
 Sticky-bar call sites to keep in sync: `StickyActionBar.tsx`,
 `SupplierBrowser.tsx`. Page-tail clearance beyond the shell padding is the
 page's job (e.g. quote preview `<main>` adds `pb-24` for the StickyActionBar).
+
+---
+
+## Addendum — 2026-09-25: the new look (redesign phase 2)
+
+When `isNewLookOn()` is true, `src/app/app/layout.tsx` renders
+`<NewLookShell>` (`src/app/app/_v2/shell/`) instead of the shell above. With
+the switch off nothing here changes. Same four owners, same rules:
+
+| Concern | Owner in the new look |
+|---|---|
+| Page paint | the canvas: `studio-app t2q-app-canvas … bg-ui-bg!` (solid ui-bg, follows outdoor mode), normal flow, `min-h-dvh`, `overflow-x-clip` |
+| Scrolling | the document; `<AppContent>` is the `.t2q-app-scroll` wrapper (not a scroller) |
+| Top safe area | `<AppContent>` pads it on phones (as before); a fixed `bg-ui-bg` strip paints it so nothing scrolls visibly under the status bar. New-look top bars pass `safeArea={false}` and the kit TopBar then sticks at `top: env(safe-area-inset-top)` |
+| Bottom safe area | the docked tab bar (`<AppNav>`, fixed `bottom: 0`, own `bg-ui-bg`, `padding-bottom: env(safe-area-inset-bottom)`); on focused routes the screen's own `BottomActionBar` (kit default `safeArea`) |
+
+Geometry: tab bar 4rem + inset (the raised New tile rises 1rem). The
+`.t2q-app-scroll` clearance stays 5.8rem + inset and fixed bars still dock at
+5.3rem + inset, above the bar. From `sm` up the bar is a left rail
+(6rem + inset-left) and the content column pads for it.
+
+Focused routes (`FOCUSED_ROUTES` in `_v2/lib/app-nav.ts`: the new-quote flow
+and the job page) hide the phone tab bar and drop the bottom clearance
+(`max-sm:pb-0!`), so their `BottomActionBar` sits on the bottom edge. Add a
+route there when a redesigned screen puts an action bar on the bottom edge;
+screens that keep the tab bar should not use a sticky `BottomActionBar`
+(the bar would cover it) — dock a fixed bar at 5.3rem + inset instead.
+
+Inside the /app shell use `<Screen height="fill">`: the canvas already fills
+the screen, and a `min-h-dvh` screen plus the bottom clearance always scrolls.
