@@ -36,6 +36,10 @@ export interface StatusRailProps {
 /**
  * Job progress from quote to paid: done steps get a tick, the waiting step is
  * ringed in orange, later steps are grey. Always shows what's next.
+ *
+ * The end dots sit on the edges so the middle labels get the most room
+ * ("Accepted" and "Booked" are the widest neighbours); in a box narrower than
+ * 20rem every other label drops to a second row rather than colliding.
  */
 export function StatusRail({
   position,
@@ -45,29 +49,33 @@ export function StatusRail({
 }: StatusRailProps) {
   const states = railStates(position);
   const progress = railProgress(position);
-  const motion = animate
-    ? "transition-transform duration-ui-slow ease-ui-out motion-reduce:transition-none"
-    : "";
+  const last = states.length - 1;
   return (
-    <div className={cx("relative font-ui-sans", className)} data-position={position}>
-      {/* The line runs between the first and last dot centres (1/12 in from each side). */}
+    <div className={cx("@container relative font-ui-sans", className)} data-position={position}>
+      {/* The line runs between the first and last dot centres (dots are 36 px). */}
       <div
         aria-hidden="true"
-        className="absolute top-[1.125rem] right-[calc(100%/12)] left-[calc(100%/12)] h-1 -translate-y-1/2 overflow-hidden rounded-full bg-ui-line"
+        className="absolute top-[1.125rem] right-[1.125rem] left-[1.125rem] h-1 -translate-y-1/2 overflow-hidden rounded-full bg-ui-line"
       >
         <div
           data-rail-fill=""
-          className={cx("h-full w-full origin-left rounded-full bg-ui-ok", motion)}
+          className={cx(
+            "h-full w-full origin-left rounded-full bg-ui-ok",
+            animate && "transition-transform duration-ui-slow ease-ui-out motion-reduce:transition-none",
+          )}
           style={{ transform: `scaleX(${progress})` }}
         />
       </div>
-      <ol aria-label={label} className="relative grid grid-cols-6">
-        {states.map(({ stage, state }) => (
+      <ol aria-label={label} className="relative flex items-start justify-between">
+        {states.map(({ stage, state }, i) => (
           <li
             key={stage}
             data-state={state}
             aria-current={state === "current" ? "step" : undefined}
-            className="flex min-w-0 flex-col items-center gap-1.5 text-center"
+            className={cx(
+              "flex w-9 shrink-0 flex-col gap-1.5",
+              i === 0 ? "items-start" : i === last ? "items-end" : "items-center",
+            )}
           >
             <span
               aria-hidden="true"
@@ -83,7 +91,15 @@ export function StatusRail({
                 <span className="h-2.5 w-2.5 rounded-full bg-ui-brand" />
               ) : null}
             </span>
-            <span className={cx("text-ui-xs", LABEL[state])}>{stage}</span>
+            <span
+              className={cx(
+                "text-ui-xs whitespace-nowrap",
+                LABEL[state],
+                i % 2 === 1 && "@max-xs:mt-[1.125rem]",
+              )}
+            >
+              {stage}
+            </span>
             <span className="sr-only">, {SPOKEN[state]}</span>
           </li>
         ))}
