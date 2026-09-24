@@ -12,6 +12,7 @@ import { AppHeader } from "../_components/AppHeader";
 import { SupplierShortcuts } from "./_components/SupplierShortcuts";
 import { MaterialsList } from "./_components/MaterialsList";
 import { MaterialsListSkeleton } from "./_components/MaterialsListSkeleton";
+import { ScanBarcodeButton } from "./_components/ScanBarcodeButton";
 
 export const metadata: Metadata = {
   title: "Materials",
@@ -184,6 +185,8 @@ async function MaterialsBody({ userId }: { userId: string }) {
             <Upload size={18} weight="bold" />
             Import CSV
           </Link>
+          {/* Found → opens the item; new → saved to the library with its code. */}
+          <ScanBarcodeButton mode="library" currency={currency} library={materials} />
           <Link
             href="/app/materials/new"
             data-testid="materials-add-link"

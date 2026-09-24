@@ -57,6 +57,8 @@ import { blockedLineGuide } from "@/lib/takeoff/blockedLineGuide";
 import { PhotoPlanPanel } from "./PhotoPlanPanel";
 import { SendQuoteButton } from "./SendQuoteButton";
 import { MaterialsListButton } from "./MaterialsListButton";
+import { ScanBarcodeButton } from "@/app/app/materials/_components/ScanBarcodeButton";
+import { scannedMaterialLine } from "@/lib/materials/barcodeLine";
 import { hasT2QCALWorking, T2QCALWorking } from "./T2QCALWorking";
 import { QuoteReviewSection } from "./QuoteReviewSection";
 import { CsiGroupedView } from "./CsiGroupedView";
@@ -335,7 +337,8 @@ export function QuoteEditor({
     setItems((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  function addItem(type: QuoteItemType) {
+  // `filled` pre-fills the new line (a scanned barcode's library item).
+  function addItem(type: QuoteItemType, filled?: Partial<QuoteLineItem>) {
     const blank: QuoteLineItem = {
       type,
       description: "",
@@ -344,7 +347,7 @@ export function QuoteEditor({
       unit_price: 0,
       line_total: 0,
     };
-    setItems((prev) => [...prev, blank]);
+    setItems((prev) => [...prev, { ...blank, ...filled }]);
   }
 
   function handleTakeoffResult(result: MaterialTakeoffResult) {
@@ -794,8 +797,17 @@ export function QuoteEditor({
           addLabel="Add material"
           disabled={isAccepted}
         />
-        {/* Take the takeoff to the merchant counter — quantities, no prices. */}
-        <div className="mt-3 flex justify-end">
+        {/* Take the takeoff to the merchant counter — quantities, no prices.
+            Scan barcode adds a library item as a line; hidden once locked. */}
+        <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+          {!isAccepted && (
+            <ScanBarcodeButton
+              mode="quote"
+              currency={currency}
+              library={library}
+              onAddToQuote={(m) => addItem("material", scannedMaterialLine(m))}
+            />
+          )}
           <MaterialsListButton
             items={items}
             jobSummary={initialData.job_summary}
