@@ -20,7 +20,16 @@ type AcceptBody = {
   email?: unknown;
   signature?: unknown;
   accepted?: unknown;
+  /** quotes.version the customer's page rendered (get_quote_by_token). */
+  version?: unknown;
+  /** The total the customer's page displayed. */
+  total?: unknown;
 };
+
+/** Money compared to the cent: the page round-trips the total through JSON. */
+function sameCents(a: number, b: number): boolean {
+  return Math.round(a * 100) === Math.round(b * 100);
+}
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -77,6 +86,20 @@ export async function POST(
       { status: 400 },
     );
   }
+  // The page must say which revision and total the customer was shown. A
+  // page without them (loaded before this check shipped) is stale by
+  // definition — it reloads and shows the current quote.
+  const shownVersion =
+    typeof body.version === "number" && Number.isInteger(body.version) && body.version >= 1
+      ? body.version
+      : null;
+  const shownTotal =
+    typeof body.total === "number" && Number.isFinite(body.total) && body.total >= 0
+      ? body.total
+      : null;
+  if (shownVersion === null || shownTotal === null) {
+    return NextResponse.json({ error: "quote_changed" }, { status: 409 });
+  }
 
   const base64 = signature.slice(SIGNATURE_PREFIX.length);
   let signatureBytes: Buffer;
@@ -108,7 +131,7 @@ export async function POST(
   const { data: quoteRaw } = await admin
     .from("quotes")
     .select(
-      "id, status, expires_at, total_amount, accepted_quote_version, user_id, created_at",
+      "id, status, expires_at, total_amount, version, user_id, created_at, deleted_at",
     )
     .eq("public_token", token)
     .maybeSingle();
@@ -118,12 +141,13 @@ export async function POST(
         status: string;
         expires_at: string | null;
         total_amount: number | null;
-        accepted_quote_version: number | null;
+        version: number;
         user_id: string;
         created_at: string;
+        deleted_at: string | null;
       }
     | null;
-  if (!quote) {
+  if (!quote || quote.deleted_at) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
   if (quote.expires_at && new Date(quote.expires_at) < new Date()) {
@@ -134,6 +158,20 @@ export async function POST(
   }
   if (quote.status === "declined") {
     return NextResponse.json({ error: "declined" }, { status: 409 });
+  }
+  // Only a live offer can be accepted — never a draft, an expired quote or a
+  // job that is already scheduled / underway / complete (accept_quote enforces
+  // the same under its row lock; these early exits just avoid storing an
+  // orphan signature).
+  if (quote.status !== "sent" && quote.status !== "viewed") {
+    return NextResponse.json({ error: "not_available" }, { status: 409 });
+  }
+  if (
+    shownVersion !== Number(quote.version) ||
+    quote.total_amount === null ||
+    !sameCents(shownTotal, Number(quote.total_amount))
+  ) {
+    return NextResponse.json({ error: "quote_changed" }, { status: 409 });
   }
 
   let signaturePath: string;
@@ -153,8 +191,6 @@ export async function POST(
 
   const ip = clientIp(request);
   const userAgent = request.headers.get("user-agent");
-  const total = Number(quote.total_amount) || 0;
-  const version = Number(quote.accepted_quote_version) || 1;
 
   const { data: rpcResult, error: rpcErr } = await admin.rpc(
     "accept_quote",
@@ -165,12 +201,15 @@ export async function POST(
       p_signature_path: signaturePath,
       p_ip: ip,
       p_user_agent: userAgent,
-      p_total: total,
-      p_version: version,
+      // What the customer was shown — accept_quote re-checks both against
+      // the locked row and records the row's own total and version.
+      p_total: shownTotal,
+      p_version: shownVersion,
     } as never,
   );
   if (rpcErr) {
     console.error("accept_quote RPC failed", rpcErr);
+    captureError(rpcErr, { route: "quote/accept" });
     return NextResponse.json({ error: "accept_failed" }, { status: 500 });
   }
   const result = rpcResult as { ok?: boolean; error?: string };

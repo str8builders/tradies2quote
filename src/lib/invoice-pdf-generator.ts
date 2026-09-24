@@ -6,7 +6,7 @@ import {
   rgb,
   type PDFFont,
 } from "pdf-lib";
-import { formatCurrency, formatIssueDate } from "./quote-defaults";
+import { formatCurrency, formatIssueDate, splitDisplaySubtotals } from "./quote-defaults";
 import type { QuoteData, QuoteLineItem, QuoteProfile } from "./quote-types";
 import { drawPdfLogo, type PdfLogo } from "./pdf-logo";
 
@@ -374,8 +374,10 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
     ? `Please pay by ${formatIssueDate(dueDate)}. Use ${invoiceNumber} as the reference.`
     : `Payment is due on receipt. Use ${invoiceNumber} as the reference.`);
   const paymentHeight = 46 + 13 * wrapText(sanitise(paymentText), helv, 10, PAGE_W - 2 * MARGIN_X).length;
-  // Keep the amount due and ordinary payment instructions on the same page.
-  ensureSpace(Math.min(TOP - BOTTOM_MIN, 86 + Math.max(60, paymentHeight)));
+  // Totals rows (materials, other, markup, labour, subtotal, tax, amount due)
+  // plus ordinary payment instructions stay together on one page.
+  const totalsHeight = 128 + (other.length > 0 ? 14 : 0);
+  ensureSpace(Math.min(TOP - BOTTOM_MIN, totalsHeight + Math.max(60, paymentHeight)));
   drawRule(y);
   y -= 14;
 
@@ -403,7 +405,20 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
     y -= emphasis ? 22 : 14;
   }
 
-  drawTotalRow("Subtotal", snapshot.subtotal_before_tax);
+  // Same breakdown as the quote PDF (pdf-generator.ts). The subtotal carries
+  // the materials markup, so without its own row the listed lines never add
+  // up to it and the markup is hidden from the client being billed.
+  const displaySplit = splitDisplaySubtotals(snapshot.line_items);
+  drawTotalRow("Materials subtotal", displaySplit.materials);
+  if (other.length > 0) {
+    drawTotalRow("Other subtotal", displaySplit.other);
+  }
+  drawTotalRow(`Markup (${Number(snapshot.markup_pct) || 0}%)`, Number(snapshot.markup_amount) || 0);
+  drawTotalRow("Labour subtotal", Number(snapshot.labour_subtotal) || 0);
+  drawTotalRow(
+    snapshot.tax_rate > 0 ? `Subtotal (excl. ${snapshot.tax_label})` : "Subtotal",
+    snapshot.subtotal_before_tax,
+  );
   drawTotalRow(`${snapshot.tax_label} (${snapshot.tax_rate}%)`, snapshot.tax_amount);
   y -= 4;
   drawRule(y);

@@ -32,6 +32,7 @@ import type {
   QuoteStatus,
 } from "@/lib/quote-types";
 import { applyLineEdit } from "@/lib/t2qcalLineEdit";
+import { isQuoteLocked } from "@/lib/lifecycle/lock";
 import {
   confirmAndRecalc,
   type DimensionEdit,
@@ -121,7 +122,9 @@ export function QuoteEditor({
   const [client, setClient] = useState(() =>
     migrateLegacyContact(initialData.client),
   );
-  const isAccepted = quoteStatus === "accepted";
+  // Locked from acceptance onward (scheduled, in progress, completed…), not
+  // only while the status is literally "accepted".
+  const isAccepted = isQuoteLocked(quoteStatus);
   const [items, setItems] = useState<QuoteLineItem[]>(initialData.line_items);
   const libraryById = useMemo(
     () => new Map(library.map((m) => [m.id, m])),

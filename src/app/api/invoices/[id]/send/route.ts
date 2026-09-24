@@ -8,6 +8,7 @@ import { generateInvoicePdf } from "@/lib/invoice-pdf-generator";
 import { loadLogoForPdf } from "@/lib/pdf-logo";
 import { sendInvoiceEmail } from "@/lib/email-invoice";
 import { formatCurrency, formatIssueDate } from "@/lib/quote-defaults";
+import { dueDateForSend } from "@/lib/invoice-due-date";
 import type { InvoiceSnapshot } from "@/lib/types/invoice";
 
 export const runtime = "nodejs";
@@ -114,12 +115,18 @@ export async function POST(
 
   const logo = await loadLogoForPdf(profile?.logo_url);
 
+  // First send restarts the payment term from today (a draft raised weeks
+  // ago must not arrive overdue); a re-send keeps the date already given.
+  // The PDF, the email and the stored row all use this one value.
+  const sentAt = new Date();
+  const dueDate = dueDateForSend(invoice, sentAt);
+
   let pdfBytes: Uint8Array;
   try {
     pdfBytes = await generateInvoicePdf({
       invoiceNumber: invoice.invoice_number,
       createdAt: invoice.created_at,
-      dueDate: invoice.due_date,
+      dueDate,
       snapshot,
       profile: profile ?? { business_name: null },
       paymentInstructions,
@@ -143,9 +150,7 @@ export async function POST(
   );
   // due_date is null until the tradie sets one — that means "on receipt",
   // never the epoch ("01 Jan 1970") that formatIssueDate(null) produces.
-  const dueDateLabel = invoice.due_date
-    ? formatIssueDate(invoice.due_date)
-    : "on receipt";
+  const dueDateLabel = dueDate ? formatIssueDate(dueDate) : "on receipt";
 
   const emailResult = await sendInvoiceEmail({
     to,
@@ -197,7 +202,8 @@ export async function POST(
     .from("invoices")
     .update({
       status: "sent",
-      sent_at: new Date().toISOString(),
+      sent_at: sentAt.toISOString(),
+      ...(dueDate ? { due_date: dueDate } : {}),
     })
     .eq("id", invoice.id);
   if (uErr) {

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { QuoteData } from "@/lib/quote-types";
+import { isQuoteLocked, QUOTE_LOCKED_MESSAGE } from "@/lib/lifecycle/lock";
 
 /**
  * Edit the cleaned transcript without regenerating the quote.
@@ -56,7 +57,7 @@ export async function POST(
 
   const { data: quote, error } = await supabase
     .from("quotes")
-    .select("id, quote_data, user_id")
+    .select("id, quote_data, user_id, status")
     .eq("id", id)
     .single();
   if (error || !quote) {
@@ -64,6 +65,10 @@ export async function POST(
   }
   if (quote.user_id !== user.id) {
     return NextResponse.json({ error: "Quote not found" }, { status: 404 });
+  }
+  // Accepted quotes are read-only end to end, including this private note.
+  if (isQuoteLocked(quote.status)) {
+    return NextResponse.json({ error: QUOTE_LOCKED_MESSAGE }, { status: 409 });
   }
 
   const quoteData = quote.quote_data as QuoteData | null;

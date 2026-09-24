@@ -48,7 +48,7 @@ export async function POST(
   const { data: quote, error: qErr } = await supabase
     .from("quotes")
     .select(
-      "id, user_id, status, quote_data, total_amount, currency, created_at, public_token, pdf_path, expires_at, voice_transcript",
+      "id, user_id, status, quote_data, total_amount, currency, created_at, public_token, pdf_path, expires_at, voice_transcript, version",
     )
     .eq("id", id)
     .eq("user_id", user.id)
@@ -150,7 +150,9 @@ export async function POST(
     new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
   const { error: preErr } = await admin
     .from("quotes")
-    .update({ pdf_path: pdfPath, public_token: token, expires_at })
+    // pdf_version: the revision this PDF was rendered from, so the public
+    // "View full PDF" re-renders once the quote is edited after sending.
+    .update({ pdf_path: pdfPath, pdf_version: quote.version, public_token: token, expires_at })
     .eq("id", quote.id);
   if (preErr) {
     console.error("Quote pre-send update failed", preErr);

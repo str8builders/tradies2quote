@@ -6,6 +6,7 @@ import {
   type WallContext,
 } from "@/lib/compliance";
 import type { QuoteData } from "@/lib/quote-types";
+import { isQuoteLocked, QUOTE_LOCKED_MESSAGE } from "@/lib/lifecycle/lock";
 
 /**
  * Compliance clarification round-trip.
@@ -66,7 +67,7 @@ export async function POST(
 
   const { data: quote, error } = await supabase
     .from("quotes")
-    .select("id, voice_transcript, quote_data, user_id")
+    .select("id, voice_transcript, quote_data, user_id, status")
     .eq("id", id)
     .single();
   if (error || !quote) {
@@ -75,6 +76,11 @@ export async function POST(
   if (quote.user_id !== user.id) {
     // Defence-in-depth on top of RLS — refuse cross-user clarification.
     return NextResponse.json({ error: "Quote not found" }, { status: 404 });
+  }
+  // A clarification round rewrites quote_data.line_items, so it is an edit:
+  // refused once the client has accepted (the invoice bills these lines).
+  if (isQuoteLocked(quote.status)) {
+    return NextResponse.json({ error: QUOTE_LOCKED_MESSAGE }, { status: 409 });
   }
 
   const quoteData = quote.quote_data as QuoteData | null;

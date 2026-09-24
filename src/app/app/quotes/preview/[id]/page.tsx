@@ -510,7 +510,12 @@ export default async function QuotePreviewPage({
                     id="agent-transcript"
                     title="Transcript"
                   >
-                    <TranscriptPanel quoteId={quote.id} transcript={t} />
+                    <TranscriptPanel
+                      quoteId={quote.id}
+                      transcript={t}
+                      status={(quote.status ?? "draft") as QuoteStatus}
+                      lineCount={quoteData.line_items.length}
+                    />
                   </CollapsibleSection>
                 );
               })()}

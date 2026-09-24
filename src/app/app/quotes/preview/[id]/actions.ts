@@ -29,6 +29,11 @@ import type {
 import { assessQuoteTakeoffSafety } from "@/lib/quote-validation";
 import { canTransition } from "@/lib/lifecycle/stages";
 import {
+  isQuoteLocked,
+  QUOTE_LOCKED_MESSAGE,
+  QUOTE_LOCKED_SQLSTATE,
+} from "@/lib/lifecycle/lock";
+import {
   logAgentError,
   logAgentEvent,
 } from "@/lib/agent-monitor/logger";
@@ -58,8 +63,10 @@ export async function saveQuoteChanges(
   if (!priorRow || priorRow.user_id !== user.id) {
     return { error: "Quote not found." };
   }
-  if (priorRow.status === "accepted") {
-    return { error: "Quote already accepted — edits are locked." };
+  // Accepted and every later stage (scheduled, in progress, completed…) is
+  // the agreed contract that invoicing bills — never just "accepted".
+  if (isQuoteLocked(priorRow.status)) {
+    return { error: QUOTE_LOCKED_MESSAGE };
   }
   const prior = (priorRow.quote_data ?? null) as QuoteData | null;
   // ai_snapshot is the frozen baseline — never mutated after generation.
@@ -117,6 +124,9 @@ export async function saveQuoteChanges(
     .eq("id", id)
     .select("id");
   if (uErr) {
+    // The database lock trigger won a race with a customer accepting
+    // between the status read above and this write.
+    if (uErr.code === QUOTE_LOCKED_SQLSTATE) return { error: QUOTE_LOCKED_MESSAGE };
     captureError(new Error(`saveQuoteChanges update failed: ${uErr.message}`), {
       route: "actions/saveQuoteChanges",
       surface: "server_action",
@@ -175,19 +185,33 @@ export async function saveQuoteChanges(
 
   // Wave 40 — log the AI-vs-tradie diff for the eval loop. Always
   // diffed against the frozen ai_snapshot, never against the previous
-  // edit, so the signal stays clean across multiple saves. Failures
-  // are swallowed: logging is a side benefit, not part of the save.
-  try {
-    if (isHumanEdit) {
-      await supabase.from("quote_edit_events").insert({
+  // edit, so the signal stays clean across multiple saves. A failure never
+  // fails the save (logging is a side benefit), but it is reported: the
+  // client returns errors instead of throwing, so the old try/catch alone
+  // hid every lost eval row. Only the SQLSTATE is recorded — Postgres
+  // details can echo the failing row (client names, prices).
+  if (isHumanEdit) {
+    try {
+      const { error: evErr } = await supabase.from("quote_edit_events").insert({
         quote_id: id,
         user_id: user.id,
         edited_data: next,
         diff: editDiff,
       });
+      if (evErr) {
+        captureError(
+          new Error(`quote_edit_events insert failed: ${evErr.code ?? "unknown"}`),
+          { route: "actions/saveQuoteChanges", surface: "server_action" },
+        );
+        console.warn("quote_edit_events insert failed (non-fatal)", { code: evErr.code });
+      }
+    } catch {
+      captureError(new Error("quote_edit_events insert threw"), {
+        route: "actions/saveQuoteChanges",
+        surface: "server_action",
+      });
+      console.warn("quote_edit_events insert threw (non-fatal)");
     }
-  } catch (e) {
-    console.warn("quote_edit_events insert failed (non-fatal)", e);
   }
 
   // Tradie Brain (v1, observe-only) — learn the tradie's own preferences from
@@ -243,8 +267,8 @@ export async function confirmDimensions(
   if (!priorRow || priorRow.user_id !== user.id) {
     return { error: "Quote not found." };
   }
-  if (priorRow.status === "accepted") {
-    return { error: "Quote already accepted — edits are locked." };
+  if (isQuoteLocked(priorRow.status)) {
+    return { error: QUOTE_LOCKED_MESSAGE };
   }
 
   const result = confirmAndRecalc(data, edits, {
@@ -282,6 +306,7 @@ export async function confirmDimensions(
     })
     .eq("id", id)
     .select("id");
+  if (uErr?.code === QUOTE_LOCKED_SQLSTATE) return { error: QUOTE_LOCKED_MESSAGE };
   if (uErr || !updatedRows || updatedRows.length === 0) {
     console.error("confirmDimensions update failed", uErr);
     captureError(uErr, { route: "action:confirmDimensions" });

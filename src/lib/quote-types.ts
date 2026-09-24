@@ -297,6 +297,9 @@ export type PublicQuotePayload = {
   accepted_at: string | null;
   accepted_name: string | null;
   accepted_quote_version: number;
+  /** Revision of the quote content this payload shows (quotes.version). The
+   *  accept form posts it back so a stale page cannot accept an edited quote. */
+  version: number;
   currency: string;
   has_pdf: boolean;
   has_signature: boolean;
