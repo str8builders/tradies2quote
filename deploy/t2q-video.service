@@ -25,7 +25,9 @@ WorkingDirectory=/srv/t2q/app
 EnvironmentFile=/srv/t2q/app.env
 # Chrome and fontconfig keep caches under $HOME; use the private /tmp.
 Environment=HOME=/tmp
-ExecStart=/usr/bin/node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON /srv/t2q/app/scripts/quote-video-worker.mjs
+# The worker imports its TypeScript job logic directly: type stripping is on by
+# default from Node 22.18; the flag also covers 22.6-22.17.
+ExecStart=/usr/bin/node --experimental-strip-types --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON /srv/t2q/app/scripts/quote-video-worker.mjs
 Restart=on-failure
 RestartSec=30
 # SIGTERM cancels the render in flight and hands the job back to the queue.
