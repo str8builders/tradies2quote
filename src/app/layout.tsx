@@ -54,7 +54,9 @@ const fraunces = Fraunces({
 // fallback / for any place we explicitly reach for it via `--font-inter`.
 const inter = Inter({
   variable: "--font-inter",
-  weight: ["400", "500", "600", "700"],
+  // Variable font (no weight list): Google serves the fixed-weight request's
+  // CSS with `&amp;`-joined font URLs that Turbopack's loader rejects ("next/font/google
+  // queries have exactly one entry"), which failed builds intermittently.
   subsets: ["latin"],
   // Fallback face only; loads on demand instead of being preloaded everywhere.
   preload: false,
