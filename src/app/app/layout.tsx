@@ -2,6 +2,11 @@ import { SideMeasureTape } from "../_components/app/SideMeasureTape";
 import AppSplash from "./_components/AppSplash";
 import { cookies } from "next/headers";
 import { WELCOME_SEEN_COOKIE } from "@/lib/welcome-cookie";
+import {
+  OUTDOOR_COOKIE,
+  contrastAttributeValue,
+  isOutdoorCookieValue,
+} from "@/lib/ui/outdoor";
 import { MobileAppMenu } from "./_components/MobileAppMenu";
 import { OnboardingTourGate } from "./_components/OnboardingTourGate";
 import { TopProgressBar } from "./_components/TopProgressBar";
@@ -56,8 +61,13 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = await cookies();
   // Server-side half of the welcome decision (see src/lib/welcome-cookie.ts).
-  const welcomeSeen = Boolean((await cookies()).get(WELCOME_SEEN_COOKIE)?.value);
+  const welcomeSeen = Boolean(cookieStore.get(WELCOME_SEEN_COOKIE)?.value);
+  // Per-device outdoor (high-contrast) mode, rendered on the shell so the
+  // first paint is already right. Only ui- tokens react to it, so existing
+  // screens look the same either way (see src/lib/ui/outdoor.ts).
+  const outdoor = isOutdoorCookieValue(cookieStore.get(OUTDOOR_COOKIE)?.value);
   return (
     // Dark shell — the app now runs the website's native ink + brand
     // palette (the `[data-theme="light"]` override sheet in globals.css
@@ -65,6 +75,8 @@ export default async function AppLayout({
     <div
       data-shell="app"
       data-theme="dark"
+      data-contrast-root=""
+      data-contrast={contrastAttributeValue(outdoor)}
       className="studio-app t2q-app-canvas min-h-dvh w-full max-w-full overflow-x-clip lg:grid lg:grid-cols-[24px_1fr_24px]"
     >
       {/*

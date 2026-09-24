@@ -42,6 +42,227 @@
   --animate-pulse-ring: pulse-ring 1.6s cubic-bezier(.215,.61,.355,1) infinite;
 }
 
+/* ─── New-look tokens (ui namespace) ─────────────────────────────────────────
+   Redesign phase 1. Additive: nothing that existed before uses a ui- name, so
+   no current screen changes.
+   - Every value mirrors src/lib/ui/tokens.ts. src/lib/ui/tokens.test.ts parses
+     this file, fails on drift and checks WCAG contrast of both palettes.
+   - Colour, shadow and body-weight utilities (bg-ui-surface, text-ui-muted,
+     shadow-ui-card, font-ui-body …) read --ui-* variables through
+     `@theme inline`, so [data-contrast="outdoor"] switches them, and only
+     them, for the element it sits on and everything inside it.
+   - Fonts reuse the variables next/font already loads: no new downloads.
+   - Motion: transitions move transform/opacity only and last 250 ms or less.
+     Components add motion-reduce: variants so every animation stops for
+     phones set to reduce motion. */
+@theme {
+  --font-ui-sans: var(--font-ibm-plex-sans), "IBM Plex Sans", system-ui, sans-serif;
+  --font-ui-display: var(--font-archivo-black), "Archivo Black", system-ui, sans-serif;
+
+  /* 13 px is for captions only. Body text is 17 px. */
+  --text-ui-xs: 0.8125rem;
+  --text-ui-xs--line-height: 1.125rem;
+  --text-ui-sm: 0.9375rem;
+  --text-ui-sm--line-height: 1.375rem;
+  --text-ui-base: 1.0625rem;
+  --text-ui-base--line-height: 1.625rem;
+  --text-ui-lg: 1.25rem;
+  --text-ui-lg--line-height: 1.75rem;
+  --text-ui-xl: 1.5rem;
+  --text-ui-xl--line-height: 1.875rem;
+  --text-ui-2xl: 1.875rem;
+  --text-ui-2xl--line-height: 2.25rem;
+  --text-ui-display: 2.25rem;
+  --text-ui-display--line-height: 2.5rem;
+
+  --radius-ui-sm: 0.5rem;
+  --radius-ui-md: 0.75rem;
+  --radius-ui-lg: 1rem;
+  --radius-ui-xl: 1.5rem;
+
+  --ease-ui-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-ui-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-duration-ui-fast: 120ms;
+  --transition-duration-ui-base: 200ms;
+  --transition-duration-ui-slow: 250ms;
+
+  --animate-ui-sheet-in: ui-sheet-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-ui-fade-in: ui-fade-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-ui-toast-in: ui-toast-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  /* Looping "still loading" pulse (skeletons). Not a transition; it stops
+     under reduced motion like everything else. */
+  --animate-ui-pulse: ui-pulse 1.6s ease-in-out infinite;
+
+  @keyframes ui-sheet-in {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  @keyframes ui-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes ui-toast-in {
+    from { opacity: 0; transform: translateY(0.75rem); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes ui-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
+}
+
+@theme inline {
+  --color-ui-bg: var(--ui-bg);
+  --color-ui-surface: var(--ui-surface);
+  --color-ui-surface-2: var(--ui-surface-2);
+  --color-ui-line: var(--ui-line);
+  --color-ui-line-strong: var(--ui-line-strong);
+  --color-ui-text: var(--ui-text);
+  --color-ui-muted: var(--ui-muted);
+  --color-ui-faint: var(--ui-faint);
+  --color-ui-brand: var(--ui-brand);
+  --color-ui-brand-text: var(--ui-brand-text);
+  --color-ui-on-brand: var(--ui-on-brand);
+  --color-ui-brand-soft: var(--ui-brand-soft);
+  --color-ui-hivis: var(--ui-hivis);
+  --color-ui-mark: var(--ui-mark);
+  --color-ui-on-mark: var(--ui-on-mark);
+  --color-ui-ok: var(--ui-ok);
+  --color-ui-ok-soft: var(--ui-ok-soft);
+  --color-ui-warn: var(--ui-warn);
+  --color-ui-warn-soft: var(--ui-warn-soft);
+  --color-ui-bad: var(--ui-bad);
+  --color-ui-bad-soft: var(--ui-bad-soft);
+  --color-ui-info: var(--ui-info);
+  --color-ui-info-soft: var(--ui-info-soft);
+  --color-ui-focus: var(--ui-focus);
+  --color-ui-scrim: var(--ui-scrim);
+
+  --shadow-ui-card: var(--ui-shadow-card);
+  --shadow-ui-raised: var(--ui-shadow-raised);
+  --shadow-ui-sheet: var(--ui-shadow-sheet);
+
+  --font-weight-ui-body: var(--ui-body-weight);
+}
+
+/* Default palette: dark ink ground. */
+:root {
+  --ui-bg: #111110;
+  --ui-surface: #1B1B1A;
+  --ui-surface-2: #242422;
+  --ui-line: #34332F;
+  --ui-line-strong: #75736C;
+  --ui-text: #F5F4F0;
+  --ui-muted: #BDBBB3;
+  --ui-faint: #8E8C85;
+  --ui-brand: #FF5F15;
+  --ui-brand-text: #FF8A4C;
+  --ui-on-brand: #121211;
+  --ui-brand-soft: #3A1D0E;
+  --ui-hivis: #FFEA00;
+  --ui-mark: #3B3509;
+  --ui-on-mark: #FFEA00;
+  --ui-ok: #3CCB7F;
+  --ui-ok-soft: #15301F;
+  --ui-warn: #FFB224;
+  --ui-warn-soft: #35280C;
+  --ui-bad: #FF6A5E;
+  --ui-bad-soft: #3A1916;
+  --ui-info: #58A6FF;
+  --ui-info-soft: #132A45;
+  --ui-focus: #FFEA00;
+  --ui-scrim: rgba(0, 0, 0, 0.6);
+  --ui-shadow-card: inset 0 1px 0 0 rgba(255, 255, 255, 0.04), 0 12px 28px -18px rgba(0, 0, 0, 0.8);
+  --ui-shadow-raised: 0 18px 40px -16px rgba(0, 0, 0, 0.85);
+  --ui-shadow-sheet: 0 -24px 48px -16px rgba(0, 0, 0, 0.75);
+  --ui-body-weight: 400;
+  --ui-focus-width: 3px;
+  --ui-color-scheme: dark;
+}
+
+/* Outdoor mode: light, glare-proof palette for bright sun. Set per device
+   (t2q-outdoor cookie) on the app shell by src/app/app/layout.tsx and flipped
+   live by <OutdoorModeToggle>. Orange stays a fill with black text on it. */
+[data-contrast="outdoor"] {
+  --ui-bg: #FFFFFF;
+  --ui-surface: #F3F3F1;
+  --ui-surface-2: #E8E8E5;
+  --ui-line: #6F6E69;
+  --ui-line-strong: #3D3C38;
+  --ui-text: #000000;
+  --ui-muted: #2E2D2A;
+  --ui-faint: #4A4944;
+  --ui-brand: #FF5F15;
+  --ui-brand-text: #A63400;
+  --ui-on-brand: #000000;
+  --ui-brand-soft: #FFE4D6;
+  --ui-hivis: #FFEA00;
+  --ui-mark: #FFEA00;
+  --ui-on-mark: #000000;
+  --ui-ok: #0B6B3A;
+  --ui-ok-soft: #DDF3E6;
+  --ui-warn: #8A4B00;
+  --ui-warn-soft: #FFEFD2;
+  --ui-bad: #B3261E;
+  --ui-bad-soft: #FCE4E2;
+  --ui-info: #0B57D0;
+  --ui-info-soft: #DDE8FB;
+  --ui-focus: #000000;
+  --ui-scrim: rgba(0, 0, 0, 0.5);
+  --ui-shadow-card: 0 1px 2px 0 rgba(0, 0, 0, 0.12);
+  --ui-shadow-raised: 0 8px 20px -8px rgba(0, 0, 0, 0.35);
+  --ui-shadow-sheet: 0 -8px 24px -8px rgba(0, 0, 0, 0.3);
+  --ui-body-weight: 500;
+  --ui-focus-width: 4px;
+  --ui-color-scheme: light;
+}
+
+/* Kit guards. Older app CSS restyles h1–h5, inputs and focus rings with
+   unlayered element rules (e.g. `[data-shell="app"] :is(h1, h2, h3, h4)` and
+   `[data-shell="app"] input:not(…)`), and unlayered CSS beats Tailwind's
+   layered utilities whatever their specificity. These few utilities carry
+   !important on exactly those properties, so a kit part looks the same inside
+   the /app shell as it does on /ui-kit. For src/components/ui only. */
+@utility ui-focus-ring {
+  &:focus-visible {
+    outline: var(--ui-focus-width) solid var(--ui-focus) !important;
+    outline-offset: 2px !important;
+  }
+}
+@utility ui-focus-within-ring {
+  &:focus-within {
+    outline: var(--ui-focus-width) solid var(--ui-focus);
+    outline-offset: 2px;
+  }
+}
+@utility ui-heading {
+  font-family: var(--font-ui-display) !important;
+  font-weight: 400 !important;
+  letter-spacing: -0.01em !important;
+  text-transform: none !important;
+}
+@utility ui-title {
+  font-family: var(--font-ui-sans) !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.005em !important;
+  text-transform: none !important;
+}
+@utility ui-input-reset {
+  appearance: none !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  color: inherit !important;
+  font: inherit !important;
+  letter-spacing: inherit !important;
+  &::placeholder {
+    color: var(--ui-faint) !important;
+    opacity: 1 !important;
+  }
+}
+
 /* ─── Global base ─────────────────────────────────────────────────────────── */
 html {
   scroll-behavior: smooth;
