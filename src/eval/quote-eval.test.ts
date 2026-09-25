@@ -151,9 +151,10 @@ describe.skipIf(!ENABLED)("quote-generation eval", () => {
       );
 
       // Hard-fail the case ONLY if a universal (structural / maths)
-      // check broke — those are non-negotiable. The per-case quality
-      // checks are reported but don't hard-fail, so the eval always
-      // completes and shows the full picture.
+      // check broke, or a check marked `hard` (a number the tradie SAID
+      // that must come back exactly) — those are non-negotiable. The other
+      // per-case quality checks are reported but don't hard-fail, so the
+      // eval always completes and shows the full picture.
       const universalPassed = results
         .slice(0, universal.length)
         .filter((r) => r.ok).length;
@@ -161,6 +162,14 @@ describe.skipIf(!ENABLED)("quote-generation eval", () => {
         universalPassed,
         `${evalCase.id}: every structural/maths check must pass`,
       ).toBe(universal.length);
+      const hardMisses = checks
+        .map((c, i) => ({ c, ok: results[i].ok }))
+        .filter(({ c, ok }) => c.hard && !ok)
+        .map(({ c }) => c.label);
+      expect(
+        hardMisses,
+        `${evalCase.id}: numbers stated in the transcript must come back exactly`,
+      ).toEqual([]);
     });
   }
 

@@ -23,6 +23,11 @@ import type {
 export type QuoteCheck = {
   label: string;
   pass: (q: QuoteData) => boolean;
+  /**
+   * Hard-fail the case when this check fails (like the universal checks).
+   * Used for numbers the tradie SAID — those must come back exactly.
+   */
+  hard?: boolean;
 };
 
 export type QuoteEvalCase = {
@@ -180,6 +185,39 @@ const hasItem = (q: QuoteData, re: RegExp): boolean =>
 const hasType = (q: QuoteData, type: string): boolean =>
   q.line_items.some((it) => it.type === type);
 
+/** Money as integer cents (exact comparison, no float tolerance). */
+const cents = (n: unknown): number => Math.round(Number(n) * 100);
+
+/**
+ * EXACT check for a line the tradie priced out loud: some line of `type`
+ * whose description matches `re` carries exactly `quantity` at exactly
+ * `unitPrice`, and its line_total is that product to the cent. A "2 days at
+ * $560" line re-expressed as 16 h at $70 fails on purpose: in production the
+ * pricing policy only trusts the stated $560, so the hour version would be
+ * repriced at the profile rate.
+ */
+export function statedLine(
+  label: string,
+  type: "material" | "labour" | "other" | "any",
+  re: RegExp,
+  quantity: number,
+  unitPrice: number,
+): QuoteCheck {
+  return {
+    label: `${label} — exactly ${quantity} × $${unitPrice.toFixed(2)} = $${(Math.round(quantity * unitPrice * 100) / 100).toFixed(2)}`,
+    hard: true,
+    pass: (q) =>
+      q.line_items.some(
+        (it) =>
+          (type === "any" || it.type === type) &&
+          re.test(it.description) &&
+          Number(it.quantity) === quantity &&
+          cents(it.unit_price) === cents(unitPrice) &&
+          cents(it.line_total) === Math.round(quantity * unitPrice * 100),
+      ),
+  };
+}
+
 export const QUOTE_EVAL_CASES: QuoteEvalCase[] = [
   {
     id: "exterior-repaint",
@@ -246,6 +284,48 @@ export const QUOTE_EVAL_CASES: QuoteEvalCase[] = [
         label: "keeps NZ term — does not rename 'spouting' to 'guttering'",
         pass: (q) => !hasItem(q, /guttering/i) && !/guttering/i.test(q.job_summary),
       },
+    ],
+  },
+
+  // ── EXACT NUMBERS — the transcript states them, so they must come back
+  //    to the cent (hard checks: a miss fails the case). ─────────────────
+  {
+    id: "exact-hourly-rate-and-part",
+    description:
+      "Replace the kitchen mixer tap and fix the leak under the sink for Aroha Ngata on Cameron Road, Tauranga. 3 hours at $95 an hour, and the Methven mixer is $289.",
+    checks: [
+      statedLine("labour at the stated hourly rate", "labour", /./, 3, 95),
+      statedLine("the stated mixer price", "material", /mixer|tap|methven/i, 1, 289),
+    ],
+  },
+  {
+    id: "exact-day-rate-and-paint",
+    description:
+      "Paint the lounge and hallway ceilings. 2 days at $560 a day, and 3 tins of Resene ceiling white 10L at $189 a tin.",
+    checks: [
+      statedLine("labour kept as 2 days at the stated day rate", "labour", /./, 2, 560),
+      statedLine("3 tins at the stated price", "material", /paint|resene|ceiling|white/i, 3, 189),
+    ],
+  },
+  {
+    id: "exact-stated-price-beats-library",
+    description:
+      "Supply and fix 14 sheets of 10mm GIB at $31.50 a sheet and 2 boxes of GIB screws at $35 a box. One day labour at $650.",
+    checks: [
+      // TEST_LIBRARY has GIB 10mm at $28.50 — the price the tradie SAID for
+      // this job is $31.50 and must win.
+      statedLine("GIB at the stated $31.50 (not the $28.50 library price)", "material", /gib(?!.*screw)|plasterboard/i, 14, 31.5),
+      statedLine("screws at the stated box price", "material", /screw/i, 2, 35),
+      statedLine("one day at the stated rate", "labour", /./, 1, 650),
+    ],
+  },
+  {
+    id: "exact-lump-sum-and-fee",
+    description:
+      "Assemble and install the client's kitset garden shed for a fixed price of $2,500, plus $150 for delivering the concrete blocks.",
+    checks: [
+      statedLine("the fixed price as one line", "any", /./, 1, 2500),
+      statedLine("the stated delivery fee", "any", /deliver|block|cartage|freight/i, 1, 150),
     ],
   },
 ];
