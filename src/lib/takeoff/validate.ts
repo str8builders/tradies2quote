@@ -116,8 +116,8 @@ export function validateExtractionForScope(
 
   switch (scope) {
     case "deck": {
-      const l = requireMetres("length_m", "Deck length", dimensions.length_m, "edge");
-      const w = requireMetres("width_m", "Deck width", dimensions.width_m, "edge");
+      const l = requireMetres("length_m", "Deck length", dimensions.length_m, "footprint");
+      const w = requireMetres("width_m", "Deck width", dimensions.width_m, "footprint");
       // Hard-block on missing, physically impossible (negative/zero/NaN) or
       // outside the shared plausibility band — all pushed to `reasons`, so a
       // non-empty reasons array means at least one critical input is

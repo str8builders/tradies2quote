@@ -402,8 +402,8 @@ describe("Whakamārama deck regression", () => {
       deckWidthM: 3820,
     });
     expect(r.materials).toEqual([]);
-    expect(r.warnings.join(" ")).toMatch(/Deck length 4800 m is more than 100 m — check it\. If you meant 4800 mm, that's 4\.8 m\./);
-    expect(r.warnings.join(" ")).toMatch(/Deck width 3820 m is more than 100 m/);
+    expect(r.warnings.join(" ")).toMatch(/Deck length 4800 m is more than 30 m — check it\. If you meant 4800 mm, that's 4\.8 m\./);
+    expect(r.warnings.join(" ")).toMatch(/Deck width 3820 m is more than 30 m/);
   });
 });
 

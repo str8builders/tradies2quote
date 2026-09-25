@@ -154,9 +154,10 @@ export interface StructuredPlanMarker {
 /**
  * Pull `[T2Q_PLAN] key=value key=value …` off the transcript. Returns
  * undefined if no marker, or if the marker's length/width values are
- * outside the shared plausible edge band (takeoff/plausibility.ts,
- * 0.1–100 m) — a corrupted marker (a 4800 "m" side) can't bypass the
- * safety floor, and is never rescaled.
+ * outside the shared plausibility band (takeoff/plausibility.ts): a deck /
+ * floor footprint side 1–30 m, a cladding / wall run 0.1–100 m — a
+ * corrupted marker (a 4800 "m" side) can't bypass the safety floor, and is
+ * never rescaled.
  */
 export function extractStructuredPlanMarker(
   text: string,
@@ -172,15 +173,18 @@ export function extractStructuredPlanMarker(
   };
   const rawLength = optNum("length_m");
   const rawWidth = optNum("width_m");
-  // Envelope check — the ONE shared plausibility rule for a plan edge
-  // (the orchestrator's marker reader uses the same band). The old 1–30 m
-  // envelope dropped a real 62 m cladding marker, so the legacy calculator
-  // asked for a wall length the drawing already gave. Out-of-band markers
-  // are dropped so a corrupted marker can't bypass the safety floor.
-  if (rawLength !== undefined && !isPlausibleMetres(rawLength, "edge")) {
+  // Envelope check — the ONE shared plausibility rule. A cladding / wall
+  // marker's length is a wall run (the old 1–30 m footprint envelope dropped
+  // a real 62 m cladding run, so the calculator asked for a length the
+  // drawing already gave); a deck / floor marker (or an untyped one) carries
+  // a footprint. Out-of-band markers are dropped so a corrupted marker can't
+  // bypass the safety floor.
+  const markerType = pairs["type"]?.toLowerCase();
+  const sideKind = markerType === "cladding" || markerType === "wall" ? "edge" : "footprint";
+  if (rawLength !== undefined && !isPlausibleMetres(rawLength, sideKind)) {
     return undefined;
   }
-  if (rawWidth !== undefined && !isPlausibleMetres(rawWidth, "edge")) {
+  if (rawWidth !== undefined && !isPlausibleMetres(rawWidth, sideKind)) {
     return undefined;
   }
   // NZ convention: length ≥ width. The deck calculator runs joists
@@ -927,11 +931,12 @@ function extractRectangle(
   const parseSide = (value: string, unit: string | undefined): number =>
     readDimension(value, unit, "length")?.value ?? NaN;
   // A sane deck/wall/slab footprint is 1 m on the short side and at
-  // most 30 m on the long side. Anything outside that envelope is
-  // almost certainly a timber size (90x45, 125x125, 140x19) or a
-  // bay window or fastener spacing, not the plan footprint.
-  const MIN_PLAN_M = 1;
-  const MAX_PLAN_M = 30;
+  // most 30 m on the long side (the shared footprint band). Anything
+  // outside that envelope is almost certainly a timber size (90x45,
+  // 125x125, 140x19) or a bay window or fastener spacing, not the plan
+  // footprint.
+  const MIN_PLAN_M = METRES_BANDS.footprint.min;
+  const MAX_PLAN_M = METRES_BANDS.footprint.max;
   for (const m of text.matchAll(re)) {
     const a = parseSide(m[1] ?? "", m[2]);
     const b = parseSide(m[3] ?? "", m[4]);
@@ -994,8 +999,8 @@ function extractStandaloneDims(
   // a standalone metre unit.
   const re = rx(String.raw`${NUM}\s*${LEN_UNIT}${UNIT_END}`);
   const values = new Set<number>();
-  const MIN_PLAN_M = 1;
-  const MAX_PLAN_M = 30;
+  const MIN_PLAN_M = METRES_BANDS.footprint.min;
+  const MAX_PLAN_M = METRES_BANDS.footprint.max;
   for (const m of withoutPairs.matchAll(re)) {
     const inM = readDimension(m[1] ?? "", m[2], "length")?.value;
     if (inM === undefined) continue;
@@ -1094,9 +1099,9 @@ export function extractDeckBoardWidthMm(text: string): number | undefined {
   return undefined;
 }
 
-/** Sane footprint envelope for a deck / subfloor edge (same as the marker). */
-const PLAN_MIN_M = 1;
-const PLAN_MAX_M = 30;
+/** Sane footprint envelope for a deck / subfloor edge — the shared footprint band. */
+const PLAN_MIN_M = METRES_BANDS.footprint.min;
+const PLAN_MAX_M = METRES_BANDS.footprint.max;
 
 /**
  * Deck / subfloor footprint, in priority order:
@@ -1828,7 +1833,7 @@ function parseWallDescription(
 }
 
 /** A finite number of metres inside the shared band for `kind`. */
-function plausible(v: unknown, kind: "edge" | "wallRun" | "wallHeight"): boolean {
+function plausible(v: unknown, kind: "footprint" | "edge" | "wallRun" | "wallHeight"): boolean {
   return typeof v === "number" && isPlausibleMetres(v, kind);
 }
 
@@ -1847,7 +1852,7 @@ export function canRunCalculator(parsed: ParsedTakeoffResult): boolean {
   if (parsed.reviewFlags && parsed.reviewFlags.length > 0) return false;
   if (parsed.type === "deck") {
     const i = parsed.input as Partial<DeckTakeoffInput>;
-    return plausible(i.deckLengthM, "edge") && plausible(i.deckWidthM, "edge");
+    return plausible(i.deckLengthM, "footprint") && plausible(i.deckWidthM, "footprint");
   }
   if (parsed.type === "cladding") {
     const i = parsed.input as Partial<CladdingTakeoffInput>;
@@ -1855,7 +1860,7 @@ export function canRunCalculator(parsed: ParsedTakeoffResult): boolean {
   }
   if (parsed.type === "subfloor") {
     const i = parsed.input as Partial<SubfloorTakeoffInput>;
-    return plausible(i.floorLengthM, "edge") && plausible(i.floorWidthM, "edge");
+    return plausible(i.floorLengthM, "footprint") && plausible(i.floorWidthM, "footprint");
   }
   // wall (original) — need length + height + gibSides. The length may be a
   // whole-house wall run, so it takes the wall-run band.

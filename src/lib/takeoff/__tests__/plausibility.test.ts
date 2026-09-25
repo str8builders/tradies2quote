@@ -69,3 +69,18 @@ describe("the millimetre hint is only offered when the mm reading is a real size
     });
   });
 });
+
+describe("the footprint band (deck / floor sides)", () => {
+  it("is the 1–30 m envelope every plan reader uses", () => {
+    expect(METRES_BANDS.footprint).toEqual({ min: 1, max: 30 });
+    expect(checkMetres("Deck width", 54, "footprint")).toEqual({
+      ok: false,
+      reason: "Deck width 54 m is more than 30 m — check it.",
+    });
+    expect(checkMetres("Deck width", 5.4, "footprint")).toEqual({ ok: true, value: 5.4 });
+    expect(checkMetres("Deck width", 5400, "footprint")).toEqual({
+      ok: false,
+      reason: "Deck width 5400 m is more than 30 m — check it. If you meant 5400 mm, that's 5.4 m.",
+    });
+  });
+});

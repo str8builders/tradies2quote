@@ -21,7 +21,9 @@ import type { ExtractedExtraction } from "../schemas";
 // normalise.toMetres), while the orchestrator's validator let 50–100 m through
 // without a flag. A real 62 m cladding run became 0.062 m → 1 weatherboard.
 // Now ONE rule (takeoff/plausibility.ts): in-band values are taken as stated,
-// out-of-band values are refused with a plain reason — never rescaled.
+// out-of-band values are refused with a plain reason — never rescaled. A
+// cladding run is an "edge" (up to 100 m); a deck / floor side is a
+// "footprint" (1–30 m, the envelope every plan reader already used).
 
 const qty = (r: MaterialTakeoffResult, id: string) =>
   r.materials.find((m) => m.id === id)?.quantity;
@@ -69,16 +71,24 @@ describe("calculators take a 50–100 m edge as stated", () => {
     expect(qty(r, "cladding-nails")).toBe(1965); // ceil(148.8 × 12 × 1.1)
   });
 
-  it("a 60 m × 4 m deck has 135 joists (was 2 — read as 0.06 m)", () => {
+  it("a 25 m × 4 m deck is taken as stated: 57 joists", () => {
+    const r = calculateDeckTakeoff({ deckLengthM: 25, deckWidthM: 4 });
+    expect(r.summary.wallAreaM2).toBe(100);
+    expect(qty(r, "joist-hangers")).toBe(57); // ceil(25000/450) + 1
+  });
+});
+
+describe("deck / floor sides use the shared footprint band — refused, not shrunk", () => {
+  it("a 60 m deck side is refused with a plain reason (was read as 0.06 m → 2 joists)", () => {
     const r = calculateDeckTakeoff({ deckLengthM: 60, deckWidthM: 4 });
-    expect(r.summary.wallAreaM2).toBe(240);
-    expect(qty(r, "joist-hangers")).toBe(135); // ceil(60000/450) + 1
+    expect(r.materials).toEqual([]);
+    expect(r.warnings).toEqual(["Deck length 60 m is more than 30 m — check it."]);
   });
 
-  it("a 55 m × 8 m subfloor has 124 joists (was 2 — read as 0.055 m)", () => {
+  it("a 55 m floor side is refused with a plain reason (was read as 0.055 m → 2 joists)", () => {
     const r = calculateSubfloorTakeoff({ floorLengthM: 55, floorWidthM: 8 });
-    expect(r.summary.wallAreaM2).toBe(440);
-    expect(qty(r, "subfloor-joist-hangers")).toBe(124); // ceil(55000/450) + 1
+    expect(r.materials).toEqual([]);
+    expect(r.warnings).toEqual(["Floor length 55 m is more than 30 m — check it."]);
   });
 });
 
@@ -93,7 +103,7 @@ describe("out-of-band metres are refused with a plain reason — never divided b
   it("a 4800 × 3820 deck gives no materials (was silently 4.8 × 3.82)", () => {
     const r = calculateDeckTakeoff({ deckLengthM: 4800, deckWidthM: 3820 });
     expect(r.materials).toEqual([]);
-    expect(r.warnings.join(" ")).toMatch(/Deck length 4800 m is more than 100 m/);
+    expect(r.warnings.join(" ")).toMatch(/Deck length 4800 m is more than 30 m — check it\. If you meant 4800 mm, that's 4\.8 m\./);
   });
 
   it("a 2400 m cladding height is refused, not read as 2.4 m", () => {
@@ -126,15 +136,17 @@ describe("every path gates on the same bands", () => {
     expect(canRunCalculator(cladding(150))).toBe(false);
   });
 
-  it("legacy gate: a 60 m deck edge can be calculated (was refused over 50 m)", () => {
-    const deck: ParsedTakeoffResult = {
+  it("legacy gate: deck sides use the same footprint band as the calculator (25 m runs, 40 m doesn't)", () => {
+    const deck = (deckLengthM: number): ParsedTakeoffResult => ({
       type: "deck",
-      input: { deckLengthM: 60, deckWidthM: 4 },
+      input: { deckLengthM, deckWidthM: 4 },
       missingFields: [],
       assumptions: [],
       confidence: 1,
-    };
-    expect(canRunCalculator(deck)).toBe(true);
+    });
+    expect(canRunCalculator(deck(25))).toBe(true);
+    // Was allowed up to 50 m here while the parser capped footprints at 30 m.
+    expect(canRunCalculator(deck(40))).toBe(false);
   });
 
   it("voice: '62m of wall' cladding runs the calculator (was flagged 'more than the 50 m')", () => {
@@ -176,7 +188,7 @@ describe("every path gates on the same bands", () => {
     });
     const v = validateExtractionForScope(e, "deck");
     expect(v.status).toBe("blocked");
-    expect(v.reasons.join(" ")).toMatch(/Deck length 150 m is more than 100 m/);
+    expect(v.reasons.join(" ")).toMatch(/Deck length 150 m is more than 30 m/);
     const r = runTakeoffWithExtraction(e);
     expect(r.status).toBe("blocked");
     expect(r.scopes[0].lines).toEqual([]);

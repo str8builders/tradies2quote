@@ -578,8 +578,8 @@ export function calculateDeckTakeoff(
   const invalid = invalidTakeoff(input, ["deckLengthM", "deckWidthM"], ["deckLengthM", "deckWidthM", "joistSpacingMm", "bearerSpacingM", "pileSpacingM", "boardWidthMm", "timberStockLengthM"]);
   if (invalid) return invalid;
   const refused = metresProblems([
-    ["Deck length", input.deckLengthM, "edge"],
-    ["Deck width", input.deckWidthM, "edge"],
+    ["Deck length", input.deckLengthM, "footprint"],
+    ["Deck width", input.deckWidthM, "footprint"],
   ]);
   if (refused.length > 0) return refusedTakeoff(refused);
   const deckLengthM = Number(input.deckLengthM);
@@ -981,8 +981,8 @@ export function calculateSubfloorTakeoff(
   const invalid = invalidTakeoff(input, ["floorLengthM", "floorWidthM"], ["floorLengthM", "floorWidthM", "joistSpacingMm", "bearerSpacingM", "pileSpacingM", "timberStockLengthM", "plywoodSheetWidthM", "plywoodSheetHeightM"]);
   if (invalid) return invalid;
   const refused = metresProblems([
-    ["Floor length", input.floorLengthM, "edge"],
-    ["Floor width", input.floorWidthM, "edge"],
+    ["Floor length", input.floorLengthM, "footprint"],
+    ["Floor width", input.floorWidthM, "footprint"],
   ]);
   if (refused.length > 0) return refusedTakeoff(refused);
   const floorLengthM = Number(input.floorLengthM);

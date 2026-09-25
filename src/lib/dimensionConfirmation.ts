@@ -171,6 +171,8 @@ function metresKindFor(type: string, key: string): MetresKind {
   if (key === "wallHeightM") return "wallHeight";
   // A wall takeoff's length is the whole-plan wall run.
   if (type === "wall" && key === "wallLengthM") return "wallRun";
+  // Deck / floor sides are a footprint; a cladding run is a single edge.
+  if (type === "deck" || type === "subfloor") return "footprint";
   return "edge";
 }
 

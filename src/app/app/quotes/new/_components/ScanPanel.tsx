@@ -27,6 +27,7 @@ import {
   readNumberTokens,
   readWallRunLine,
 } from "@/lib/aiTakeoffParser";
+import { METRES_BANDS } from "@/lib/takeoff/plausibility";
 
 type ScanState =
   | "idle"
@@ -214,9 +215,9 @@ type LineRole =
   | { role: "unlabelled" }
   | { role: "other" };
 
-/** Plan footprint envelope — the same band the takeoff marker accepts. */
-const PLAN_EDGE_MIN_M = 1;
-const PLAN_EDGE_MAX_M = 30;
+/** Plan footprint envelope — the shared footprint band the takeoff marker accepts. */
+const PLAN_EDGE_MIN_M = METRES_BANDS.footprint.min;
+const PLAN_EDGE_MAX_M = METRES_BANDS.footprint.max;
 
 const SPACING_WORDS_RE =
   /(?:\b(?:centres?|centers?|crs|ctrs|cc|spacing|spaced|apart|at)\b|c\/c|@)/;

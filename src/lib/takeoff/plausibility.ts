@@ -10,8 +10,11 @@
 //   - the orchestrator (takeoff/validate.ts and the extraction marker),
 //   - the drawing dimension-confirmation recompute.
 //
-//   edge        one straight run or edge — deck length/width, floor
-//               length/width, a cladding wall run            0.1 – 100 m
+//   footprint   a deck or floor side (length / width)            1 – 30 m
+//               (the residential footprint envelope every plan reader
+//               already used — a 54 m deck side is a misread)
+//   edge        one straight run — a cladding wall run, a
+//               single wall                                   0.1 – 100 m
 //   wallRun     a whole-plan wall run (every wall summed)     0.1 – 1000 m
 //   wallHeight  a wall / stud height                          1.8 – 6 m
 //
@@ -29,9 +32,10 @@
 // stated ("62 of weatherboard" is 62 m).
 // ─────────────────────────────────────────────────────────────────────────
 
-export type MetresKind = "edge" | "wallRun" | "wallHeight";
+export type MetresKind = "footprint" | "edge" | "wallRun" | "wallHeight";
 
 export const METRES_BANDS: Readonly<Record<MetresKind, { min: number; max: number }>> = {
+  footprint: { min: 1, max: 30 },
   edge: { min: 0.1, max: 100 },
   wallRun: { min: 0.1, max: 1000 },
   wallHeight: { min: 1.8, max: 6 },

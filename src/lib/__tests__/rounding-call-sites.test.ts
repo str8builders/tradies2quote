@@ -14,8 +14,9 @@ import { mergeExtractions, type ScanPage } from "../materials/mergeExtractions";
 // 1.00499999999999989…, so it came out 1.00 instead of 1.01.
 
 describe("area rounding is exact half-up in every calculator", () => {
-  it("a 2.01 m × 0.5 m deck is 1.01 m² (was 1.00)", () => {
-    expect(calculateDeckTakeoff({ deckLengthM: 2.01, deckWidthM: 0.5 }).summary.wallAreaM2).toBe(1.01);
+  it("a 2.01 m × 1.5 m deck is 3.02 m² (was 3.01)", () => {
+    // 2.01 × 1.5 is stored as 3.01499999999999968…
+    expect(calculateDeckTakeoff({ deckLengthM: 2.01, deckWidthM: 1.5 }).summary.wallAreaM2).toBe(3.02);
   });
 
   it("normalise.areaM2(2.01, 0.5) is 1.01 m² (was 1.00)", () => {
