@@ -98,12 +98,18 @@ describe("Home states", () => {
     expect(hero).toContain('alt=""');
     // The h1 is the top bar's (greeting); Home's own headings are h2s.
     expect(out).not.toContain("<h1");
-    expect(links(out.slice(out.indexOf('data-testid="home-quick"'))).slice(0, 4).map((a) => /href="([^"]+)"/.exec(a)?.[1])).toEqual([
+    const quick = out.slice(out.indexOf('data-testid="home-quick"'), out.indexOf("</nav>", out.indexOf('data-testid="home-quick"')));
+    expect(links(quick).map((a) => /href="([^"]+)"/.exec(a)?.[1])).toEqual([
       "/app/quotes/new?start=talk",
-      "/t2qcal/calculators",
-      "/t2qcal/measure",
+      "/app/timesheet?add=today",
       "/app/materials/import-quote",
     ]);
+    // T2QCAL is never the web copy: only a button that opens the T2QCAL app, when offered.
+    expect(out).not.toContain("/t2qcal/");
+    expect(quick).not.toContain('data-testid="launch-t2qcal"');
+    const withApp = html(<HomeView {...base} todos={[todo(1)]} t2qcal />);
+    expect(withApp).toContain('data-testid="launch-t2qcal"');
+    expect(withApp).toContain("grid-cols-4");
     expect(out.indexOf('data-testid="home-quick"')).toBeLessThan(out.indexOf('data-testid="home-todos"'));
   });
 

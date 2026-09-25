@@ -1,7 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { METER_START_TIMEOUT_MS, microphoneLevel, primeMicrophoneMeter, startMicrophoneMeter } from "./microphone-level";
+import {
+  METER_START_TIMEOUT_MS,
+  SILENT_FRAMES_LIMIT,
+  isDigitalSilence,
+  microphoneLevel,
+  primeMicrophoneMeter,
+  releasePrimedMeter,
+  startMicrophoneMeter,
+} from "./microphone-level";
 
 afterEach(() => {
+  releasePrimedMeter();
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
@@ -118,5 +127,60 @@ describe("microphone volume feedback", () => {
     startMicrophoneMeter(stream, vi.fn())();
     expect(made).toBe(1);
     expect(close).not.toHaveBeenCalled();
+  });
+
+  it("tells digital silence (nothing at all) from a quiet room", () => {
+    expect(isDigitalSilence(new Float32Array(8))).toBe(true);
+    expect(isDigitalSilence(Float32Array.from([0, 0, 0.0001, 0]))).toBe(false);
+  });
+
+  /** A browser whose contexts are deaf (all zeros) for the first `deaf` contexts made. */
+  function deafBrowser(deaf: number) {
+    let made = 0;
+    const ticks: FrameRequestCallback[] = [];
+    const closes: Array<ReturnType<typeof vi.fn>> = [];
+    vi.stubGlobal("window", { AudioContext: class {
+      id = ++made;
+      state = "running";
+      close = vi.fn().mockResolvedValue(undefined);
+      constructor() { closes.push(this.close); }
+      resume = () => Promise.resolve();
+      createAnalyser = () => {
+        const id = this.id;
+        return { fftSize: 512, disconnect: vi.fn(), getFloatTimeDomainData: (samples: Float32Array) => samples.fill(id <= deaf ? 0 : 0.1) };
+      };
+      createMediaStreamSource = () => ({ connect: vi.fn(), disconnect: vi.fn() });
+    } });
+    vi.stubGlobal("requestAnimationFrame", vi.fn((cb: FrameRequestCallback) => { ticks.push(cb); return ticks.length; }));
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    const run = (frames: number) => { for (let i = 0; i < frames; i++) ticks.shift()?.(i * 40 + 1000 * made); };
+    return { run, made: () => made, closes };
+  }
+
+  it("a deaf audio context is rebuilt once from the live stream, and then the bars move", async () => {
+    const b = deafBrowser(1);
+    const updates = vi.fn();
+    const stop = startMicrophoneMeter({} as MediaStream, updates);
+    await Promise.resolve();
+    b.run(SILENT_FRAMES_LIMIT);
+    expect(b.made()).toBe(2);
+    expect(b.closes[0]).toHaveBeenCalledOnce();
+    await Promise.resolve();
+    b.run(3);
+    expect(updates).not.toHaveBeenCalledWith(null);
+    expect(updates.mock.calls.at(-1)?.[0]).toBeGreaterThan(0.3);
+    stop();
+  });
+
+  it("still deaf after the rebuild: says so (null) so the bars fall back to the wave", async () => {
+    const b = deafBrowser(2);
+    const updates = vi.fn();
+    startMicrophoneMeter({} as MediaStream, updates);
+    await Promise.resolve();
+    b.run(SILENT_FRAMES_LIMIT);
+    await Promise.resolve();
+    b.run(SILENT_FRAMES_LIMIT);
+    expect(updates).toHaveBeenLastCalledWith(null);
+    expect(b.made()).toBe(2);
   });
 });

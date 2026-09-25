@@ -78,4 +78,7 @@ export const TOP_BAR_FIXTURE = {
   email: "sam@example.test",
   businessName: "Sam's Building",
   outdoor: false,
+  t2qcal: true,
+  isOwner: false,
+  canChooseLook: false,
 } as const satisfies import("./top-bar").TopBarData;

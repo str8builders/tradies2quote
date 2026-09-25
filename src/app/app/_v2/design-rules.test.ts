@@ -8,7 +8,7 @@ import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
-const DIRS = ["src/app/app/_v2", "src/app/app/jobs", "src/app/app/more"];
+const DIRS = ["src/app/app/_v2", "src/app/app/jobs", "src/app/app/more", "src/app/app/timesheet"];
 
 function sources(dir: string): string[] {
   const out: string[] = [];

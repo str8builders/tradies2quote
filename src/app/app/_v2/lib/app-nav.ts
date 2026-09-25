@@ -1,7 +1,8 @@
 /**
  * New-look navigation, as data (pure, tested in node).
  *
- *   - The five tabs: Home · Jobs · New (+) · Prices · More.
+ *   - The five tabs: Home · Jobs · New (+) · Prices · Timesheet. Everything
+ *     else is in the menu behind your photo (and on /app/more).
  *   - Which tab a path belongs to (the highlighted one).
  *   - Focused routes: task screens that own the bottom edge of a phone with
  *     their own action bar, so the tab bar steps aside there.
@@ -16,7 +17,7 @@ import {
   JOBS_PATH,
 } from "./job-board";
 
-export type AppTabId = "home" | "jobs" | "new" | "prices" | "more";
+export type AppTabId = "home" | "jobs" | "new" | "prices" | "timesheet";
 
 export interface AppTab {
   id: AppTabId;
@@ -31,13 +32,14 @@ export const HOME_PATH = "/app";
 export const NEW_QUOTE_PATH = "/app/quotes/new";
 export const PRICES_PATH = "/app/materials";
 export const MORE_PATH = "/app/more";
+export const TIMESHEET_PATH = "/app/timesheet";
 
 export const APP_TABS: readonly AppTab[] = [
   { id: "home", label: "Home", name: "Home", href: HOME_PATH },
   { id: "jobs", label: "Jobs", name: "Jobs", href: JOBS_PATH },
   { id: "new", label: "New", name: "New quote", href: NEW_QUOTE_PATH },
   { id: "prices", label: "Prices", name: "Prices", href: PRICES_PATH },
-  { id: "more", label: "More", name: "More", href: MORE_PATH },
+  { id: "timesheet", label: "Timesheet", name: "Timesheet", href: TIMESHEET_PATH },
 ];
 
 /** "/app/jobs/" → "/app/jobs"; query and hash dropped. */
@@ -72,7 +74,7 @@ export function activeTab(pathname: string | null | undefined): AppTabId | null 
   if (under(path, NEW_QUOTE_PATH)) return "new";
   if (JOBS_AREAS.some((base) => under(path, base))) return "jobs";
   if (PRICES_AREAS.some((base) => under(path, base))) return "prices";
-  if (MORE_AREAS.some((base) => under(path, base))) return "more";
+  if (under(path, TIMESHEET_PATH)) return "timesheet";
   return null;
 }
 

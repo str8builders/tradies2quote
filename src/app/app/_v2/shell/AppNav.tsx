@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Icon } from "@phosphor-icons/react";
-import { Briefcase, DotsThree, House, Plus, Tag } from "@phosphor-icons/react/dist/ssr";
+import { Briefcase, House, Plus, Tag, Timer } from "@phosphor-icons/react/dist/ssr";
 import { cx } from "@/components/ui/cx";
 import { TAP, UI_TEXT } from "@/components/ui/styles";
 import { APP_TABS, activeTab, isFocusedRoute, type AppTab, type AppTabId } from "../lib/app-nav";
@@ -13,7 +13,7 @@ const ICON: Readonly<Record<AppTabId, Icon>> = {
   jobs: Briefcase,
   new: Plus,
   prices: Tag,
-  more: DotsThree,
+  timesheet: Timer,
 };
 
 const LINK = cx(
@@ -74,7 +74,7 @@ function NavLink({ tab, current }: { tab: AppTab; current: boolean }) {
  * The new-look navigation, one element for every screen size.
  *
  * Phones: a bar docked to the bottom edge (Home, Jobs, a raised New (+),
- * Prices, More). It paints the home-indicator zone itself. The shell's
+ * Prices, Timesheet). It paints the home-indicator zone itself. The shell's
  * `.t2q-app-scroll` clearance (5.8rem + inset) is taller than the bar
  * (4rem + inset, the New tile rising 1rem), so fixed bars docked at
  * 5.3rem + inset still sit clear above it.

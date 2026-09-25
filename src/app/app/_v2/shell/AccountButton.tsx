@@ -11,13 +11,18 @@ import { ListRow } from "@/components/ui/list-row";
 import { OutdoorModeToggle } from "@/components/ui/outdoor-mode-toggle";
 import { PRESS, TAP } from "@/components/ui/styles";
 import { MORE_ICON } from "../../more/_components/more-icons";
-import { MORE_TONE, accountSheetItems } from "../../more/_lib/menu";
+import { NewLookRow } from "../../more/_components/NewLookRow";
+import { MORE_TONE, accountMenuSections, ownerMenu, type MoreItem } from "../../more/_lib/menu";
 import type { TopBarData } from "../lib/top-bar";
 import { Avatar } from "./Avatar";
+import { T2QCALRow } from "./T2QCALLauncher";
 
-type AccountData = Pick<TopBarData, "name" | "letter" | "avatarUrl" | "email" | "businessName" | "outdoor">;
+type AccountData = Pick<
+  TopBarData,
+  "name" | "letter" | "avatarUrl" | "email" | "businessName" | "outdoor" | "t2qcal" | "isOwner" | "canChooseLook"
+>;
 
-/** Who's signed in, big, with a way to change it. */
+/** Who's signed in, big. */
 function SheetHeader({ data }: { data: AccountData }) {
   const detail = [data.businessName && data.businessName !== data.name ? data.businessName : null, data.email]
     .filter(Boolean)
@@ -33,15 +38,51 @@ function SheetHeader({ data }: { data: AccountData }) {
   );
 }
 
+function Rows({ items, close }: { items: MoreItem[]; close: () => void }) {
+  return (
+    <>
+      {items.map((item) => {
+        const ItemIcon = MORE_ICON[item.id];
+        return (
+          <li key={item.id} onClickCapture={close}>
+            <ListRow
+              href={item.href}
+              title={item.label}
+              subtitle={item.caption}
+              icon={<ItemIcon weight="duotone" />}
+              iconTone={MORE_TONE[item.id]}
+            />
+          </li>
+        );
+      })}
+    </>
+  );
+}
+
+function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
+  return (
+    <section aria-labelledby={`account-${id}`} data-group={id} className="mt-4 first:mt-0">
+      <h3 id={`account-${id}`} className="px-1 pb-2 text-ui-sm font-semibold text-ui-muted">
+        {title}
+      </h3>
+      <Card padding="none">
+        <ul className="divide-y divide-ui-line">{children}</ul>
+      </Card>
+    </section>
+  );
+}
+
 /**
- * Your photo, top left on every tab. A tap slides your settings up from the
- * bottom: your profile, the business's details, rates, getting paid, team,
- * help, outdoor mode and sign out. The same rows as More, so nothing is
- * only here. No plans or prices, so it's the same in the iOS app.
+ * Your photo, top left on every tab. A tap slides up everything that isn't
+ * a tab (the More tab's replacement): your profile and the business's
+ * settings, clients, calendar and team, T2QCAL (opens its own app), help,
+ * outdoor mode, the owner's tools and sign out. No plans or prices, so it's
+ * the same in the iOS app.
  */
 export function AccountButton({ data }: { data: AccountData }) {
   const [open, setOpen] = useState(false);
-  const items = accountSheetItems();
+  const sections = accountMenuSections();
+  const owner = ownerMenu(data.isOwner);
   const close = () => setOpen(false);
   return (
     <>
@@ -58,36 +99,40 @@ export function AccountButton({ data }: { data: AccountData }) {
       </button>
       <BottomSheet open={open} onClose={close} title="Your account">
         <SheetHeader data={data} />
-        <Card padding="none">
-          <ul className="divide-y divide-ui-line">
-            {items.map((item) => {
-              const ItemIcon = MORE_ICON[item.id];
-              return (
-                <li key={item.id} onClickCapture={close}>
-                  <ListRow
-                    href={item.href}
-                    title={item.label}
-                    subtitle={item.caption}
-                    icon={<ItemIcon weight="duotone" />}
-                    iconTone={MORE_TONE[item.id]}
-                  />
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
-        <Card className="mt-3">
-          <OutdoorModeToggle initialOn={data.outdoor} compact />
-          <p className="text-ui-sm text-ui-muted">High contrast for bright sun</p>
-        </Card>
-        <form action="/auth/signout" method="POST" className="mt-3">
+        {sections.map((section) => (
+          <Section key={section.id} id={section.id} title={section.title}>
+            <Rows items={section.items} close={close} />
+            {section.id === "work" && data.t2qcal ? (
+              <li>
+                <T2QCALRow />
+              </li>
+            ) : null}
+          </Section>
+        ))}
+        <Section id="device" title="On this device">
+          <li className="px-4 py-3">
+            <OutdoorModeToggle initialOn={data.outdoor} compact />
+            <p className="text-ui-sm text-ui-muted">High contrast for bright sun</p>
+          </li>
+          {data.canChooseLook ? (
+            <li>
+              <NewLookRow />
+            </li>
+          ) : null}
+        </Section>
+        <form action="/auth/signout" method="POST" className="mt-4">
           <Button type="submit" variant="danger" fullWidth icon={<SignOut weight="bold" />} data-testid="account-sheet-sign-out">
             Sign out
           </Button>
         </form>
-        <p className="mt-3 text-center text-ui-sm text-ui-muted">
+        {owner ? (
+          <Section id="owner" title={owner.title}>
+            <Rows items={owner.items} close={close} />
+          </Section>
+        ) : null}
+        <p className="mt-4 text-center text-ui-sm text-ui-muted">
           <Link href="/app/more" onClick={close} className="ui-focus-ring rounded-ui-sm text-ui-brand-text underline-offset-4 hover:underline">
-            Everything else is in More
+            See it all on one page
           </Link>
         </p>
       </BottomSheet>

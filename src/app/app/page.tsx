@@ -27,10 +27,10 @@ import { ScheduleCalendar } from "./_components/ScheduleCalendar";
 import { WeekOutlook } from "./_components/WeekOutlook";
 import { getWeekOutlook } from "@/lib/weather-impact/outlook";
 import { SiteConditions } from "./_components/SiteConditions";
-import { T2QCALIcon } from "./_components/T2QCALIcon";
 import { RequestCodeCard } from "./_components/RequestCodeCard";
 import { LocalWeather } from "./_components/LocalWeather";
 import { isNewLookOn } from "@/lib/ui/newLook";
+import CalculatorLaunch from "./_components/CalculatorLaunch";
 import { NewHome } from "./_v2/home/NewHome";
 import { loadTopBarData } from "./_v2/lib/top-bar";
 
@@ -126,15 +126,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <Link href="/t2qcal/calculators" data-testid="dashboard-calculators-card"
-          className="t2q-cal-shortcut" aria-label="Open T2QCAL site calculators">
-          <T2QCALIcon />
-          <span className="t2q-cal-shortcut-copy">
-            <strong>T2Q<span>CAL</span> <span className="t2q-cal-shortcut-category">Site calculators</span></strong>
-            <span>Measure it. Work it out. Add it to your quote.</span>
-          </span>
-          <span className="t2q-cal-shortcut-open">Open <ArrowRight size={18} weight="bold" aria-hidden="true" /></span>
-        </Link>
+        <CalculatorLaunch route="tools" isOwner={isOwner} className="mb-6" />
 
         <Suspense fallback={<DashboardSkeleton />}>
           <DashboardData userId={user.id} isOwner={isOwner} />

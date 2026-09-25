@@ -42,6 +42,7 @@ const QUOTE_CHILD_TABLES = [
 
 /** Tables keyed by user_id, deleted before quotes/profiles. */
 const USER_TABLES = [
+  "time_entries",
   "customer_message_drafts",
   "job_weather_assessments",
   "ai_recommendations",
@@ -181,6 +182,7 @@ export async function purgeAccount(userId: string): Promise<PurgeResult> {
     "customer_message_drafts",
     "job_weather_assessments",
     "calendar_notes",
+    "time_entries",
     "beta_feedback",
   ]);
   if (failures.some((t) => critical.has(t))) {

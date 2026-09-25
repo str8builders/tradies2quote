@@ -44,3 +44,18 @@ describe("calculatorDeepLink", () => {
     expect(calculatorDeepLink("/measure")).toBe("t2qcal://measure");
   });
 });
+
+describe("shouldOfferT2QCAL", () => {
+  it("on the web: always; in the iOS app: once it's on the App Store, or for the owner testing it", async () => {
+    const { shouldOfferT2QCAL } = await import("./calculator-app");
+    expect(shouldOfferT2QCAL({ nativeShell: false, isOwner: false })).toBe(true);
+    expect(shouldOfferT2QCAL({ nativeShell: true, isOwner: false })).toBe(false);
+    expect(shouldOfferT2QCAL({ nativeShell: true, isOwner: false, appStoreUrl: "https://apps.apple.com/app/id1" })).toBe(true);
+    expect(shouldOfferT2QCAL({ nativeShell: true, isOwner: true })).toBe(true);
+  });
+  it("opens the app's calculators and measuring (routes T2QCAL handles)", async () => {
+    const { T2QCAL_ROUTES, calculatorDeepLink } = await import("./calculator-app");
+    expect(calculatorDeepLink(T2QCAL_ROUTES.tools)).toBe("t2qcal://tools");
+    expect(calculatorDeepLink(T2QCAL_ROUTES.measure)).toBe("t2qcal://measure");
+  });
+});

@@ -10,13 +10,13 @@ import {
 } from "./app-nav";
 
 describe("the five tabs", () => {
-  it("Home · Jobs · New · Prices · More, pointing at the right routes", () => {
+  it("Home · Jobs · New · Prices · Timesheet, pointing at the right routes", () => {
     expect(APP_TABS.map((t) => [t.label, t.href])).toEqual([
       ["Home", "/app"],
       ["Jobs", "/app/jobs"],
       ["New", "/app/quotes/new"],
       ["Prices", "/app/materials"],
-      ["More", "/app/more"],
+      ["Timesheet", "/app/timesheet"],
     ]);
     expect(APP_TABS.find((t) => t.id === "new")?.name).toBe("New quote");
   });
@@ -40,15 +40,8 @@ describe("activeTab: which tab is highlighted", () => {
     ["/app/materials/quick-start", "prices"],
     ["/app/materials/abc/edit", "prices"],
     ["/app/suppliers", "prices"],
-    ["/app/more", "more"],
-    ["/app/settings", "more"],
-    ["/app/settings/business", "more"],
-    ["/app/clients", "more"],
-    ["/app/team", "more"],
-    ["/app/beta", "more"],
-    ["/app/agents/monitor", "more"],
-    ["/app/debug/brain", "more"],
-    ["/app/admin", "more"],
+    ["/app/timesheet", "timesheet"],
+    ["/app/timesheet/", "timesheet"],
   ] as const)("%s → %s", (path, tab) => {
     expect(activeTab(path)).toBe(tab);
   });
@@ -56,6 +49,11 @@ describe("activeTab: which tab is highlighted", () => {
   it("no tab for paths it doesn't know, and no false prefix matches", () => {
     expect(activeTab("/app/jobsite")).toBeNull();
     expect(activeTab("/app/moreover")).toBeNull();
+    // More's pages are reached from the photo menu now: no tab lights up.
+    for (const path of ["/app/more", "/app/settings/business", "/app/clients", "/app/team", "/app/admin"]) {
+      expect(activeTab(path)).toBeNull();
+    }
+    expect(activeTab("/app/timesheets")).toBeNull();
     expect(activeTab("/t2qcal/calculators")).toBeNull();
     expect(activeTab(null)).toBeNull();
   });

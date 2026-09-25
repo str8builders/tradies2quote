@@ -18,7 +18,6 @@ export type MoreItemId =
   | "payments"
   | "account"
   | "team"
-  | "calculators"
   | "help"
   | "feedback"
   | "agents"
@@ -73,12 +72,6 @@ const TOOLS: MoreGroup = {
   title: "Tools and help",
   items: [
     { id: "team", label: "Team", caption: "People and shared clients", href: "/app/team" },
-    {
-      id: "calculators",
-      label: "Calculators",
-      caption: "Rafters, stairs, concrete and more",
-      href: "/t2qcal/calculators",
-    },
     { id: "help", label: "Help", caption: "Questions, answers and support", href: "/help" },
     { id: "feedback", label: "Send feedback", caption: "Tell us what to fix", href: "/app/beta" },
   ],
@@ -115,7 +108,6 @@ export const MORE_TONE: Readonly<Record<MoreItemId, IconTone>> = {
   payments: "ok",
   account: "brand",
   team: "violet",
-  calculators: "tools",
   help: "neutral",
   feedback: "neutral",
   agents: "brand",
@@ -124,19 +116,39 @@ export const MORE_TONE: Readonly<Record<MoreItemId, IconTone>> = {
   ops: "brand",
 };
 
-const SHEET_ORDER: readonly MoreItemId[] = ["account", "business", "rates", "payments", "team", "help", "feedback"];
+export interface MenuSection {
+  id: "you" | "work" | "help";
+  title: string;
+  items: MoreItem[];
+}
+
+const SECTIONS: ReadonlyArray<{ id: MenuSection["id"]; title: string; ids: readonly MoreItemId[] }> = [
+  { id: "you", title: "You and your business", ids: ["account", "business", "rates", "payments"] },
+  { id: "work", title: "Work", ids: ["clients", "calendar", "team"] },
+  { id: "help", title: "Help", ids: ["help", "feedback"] },
+];
 
 /**
- * The account sheet behind your photo in the top bar: your own settings
- * and the business's, then help. The same rows as More (one list, so the
- * two can't drift), with "Account" said the way the sheet means it. No
- * plans or prices, so it's the same in the iOS app.
+ * The menu behind your photo (top left on every tab), which replaced the
+ * More tab: every More row except Prices (a tab of its own), in three
+ * groups, "Account" said the way the menu means it. The same rows as the
+ * More page, so the two can't drift. No plans or prices, so it's the same
+ * in the iOS app.
  */
-export function accountSheetItems(): MoreItem[] {
+export function accountMenuSections(): MenuSection[] {
   const all = [...BUSINESS.items, ...TOOLS.items];
-  return SHEET_ORDER.map((id) => {
-    const item = all.find((entry) => entry.id === id);
-    if (!item) throw new Error(`accountSheetItems: no More item "${id}"`);
-    return id === "account" ? { ...item, label: "Your profile" } : item;
-  });
+  return SECTIONS.map(({ id, title, ids }) => ({
+    id,
+    title,
+    items: ids.map((itemId) => {
+      const item = all.find((entry) => entry.id === itemId);
+      if (!item) throw new Error(`accountMenuSections: no More item "${itemId}"`);
+      return itemId === "account" ? { ...item, label: "Your profile" } : item;
+    }),
+  }));
+}
+
+/** The owner's tools for the photo menu (null for everyone else). */
+export function ownerMenu(isOwner: boolean): MoreGroup | null {
+  return isOwner ? OWNER : null;
 }

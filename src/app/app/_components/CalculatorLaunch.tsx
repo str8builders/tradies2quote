@@ -1,5 +1,5 @@
 import { isNativeShellRequest } from "@/lib/native-shell";
-import { shouldOfferCalculatorApp } from "@/lib/calculator-app";
+import { shouldOfferT2QCAL } from "@/lib/calculator-app";
 import OpenCalculator from "./OpenCalculator";
 
 /**
@@ -31,15 +31,19 @@ import OpenCalculator from "./OpenCalculator";
  */
 export default async function CalculatorLaunch({
   route,
+  isOwner = false,
   className,
 }: {
   route?: string;
+  /** The owner tests T2QCAL on their own phone before it's on the store. */
+  isOwner?: boolean;
   className?: string;
 }) {
   const nativeShell = await isNativeShellRequest();
-  const offer = shouldOfferCalculatorApp({
+  const offer = shouldOfferT2QCAL({
     nativeShell,
     appStoreUrl: process.env.NEXT_PUBLIC_T2QCAL_APPSTORE_URL,
+    isOwner,
   });
 
   if (!offer) return null;
