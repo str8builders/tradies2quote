@@ -12,49 +12,217 @@ import { MoreView } from "@/app/app/more/_components/MoreView";
 import { contrastAttributeValue } from "@/lib/ui/outdoor";
 import { TimesheetView } from "@/app/app/timesheet/_components/TimesheetView";
 import type { TimesheetData } from "@/app/app/timesheet/_lib/types";
+import { ForgetWelcome } from "./ForgetWelcome";
 import { TalkLive } from "./TalkLive";
 import { TalkPreview } from "./TalkPreview";
 
 export const dynamic = "force-dynamic";
 
-const bar = { ...TOP_BAR_FIXTURE, name: "Challis", letter: "C", businessName: "STR8 Builders", email: "challis@example.test" };
+const bar = {
+  ...TOP_BAR_FIXTURE,
+  name: "Challis",
+  letter: "C",
+  businessName: "STR8 Builders",
+  email: "challis@example.test",
+};
 
 const todos: Todo[] = [
-  { key: "draft:1", kind: "draft", title: "Quote ready to send", detail: "Hemi Walker · Deck rebuild · $6,240.00", action: { label: "Check and send", href: "#" }, tone: "brand" },
-  { key: "invoice:2", kind: "invoice", title: "Job done, time to invoice", detail: "K. Patel · Bathroom reno · $3,640.00", action: { label: "Send invoice", href: "#" }, tone: "ok" },
-  { key: "overdue:3", kind: "overdue", title: "$1,180.00 is 9 days late", detail: "Sarah Tane · Fence repair", action: { label: "Send a reminder", href: "#" }, tone: "bad" },
-  { key: "book:4", kind: "book", title: "Accepted, not booked", detail: "M. Rangi · Pergola", action: { label: "Book the job", href: "#" }, tone: "info" },
+  {
+    key: "draft:1",
+    kind: "draft",
+    title: "Quote ready to send",
+    detail: "Hemi Walker · Deck rebuild · $6,240.00",
+    action: { label: "Check and send", href: "#" },
+    tone: "brand",
+  },
+  {
+    key: "invoice:2",
+    kind: "invoice",
+    title: "Job done, time to invoice",
+    detail: "K. Patel · Bathroom reno · $3,640.00",
+    action: { label: "Send invoice", href: "#" },
+    tone: "ok",
+  },
+  {
+    key: "overdue:3",
+    kind: "overdue",
+    title: "$1,180.00 is 9 days late",
+    detail: "Sarah Tane · Fence repair",
+    action: { label: "Send a reminder", href: "#" },
+    tone: "bad",
+  },
+  {
+    key: "book:4",
+    kind: "book",
+    title: "Accepted, not booked",
+    detail: "M. Rangi · Pergola",
+    action: { label: "Book the job", href: "#" },
+    tone: "info",
+  },
 ];
-const owed: MoneyTotal = { amount: 4820, count: 3, currency: "NZD", otherCurrencies: 0 };
-const paid: MoneyTotal = { amount: 12460, count: 5, currency: "NZD", otherCurrencies: 0 };
+const owed: MoneyTotal = {
+  amount: 4820,
+  count: 3,
+  currency: "NZD",
+  otherCurrencies: 0,
+};
+const paid: MoneyTotal = {
+  amount: 12460,
+  count: 5,
+  currency: "NZD",
+  otherCurrencies: 0,
+};
 
-const job = (id: string, client: string, jobText: string, amount: number, pill: JobRow["pill"], filter: JobRow["filter"]): JobRow => ({
-  id, href: "#", client, job: jobText, amount, currency: "NZD", pill, filter, archived: false, rank: 0,
+const job = (
+  id: string,
+  client: string,
+  jobText: string,
+  amount: number,
+  pill: JobRow["pill"],
+  filter: JobRow["filter"],
+): JobRow => ({
+  id,
+  href: "#",
+  client,
+  job: jobText,
+  amount,
+  currency: "NZD",
+  pill,
+  filter,
+  archived: false,
+  rank: 0,
 });
 const rows: JobRow[] = [
-  job("1", "Hemi Walker", "Deck rebuild, 14 Kauri St", 6240, { text: "Draft", tone: "neutral" }, "to-send"),
-  job("2", "K. Patel", "Bathroom reno", 3640, { text: "Job done", tone: "ok" }, "unpaid"),
-  job("3", "Sarah Tane", "Fence repair", 1180, { text: "9 days late", tone: "bad" }, "unpaid"),
-  job("4", "M. Rangi", "Pergola, 4 × 3 m", 8950, { text: "Viewed", tone: "info" }, "waiting"),
-  job("5", "J. Dunn", "Kitchen framing", 12300, { text: "Booked Tue 30 Sept", tone: "info" }, "booked"),
-  job("6", "Aroha Ngata", "Retaining wall", 5400, { text: "Paid", tone: "ok" }, "done"),
+  job(
+    "1",
+    "Hemi Walker",
+    "Deck rebuild, 14 Kauri St",
+    6240,
+    { text: "Draft", tone: "neutral" },
+    "to-send",
+  ),
+  job(
+    "2",
+    "K. Patel",
+    "Bathroom reno",
+    3640,
+    { text: "Job done", tone: "ok" },
+    "unpaid",
+  ),
+  job(
+    "3",
+    "Sarah Tane",
+    "Fence repair",
+    1180,
+    { text: "9 days late", tone: "bad" },
+    "unpaid",
+  ),
+  job(
+    "4",
+    "M. Rangi",
+    "Pergola, 4 × 3 m",
+    8950,
+    { text: "Viewed", tone: "info" },
+    "waiting",
+  ),
+  job(
+    "5",
+    "J. Dunn",
+    "Kitchen framing",
+    12300,
+    { text: "Booked Tue 30 Sept", tone: "info" },
+    "booked",
+  ),
+  job(
+    "6",
+    "Aroha Ngata",
+    "Retaining wall",
+    5400,
+    { text: "Paid", tone: "ok" },
+    "done",
+  ),
 ];
 
 const timesheet: TimesheetData = {
   weekStart: "2026-09-21",
   today: "2026-09-23",
   entries: [
-    { id: "e1", workDate: "2026-09-21", start: "07:00", finish: "15:30", breakMinutes: 30, hours: 8, note: "Deck framing", clientId: "c1", clientName: "Hemi Walker", userId: "me", person: "You", mine: true, invoice: null },
-    { id: "e2", workDate: "2026-09-21", start: "07:30", finish: "15:30", breakMinutes: 30, hours: 7.5, note: null, clientId: "c1", clientName: "Hemi Walker", userId: "s", person: "Sione", mine: false, invoice: null },
-    { id: "e3", workDate: "2026-09-22", start: "06:45", finish: "15:05", breakMinutes: 20, hours: 8, note: "Joists and bearers", clientId: "c1", clientName: "Hemi Walker", userId: "me", person: "You", mine: true, invoice: null },
-    { id: "e4", workDate: "2026-09-23", start: "08:00", finish: "12:00", breakMinutes: 0, hours: 4, note: "Bathroom lining", clientId: "c2", clientName: "K. Patel", userId: "me", person: "You", mine: true, invoice: { id: "i1", number: "INV-3F9A21C0" } },
+    {
+      id: "e1",
+      workDate: "2026-09-21",
+      start: "07:00",
+      finish: "15:30",
+      breakMinutes: 30,
+      hours: 8,
+      note: "Deck framing",
+      clientId: "c1",
+      clientName: "Hemi Walker",
+      userId: "me",
+      person: "You",
+      mine: true,
+      invoice: null,
+    },
+    {
+      id: "e2",
+      workDate: "2026-09-21",
+      start: "07:30",
+      finish: "15:30",
+      breakMinutes: 30,
+      hours: 7.5,
+      note: null,
+      clientId: "c1",
+      clientName: "Hemi Walker",
+      userId: "s",
+      person: "Sione",
+      mine: false,
+      invoice: null,
+    },
+    {
+      id: "e3",
+      workDate: "2026-09-22",
+      start: "06:45",
+      finish: "15:05",
+      breakMinutes: 20,
+      hours: 8,
+      note: "Joists and bearers",
+      clientId: "c1",
+      clientName: "Hemi Walker",
+      userId: "me",
+      person: "You",
+      mine: true,
+      invoice: null,
+    },
+    {
+      id: "e4",
+      workDate: "2026-09-23",
+      start: "08:00",
+      finish: "12:00",
+      breakMinutes: 0,
+      hours: 4,
+      note: "Bathroom lining",
+      clientId: "c2",
+      clientName: "K. Patel",
+      userId: "me",
+      person: "You",
+      mine: true,
+      invoice: { id: "i1", number: "INV-3F9A21C0" },
+    },
   ],
   clients: [
-    { id: "c1", name: "Hemi Walker", email: "hemi@example.test", address: null, phone: null },
+    {
+      id: "c1",
+      name: "Hemi Walker",
+      email: "hemi@example.test",
+      address: null,
+      phone: null,
+    },
     { id: "c2", name: "K. Patel", email: null, address: null, phone: null },
   ],
   canInvoice: true,
-  people: [{ userId: "me", name: "You" }, { userId: "s", name: "Sione" }],
+  people: [
+    { userId: "me", name: "You" },
+    { userId: "s", name: "Sione" },
+  ],
   labourRate: 85,
   currency: "NZD",
   taxLabel: "GST",
@@ -81,23 +249,40 @@ export default async function DevNewLookPage({
   if (screen === "jobs") {
     content = (
       <main className={main}>
-        <TabTopBar data={bar} title="Jobs" description="Every quote, from first draft to paid." />
+        <TabTopBar
+          data={bar}
+          title="Jobs"
+          description="Every quote, from first draft to paid."
+        />
         <JobsBrowser rows={rows} />
       </main>
     );
   } else if (screen === "more") {
-    content = <MoreView bar={bar} isOwner={false} outdoor={outdoor === "1"} canChooseLook={false} />;
+    content = (
+      <MoreView
+        bar={bar}
+        isOwner={false}
+        outdoor={outdoor === "1"}
+        canChooseLook={false}
+      />
+    );
   } else if (screen === "timesheet") {
     content = (
       <main className={main}>
-        <TabTopBar data={bar} title="Timesheet" description="Everyone's hours, and invoice a client for the week." />
+        <TabTopBar
+          data={bar}
+          title="Timesheet"
+          description="Everyone's hours, and invoice a client for the week."
+        />
         <TimesheetView data={timesheet} />
       </main>
     );
   } else if (screen === "talk-live") {
     content = <TalkLive />;
   } else if (screen === "talk" || screen === "recording") {
-    content = <TalkPreview phase={screen === "recording" ? "recording" : "idle"} />;
+    content = (
+      <TalkPreview phase={screen === "recording" ? "recording" : "idle"} />
+    );
   } else {
     content = (
       <main className={main}>
@@ -106,7 +291,15 @@ export default async function DevNewLookPage({
           <HomeView
             summary="4 things need you today"
             weather={
-              <WeatherLineView line={{ text: "Tauranga today: good to work · 14°", tone: "ok", condition: "clear" }} href={null} variant="chip" />
+              <WeatherLineView
+                line={{
+                  text: "Tauranga today: good to work · 14°",
+                  tone: "ok",
+                  condition: "clear",
+                }}
+                href={null}
+                variant="chip"
+              />
             }
             setup={null}
             todos={todos}
@@ -120,17 +313,33 @@ export default async function DevNewLookPage({
     );
   }
   return (
-    <div
-      data-shell="app"
-      data-theme="dark"
-      data-look="new"
-      data-contrast-root=""
-      data-contrast={contrastAttributeValue(outdoor === "1")}
-      className="studio-app t2q-app-canvas min-h-dvh w-full max-w-full overflow-x-clip bg-ui-bg!"
-    >
-      <div className="t2q-app-scroll min-w-0 sm:pl-[calc(6rem+env(safe-area-inset-left))]">{content}</div>
-      {screen.startsWith("talk") || screen === "recording" ? null : <AppNav />}
-      {screen === "welcome" ? <NewLookWelcome serverOpen data={{ greeting: "Good morning", name: "Challis", today: "Saturday 26 September" }} /> : null}
-    </div>
+    <>
+      {screen === "welcome" ? <ForgetWelcome /> : null}
+      {screen === "welcome" ? (
+        <NewLookWelcome
+          serverOpen
+          data={{
+            greeting: "Good morning",
+            name: "Challis",
+            today: "Saturday 26 September",
+          }}
+        />
+      ) : null}
+      <div
+        data-shell="app"
+        data-theme="dark"
+        data-look="new"
+        data-contrast-root=""
+        data-contrast={contrastAttributeValue(outdoor === "1")}
+        className="studio-app t2q-app-canvas min-h-dvh w-full max-w-full overflow-x-clip bg-ui-bg!"
+      >
+        <div className="t2q-app-scroll min-w-0 sm:pl-[calc(6rem+env(safe-area-inset-left))]">
+          {content}
+        </div>
+        {screen.startsWith("talk") || screen === "recording" ? null : (
+          <AppNav />
+        )}
+      </div>
+    </>
   );
 }

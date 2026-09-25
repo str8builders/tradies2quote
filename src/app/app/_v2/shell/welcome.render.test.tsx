@@ -14,7 +14,8 @@ const html = (over: Partial<Parameters<typeof NewLookWelcome>[0]> = {}) =>
 describe("NewLookWelcome", () => {
   it("covers the screen from the first HTML and says who it greets", () => {
     const out = html();
-    expect(out).toMatch(/role="dialog" aria-modal="true" aria-labelledby="welcome-greeting"/);
+    // An open dialog in the first HTML; the browser's top layer once running.
+    expect(out).toMatch(/<dialog open="" tabindex="-1" aria-labelledby="welcome-greeting"/);
     expect(out).toContain("fixed inset-0");
     expect(out).toContain("bg-ui-bg");
     expect(out).toMatch(/<h1 id="welcome-greeting" class="sr-only">Good morning, Challis. Saturday 26 September.<\/h1>/);

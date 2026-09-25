@@ -34,7 +34,6 @@ const ORANGE_TEXT = "#FF8A4C";
 const HIVIS = "#FFEA00";
 const INK = "#121211";
 const TEXT = "#F5F4F0";
-const MUTED = "#BDBBB3";
 const GRID = "rgba(88, 166, 255, 0.16)";
 const GRID_STRONG = "rgba(88, 166, 255, 0.3)";
 const DISPLAY = 'var(--font-archivo-black), "Archivo Black", "Arial Black", system-ui, sans-serif';
@@ -227,9 +226,6 @@ export function NewWelcomeArt({ frame, fps, greeting, name, today, calm = false 
         ))}
       </div>
 
-      <div style={{ position: "absolute", left: 0, right: 0, bottom: 40, textAlign: "center", fontFamily: SANS, fontSize: 24, color: MUTED, opacity: lerp(frame, [30, 50], [0, 0.9]) }}>
-        Tradies2Quote
-      </div>
     </div>
   );
 }

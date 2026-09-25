@@ -14,7 +14,8 @@ import { AppNav } from "./AppNav";
  * freeze mid-slide, off screen. In the new look those short animations are
  * skipped instead, so a paused choice means "no motion", never "stuck".
  */
-const SETTLE_KIT_MOTION = "[[data-motion=paused]_&_[class*='animate-ui-']]:animate-none!";
+const SETTLE_KIT_MOTION =
+  "[[data-motion=paused]_&_[class*='animate-ui-']]:animate-none!";
 
 /**
  * The /app shell in the new look (src/app/app/layout.tsx switches to it when
@@ -46,32 +47,39 @@ export function NewLookShell({
   children: ReactNode;
 }) {
   return (
-    <div
-      data-shell="app"
-      data-theme="dark"
-      data-look="new"
-      data-contrast-root=""
-      data-contrast={contrastAttributeValue(outdoor)}
-      className={cx("studio-app t2q-app-canvas min-h-dvh w-full max-w-full overflow-x-clip bg-ui-bg!", SETTLE_KIT_MOTION)}
-    >
+    <>
       <div
-        aria-hidden="true"
-        data-testid="status-bar-strip"
-        className="pointer-events-none fixed inset-x-0 top-0 z-50 h-[env(safe-area-inset-top)] bg-ui-chrome"
-      />
-      <AppContent
-        banners={
-          <>
-            <TrialBanner />
-            <BetaNoticeBanner />
-          </>
-        }
+        data-shell="app"
+        data-theme="dark"
+        data-look="new"
+        data-contrast-root=""
+        data-contrast={contrastAttributeValue(outdoor)}
+        className={cx(
+          "studio-app t2q-app-canvas min-h-dvh w-full max-w-full overflow-x-clip bg-ui-bg!",
+          SETTLE_KIT_MOTION,
+        )}
       >
-        {children}
-      </AppContent>
-      <AppNav />
-      <TopProgressBar />
+        <div
+          aria-hidden="true"
+          data-testid="status-bar-strip"
+          className="pointer-events-none fixed inset-x-0 top-0 z-50 h-[env(safe-area-inset-top)] bg-ui-chrome"
+        />
+        <AppContent
+          banners={
+            <>
+              <TrialBanner />
+              <BetaNoticeBanner />
+            </>
+          }
+        >
+          {children}
+        </AppContent>
+        <AppNav />
+        <TopProgressBar />
+      </div>
+      {/* Outside the canvas, which is its own stacking context; the welcome
+        lifts itself into the browser's top layer once it runs. */}
       {welcome}
-    </div>
+    </>
   );
 }

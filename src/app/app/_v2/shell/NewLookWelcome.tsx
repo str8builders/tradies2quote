@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { cx } from "@/components/ui/cx";
 import { useReducedMotion } from "@/components/ui/lib/use-reduced-motion";
@@ -44,6 +44,7 @@ export function NewLookWelcome({ serverOpen, data }: { serverOpen: boolean; data
   const [playing, setPlaying] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const calm = useReducedMotion();
+  const dialog = useRef<HTMLDialogElement>(null);
 
   const finish = useCallback(() => {
     writeWelcomeSeen();
@@ -83,6 +84,24 @@ export function NewLookWelcome({ serverOpen, data }: { serverOpen: boolean; data
     return () => window.clearTimeout(timer);
   }, [leaving, calm, finish]);
 
+  // Into the browser's top layer, above everything on the page (the cookie
+  // banner included), like the old welcome. The first HTML already shows it
+  // as an open, fixed dialog, so nothing is seen before this.
+  useEffect(() => {
+    const el = dialog.current;
+    if (!shown || !el) return;
+    try {
+      if (!el.matches(":modal")) {
+        el.close();
+        el.showModal();
+      }
+      // Focus the welcome itself, not the skip button (no ring on arrival).
+      el.focus();
+    } catch {
+      // Still covers the screen as a fixed, open dialog.
+    }
+  }, [shown]);
+
   // Any key skips it too.
   useEffect(() => {
     if (!shown) return;
@@ -95,15 +114,21 @@ export function NewLookWelcome({ serverOpen, data }: { serverOpen: boolean; data
 
   const words = data.name ? `${data.greeting}, ${data.name}` : `${data.greeting}. Let’s get to work.`;
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
+    <dialog
+      ref={dialog}
+      open
+      tabIndex={-1}
       aria-labelledby="welcome-greeting"
       data-testid="new-look-welcome"
       data-leaving={leaving ? "true" : "false"}
       onClick={skip}
+      onCancel={(event) => {
+        // Escape: skip, and keep React in charge of when it closes.
+        event.preventDefault();
+        skip();
+      }}
       className={cx(
-        "ui-glow fixed inset-0 z-[100] h-dvh w-screen overflow-hidden bg-ui-bg",
+        "ui-glow fixed inset-0 z-[100] m-0 h-dvh max-h-none w-screen max-w-none overflow-hidden border-0 bg-ui-bg p-0 outline-none backdrop:bg-ui-bg",
         leaving && "animate-ui-fade-out motion-reduce:animate-none",
         UI_TEXT,
       )}
@@ -126,6 +151,6 @@ export function NewLookWelcome({ serverOpen, data }: { serverOpen: boolean; data
       >
         Tap anywhere to skip
       </button>
-    </div>
+    </dialog>
   );
 }
