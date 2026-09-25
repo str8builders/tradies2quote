@@ -65,6 +65,18 @@ export function consumeDailyQuota(key: string, limit: number): QuotaResult {
 }
 
 /**
+ * Give back one unit of a daily quota: for a request that was counted but
+ * never reached the cost-bearing call (a quote already being written, or
+ * already written, answers 409 without running the model). Never goes below
+ * zero and never touches an expired window.
+ */
+export function refundDailyQuota(key: string): void {
+  const existing = buckets.get(key);
+  if (!existing || existing.resetAt <= Date.now() || existing.count <= 0) return;
+  existing.count -= 1;
+}
+
+/**
  * Short fixed-window throttle (e.g. per-minute) over the SAME in-memory,
  * per-instance buckets as `consumeDailyQuota`. Where the daily quota guards
  * cost-bearing LLM routes, this guards bursty, high-frequency endpoints (the

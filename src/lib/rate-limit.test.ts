@@ -52,3 +52,27 @@ describe("consumeFixedWindow — short fixed-window per-key throttle", () => {
     expect(consumeFixedWindow(b, 1, 1000).ok).toBe(true); // unaffected by a
   });
 });
+
+describe("refundDailyQuota — give back a counted request that never ran the model", () => {
+  it("returns one unit so a wait-and-ask-again doesn't use up the day", async () => {
+    const { consumeDailyQuota, refundDailyQuota } = await import("./rate-limit");
+    const key = `refund-test:${Math.random()}`;
+    expect(consumeDailyQuota(key, 2).remaining).toBe(1);
+    expect(consumeDailyQuota(key, 2).remaining).toBe(0);
+    expect(consumeDailyQuota(key, 2).ok).toBe(false);
+    refundDailyQuota(key);
+    const again = consumeDailyQuota(key, 2);
+    expect(again.ok).toBe(true);
+    expect(again.remaining).toBe(0);
+  });
+
+  it("never goes below zero and ignores unknown keys", async () => {
+    const { consumeDailyQuota, refundDailyQuota } = await import("./rate-limit");
+    const key = `refund-floor:${Math.random()}`;
+    refundDailyQuota(key); // no bucket yet: no-op
+    consumeDailyQuota(key, 3);
+    refundDailyQuota(key);
+    refundDailyQuota(key); // already back at zero
+    expect(consumeDailyQuota(key, 3).remaining).toBe(2);
+  });
+});
