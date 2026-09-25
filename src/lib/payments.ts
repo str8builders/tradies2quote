@@ -1,5 +1,6 @@
 import "server-only";
 
+import { round2 } from "@/lib/quote-defaults";
 import { stripeClient } from "@/lib/stripe-client";
 import { adminClient } from "@/lib/supabase/admin";
 
@@ -27,14 +28,28 @@ export function platformFeeBps(): number {
   return Number.isFinite(n) && n >= 0 && n < 5000 ? Math.floor(n) : 0;
 }
 
-/** NZD/AUD/GBP/USD/CAD are all 2-decimal currencies → *100 is correct. */
+/**
+ * NZD/AUD/GBP/USD/CAD are all 2-decimal currencies → *100 is correct. The
+ * amount goes through the app's exact half-up round2 first, so a half cent
+ * can't be lost to float noise (1.005 × 100 = 100.49999999999999).
+ */
 export function toMinorUnits(amount: number): number {
-  return Math.round((Number(amount) || 0) * 100);
+  return Math.round(round2(Number(amount) || 0) * 100);
 }
 
+/**
+ * The deposit Stripe charges, in integer cents: the deposit % (clamped to
+ * 0–100) of the quote total, rounded half-up like every other money figure.
+ * Done in integers — cents × basis points ÷ 10,000 — because the float
+ * version put 163,850 × 0.35 at 57,347.49999999999 and rounded an exact half
+ * cent ($573.475) DOWN to $573.47.
+ */
 export function depositCents(total: number, depositPct: number): number {
   const pct = Math.min(100, Math.max(0, Number(depositPct) || 0));
-  return Math.max(0, Math.round(toMinorUnits(total) * (pct / 100)));
+  const cents = toMinorUnits(total);
+  if (!(cents > 0) || pct === 0) return 0;
+  const basisPoints = Math.round(pct * 100);
+  return Math.floor((cents * basisPoints + 5000) / 10000);
 }
 
 export type ConnectStatus = {

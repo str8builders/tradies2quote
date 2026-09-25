@@ -591,12 +591,6 @@ export const MONEY_JOBS: GoldenJob[] = [
       "214.48 @ 0%": count(0, "no deposit"),
       "214.48 @ 120%": count(21448, "a deposit can't exceed the total — capped at 100 %"),
     },
-    knownBugs: {
-      "1638.50 @ 35%":
-        "KNOWN BUG: payments.depositCents does Math.round(163850 × 0.35) and 163850 × 0.35 = 57347.49999999999 in floats — expected 57348 (573.475 → half-up, the app's round2 rule), code gives 57347",
-      "1638.45 @ 70%":
-        "KNOWN BUG: same float half-cent in depositCents (163845 × 0.7 = 114691.49999999999) — expected 114692, code gives 114691",
-    },
     compute: (): Actuals => ({
       "3109.77 @ 50%": depositCents(3109.77, 50),
       "1638.50 @ 35%": depositCents(1638.5, 35),
