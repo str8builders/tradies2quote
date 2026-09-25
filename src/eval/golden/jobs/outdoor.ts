@@ -204,15 +204,6 @@ export const OUTDOOR_JOBS: GoldenJob[] = [
       tax_amount: money("441.82", "15 % × 2945.48 → 441.82"),
       total: money("3387.30", "2945.48 + 441.82"),
     },
-    knownBugs: {
-      lines:
-        "KNOWN BUG: takeoff/extraction.ts extractPerimeterM only reads '<n> m of fence|fencing|perimeter|running' — 'metres of paling fence' has 'paling' in between, so the fence scope is blocked (safe: a clarification note) — expected the 4 fence lines, code emits none",
-      "qty:fence-posts": "KNOWN BUG: fence run not read ('20 metres of paling fence') — expected 13 posts, code gives nothing",
-      "qty:fence-rails": "KNOWN BUG: fence run not read — expected 10 rails, code gives nothing",
-      "qty:fence-palings": "KNOWN BUG: fence run not read — expected 191 palings, code gives nothing",
-      "qty:fence-post-concrete": "KNOWN BUG: fence run not read — expected 0.65 m³, code gives nothing",
-      ...moneyCascade(["fence-posts", "fence-rails", "fence-palings", "fence-post-concrete"], "KNOWN BUG: cascades from the unread fence run — only the labour reaches the quote"),
-    },
   }),
 
   takeoffJob({
@@ -236,12 +227,6 @@ export const OUTDOOR_JOBS: GoldenJob[] = [
       subtotal_before_tax: money("1839.00", "1532.50 + 306.50"),
       tax_amount: money("275.85", "15 % × 1839.00"),
       total: money("2114.85", "1839.00 + 275.85"),
-    },
-    knownBugs: {
-      "qty:fence-posts":
-        "KNOWN BUG: takeoff/calculators/fencing.ts always uses 1.8 m post centres (DEFAULT_POST_SPACING_M) even though its own assumption note says 'say e.g. \"posts at 2.4m centres\" to change it' — expected 11 posts, code gives 15",
-      "qty:fence-post-concrete": "KNOWN BUG: cascades from 15 posts — expected 0.55 m³, code gives 0.75",
-      ...moneyCascade(["fence-posts", "fence-post-concrete"], "KNOWN BUG: cascades from the ignored 2.4 m post spacing — 4 posts and 0.2 m³ too many"),
     },
   }),
 

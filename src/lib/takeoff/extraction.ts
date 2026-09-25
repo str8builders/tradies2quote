@@ -125,13 +125,48 @@ function extractVolumeM3(text: string): number | null {
   return null;
 }
 
+/**
+ * Words that describe a fence between "<n> m of" and "fence" — "20 metres of
+ * paling fence", "30m of new timber paling fencing", "15 m of post and rail
+ * fence". Only fence words: "6m of deck and a fence" is not a 6 m fence.
+ */
+const FENCE_DESCRIPTORS = String.raw`(?:(?:new|timber|wooden|wood|paling|palings|picket|pool|boundary|lapped|capped|slatted|horizontal|vertical|board|panel|privacy|garden|colou?rsteel|colorbond|post[-\s]+and[-\s]+rail)[\s-]+){0,3}`;
+
 function extractPerimeterM(text: string): number | null {
-  const re =
-    /(\d+(?:\.\d+)?)\s*(?:m|metres?)\s+(?:of\s+)?(?:perimeter|fence|fencing|running)/i;
+  const re = new RegExp(
+    String.raw`(\d+(?:\.\d+)?)\s*(?:m|metres?|meters?)\s+(?:of\s+)?(?:perimeter|running|${FENCE_DESCRIPTORS}(?:fence|fencing)\b)`,
+    "i",
+  );
   const m = text.match(re);
   if (m) {
     const n = Number(m[1]);
     if (Number.isFinite(n) && n > 0) return n;
+  }
+  return null;
+}
+
+/**
+ * Fence post centres, in mm — only with "post" in the phrase, so no other
+ * spacing (rails, palings, joists) is read as one: "posts at 2.4m centres",
+ * "posts at 2400 centres", "posts every 2.4 m", "posts 2.4m apart", "post
+ * spacing 2.4m", "2.4m post centres". A post's own size or length ("125x125
+ * posts 2.4m long") is never read. The fencing calculator decides whether
+ * the figure can be right.
+ */
+function extractPostSpacingMm(text: string): number | null {
+  const NUM_UNIT = String.raw`(\d+(?:\.\d+)?)\s*(mm|cm|m|metres?|meters?)?`;
+  const SPACING = String.raw`(?:centres?|centers?|crs|c\/c|apart|spacings?)`;
+  const patterns = [
+    new RegExp(String.raw`\bposts?\s+(?:are\s+)?(?:at|@|every|on|spaced(?:\s+at)?)\s*${NUM_UNIT}(?![\dx×])`, "i"),
+    new RegExp(String.raw`\bposts?\s+${NUM_UNIT}\s*${SPACING}\b`, "i"),
+    new RegExp(String.raw`\bpost\s+(?:spacings?|centres?|centers?)\s*(?:of\s+|at\s+|is\s+|=\s*|:\s*)?${NUM_UNIT}`, "i"),
+    new RegExp(String.raw`${NUM_UNIT}\s*post\s+(?:centres?|centers?|spacings?)\b`, "i"),
+  ];
+  for (const re of patterns) {
+    const m = text.match(re);
+    if (!m) continue;
+    const metres = toMetres(Number(m[1]), m[2]);
+    if (Number.isFinite(metres) && metres > 0) return Math.round(metres * 1000);
   }
   return null;
 }
@@ -443,7 +478,12 @@ export function extractFromText(
   };
   applyMarkerCount("door", marker?.door_count);
   applyMarkerCount("window", marker?.window_count);
-  const spacing_mm = extractSpacing(text) ?? marker?.spacing_mm ?? null;
+  // A fence's spacing is its POST centres, read only with "post" in the
+  // phrase — never another member's "600 centres".
+  const spacing_mm =
+    scope === "fencing"
+      ? extractPostSpacingMm(text)
+      : (extractSpacing(text) ?? marker?.spacing_mm ?? null);
   const waste_percent = extractWastePercent(text);
   const stock_length_m = extractStockLengthM(text);
   const coverage_mm = extractCoverageMm(text);

@@ -2,8 +2,9 @@
 // Fencing calculator.
 //
 // Lineal-metres × posts at spacing × rails per bay × palings/pickets
-// at coverage. Defaults are NZ paling fence on 1.8m post centres,
-// 2 rails, 100mm wide palings with 5mm gap.
+// at coverage. Defaults are NZ paling fence on 1.8m post centres (unless
+// the tradie gives theirs — "posts at 2.4m centres"), 2 rails, 100mm wide
+// palings with 5mm gap.
 // ─────────────────────────────────────────────────────────────────────────
 
 import type {
@@ -20,6 +21,8 @@ import {
 } from "../normalise";
 
 const DEFAULT_POST_SPACING_M = 1.8;
+/** Post centres a fence can have (m): anything outside is a misread, not a spacing. */
+const POST_SPACING_BAND_M = { min: 0.9, max: 3.6 } as const;
 const DEFAULT_RAIL_COUNT = 2;
 const DEFAULT_PALING_WIDTH_MM = 100;
 const DEFAULT_PALING_GAP_MM = 5;
@@ -46,7 +49,17 @@ export function runFencingCalculator(ext: ExtractedExtraction): ScopeResult {
     assumptions.push("Used default 10% waste.");
   }
 
-  const postSpacing = DEFAULT_POST_SPACING_M;
+  // Post centres: the tradie's own ("posts at 2.4m centres" → spacing_mm
+  // 2400), else 1.8 m — flagged below either way it's defaulted.
+  const statedSpacingM =
+    typeof ext.spacing_mm === "number" && Number.isFinite(ext.spacing_mm) && ext.spacing_mm > 0
+      ? ext.spacing_mm / 1000
+      : null;
+  const spacingUsable =
+    statedSpacingM !== null &&
+    statedSpacingM >= POST_SPACING_BAND_M.min &&
+    statedSpacingM <= POST_SPACING_BAND_M.max;
+  const postSpacing = spacingUsable ? statedSpacingM : DEFAULT_POST_SPACING_M;
   const posts = safeCeil(length_m / postSpacing) + 1;
   const rails = DEFAULT_RAIL_COUNT;
   const railsLinearM = round2(length_m * rails);
@@ -143,11 +156,18 @@ export function runFencingCalculator(ext: ExtractedExtraction): ScopeResult {
     priceMatchKey: "ready-mix-concrete",
   });
 
-  // Post spacing, rail count and paling width are fixed defaults that drive
-  // the counts and aren't read from the spec yet — flag every line they feed
-  // so a different fence spec is never silently mis-counted.
+  // Rail count and paling width are fixed defaults that drive the counts and
+  // aren't read from the spec yet — and the post spacing is, unless the
+  // tradie gave a usable one — so flag every line they feed and a different
+  // fence spec is never silently mis-counted.
   const fenceDefaultNotes = [
-    `Assumed ${DEFAULT_POST_SPACING_M}m post spacing — say e.g. "posts at 2.4m centres" to change it.`,
+    ...(spacingUsable
+      ? []
+      : statedSpacingM !== null
+        ? [
+            `Post spacing ${Math.round(statedSpacingM * 1000) / 1000}m isn't a fence post spacing (${POST_SPACING_BAND_M.min}–${POST_SPACING_BAND_M.max}m) — used ${DEFAULT_POST_SPACING_M}m centres. Check it.`,
+          ]
+        : [`Assumed ${DEFAULT_POST_SPACING_M}m post spacing — say e.g. "posts at 2.4m centres" to change it.`]),
     `Assumed ${DEFAULT_RAIL_COUNT} rails per bay.`,
     `Assumed ${DEFAULT_PALING_WIDTH_MM}mm palings (${DEFAULT_PALING_GAP_MM}mm gap) — state the paling width if different.`,
   ];
