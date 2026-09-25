@@ -1,5 +1,7 @@
 import { computePlanGeometry, type Region } from "@/lib/takeoff/geometry";
 import { aiModel } from "@/lib/ai/models";
+import { readWallRunLine } from "@/lib/aiTakeoffParser";
+import { round2 } from "@/lib/quantity-maths";
 
 export const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 // The drawing-scan model id lives in src/lib/ai/models.ts (role
@@ -201,6 +203,12 @@ export interface ScannedPlan {
   joist_spacing_mm: number | null;
   joist_orientation: "width" | "length" | null;
   height_m: number | null;
+  /**
+   * Things the tradie should check on the scan review, e.g. a wall run the
+   * model added up differently from the wall lengths it listed. Absent when
+   * there's nothing to check.
+   */
+  review_flags?: string[];
 }
 
 export interface ScanPayload {
@@ -245,7 +253,45 @@ function sanitiseRegions(raw: unknown): Region[] | null {
   return out.length > 0 ? out : null;
 }
 
-export function sanitisePlan(raw: unknown): ScannedPlan | null {
+/** One wall-run sum computed in code from its transcribed segments. */
+type CodeWallRun = { sum: number; addends: string };
+
+/**
+ * The wall runs the model wrote as a sum in its dimensions text —
+ * "TOTAL / EXTERIOR / INTERIOR WALL RUN = 6.0 + 4.8 + 3.6 = …" — added up
+ * HERE, from the segments it listed (the model's own "= total" is ignored).
+ * The last line of each kind wins. Only lines that list 2+ segments count.
+ */
+export function wallRunSumsFromText(
+  text: string,
+): Partial<Record<"total" | "exterior" | "interior", CodeWallRun>> {
+  const out: Partial<Record<"total" | "exterior" | "interior", CodeWallRun>> = {};
+  for (const line of (text ?? "").split(/\r?\n/)) {
+    const hit = readWallRunLine(line);
+    if (!hit || hit.run.addendSum === undefined) continue;
+    const addends =
+      line
+        .split("=")
+        .map((s) => s.trim())
+        .find((s) => s.includes("+")) ?? "";
+    out[hit.which] = { sum: round2(hit.run.addendSum), addends };
+  }
+  return out;
+}
+
+/** Past this relative gap the model's wall-run arithmetic is replaced and flagged. */
+const WALL_RUN_TOLERANCE = 0.02;
+
+export function sanitisePlan(
+  raw: unknown,
+  opts: {
+    /**
+     * The scan's DIMENSIONS text. Its "… WALL RUN = a + b + c = t" lines are
+     * the transcribed segment list the wall-run sums are checked against.
+     */
+    dimensionsText?: string;
+  } = {},
+): ScannedPlan | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
   const shape = (
@@ -266,9 +312,10 @@ export function sanitisePlan(raw: unknown): ScannedPlan | null {
   // but a value beyond 1000m is almost certainly a mm/garbage misread, and
   // a value below 2m can't be a whole-house wall total — clamp to a sane
   // band so a bad read can't blow the framing/lining quantities up.
+  const inRunBand = (n: number): boolean => Number.isFinite(n) && n >= 2 && n <= 1000;
   const optRunM = (v: unknown): number | null => {
     const n = Number(v);
-    return Number.isFinite(n) && n >= 2 && n <= 1000 ? Math.round(n * 100) / 100 : null;
+    return inRunBand(n) ? round2(n) : null;
   };
   const optCount = (v: unknown): number | null => {
     const n = Number(v);
@@ -308,14 +355,44 @@ export function sanitisePlan(raw: unknown): ScannedPlan | null {
     trap_h_m,
   });
 
-  // Wall totals (Wave 44). exterior + interior fall back to summing the two
-  // when the model gave the split but not the total, and vice-versa.
-  const exteriorRun = optRunM(r.exterior_wall_run_m);
-  const interiorRun = optRunM(r.interior_wall_run_m);
-  let wallRun = optRunM(r.wall_run_m);
+  // Wall totals (Wave 44). The model is asked to ADD the wall segments it
+  // transcribed; the sum is computed here instead, from the segment list in
+  // its dimensions text (audit item 5). A model figure more than 2 % off is
+  // replaced by the code's sum and flagged for the tradie; within 2 % the
+  // exact sum of the listed walls is used. With no segment list, the model's
+  // figure is kept as before.
+  const review_flags: string[] = [];
+  const sums = wallRunSumsFromText(opts.dimensionsText ?? "");
+  const reconcile = (
+    label: string,
+    model: number | null,
+    code: CodeWallRun | undefined,
+  ): number | null => {
+    if (!code || !inRunBand(code.sum)) return model;
+    if (model !== null && Math.abs(model - code.sum) / code.sum > WALL_RUN_TOLERANCE) {
+      review_flags.push(
+        `The drawing's ${label} said ${model} m, but the walls it listed add up to ${code.sum} m (${code.addends}). Used ${code.sum} m — check the wall lengths.`,
+      );
+    }
+    return code.sum;
+  };
+  const exteriorRun = reconcile("exterior wall run", optRunM(r.exterior_wall_run_m), sums.exterior);
+  const interiorRun = reconcile("interior wall run", optRunM(r.interior_wall_run_m), sums.interior);
+  // No TOTAL line: the listed exterior + interior walls are the total.
+  const codeTotal =
+    sums.total ??
+    (sums.exterior && sums.interior
+      ? {
+          sum: round2(sums.exterior.sum + sums.interior.sum),
+          addends: `${sums.exterior.addends} + ${sums.interior.addends}`,
+        }
+      : undefined);
+  let wallRun = reconcile("total wall run", optRunM(r.wall_run_m), codeTotal);
+  // exterior + interior fall back to summing the two when the model gave the
+  // split but not the total.
   if (wallRun === null && (exteriorRun !== null || interiorRun !== null)) {
-    const summed = (exteriorRun ?? 0) + (interiorRun ?? 0);
-    wallRun = summed >= 2 && summed <= 1000 ? Math.round(summed * 100) / 100 : null;
+    const summed = round2((exteriorRun ?? 0) + (interiorRun ?? 0));
+    wallRun = inRunBand(summed) ? summed : null;
   }
 
   return {
@@ -344,6 +421,7 @@ export function sanitisePlan(raw: unknown): ScannedPlan | null {
     joist_spacing_mm: optNum(r.joist_spacing_mm),
     joist_orientation: orientation,
     height_m: optNum(r.height_m),
+    ...(review_flags.length > 0 ? { review_flags } : {}),
   };
 }
 

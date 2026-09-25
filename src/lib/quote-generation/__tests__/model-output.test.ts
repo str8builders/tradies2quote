@@ -99,3 +99,34 @@ describe("aiTermsToNotes — the tradie's terms are never replaced", () => {
     expect(aiTermsToNotes(many)).toHaveLength(5);
   });
 });
+
+describe("sanitiseModelQuote — the 200-line cap is never silent (audit item 9)", () => {
+  const lines = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      type: "material",
+      description: `Item ${i + 1}`,
+      quantity: 1,
+      unit: "each",
+      unit_price: 1,
+    }));
+
+  it("keeps the first 200 of 250 lines and says 50 were left off (was dropped silently)", () => {
+    const out = sanitiseModelQuote({
+      line_items: lines(250),
+      notes: Array.from({ length: 60 }, (_, i) => `note ${i + 1}`),
+    });
+    expect(out.line_items).toHaveLength(200);
+    expect(out.line_items[199].description).toBe("Item 200");
+    // First, so the model's own notes (capped at 40) can never push it out.
+    expect(out.notes[0]).toBe(
+      'The AI returned 250 lines but only the first 200 fit on a quote — 50 were left off, starting at "Item 201". Check nothing\'s missing before sending.',
+    );
+    expect(out.notes).toHaveLength(41);
+  });
+
+  it("adds no note at or under the cap", () => {
+    const out = sanitiseModelQuote({ line_items: lines(200) });
+    expect(out.line_items).toHaveLength(200);
+    expect(out.notes).toEqual([]);
+  });
+});

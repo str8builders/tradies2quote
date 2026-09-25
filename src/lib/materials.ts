@@ -270,12 +270,23 @@ export type CsvParseResult = {
   invalid: Array<{ row: number; reason: string; raw: string }>;
 };
 
-/** The review-screen statement of how CSV prices are treated for GST. */
-export function csvGstStatement(pricesIncludeGst: boolean, taxRate: number): string {
+/**
+ * The review-screen statement of how CSV prices are treated for tax, in the
+ * tradie's own tax label ("GST", "VAT", "Tax") — not "GST" for everyone.
+ */
+export function csvGstStatement(
+  pricesIncludeGst: boolean,
+  taxRate: number,
+  taxLabel = "GST",
+): string {
   const pct = Math.round(taxRate * 1000) / 10;
-  return pricesIncludeGst
-    ? `Prices include GST — each is divided by ${(1 + taxRate).toFixed(pct % 1 === 0 ? 2 : 3)} and saved ex-GST (${pct}% GST).`
-    : "Prices are treated as excluding GST and saved as written. Tick the box above if the file's prices include GST.";
+  if (!pricesIncludeGst) {
+    return `Prices are treated as excluding ${taxLabel} and saved as written. Tick the box above if the file's prices include ${taxLabel}.`;
+  }
+  if (!(taxRate > 0)) {
+    return `Prices include ${taxLabel} — at 0% there's nothing to take off, so they're saved as written.`;
+  }
+  return `Prices include ${taxLabel} — each is divided by ${(1 + taxRate).toFixed(pct % 1 === 0 ? 2 : 3)} and saved ex-${taxLabel} (${pct}% ${taxLabel}).`;
 }
 
 export type CsvPrice =

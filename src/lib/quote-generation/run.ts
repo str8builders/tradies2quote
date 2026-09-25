@@ -15,6 +15,7 @@ import {
   canRunCalculator,
   parseTakeoffDescription,
   runTakeoff,
+  voiceTakeoffSizesNeeded,
 } from "@/lib/aiTakeoffParser";
 import { buildDimensionConfirmation } from "@/lib/dimensionConfirmation";
 import {
@@ -40,6 +41,7 @@ import { loadUserVocab } from "@/lib/transcript/vocab";
 import { reportSummaryFailureToMonitor } from "@/lib/transcript/summaryMonitoring";
 import { aiTermsToNotes, sanitiseModelQuote } from "./model-output";
 import { applyPricingPolicy, extractStatedAmounts } from "./pricing";
+import { labourPlausibilityWarnings } from "@/lib/labour-plausibility";
 import { verifyGeneratedQuote } from "./verification";
 import type {
   LibraryMaterial,
@@ -451,6 +453,15 @@ async function generateAndSaveQuote(g: {
   // scale" — one of the risk signals that requires the tradie to confirm the
   // key dimensions before sending.
   const noScale = isDrawing && !/\[T2Q_PLAN\]/i.test(transcript);
+  // Audit item 2 — a VOICE/typed calculator job (a lined wall, a deck
+  // build, cladding, a subfloor) whose size is missing or can't be right:
+  // like a drawing, the AI's material counts for that scope are left out and
+  // one blocked line names the size needed. Null for jobs the calculator
+  // doesn't own, so their AI lines stay.
+  const voiceSizesNeeded =
+    !isDrawing && !useCalculator
+      ? voiceTakeoffSizesNeeded(parsedTakeoff, transcript)
+      : null;
 
   // PHASE 7 — a takeoff scope the calculator/orchestrator could not compute
   // (missing / uncertain / impossible dimensions) becomes an explicit
@@ -758,6 +769,9 @@ async function generateAndSaveQuote(g: {
       blockedTakeoffLine(parsedTakeoff.type, parsedTakeoff.missingFields),
     );
   }
+  if (voiceSizesNeeded) {
+    calculatorItems.push(blockedTakeoffLine(parsedTakeoff.type, voiceSizesNeeded));
+  }
 
   // Wave 44 — also exclude AI lines that overlap with what the
   // orchestrator already produced for non-legacy scopes (roofing,
@@ -801,6 +815,7 @@ async function generateAndSaveQuote(g: {
     }
   }
   const droppedUnlicensed: string[] = [];
+  const droppedForSizes: string[] = [];
 
   const aiItems: QuoteLineItem[] = [];
   for (const it of parsed.line_items) {
@@ -812,10 +827,11 @@ async function generateAndSaveQuote(g: {
       continue;
     }
     if (
-      useCalculator &&
+      (useCalculator || voiceSizesNeeded) &&
       it.type === "material" &&
       looksLikeTakeoffMaterial(it.description)
     ) {
+      if (voiceSizesNeeded) droppedForSizes.push(it.description);
       continue;
     }
     if (
@@ -881,6 +897,16 @@ async function generateAndSaveQuote(g: {
     }
     const lt = round2(qty * price);
     aiItems.push({ ...it, quantity: qty, unit_price: price, line_total: lt });
+  }
+
+  // Voice-blocked scope drops are never silent either (item 2).
+  if (droppedForSizes.length > 0) {
+    parsed.notes = [
+      `Left out ${droppedForSizes.length} AI-estimated material line(s) for the ${parsedTakeoff.type} — the calculator works them out once it has the sizes: ${droppedForSizes
+        .slice(0, 3)
+        .join("; ")}${droppedForSizes.length > 3 ? "; …" : ""}.`,
+      ...(parsed.notes ?? []),
+    ];
   }
 
   // Unlicensed-family drops are never silent — the tradie sees exactly
@@ -1080,6 +1106,15 @@ async function generateAndSaveQuote(g: {
       hourlyRate: Number(profile.default_labour_rate) || 0,
       statedAmounts: asAdmin ? [] : extractStatedAmounts(transcript),
     });
+  }
+
+  // Audit item 3 — labour that can't be right (more than 12 hours a day
+  // against the duration in the transcript, or an absurd line) is flagged at
+  // the top of the review notes now; the send gate then makes the tradie
+  // acknowledge it. The quantity itself is never changed.
+  const labourChecks = labourPlausibilityWarnings(parsed.line_items, transcript);
+  if (labourChecks.length > 0) {
+    parsed.notes = [...labourChecks, ...(parsed.notes ?? [])];
   }
 
   const totals = computeQuoteTotals(

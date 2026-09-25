@@ -271,15 +271,31 @@ const QUESTION_BANK: Record<ScopeType, FieldQuestion[]> = {
 /**
  * Generate clarification questions for a scope's extraction. Pulls
  * from the bank above, filters to only the questions whose target
- * field is currently null/missing.
+ * field is currently null/missing. `problems` are fields the validator
+ * refused as implausible (validate.ts) — each becomes a blocking question
+ * quoting the exact number that's wrong ("Deck length 150 m is more than
+ * 100 m — check it."), so a refused size is never presented as missing.
  */
 export function buildClarifications(
   scope: ScopeType,
   ext: ExtractedExtraction,
+  problems: ReadonlyArray<{ field: string; reason: string }> = [],
 ): { questions: ClarificationQuestion[]; blocking: boolean } {
   const bank = QUESTION_BANK[scope] ?? [];
   const missing: ClarificationQuestion[] = [];
+  for (const p of problems) {
+    const banked = bank.find((q) => q.field === p.field);
+    missing.push({
+      id: `${scope}.${p.field}`,
+      scope,
+      field: p.field,
+      question: p.reason,
+      blocking: true,
+      unit: banked?.unit,
+    });
+  }
   for (const q of bank) {
+    if (problems.some((p) => p.field === q.field)) continue;
     if (!isFieldMissing(ext, q.field)) continue;
     missing.push({
       id: `${scope}.${q.field}`,

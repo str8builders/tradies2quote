@@ -25,6 +25,8 @@
  *     photo files are also skipped on the device before upload (see
  *     scanDedupe.ts); this catches a page photographed twice.
  */
+import { round2 } from "../quote-defaults";
+
 export type ScanPage = {
   supplier: string | null;
   quote_number?: string | null;
@@ -64,7 +66,7 @@ function sumReported(values: Array<number | null | undefined>): number | null {
   const reported = values.filter((v): v is number => typeof v === "number" && Number.isFinite(v));
   if (reported.length === 0) return null;
   if (reported.length === 1) return reported[0];
-  return Math.round(reported.reduce((a, b) => a + b, 0) * 100) / 100;
+  return round2(reported.reduce((a, b) => a + b, 0));
 }
 
 type Entry = { page: ScanPage; photo: number };

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
 import { createClient } from "@/lib/supabase/server";
-import { NZ_DEFAULTS } from "@/lib/quote-defaults";
+import { NZ_DEFAULTS, resolveTaxLabel, resolveTaxRate } from "@/lib/quote-defaults";
 import { AppHeader } from "../../_components/AppHeader";
 import { QuoteImportClient } from "./_components/QuoteImportClient";
 
@@ -20,12 +20,14 @@ export default async function ImportQuotePage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("currency, tax_rate")
+    .select("currency, tax_rate, tax_label, country")
     .eq("id", user.id)
     .maybeSingle();
   const currency = profile?.currency ?? NZ_DEFAULTS.currency;
-  // Stored as a percentage (15 = 15 %); the client works in fractions.
-  const taxRate = Number(profile?.tax_rate ?? NZ_DEFAULTS.tax_rate) / 100;
+  // The tradie's own tax label and rate (a UK profile is VAT 20 %, never
+  // NZ's "GST" 15 %). Stored as a percentage; the client works in fractions.
+  const taxRate = resolveTaxRate(profile?.tax_rate, profile?.country, profile?.currency) / 100;
+  const taxLabel = resolveTaxLabel(profile?.tax_label, profile?.country, profile?.currency);
 
   return (
     <div className="min-h-screen text-white">
@@ -59,7 +61,7 @@ export default async function ImportQuotePage() {
           </p>
         </div>
 
-        <QuoteImportClient currency={currency} taxRate={taxRate} />
+        <QuoteImportClient currency={currency} taxRate={taxRate} taxLabel={taxLabel} />
       </main>
     </div>
   );

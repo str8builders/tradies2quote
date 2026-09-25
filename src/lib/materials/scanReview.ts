@@ -65,9 +65,11 @@ export function buildReviewRows(
 export function gstBasisNote(
   detected: boolean | null,
   inclusive: boolean,
+  taxLabel = "GST",
 ): string | null {
   if (detected !== null) return null;
+  const t = taxLabel;
   return inclusive
-    ? "The scan couldn’t tell whether these prices include GST. You’ve set them as including GST, so they’re converted to ex-GST when saved."
-    : "The scan couldn’t tell whether these prices include GST, so they’re treated as excluding GST. Tick “Prices include GST” if the quote shows GST-inclusive prices.";
+    ? `The scan couldn’t tell whether these prices include ${t}. You’ve set them as including ${t}, so they’re converted to ex-${t} when saved.`
+    : `The scan couldn’t tell whether these prices include ${t}, so they’re treated as excluding ${t}. Tick “Prices include ${t}” if the quote shows ${t}-inclusive prices.`;
 }

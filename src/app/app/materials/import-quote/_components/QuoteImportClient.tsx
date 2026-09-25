@@ -65,7 +65,7 @@ function validRowPrice(r: ReviewRow): boolean {
   return Number.isFinite(p) && (p > 0 || (r.credit && p < 0));
 }
 
-export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: string; /** Fraction, e.g. 0.15. The tradie's configured rate, not a fixed GST. */ taxRate?: number }) {
+export function QuoteImportClient({ currency, taxRate = 0.15, taxLabel = "GST" }: { currency: string; /** Fraction, e.g. 0.15. The tradie's configured rate, not a fixed GST. */ taxRate?: number; /** The tradie's own tax label ("GST", "VAT", "Tax"). */ taxLabel?: string }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const libraryRef = useRef<HTMLInputElement>(null);
@@ -718,10 +718,10 @@ export function QuoteImportClient({ currency, taxRate = 0.15 }: { currency: stri
                   className="h-4 w-4 accent-brand"
                   data-testid="quote-import-gst"
                 />
-                <span className="text-sm text-ink-200">Prices include GST</span>
+                <span className="text-sm text-ink-200">Prices include {taxLabel}</span>
               </label>
             </div>
-            <ScanGstNote detected={gstDetected} inclusive={gstInclusive} />
+            <ScanGstNote detected={gstDetected} inclusive={gstInclusive} taxLabel={taxLabel} />
             {notes.length > 0 && (
               <ul className="mt-3 space-y-1 rounded-sm border border-hivis/30 bg-hivis/5 p-3">
                 <li className="font-mono text-[10px] uppercase tracking-[0.2em] text-hivis">

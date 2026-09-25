@@ -20,9 +20,10 @@ describe("normalise — unit conversions", () => {
     expect(toMetres(480, "cm")).toBe(4.8);
   });
 
-  it("toMetres applies reasonableness clamp on unitless values > 50", () => {
+  it("toMetres reads unitless values by the shared bare-number rule (≥ 100 is mm, below is metres)", () => {
     expect(toMetres(4800)).toBe(4.8);
     expect(toMetres(7.2)).toBe(7.2);
+    expect(toMetres(62)).toBe(62); // the old "> 50 means mm" clamp made this 0.062
   });
 
   it("toMillimetres round-trips", () => {

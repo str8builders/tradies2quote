@@ -15,6 +15,10 @@ import type {
  * provenance flag, total, tax and currency is set by server code later.
  */
 
+/**
+ * A quote holds at most this many model lines. Anything past it is left off
+ * — never silently: a review note says how many and where the cut came.
+ */
 const MAX_LINES = 200;
 const MAX_NOTES = 40;
 
@@ -156,9 +160,9 @@ export function sanitiseModelQuote(raw: unknown): SanitisedModelQuote {
       ? (obj.client as Record<string, unknown>)
       : {};
 
-  const line_items: QuoteLineItem[] = (
-    Array.isArray(obj.line_items) ? obj.line_items.slice(0, MAX_LINES) : []
-  )
+  const rawLines: unknown[] = Array.isArray(obj.line_items) ? obj.line_items : [];
+  const line_items: QuoteLineItem[] = rawLines
+    .slice(0, MAX_LINES)
     .filter((l): l is Record<string, unknown> => !!l && typeof l === "object")
     .map((it) => {
       const quantity = nonNegative(it.quantity);
@@ -183,6 +187,17 @@ export function sanitiseModelQuote(raw: unknown): SanitisedModelQuote {
     .map((n) => text(n, 1000))
     .filter((n) => n.length > 0)
     .slice(0, MAX_NOTES);
+  // The line cap is never silent (audit item 9). First, so the model's own
+  // notes can't push it out.
+  if (rawLines.length > MAX_LINES) {
+    const dropped = rawLines.length - MAX_LINES;
+    const first = rawLines[MAX_LINES] as Record<string, unknown> | null;
+    const firstName =
+      first && typeof first === "object" ? text(first.description, 80) : "";
+    notes.unshift(
+      `The AI returned ${rawLines.length} lines but only the first ${MAX_LINES} fit on a quote — ${dropped} ${dropped === 1 ? "was" : "were"} left off${firstName ? `, starting at "${firstName}"` : ""}. Check nothing's missing before sending.`,
+    );
+  }
 
   const aiTerms = Array.isArray(obj.terms)
     ? obj.terms.map((t) => text(t, 2000)).filter(Boolean).join("\n")

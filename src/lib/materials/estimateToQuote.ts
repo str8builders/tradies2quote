@@ -31,6 +31,7 @@ import type {
 import { matchToLibrary } from "../materials";
 import {
   computeQuoteTotals as computeSharedQuoteTotals,
+  formatCurrency,
   round2,
 } from "../quote-defaults";
 
@@ -200,6 +201,93 @@ function mirrorUnitPriceExGst(
   return unitPriceExGst(price, true, taxRate);
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// GST-inclusive cents (audit item 8).
+//
+// The quote stores ex-GST lines and adds GST on the subtotal
+// (computeQuoteTotals). Converting each printed inclusive line total on its
+// own (10 ÷ 1.15 = 8.6957 → 8.70) lets the cents pile up: five $10 lines came
+// to $50.03, twenty-five $9.99 lines to $249.84 instead of $249.75. Instead
+// the ex-GST subtotal is chosen so subtotal + GST adds back to the printed
+// inclusive total EXACTLY, and its cents are shared across the lines by the
+// largest-remainder method — each line is within a cent of its own exact
+// ex-GST value, and the lines that took a rounding cent are named.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** GST cents the quote adds to an ex-GST subtotal — exactly as computeQuoteTotals does. */
+function gstCentsOn(subtotalCents: number, taxRate: number): number {
+  return Math.round(round2((subtotalCents / 100) * taxRate) * 100);
+}
+
+/**
+ * The ex-GST subtotal (in cents) whose subtotal + GST equals `totalCents`,
+ * nearest the exact value. Some totals can't be reached at all (15 % GST
+ * rounded to the cent skips about 1 total in 8: nothing + GST makes $999.00);
+ * then the nearest is returned with `exact: false`.
+ */
+export function exGstSubtotalForTotal(
+  totalCents: number,
+  taxRate: number,
+): { cents: number; exact: boolean } {
+  const ideal = totalCents / (1 + taxRate);
+  let best = { cents: Math.round(ideal), gap: Infinity, dist: Infinity };
+  for (let s = Math.floor(ideal) - 3; s <= Math.ceil(ideal) + 3; s++) {
+    const gap = Math.abs(s + gstCentsOn(s, taxRate) - totalCents);
+    const dist = Math.abs(s - ideal);
+    if (gap < best.gap || (gap === best.gap && dist < best.dist)) best = { cents: s, gap, dist };
+  }
+  return { cents: best.cents, exact: best.gap === 0 };
+}
+
+/**
+ * Split printed GST-inclusive line amounts (cents) into ex-GST line amounts
+ * (cents) that add up to the subtotal from exGstSubtotalForTotal. Largest
+ * remainder: every line starts at the floor of its exact ex-GST value and
+ * the spare cents go to the biggest fractions (ties: earlier lines first).
+ * `absorbed[i]` is true when line i differs from its own rounded value.
+ */
+export function allocateExGstCents(
+  inclusiveCents: number[],
+  taxRate: number,
+): { exCents: number[]; absorbed: boolean[]; totalCents: number; exact: boolean } {
+  const totalCents = inclusiveCents.reduce((a, b) => a + b, 0);
+  const { cents: target, exact } = exGstSubtotalForTotal(totalCents, taxRate);
+  const ideal = inclusiveCents.map((c) => c / (1 + taxRate));
+  const exCents = ideal.map((e) => Math.floor(e + 1e-9));
+  const remainder = ideal.map((e, i) => Math.max(0, e - exCents[i]));
+  const n = exCents.length;
+  let spare = target - exCents.reduce((a, b) => a + b, 0);
+  if (n > 0) {
+    const biggestFirst = exCents.map((_, i) => i).sort((a, b) => remainder[b] - remainder[a] || a - b);
+    const smallestFirst = exCents.map((_, i) => i).sort((a, b) => remainder[a] - remainder[b] || b - a);
+    for (let j = 0; spare > 0; j++, spare--) exCents[biggestFirst[j % n]] += 1;
+    for (let j = 0; spare < 0; j++, spare++) exCents[smallestFirst[j % n]] -= 1;
+  }
+  const own = ideal.map((e) => Math.sign(e) * Math.round(Math.abs(e) + 1e-9));
+  return { exCents, absorbed: exCents.map((c, i) => c !== own[i]), totalCents, exact };
+}
+
+/** A unit price (full precision) whose quantity × price rounds to exactly `lineTotal`. */
+function unitPriceForLineTotal(lineTotal: number, quantity: number): number {
+  const p = preciseUnitPrice(lineTotal / quantity);
+  if (round2(quantity * p) === lineTotal) return p;
+  return Number((lineTotal / quantity).toPrecision(15));
+}
+
+/** Flag on a mirrored line that took a 1¢ GST rounding difference. */
+export const GST_ROUNDING_CENT_FLAG = "gst_rounding_cent";
+
+export type MirrorQuote = {
+  lines: QuoteLineItem[];
+  /**
+   * GST-inclusive quotes: how the printed inclusive amounts were split.
+   * `printedTotal` is the inclusive total of the lines split this way;
+   * `exact` is false when no ex-GST subtotal + GST can reach it (1¢ off);
+   * `absorbed` names the lines that took a rounding cent. Null otherwise.
+   */
+  gst: { printedTotal: number; exact: boolean; absorbed: string[] } | null;
+};
+
 /**
  * Faithful 1:1 mirror of a scanned supplier (ITM) quote → quote lines.
  *
@@ -207,7 +295,8 @@ function mirrorUnitPriceExGst(
  *   - quantity is exactly as scanned (no waste, no stock-length rounding),
  *   - price is exactly as scanned (only converted to ex-GST so the quote's
  *     own GST line reconstructs the supplier total — never rounded to the
- *     cent, see `mirrorUnitPriceExGst`),
+ *     cent, see `mirrorUnitPriceExGst`; GST-inclusive amounts are split to
+ *     the cent so lines + GST add back to the printed total exactly),
  *   - a printed discount / credit line stays a negative line,
  *   - no library substitution.
  * Combined with markup = 0 at the caller, the quote total equals the
@@ -217,12 +306,19 @@ export function buildMirrorQuoteLines(
   items: ExtractedSupplierItem[],
   opts: MirrorQuoteOptions = {},
 ): QuoteLineItem[] {
+  return buildMirrorQuote(items, opts).lines;
+}
+
+/** buildMirrorQuoteLines plus the GST-inclusive split, for the caller's notes. */
+export function buildMirrorQuote(
+  items: ExtractedSupplierItem[],
+  opts: MirrorQuoteOptions = {},
+): MirrorQuote {
   const gstInclusive = opts.gstInclusive ?? false;
   const taxRate = opts.taxRate ?? 0.15;
 
-  return items
-    .filter((it) => it.name.trim().length > 0)
-    .map((it) => {
+  const named = items.filter((it) => it.name.trim().length > 0);
+  const lines = named.map((it) => {
       // Quantity drives the line total; prefer the printed quantity (in the
       // unit the price is per), falling back to the piece count.
       const quantity = Math.max(0, it.quantity ?? it.pieces ?? 0);
@@ -262,6 +358,74 @@ export function buildMirrorQuoteLines(
       };
       return line;
     });
+
+  if (!gstInclusive) return { lines, gst: null };
+
+  // Lines whose ex-GST value comes from an inclusive amount: a printed line
+  // total that agrees with qty × price, or qty × price when none was printed.
+  // A printed total that DISAGREES keeps its price-derived value — the
+  // reconciliation already flags it.
+  const parts: Array<{ line: number; cents: number; printed: boolean }> = [];
+  named.forEach((it, i) => {
+    const quantity = lines[i].quantity;
+    const price = it.price != null && Number.isFinite(it.price) ? it.price : 0;
+    if (price === 0 || !(quantity > 0)) return;
+    const printed = it.source_line_total;
+    const agrees =
+      printed != null &&
+      Math.abs(round2(quantity * price) - printed) <= LINE_AGREEMENT_TOLERANCE;
+    if (printed != null && !agrees) return;
+    const inclusive = printed != null ? printed : round2(quantity * price);
+    parts.push({ line: i, cents: Math.round(inclusive * 100), printed: printed != null });
+  });
+  if (parts.length === 0) return { lines, gst: null };
+
+  const split = allocateExGstCents(parts.map((p) => p.cents), taxRate);
+  const absorbed: string[] = [];
+  parts.forEach((p, j) => {
+    const line = lines[p.line];
+    const lineTotal = split.exCents[j] / 100;
+    line.unit_price = lineTotal === 0 ? 0 : unitPriceForLineTotal(lineTotal, line.quantity);
+    line.line_total = round2(line.quantity * line.unit_price);
+    line.is_missing_price = line.unit_price === 0;
+    line.price_source = line.unit_price !== 0 ? "supplier_import" : "missing_price";
+    // The printed line total in the quote's ex-GST basis is the split value.
+    if (p.printed) line.source_line_total = line.line_total;
+    if (split.absorbed[j]) {
+      line.validation_flags = [...(line.validation_flags ?? []), GST_ROUNDING_CENT_FLAG];
+      absorbed.push(line.description);
+    }
+  });
+  return {
+    lines,
+    gst: { printedTotal: split.totalCents / 100, exact: split.exact, absorbed },
+  };
+}
+
+/**
+ * Plain review notes for a GST-inclusive mirror: which lines took a 1¢
+ * rounding difference so the quote adds back to the printed total, or — for
+ * a total no ex-GST subtotal can reach — the unavoidable 1¢ gap.
+ */
+export function gstRoundingNotes(
+  gst: MirrorQuote["gst"],
+  quoteTotal: number,
+  opts: { taxRatePct: number; taxLabel: string; currency: string },
+): string[] {
+  if (!gst) return [];
+  const money = (n: number) => formatCurrency(n, opts.currency || "NZD");
+  const notes: string[] = [];
+  if (!gst.exact) {
+    notes.push(
+      `The supplier's printed total of ${money(gst.printedTotal)} can't be matched to the cent with ${opts.taxRatePct}% ${opts.taxLabel} added to an ex-${opts.taxLabel} subtotal — the nearest is ${money(quoteTotal)}.`,
+    );
+  } else if (gst.absorbed.length > 0 && round2(quoteTotal) === round2(gst.printedTotal)) {
+    const names = gst.absorbed.slice(0, 5).join(", ") + (gst.absorbed.length > 5 ? ", …" : "");
+    notes.push(
+      `To match the supplier's printed total of ${money(gst.printedTotal)} to the cent, ${gst.absorbed.length} ${gst.absorbed.length === 1 ? "line" : "lines"} took a 1¢ rounding difference ex-${opts.taxLabel}: ${names}.`,
+    );
+  }
+  return notes;
 }
 
 export type QuoteTotals = {

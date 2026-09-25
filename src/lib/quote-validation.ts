@@ -7,6 +7,7 @@ import {
   t2qcalLicensedFamily,
 } from "./reviewGuard";
 import { materialFamilyForDescription } from "./takeoff/license";
+import { labourPlausibilityWarnings } from "./labour-plausibility";
 
 export type SendValidationError =
   | "client_name_missing"
@@ -383,6 +384,12 @@ export function assessQuoteTakeoffSafety(
       `${unpriced.length} line(s) have no price set and will quote at $0: ${lineLabels(unpriced)}. Add a price or confirm it's intentional before sending.`,
     );
   }
+
+  // Audit item 3 — a labour quantity that can't be right (more than 12 hours
+  // a day against the duration the tradie stated, or an absurd line) is a
+  // "check this" caution the tradie must acknowledge, like a $0 line. Never
+  // changed behind their back.
+  warning_reasons.push(...labourPlausibilityWarnings(items, opts.description));
 
   const can_send = block_reasons.length === 0;
   return {

@@ -8,11 +8,14 @@ import { gstBasisNote } from "@/lib/materials/scanReview";
 export function ScanGstNote({
   detected,
   inclusive,
+  taxLabel = "GST",
 }: {
   detected: boolean | null;
   inclusive: boolean;
+  /** The tradie's own tax label ("GST", "VAT", "Tax"). */
+  taxLabel?: string;
 }) {
-  const note = gstBasisNote(detected, inclusive);
+  const note = gstBasisNote(detected, inclusive, taxLabel);
   if (!note) return null;
   return (
     <p

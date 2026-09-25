@@ -393,17 +393,17 @@ describe("Whakamārama deck regression", () => {
   it("blocks a future 'wrong dims got through' bug from producing a $32M quote", () => {
     // Simulate the failure mode: somehow the calculator received a
     // wildly wrong deckLengthM (e.g. parser bug treating mm as m).
-    // Pre-Wave-43 this produced ~8000 joists. Post-Wave-43 the
-    // sanitiseMeters clamp catches it AND the ratio guard catches
-    // anything that slips past sanitisation.
+    // Pre-Wave-43 this produced ~8000 joists. It used to be silently
+    // divided by 1000 (which also turned a real 62 m run into 0.062 m);
+    // the shared plausibility rule now REFUSES it with a plain reason —
+    // no materials at all, never a guessed rescale.
     const r = calculateDeckTakeoff({
-      deckLengthM: 4800, // mm-as-m: sanitiseMeters → 4.8 m
-      deckWidthM: 3820, // mm-as-m: sanitiseMeters → 3.82 m
+      deckLengthM: 4800, // mm-as-m: refused, not read as 4.8 m
+      deckWidthM: 3820,
     });
-    expect(r.warnings.some((w) => w.includes("ratio guard"))).toBe(false);
-    expect(
-      r.materials.find((m) => m.id === "deck-joists")?.quantity,
-    ).toBeLessThan(50);
+    expect(r.materials).toEqual([]);
+    expect(r.warnings.join(" ")).toMatch(/Deck length 4800 m is more than 30 m — check it\. If you meant 4800 mm, that's 4\.8 m\./);
+    expect(r.warnings.join(" ")).toMatch(/Deck width 3820 m is more than 30 m/);
   });
 });
 

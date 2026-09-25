@@ -21,6 +21,7 @@ const SCOPE_NEEDS: Record<string, string> = {
   concrete: "length (m) and width (m) — or volume (m³)",
   fixing: "run length (m) or perimeter (m)",
   deck: "deck length (m) and width (m)",
+  subfloor: "floor length (m) and width (m)",
   cladding: "wall length (m) and height (m)",
   roofing: "roof area (m²) — or length (m) and width (m)",
   fencing: "fence length (m) or perimeter (m)",

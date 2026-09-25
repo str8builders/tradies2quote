@@ -27,6 +27,10 @@ import type {
   QuoteStatus,
 } from "@/lib/quote-types";
 import { assessQuoteTakeoffSafety } from "@/lib/quote-validation";
+import {
+  checkInvoiceTotals,
+  explainInvoiceRpcError,
+} from "@/lib/invoice-from-quote";
 import { canTransition } from "@/lib/lifecycle/stages";
 import {
   isQuoteLocked,
@@ -293,6 +297,9 @@ export async function confirmDimensions(
   if (!result) {
     return { error: "There are no drawing dimensions to confirm on this quote." };
   }
+  // A size the calculator can't use is refused, not half-applied: nothing is
+  // saved and nothing is marked confirmed.
+  if (result.problem) return { error: result.problem };
 
   const items = result.line_items.map((it) => {
     const qty = Number(it.quantity) || 0;
@@ -654,34 +661,6 @@ export type InvoiceCreateResult =
   | { ok: true; id: string }
   | { error: string; code?: string };
 
-interface PostgresErrorShape {
-  code?: string;
-  message?: string;
-}
-
-function explainInvoiceRpcError(err: unknown): {
-  error: string;
-  code?: string;
-} {
-  const e = (err ?? {}) as PostgresErrorShape;
-  const code = e.code;
-  if (code === "28000")
-    return { error: "You need to sign in to do that.", code };
-  if (code === "P0002") return { error: "Quote not found.", code };
-  if (code === "42501")
-    return { error: "You don't own this quote.", code };
-  if (code === "22023")
-    return {
-      error:
-        "Mark the quote complete before invoicing — only completed quotes can become invoices.",
-      code,
-    };
-  return {
-    error: e.message ?? "Could not create the invoice draft.",
-    code,
-  };
-}
-
 export async function createInvoiceFromQuote(
   quoteId: string,
 ): Promise<InvoiceCreateResult> {
@@ -706,6 +685,54 @@ export async function createInvoiceFromQuote(
     message: "create_invoice_from_quote RPC started (Draft only)",
     startedAt,
   });
+
+  // Audit item 6 — the RPC needs the stored totals to agree to the cent,
+  // while the send gate allows 1¢ of drift. Recompute from the lines first:
+  // an editable quote is re-saved; a locked (accepted → completed) quote is
+  // never written — it's invoiced as accepted when its own figures agree,
+  // otherwise refused in plain words. Drift is always logged.
+  const { data: row } = await supabase
+    .from("quotes")
+    .select("status, total_amount, quote_data")
+    .eq("id", quoteId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (row) {
+    const check = checkInvoiceTotals({
+      status: row.status,
+      total_amount: row.total_amount,
+      quote_data: row.quote_data as QuoteData | null,
+    });
+    if (check.action === "resave_then_invoice") {
+      const { error: saveErr } = await supabase
+        .from("quotes")
+        .update({ quote_data: check.quote_data, total_amount: check.total_amount })
+        .eq("id", quoteId)
+        .eq("user_id", user.id);
+      if (saveErr) {
+        console.error("createInvoiceFromQuote totals re-save failed", saveErr);
+        captureError(saveErr, { route: "action:createInvoiceFromQuote" });
+      }
+    } else if (check.action === "invoice_and_log" || check.action === "refuse") {
+      const drift = new Error(
+        `Invoice totals drift on locked quote ${quoteId}: ${check.drift.join("; ") || "total not invoiceable"}`,
+      );
+      console.warn(drift.message);
+      captureError(drift, { route: "action:createInvoiceFromQuote" });
+      if (check.action === "refuse") {
+        logAgentError({
+          agentName: "Invoice Agent",
+          quoteId,
+          runId,
+          stepName: "rpc.failed",
+          status: "failed",
+          message: "Locked quote totals don't agree — invoice not created",
+          durationMs: Date.now() - startedAt,
+        });
+        return { error: check.message, code: "22023" };
+      }
+    }
+  }
 
   const { data, error } = await supabase.rpc("create_invoice_from_quote", {
     p_quote_id: quoteId,

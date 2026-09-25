@@ -9,11 +9,16 @@
 // Nothing here calls an LLM. Every function is pure and unit-testable.
 // ─────────────────────────────────────────────────────────────────────────
 
+import { round2, safeCeil } from "../quantity-maths";
+import { bareLengthToMetres } from "./plausibility";
+
 /**
- * Convert a length value to metres. The caller hints at the unit but
- * the function also applies a "NZ trade reasonableness" clamp: anything
- * above 50 in metres-named fields is almost certainly millimetres
- * written without a suffix (4800 → 4.8 m).
+ * Convert a length value to metres. A stated unit is always honoured —
+ * "4800 m" stays 4800 m and is then refused by the shared plausibility rule
+ * (takeoff/plausibility.ts), never quietly read as 4.8 m. With NO unit the
+ * shared bare-number convention applies: 100 or more is millimetres
+ * (4800 → 4.8 m), anything smaller is metres as stated (62 → 62 m; the old
+ * "over 50 means mm" rule made it 0.062 m).
  *
  * Returns NaN for non-finite or non-positive inputs so callers can
  * branch on Number.isFinite + the validator can flag it.
@@ -25,12 +30,14 @@ export function toMetres(value: number, unit?: string): number {
     return value / 1000;
   }
   if (u === "cm") return value / 100;
-  if (u === "m" || u === "metre" || u === "metres") return value;
-  // No / unknown unit → reasonableness clamp.
-  return value > 50 ? value / 1000 : value;
+  if (u === "m" || u === "metre" || u === "metres" || u === "meter" || u === "meters") {
+    return value;
+  }
+  // No / unknown unit → the shared bare-number convention.
+  return bareLengthToMetres(value);
 }
 
-/** Convert to millimetres with the same reasonableness clamp. */
+/** Convert to millimetres with the same unit handling as toMetres. */
 export function toMillimetres(value: number, unit?: string): number {
   if (!Number.isFinite(value) || value <= 0) return NaN;
   const m = toMetres(value, unit);
@@ -44,20 +51,10 @@ export function areaM2(lengthM: number, widthM: number): number {
   return round2(lengthM * widthM);
 }
 
-export function round2(n: number): number {
-  if (!Number.isFinite(n)) return 0;
-  return Math.round(n * 100) / 100;
-}
-
-/**
- * Math.ceil with a 6-decimal-place precision guard. Same logic as
- * materialCalculator.safeCeil — pulled into this file so calculators
- * in this module can use it without importing the legacy file.
- */
-export function safeCeil(n: number): number {
-  if (!Number.isFinite(n)) return 0;
-  return Math.ceil(Math.round(n * 1e6) / 1e6);
-}
+// Area rounding (exact half-up) and the noise-guarded round-up live in the
+// one shared quantity-maths module; re-exported so the calculators in this
+// folder keep importing them from the normalisation layer.
+export { round2, safeCeil };
 
 /**
  * Convert a board nominal width + gap to its effective COVERAGE width.

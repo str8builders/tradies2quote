@@ -471,7 +471,7 @@ describe("structured [T2Q_PLAN] marker", () => {
     expect(r.input.deckWidthM).toBe(3);
   });
 
-  it("out-of-envelope marker (>30m) is ignored", () => {
+  it("out-of-band marker (300 m × 200 m, over the shared 100 m edge band) is ignored", () => {
     const t =
       "[T2Q_PLAN] type=deck length_m=300 width_m=200\n\n" +
       "Deck 6 by 3";

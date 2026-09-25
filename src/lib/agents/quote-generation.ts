@@ -25,7 +25,7 @@ import {
 } from "@/lib/tradieBrain";
 import { getRelevantMemories } from "@/lib/tradieBrain/retrieve";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { round2 } from "@/lib/quote-defaults";
+import { computeQuoteTotals, round2 } from "@/lib/quote-defaults";
 import {
   verifyQuote,
   quoteVerifyEnabledFromEnv,
@@ -53,6 +53,12 @@ export interface GeneratedQuoteLineItem {
    * report it as a zero-price / zero-total mistake.
    */
   pricePending?: boolean;
+  /**
+   * The unit price is the AI's own guess (NZ retail), not the tradie's number
+   * — shown as an estimate to confirm. False only for labour at the tradie's
+   * own labour rate.
+   */
+  priceIsEstimate?: boolean;
 }
 
 export interface GeneratedQuote {
@@ -104,6 +110,12 @@ const MAX_TOKENS = 4096;
 const DEFAULT_LABOUR_RATE = 85; // NZD/hr, sane default if caller omits
 const DEFAULT_MARKUP_PCT = 15;
 const GST_RATE = 0.15;
+/** The same rate as a percentage, as computeQuoteTotals takes it. */
+const GST_PCT = 15;
+
+/** Leads the notes whenever any price on the quote is the AI's guess. */
+export const AI_PRICE_ESTIMATE_NOTE =
+  "Prices marked “estimate” are the AI's guesses at NZ retail prices, not supplier quotes — confirm each one before using this quote.";
 
 const CATEGORIES: readonly LineItemCategory[] = [
   "materials",
@@ -209,10 +221,27 @@ function pickCategory(value: unknown): LineItemCategory {
  * Validate + normalise the model's `emit_quote` tool input into a
  * GeneratedQuote. Pure — used by the runtime, which retries once if this
  * returns an error. Keeps all the defensive normalisation the old JSON path
- * had (rounding, category clamp, recomputed totals).
+ * had (rounding, category clamp).
+ *
+ * The model's arithmetic is NEVER used (audit item 11): each line total is
+ * quantity × unit price — materials with the markup inside the line, as the
+ * prompt describes — and subtotal / GST / total come from computeQuoteTotals,
+ * the app's single source of truth. Every price the AI chose is labelled an
+ * estimate; only labour at the tradie's own `labourRate` isn't.
  */
-export function parseQuote(input: unknown): ParseResult<GeneratedQuote> {
+export function parseQuote(
+  input: unknown,
+  ctx: { markupPct?: number; labourRate?: number } = {},
+): ParseResult<GeneratedQuote> {
   const obj = (input ?? {}) as Partial<GeneratedQuote>;
+  const markup =
+    typeof ctx.markupPct === "number" && Number.isFinite(ctx.markupPct) && ctx.markupPct > 0
+      ? ctx.markupPct
+      : 0;
+  const labourRate =
+    typeof ctx.labourRate === "number" && Number.isFinite(ctx.labourRate) && ctx.labourRate > 0
+      ? ctx.labourRate
+      : null;
 
   const lineItems: GeneratedQuoteLineItem[] = Array.isArray(obj.lineItems)
     ? obj.lineItems
@@ -220,20 +249,28 @@ export function parseQuote(input: unknown): ParseResult<GeneratedQuote> {
           const rec = (l ?? {}) as Partial<GeneratedQuoteLineItem>;
           const q = Number(rec.quantity);
           const p = Number(rec.unitPrice);
-          const lt = Number(rec.lineTotal);
           const qty = Number.isFinite(q) ? q : 0;
-          const price = Number.isFinite(p) ? p : 0;
-          const lineTotal = Number.isFinite(lt)
-            ? round2(lt)
-            : round2(qty * price);
+          const unitPrice = round2(Number.isFinite(p) ? p : 0);
+          const category = pickCategory(rec.category);
+          // Materials carry the markup inside the line; everything else is
+          // plain quantity × price (subcontractors are never marked up).
+          const lineTotal =
+            category === "materials"
+              ? round2(qty * unitPrice * (1 + markup / 100))
+              : round2(qty * unitPrice);
           return {
             description:
               typeof rec.description === "string" ? rec.description.trim() : "",
             quantity: qty,
             unit: typeof rec.unit === "string" ? rec.unit : "each",
-            unitPrice: round2(price),
+            unitPrice,
             lineTotal,
-            category: pickCategory(rec.category),
+            category,
+            priceIsEstimate: !(
+              category === "labour" &&
+              labourRate !== null &&
+              Math.abs(unitPrice - round2(labourRate)) < 0.005
+            ),
           };
         })
         .filter((l) => l.description.length > 0)
@@ -246,17 +283,18 @@ export function parseQuote(input: unknown): ParseResult<GeneratedQuote> {
     };
   }
 
-  const subtotal = round2(
-    typeof obj.subtotal === "number"
-      ? obj.subtotal
-      : lineItems.reduce((s, l) => s + l.lineTotal, 0),
+  // The line totals already include any markup, so the sums run with none.
+  const totals = computeQuoteTotals(
+    lineItems.map((l) => ({ type: "material", quantity: 1, unit_price: l.lineTotal })),
+    0,
+    GST_PCT,
   );
-  const gstAmount = round2(
-    typeof obj.gstAmount === "number" ? obj.gstAmount : subtotal * GST_RATE,
-  );
-  const total = round2(
-    typeof obj.total === "number" ? obj.total : subtotal + gstAmount,
-  );
+  const subtotal = totals.subtotal_before_tax;
+  const gstAmount = totals.tax_amount;
+  const total = totals.total;
+  const modelNotes = Array.isArray(obj.notes)
+    ? obj.notes.filter((s): s is string => typeof s === "string")
+    : [];
 
   return {
     ok: true,
@@ -271,9 +309,9 @@ export function parseQuote(input: unknown): ParseResult<GeneratedQuote> {
       gstRate: GST_RATE,
       gstAmount,
       total,
-      notes: Array.isArray(obj.notes)
-        ? obj.notes.filter((s): s is string => typeof s === "string")
-        : [],
+      notes: lineItems.some((l) => l.priceIsEstimate)
+        ? [AI_PRICE_ESTIMATE_NOTE, ...modelNotes]
+        : modelNotes,
       terms: typeof obj.terms === "string" ? obj.terms : "",
     },
   };
@@ -346,7 +384,10 @@ export async function runQuoteGenerationAgent(
     system: SYSTEM_PROMPT,
     user: userPrompt,
     tool: QUOTE_TOOL,
-    parse: parseQuote,
+    // Totals are recomputed from quantity × price with the tradie's own
+    // markup, and AI-chosen prices are labelled estimates (never the model's
+    // arithmetic).
+    parse: (toolInput: unknown) => parseQuote(toolInput, { markupPct, labourRate }),
     maxTokens: MAX_TOKENS,
     userId: input.memory?.userId,
     // Caller-supplied so the route and the runtime share one run row.

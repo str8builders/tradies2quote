@@ -367,3 +367,116 @@ describe("confirmAndRecalc", () => {
     expect(labour.line_total).toBe(800);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// Audit item 4 — a correction the calculator can't use must NOT be recorded
+// as confirmed while the old quantities stay on the quote. Before: the new
+// value was stored with confirmed:true, the send gate unblocked, and the
+// line items still reflected the old size.
+// ─────────────────────────────────────────────────────────────────────────
+
+function claddingQuoteFixture(): QuoteData {
+  const parsed = {
+    type: "cladding",
+    input: { wallLengthM: 12, wallHeightM: 2.4, wastePercent: 10 },
+    missingFields: [],
+    assumptions: [],
+    confidence: 0.4,
+  } as unknown as ParsedTakeoffResult;
+  const calc = runTakeoff(parsed)!;
+  return {
+    ...deckQuoteFixture(),
+    line_items: calc.materials.map((m) => ({
+      type: "material" as const,
+      description: m.name,
+      quantity: m.quantity,
+      unit: m.unit,
+      unit_price: 0,
+      line_total: 0,
+      is_calculated_takeoff: true,
+      quantity_source: "calculator" as const,
+      formula: m.formula,
+      price_match_key: m.priceMatchKey,
+      takeoff_status: "ok" as const,
+    })),
+    takeoff_inputs: parsed.input,
+    dimension_confirmation: buildDimensionConfirmation({ isDrawing: true, parsed })!,
+  };
+}
+
+describe("confirmAndRecalc — a size the calculator can't use (item 4)", () => {
+  it("a 2400 m wall height is NOT confirmed (was stored as confirmed with the old quantities) and says 'did you mean 2400 mm?'", () => {
+    const qd = claddingQuoteFixture();
+    const r = confirmAndRecalc(
+      qd,
+      [
+        { key: "wallLengthM", value: 12 },
+        { key: "wallHeightM", value: 2400 },
+      ],
+      META,
+    )!;
+    expect(r.problem).toBe("That size looks wrong — Wall height 2400 m? Did you mean 2400 mm (2.4 m)?");
+    expect(r.changed).toBe(false);
+    // Nothing confirmed, the old value kept, nobody stamped.
+    const h = r.dimension_confirmation.dimensions.find((d) => d.key === "wallHeightM")!;
+    expect(h.value).toBe(2.4);
+    expect(r.dimension_confirmation.dimensions.every((d) => d.confirmed === false)).toBe(true);
+    expect(r.dimension_confirmation.confirmed_by ?? null).toBeNull();
+    // Quantities untouched.
+    expect(r.line_items).toEqual(qd.line_items);
+  });
+
+  it("a 4800 m deck length is refused the same way (was confirmed: true at 4800)", () => {
+    const qd = deckQuoteFixture();
+    const r = confirmAndRecalc(
+      qd,
+      [
+        { key: "deckLengthM", value: 4800 },
+        { key: "deckWidthM", value: 3.0 },
+      ],
+      META,
+    )!;
+    expect(r.problem).toBe("That size looks wrong — Deck length 4800 m? Did you mean 4800 mm (4.8 m)?");
+    const len = r.dimension_confirmation.dimensions.find((d) => d.key === "deckLengthM")!;
+    expect(len).toMatchObject({ value: 4.8, confirmed: false });
+  });
+
+  it("a size with no sensible mm reading gets the plain band reason", () => {
+    const qd = claddingQuoteFixture();
+    const r = confirmAndRecalc(qd, [{ key: "wallHeightM", value: 24 }], META)!;
+    expect(r.problem).toBe("That size looks wrong — Wall height 24 m is more than 6 m. Check it and try again.");
+    expect(r.dimension_confirmation.dimensions.every((d) => d.confirmed === false)).toBe(true);
+  });
+
+  it("a plausible size the stored inputs still can't calculate keeps everything unconfirmed and says so", () => {
+    const qd = deckQuoteFixture();
+    // Stored inputs from an old quote that lost the wall's GIB sides: the
+    // wall calculator can't run even with a sane size.
+    qd.dimension_confirmation = {
+      ...qd.dimension_confirmation!,
+      takeoff_type: "wall",
+      dimensions: [
+        { key: "wallLengthM", label: "Wall length", value: 10, unit: "m", confirmed: false },
+        { key: "wallHeightM", label: "Wall height", value: 2.4, unit: "m", confirmed: false },
+      ],
+    };
+    qd.takeoff_inputs = { wallLengthM: 10, wallHeightM: 2.4 };
+    const r = confirmAndRecalc(qd, [{ key: "wallLengthM", value: 12 }], META)!;
+    expect(r.problem).toMatch(/couldn't recalculate the materials with those sizes/i);
+    expect(r.changed).toBe(false);
+    expect(r.dimension_confirmation.dimensions.find((d) => d.key === "wallLengthM")).toMatchObject({
+      value: 10,
+      confirmed: false,
+    });
+    expect(r.line_items).toEqual(qd.line_items);
+  });
+
+  it("a usable correction still recomputes and confirms (no problem)", () => {
+    const qd = claddingQuoteFixture();
+    const r = confirmAndRecalc(qd, [{ key: "wallLengthM", value: 62 }, { key: "wallHeightM", value: 2.4 }], META)!;
+    expect(r.problem).toBeUndefined();
+    expect(r.changed).toBe(true);
+    expect(r.line_items.find((i) => i.price_match_key === "weatherboard-cladding")?.quantity).toBe(228);
+    expect(r.dimension_confirmation.dimensions.every((d) => d.confirmed)).toBe(true);
+  });
+});
