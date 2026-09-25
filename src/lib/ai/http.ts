@@ -51,6 +51,11 @@ export const MAX_BACKOFF_MS = 8_000;
 export const MAX_RETRY_AFTER_MS = 20_000;
 /** Default budget = per-attempt timeout + this: room for quick retries. */
 export const RETRY_HEADROOM_MS = 30_000;
+/**
+ * A retry needs at least this long to be worth sending; with less budget
+ * left, the previous failure is reported instead of a near-instant timeout.
+ */
+export const MIN_ATTEMPT_MS = 1_000;
 
 export interface RetryEvent {
   provider: AiProvider;
@@ -197,9 +202,11 @@ export async function sendWithRetry(req: SendRequest): Promise<SendResult> {
     ((url, init, timeoutMs) =>
       fetchWithTimeout(url, init, timeoutMs, req.fetchImpl ?? fetch));
   const startedAt = now();
+  let previous: AiError | null = null;
 
   for (let attempt = 1; ; attempt++) {
     const remaining = budgetMs - (now() - startedAt);
+    if (previous && remaining < MIN_ATTEMPT_MS) throw previous;
     const attemptTimeout = Math.max(1, Math.min(req.timeoutMs, remaining));
 
     let outcome: { response: AiHttpResponse } | { thrown: unknown };
@@ -226,7 +233,8 @@ export async function sendWithRetry(req: SendRequest): Promise<SendResult> {
     if (attempt >= maxAttempts) throw error;
     if (retryAfterMs !== null && retryAfterMs > MAX_RETRY_AFTER_MS) throw error;
     const waitMs = retryAfterMs ?? backoffDelayMs(attempt, random);
-    if (now() - startedAt + waitMs >= budgetMs) throw error;
+    if (now() - startedAt + waitMs + MIN_ATTEMPT_MS > budgetMs) throw error;
+    previous = error;
 
     req.onRetry?.({ provider: req.provider, attempt, maxAttempts, waitMs, error });
     console.warn(

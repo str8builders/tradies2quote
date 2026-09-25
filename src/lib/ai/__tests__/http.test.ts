@@ -237,6 +237,23 @@ describe("sendWithRetry", () => {
     expect(timeouts).toEqual([10_000, 4_500]);
   });
 
+  it("reports the real failure, not a timeout, when a wait overruns the budget", async () => {
+    // The sleep overshoots (a busy event loop): the next attempt would have
+    // only a sliver of budget, so the 529 is reported instead.
+    const f = scripted([res(529), res(200)]);
+    let clock = 0;
+    const err = await send(f.impl, {
+      timeoutMs: 1_000,
+      budgetMs: 3_000,
+      now: () => clock,
+      sleep: async () => {
+        clock += 2_500;
+      },
+    }).catch((e) => e);
+    expect(err.kind).toBe("overloaded");
+    expect(f.count()).toBe(1);
+  });
+
   it("does not wait past the total budget", async () => {
     const f = scripted([res(529), res(200)]);
     const err = await send(f.impl, { timeoutMs: 1_000, budgetMs: 400 }).catch((e) => e);
