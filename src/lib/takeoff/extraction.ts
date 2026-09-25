@@ -244,6 +244,18 @@ function extractOpenings(text: string): ExtractedOpening[] {
   return openings;
 }
 
+/**
+ * How many faces the tradie says a lining job covers: "GIB both sides",
+ * "two sides", "double sided" → 2; "one side", "single sided" → 1; nothing
+ * said → null (the lining calculator then assumes one side and says so).
+ * Same wording the legacy wall parser reads.
+ */
+function extractLinedFaces(text: string): 1 | 2 | null {
+  if (/\b(?:both\s+sides?|two\s+sides?|gib\s+both|double[-\s]+sided?)\b/i.test(text)) return 2;
+  if (/\b(?:one\s+side(?:\s+only)?|single[-\s]+sided?|gib\s+one\s+side)\b/i.test(text)) return 1;
+  return null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // Wall-kind detection (exterior-only insulation rule).
 //
@@ -406,6 +418,16 @@ export function extractFromText(
   const stock_length_m = extractStockLengthM(text);
   const coverage_mm = extractCoverageMm(text);
 
+  // The lining calculator reads the lined faces from the notes (the LLM
+  // extraction writes them there); the regex extraction records what the
+  // tradie said, so "GIB both sides" isn't lost on an area-only lining job.
+  const notes: string[] = [];
+  if (scope === "lining") {
+    const faces = extractLinedFaces(text);
+    if (faces === 2) notes.push("Lined both sides (as stated).");
+    if (faces === 1) notes.push("Lined one side (as stated).");
+  }
+
   const needs_clarification: string[] = [];
   const dimensionRequirementByScope: Record<ScopeType, string[]> = {
     deck: ["length_m", "width_m"],
@@ -441,7 +463,7 @@ export function extractFromText(
     // scan's exterior_wall_run_m marker. Everything else stays null.
     wall_kind: scope === "insulation" ? detectWallKind(text) : null,
     exterior_wall_run_m: marker?.exterior_wall_run_m ?? null,
-    notes: [],
+    notes,
     needs_clarification,
     clarification_questions: [],
     source_basis: marker ? "marker" : "regex",

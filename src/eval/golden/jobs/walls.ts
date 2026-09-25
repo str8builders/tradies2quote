@@ -24,7 +24,7 @@
 // ─────────────────────────────────────────────────────────────────────────
 
 import { calculateMaterialTakeoff } from "@/lib/materialCalculator";
-import { moneyCascade, takeoffJob } from "../build";
+import { takeoffJob } from "../build";
 import { NZ_PROFILE, PRICE } from "../library";
 import { bool, count, decimal, money, text, type GoldenJob } from "../types";
 
@@ -459,13 +459,6 @@ export const WALL_JOBS: GoldenJob[] = [
       subtotal_before_tax: money("830.71", "692.26 + 138.45"),
       tax_amount: money("124.61", "15 % × 830.71 = 124.6065 → 124.61"),
       total: money("955.32", "830.71 + 124.61"),
-    },
-    knownBugs: {
-      "qty:lining-sheets":
-        "KNOWN BUG: 'GIB both sides' is lost on the orchestrator lining path — takeoff/calculators/lining.ts reads the faces from ext.notes, which the regex extraction (takeoff/extraction.ts) always leaves empty — expected 19 sheets (48 m²), code gives 10 (24 m², one side)",
-      "qty:lining-screws": "KNOWN BUG: cascades from the one-side lining — expected 836, code gives 440",
-      "qty:lining-adhesive": "KNOWN BUG: cascades from the one-side lining — expected 5 tubes, code gives 3",
-      ...moneyCascade(["lining-sheets", "lining-screws", "lining-adhesive"], "KNOWN BUG: cascades from 'both sides' being dropped — half the lining is missing from the price"),
     },
   }),
 ];
