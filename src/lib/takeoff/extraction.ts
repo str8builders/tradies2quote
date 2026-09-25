@@ -28,24 +28,42 @@ import type {
   ScopeType,
 } from "./schemas";
 import { parseExtractedExtraction } from "./schemas";
+import { toMetres } from "./normalise";
+import { METRES_BANDS, isPlausibleMetres } from "./plausibility";
 
 // ─────────────────────────────────────────────────────────────────────────
 // Regex utilities — replicated here intentionally so the takeoff module
 // doesn't reach into aiTakeoffParser.ts internals.
 // ─────────────────────────────────────────────────────────────────────────
 
+/** A free-text "A x B" pair is only a plan footprint when its short side is at least this. */
 const MIN_PLAN_M = 1;
-const MAX_PLAN_M = 100;
+/** …and its long side is inside the shared plausible edge band. */
+const MAX_PLAN_M = METRES_BANDS.edge.max;
 
+/**
+ * One side of an "A x B" pair, in metres, via the normalisation layer: a
+ * written unit is honoured; a bare number follows the shared convention
+ * (100 or more is mm, smaller is metres as stated). Never the old "over 50
+ * means mm" clamp that read 62 m as 0.062 m.
+ */
 function parseLength(value: string, unit: string | undefined): number {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) return NaN;
-  const u = (unit ?? "").toLowerCase();
-  if (u === "mm") return n / 1000;
-  if (u === "cm") return n / 100;
-  if (u === "m" || u.startsWith("metre") || u.startsWith("meter")) return n;
-  // Unitless reasonableness clamp.
-  return n > 50 ? n / 1000 : n;
+  return toMetres(n, unit);
+}
+
+/**
+ * A bare 51–99 beside an "x" is a timber section (90x45, 75x50) far more
+ * often than a plan side, and it can't be told apart from a plan metre
+ * figure — so the pair is not read at all (the scope then asks for the
+ * size) rather than guessed either way. It was never usable before either:
+ * the old clamp shrank it below the 1 m footprint floor.
+ */
+function isAmbiguousBareSide(value: string | undefined, unit: string | undefined): boolean {
+  if (unit) return false;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 50 && n < 100;
 }
 
 function extractRectangle(
@@ -54,6 +72,7 @@ function extractRectangle(
   const re =
     /(\d+(?:\.\d+)?)\s*(mm|cm|m|metres?|meters?)?\s*(?:by|x|×|\*)\s*(\d+(?:\.\d+)?)\s*(mm|cm|m|metres?|meters?)?/gi;
   for (const m of text.matchAll(re)) {
+    if (isAmbiguousBareSide(m[1], m[2]) || isAmbiguousBareSide(m[3], m[4])) continue;
     const a = parseLength(m[1] ?? "", m[2]);
     const b = parseLength(m[3] ?? "", m[4]);
     if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
@@ -289,8 +308,10 @@ function extractMarker(
     const n = Number(raw);
     if (!Number.isFinite(n) || n < 0) continue;
     if (n <= 0 && key !== "door_count" && key !== "window_count") continue;
-    if (key === "length_m" && n >= MIN_PLAN_M && n <= MAX_PLAN_M) out.length_m = n;
-    if (key === "width_m" && n >= MIN_PLAN_M && n <= MAX_PLAN_M) out.width_m = n;
+    // Plan edges: the ONE shared plausibility band (the legacy marker reader
+    // uses the same). Out of band → dropped, never rescaled.
+    if (key === "length_m" && isPlausibleMetres(n, "edge")) out.length_m = n;
+    if (key === "width_m" && isPlausibleMetres(n, "edge")) out.width_m = n;
     if (key === "height_m" && n >= 0.5 && n <= 20) out.height_m = n;
     if ((key === "joist_spacing_mm" || key === "stud_spacing_mm") && n >= 100 && n <= 1200) {
       out.spacing_mm = n;

@@ -10,6 +10,12 @@ import {
   type SubfloorTakeoffInput,
 } from "./materialCalculator";
 import { normalizeSpokenMeasurements } from "./transcript/measureNormalize";
+import {
+  BARE_MM_FROM,
+  METRES_BANDS,
+  checkMetres,
+  isPlausibleMetres,
+} from "./takeoff/plausibility";
 
 /**
  * What kind of job the operator described in voice/text.
@@ -141,9 +147,9 @@ export interface StructuredPlanMarker {
 /**
  * Pull `[T2Q_PLAN] key=value key=value …` off the transcript. Returns
  * undefined if no marker, or if the marker's length/width values are
- * outside the sane plan envelope (1m–30m). The envelope check matches
- * `extractRectangle` so a corrupted marker can't bypass the safety
- * floor.
+ * outside the shared plausible edge band (takeoff/plausibility.ts,
+ * 0.1–100 m) — a corrupted marker (a 4800 "m" side) can't bypass the
+ * safety floor, and is never rescaled.
  */
 export function extractStructuredPlanMarker(
   text: string,
@@ -159,15 +165,15 @@ export function extractStructuredPlanMarker(
   };
   const rawLength = optNum("length_m");
   const rawWidth = optNum("width_m");
-  // Envelope check — same MIN/MAX as extractRectangle. Out-of-range
-  // markers are dropped so a corrupted marker can't bypass the safety
-  // floor.
-  const MIN_PLAN_M = 1;
-  const MAX_PLAN_M = 30;
-  if (rawLength !== undefined && (rawLength < MIN_PLAN_M || rawLength > MAX_PLAN_M)) {
+  // Envelope check — the ONE shared plausibility rule for a plan edge
+  // (the orchestrator's marker reader uses the same band). The old 1–30 m
+  // envelope dropped a real 62 m cladding marker, so the legacy calculator
+  // asked for a wall length the drawing already gave. Out-of-band markers
+  // are dropped so a corrupted marker can't bypass the safety floor.
+  if (rawLength !== undefined && !isPlausibleMetres(rawLength, "edge")) {
     return undefined;
   }
-  if (rawWidth !== undefined && (rawWidth < MIN_PLAN_M || rawWidth > MAX_PLAN_M)) {
+  if (rawWidth !== undefined && !isPlausibleMetres(rawWidth, "edge")) {
     return undefined;
   }
   // NZ convention: length ≥ width. The deck calculator runs joists
@@ -292,17 +298,24 @@ const DIMENSION_RULES: Record<
   DimensionKind,
   { unit: DimensionUnit; bareMmFrom?: number; min: number; max: number }
 > = {
-  // One wall / edge / member length, or a plan width.
-  length: { unit: "m", bareMmFrom: 100, min: 0.1, max: 200 },
-  width: { unit: "m", bareMmFrom: 100, min: 0.1, max: 200 },
-  // Wall / stud height — the only height the legacy calculators take.
-  height: { unit: "m", bareMmFrom: 100, min: 1.8, max: 6 },
+  // One wall / edge / member length, or a plan width. (A reading band: the
+  // calculator gate then applies the shared edge / wall-run band.)
+  length: { unit: "m", bareMmFrom: BARE_MM_FROM, min: 0.1, max: 200 },
+  width: { unit: "m", bareMmFrom: BARE_MM_FROM, min: 0.1, max: 200 },
+  // Wall / stud height — the only height the legacy calculators take. The
+  // shared wall-height band (takeoff/plausibility.ts).
+  height: {
+    unit: "m",
+    bareMmFrom: BARE_MM_FROM,
+    min: METRES_BANDS.wallHeight.min,
+    max: METRES_BANDS.wallHeight.max,
+  },
   // Joist / bearer span.
-  span: { unit: "m", bareMmFrom: 100, min: 0.1, max: 30 },
+  span: { unit: "m", bareMmFrom: BARE_MM_FROM, min: 0.1, max: 30 },
   // TOTAL wall run — every wall on the plan summed, so a bare "120" is 120 m
   // of wall (millimetres only from 1000 up). Same whole-house band as the
   // [T2Q_PLAN] wall_run_m marker.
-  run: { unit: "m", bareMmFrom: 1000, min: 2, max: 1000 },
+  run: { unit: "m", bareMmFrom: 1000, min: 2, max: METRES_BANDS.wallRun.max },
   thickness: { unit: "mm", min: 1, max: 600 },
   spacing: { unit: "mm", min: 100, max: 1200 },
   area: { unit: "m²", min: 0.1, max: 5000 },
@@ -1292,9 +1305,6 @@ function parseDeckDescription(
   };
 }
 
-/** The cladding calculator reads a run over 50 m as millimetres. */
-const CLADDING_MAX_RUN_M = 50;
-
 function parseCladdingDescription(
   description: string,
   options: ParseOptions,
@@ -1318,13 +1328,17 @@ function parseCladdingDescription(
       ? readDimension(marker.lengthM, "m", "length")
       : undefined);
   let lengthFlagged = false;
+  // The shared plausibility rule — the same edge band the cladding
+  // calculator and the orchestrator use. A run outside it is refused with
+  // its plain reason, never rescaled (a 62 m run is simply 62 m).
+  const lengthCheck = lengthReading?.plausible
+    ? checkMetres("Cladding wall length", lengthReading.value, "edge")
+    : undefined;
   if (lengthReading && !lengthReading.plausible) {
     flag(implausibleMessage("Wall length", lengthReading));
     lengthFlagged = true;
-  } else if (lengthReading && lengthReading.value > CLADDING_MAX_RUN_M) {
-    flag(
-      `Cladding wall length ${formatNumber(lengthReading.value)} m is more than the ${CLADDING_MAX_RUN_M} m the cladding calculator handles in one run — split it into walls, or check the length.`,
-    );
+  } else if (lengthCheck && !lengthCheck.ok) {
+    flag(lengthCheck.reason);
     lengthFlagged = true;
   } else if (lengthReading) {
     input.wallLengthM = lengthReading.value;
@@ -1741,16 +1755,10 @@ function parseWallDescription(
   };
 }
 
-/** Is `v` a finite number within [min, max]? */
-function inRange(v: unknown, min: number, max: number): boolean {
-  return typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
+/** A finite number of metres inside the shared band for `kind`. */
+function plausible(v: unknown, kind: "edge" | "wallRun" | "wallHeight"): boolean {
+  return typeof v === "number" && isPlausibleMetres(v, kind);
 }
-
-/**
- * The calculators read a deck / subfloor / cladding dimension over 50 m as
- * millimetres (materialCalculator.sanitiseMeters), so never hand them one.
- */
-const CALC_MAX_EDGE_M = 50;
 
 /**
  * Dispatch on type: do we have enough parsed input to actually run a
@@ -1758,40 +1766,31 @@ const CALC_MAX_EDGE_M = 50;
  *
  * Also the last line of defence against absurd inputs, however they were
  * built (parser, stored takeoff inputs, a dimension correction): a flagged
- * value, a wall height outside 1.8–6 m or a length outside its band never
- * reaches a calculator — the send gate trusts calculator quantities.
+ * value, or any dimension outside the ONE shared plausibility band
+ * (takeoff/plausibility.ts — the same bands the calculators and the
+ * orchestrator use) never reaches a calculator — the send gate trusts
+ * calculator quantities.
  */
 export function canRunCalculator(parsed: ParsedTakeoffResult): boolean {
   if (parsed.reviewFlags && parsed.reviewFlags.length > 0) return false;
-  const HEIGHT = DIMENSION_RULES.height;
-  const LENGTH_MIN = DIMENSION_RULES.length.min;
   if (parsed.type === "deck") {
     const i = parsed.input as Partial<DeckTakeoffInput>;
-    return (
-      inRange(i.deckLengthM, LENGTH_MIN, CALC_MAX_EDGE_M) &&
-      inRange(i.deckWidthM, LENGTH_MIN, CALC_MAX_EDGE_M)
-    );
+    return plausible(i.deckLengthM, "edge") && plausible(i.deckWidthM, "edge");
   }
   if (parsed.type === "cladding") {
     const i = parsed.input as Partial<CladdingTakeoffInput>;
-    return (
-      inRange(i.wallLengthM, LENGTH_MIN, CALC_MAX_EDGE_M) &&
-      inRange(i.wallHeightM, HEIGHT.min, HEIGHT.max)
-    );
+    return plausible(i.wallLengthM, "edge") && plausible(i.wallHeightM, "wallHeight");
   }
   if (parsed.type === "subfloor") {
     const i = parsed.input as Partial<SubfloorTakeoffInput>;
-    return (
-      inRange(i.floorLengthM, LENGTH_MIN, CALC_MAX_EDGE_M) &&
-      inRange(i.floorWidthM, LENGTH_MIN, CALC_MAX_EDGE_M)
-    );
+    return plausible(i.floorLengthM, "edge") && plausible(i.floorWidthM, "edge");
   }
   // wall (original) — need length + height + gibSides. The length may be a
-  // whole-house wall run, so it takes the run band's ceiling.
+  // whole-house wall run, so it takes the wall-run band.
   const i = parsed.input as Partial<MaterialTakeoffInput>;
   return (
-    inRange(i.wallLengthM, LENGTH_MIN, DIMENSION_RULES.run.max) &&
-    inRange(i.wallHeightM, HEIGHT.min, HEIGHT.max) &&
+    plausible(i.wallLengthM, "wallRun") &&
+    plausible(i.wallHeightM, "wallHeight") &&
     i.gibSides !== undefined
   );
 }

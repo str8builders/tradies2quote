@@ -8,9 +8,13 @@
 // Three categories of check:
 //   1. Hard constraints — physically impossible inputs (negative
 //      lengths, zero areas, NaN). These hard-block.
-//   2. Plausibility — dimensions outside the sane envelope, unit
-//      confusion (length 4800 in a metres-named field), spacing
-//      values not in {300, 400, 450, 600}. These soft-flag.
+//   2. Plausibility — a length / height that drives a calculator must sit
+//      inside the ONE shared band (takeoff/plausibility.ts, the same rule
+//      the legacy gate and the calculators use). Outside it HARD-blocks
+//      with a plain reason — a 4800 "m" deck is never rescaled to 4.8 m,
+//      and a 62 m cladding run is taken as stated. Merely unusual values
+//      (a deck side under 1 m, stud spacing not in {300, 400, 450, 600})
+//      soft-flag.
 //   3. Cross-field — area/perimeter mismatch, openings larger than the
 //      wall they sit in. These soft-flag.
 // ─────────────────────────────────────────────────────────────────────────
@@ -20,18 +24,23 @@ import type {
   ScopeType,
   TakeoffStatus,
 } from "./schemas";
+import { checkMetres, type MetresKind } from "./plausibility";
 
 export type ValidationResult = {
   status: TakeoffStatus;
   reasons: string[];
   /** Soft flags that don't block calculation but should colour the UI. */
   flags: string[];
+  /**
+   * Fields that were given but can't be right (outside the shared
+   * plausibility band), each with the plain reason — so the clarification
+   * asks about that exact number instead of calling it "missing".
+   */
+  problems?: Array<{ field: string; reason: string }>;
 };
 
-const MIN_PLAN_M = 1;
-const MAX_PLAN_M = 100;
-const MIN_HEIGHT_M = 0.5;
-const MAX_HEIGHT_M = 20;
+/** A plan edge under this is plausible but unusual — flagged, not blocked. */
+const TYPICAL_MIN_EDGE_M = 1;
 
 /**
  * Validate a single scope's extraction. Returns `blocked` only when
@@ -43,8 +52,16 @@ export function validateExtractionForScope(
 ): ValidationResult {
   const reasons: string[] = [];
   const flags: string[] = [];
+  const problems: Array<{ field: string; reason: string }> = [];
   const { dimensions } = ext;
+  const blocked = (): ValidationResult => ({
+    status: "blocked",
+    reasons,
+    flags,
+    ...(problems.length > 0 ? { problems } : {}),
+  });
 
+  /** Soft typical-range check (non-calculator dimensions, e.g. fence height). */
   const requireDim = (
     label: string,
     v: number | null | undefined,
@@ -66,16 +83,47 @@ export function validateExtractionForScope(
     return "ok";
   };
 
+  /**
+   * A metres value that drives a calculator: the ONE shared plausibility
+   * band. Outside it is a hard block with the plain reason (never a
+   * rescale); a plan edge under 1 m is plausible but soft-flagged.
+   */
+  const requireMetres = (
+    field: string,
+    label: string,
+    v: number | null | undefined,
+    kind: MetresKind,
+  ): "missing" | "out-of-range" | "ok" => {
+    if (v === null || v === undefined) {
+      reasons.push(`${field} is missing`);
+      return "missing";
+    }
+    if (!Number.isFinite(v) || v <= 0) {
+      reasons.push(`${field}=${v} is not a positive number`);
+      return "out-of-range";
+    }
+    const check = checkMetres(label, v, kind);
+    if (!check.ok) {
+      reasons.push(check.reason);
+      problems.push({ field, reason: check.reason });
+      return "out-of-range";
+    }
+    if (kind === "edge" && v < TYPICAL_MIN_EDGE_M) {
+      flags.push(`${label} ${v} m is unusually small — check it`);
+    }
+    return "ok";
+  };
+
   switch (scope) {
     case "deck": {
-      const l = requireDim("length_m", dimensions.length_m, MIN_PLAN_M, MAX_PLAN_M);
-      const w = requireDim("width_m", dimensions.width_m, MIN_PLAN_M, MAX_PLAN_M);
-      // Hard-block on missing OR physically impossible (negative/zero/NaN).
-      // Out-of-range values are pushed to `reasons` by requireDim, so a
+      const l = requireMetres("length_m", "Deck length", dimensions.length_m, "edge");
+      const w = requireMetres("width_m", "Deck width", dimensions.width_m, "edge");
+      // Hard-block on missing, physically impossible (negative/zero/NaN) or
+      // outside the shared plausibility band — all pushed to `reasons`, so a
       // non-empty reasons array means at least one critical input is
       // unusable and we can't run the calculator.
       if (l === "missing" || w === "missing" || reasons.length > 0) {
-        return { status: "blocked", reasons, flags };
+        return blocked();
       }
       // Length:width ratio sanity — a 20:1 deck is almost certainly
       // a fence or boardwalk, flag it.
@@ -89,10 +137,10 @@ export function validateExtractionForScope(
       break;
     }
     case "cladding": {
-      requireDim("length_m", dimensions.length_m, MIN_PLAN_M, MAX_PLAN_M);
-      requireDim("height_m", dimensions.height_m, MIN_HEIGHT_M, MAX_HEIGHT_M);
+      requireMetres("length_m", "Cladding wall length", dimensions.length_m, "edge");
+      requireMetres("height_m", "Wall height", dimensions.height_m, "wallHeight");
       if (!Number.isFinite(dimensions.length_m ?? NaN) || reasons.length > 0) {
-        return { status: "blocked", reasons, flags };
+        return blocked();
       }
       // Sum of openings shouldn't exceed wall area.
       const wallArea =
@@ -111,10 +159,11 @@ export function validateExtractionForScope(
       break;
     }
     case "framing": {
-      const l = requireDim("length_m", dimensions.length_m, MIN_PLAN_M, MAX_PLAN_M);
-      const h = requireDim("height_m", dimensions.height_m, MIN_HEIGHT_M, MAX_HEIGHT_M);
+      // Framing sizes off the wall RUN (every wall summed on a floor plan).
+      const l = requireMetres("length_m", "Wall length", dimensions.length_m, "wallRun");
+      const h = requireMetres("height_m", "Wall height", dimensions.height_m, "wallHeight");
       if (l === "missing" || h === "missing" || reasons.length > 0) {
-        return { status: "blocked", reasons, flags };
+        return blocked();
       }
       if (
         ext.spacing_mm !== null &&

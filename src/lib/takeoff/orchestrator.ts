@@ -104,7 +104,11 @@ export function runTakeoff(
 
     // 3. If blocked, build clarifications and skip the calculator.
     if (validation.status === "blocked") {
-      const { questions, blocking } = buildClarifications(scope, ext);
+      const { questions, blocking } = buildClarifications(
+        scope,
+        ext,
+        validation.problems,
+      );
       allClarifications.push(...questions);
       warnings.push(...validation.reasons.map((r) => `${scope}: ${r}`));
       const blockedScope: ScopeResult = {
@@ -197,7 +201,11 @@ export function runTakeoffWithExtraction(
 ): TakeoffResult {
   const validation = validateExtractionForScope(ext, ext.scope_type);
   if (validation.status === "blocked") {
-    const { questions } = buildClarifications(ext.scope_type, ext);
+    const { questions } = buildClarifications(
+      ext.scope_type,
+      ext,
+      validation.problems,
+    );
     return {
       status: "blocked",
       primary_scope: ext.scope_type,

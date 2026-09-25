@@ -1,4 +1,5 @@
 import { round2, safeCeil } from "./quantity-maths";
+import { checkMetres, type MetresKind } from "./takeoff/plausibility";
 
 export type MaterialTakeoffInput = {
   wallLengthM: number;
@@ -431,27 +432,37 @@ export const DECK_DEFAULTS = {
 };
 
 /**
- * Defence-in-depth clamp: any dimension above 50 m almost certainly
- * means the caller passed millimetres in a metres-named field (NZ
- * residential trade drawings are written in mm with the suffix
- * dropped). A 4800-something value should be 4.8 m. Divide by 1000.
- *
- * The parser in aiTakeoffParser also disambiguates units, but a
- * downstream clamp here means no future caller — AI, manual API, or
- * a refactor — can ever drive a million-dollar runaway quote off
- * unit confusion alone.
+ * Defence in depth: every metres input is checked against the ONE shared
+ * plausibility rule (takeoff/plausibility.ts) before any count is produced.
+ * An out-of-band value (a 4800 "m" deck, a 2400 "m" wall height) is REFUSED
+ * with a plain reason — never divided by 1000 behind the tradie's back. The
+ * old "over 50 m means millimetres" clamp turned a real 62 m cladding run
+ * into 0.062 m and quoted one weatherboard.
  */
-function sanitiseMeters(value: number): number {
-  if (!Number.isFinite(value) || value <= 0) return value;
-  return value > 50 ? value / 1000 : value;
+function metresProblems(checks: Array<[label: string, value: unknown, kind: MetresKind]>): string[] {
+  const reasons: string[] = [];
+  for (const [label, value, kind] of checks) {
+    const c = checkMetres(label, value, kind);
+    if (!c.ok) reasons.push(c.reason);
+  }
+  return reasons;
+}
+
+/** A calculator that refused its inputs: no materials, only the reasons. */
+function refusedTakeoff(reasons: string[]): MaterialTakeoffResult {
+  return {
+    summary: { wallAreaM2: 0, openingAreaM2: 0, netWallAreaM2: 0, wastePercent: 0 },
+    materials: [],
+    warnings: reasons,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────
 // Wave 43 — Geometric ratio guard (deck)
 //
 // Third defence layer behind (a) the unit-aware regex in
-// aiTakeoffParser.extractRectangle and (b) sanitiseMeters above. Both
-// of those operate on INPUTS. The ratio guard operates on OUTPUTS: it
+// aiTakeoffParser.extractRectangle and (b) the shared metres plausibility
+// check above. Both of those operate on INPUTS. The ratio guard operates on OUTPUTS: it
 // recomputes each per-m² ratio after the calculator runs and clamps
 // anything wildly outside the band that NZ residential practice
 // produces. If clamping triggers, a warning is added and the formula
@@ -566,8 +577,13 @@ export function calculateDeckTakeoff(
 ): MaterialTakeoffResult {
   const invalid = invalidTakeoff(input, ["deckLengthM", "deckWidthM"], ["deckLengthM", "deckWidthM", "joistSpacingMm", "bearerSpacingM", "pileSpacingM", "boardWidthMm", "timberStockLengthM"]);
   if (invalid) return invalid;
-  const deckLengthM = sanitiseMeters(Number(input.deckLengthM));
-  const deckWidthM = sanitiseMeters(Number(input.deckWidthM));
+  const refused = metresProblems([
+    ["Deck length", input.deckLengthM, "edge"],
+    ["Deck width", input.deckWidthM, "edge"],
+  ]);
+  if (refused.length > 0) return refusedTakeoff(refused);
+  const deckLengthM = Number(input.deckLengthM);
+  const deckWidthM = Number(input.deckWidthM);
   const joistSpacingMm =
     input.joistSpacingMm ?? DECK_DEFAULTS.joistSpacingMm;
   const bearerSpacingM =
@@ -784,10 +800,13 @@ export function calculateCladdingTakeoff(
 ): MaterialTakeoffResult {
   const invalid = invalidTakeoff(input, ["wallLengthM"], ["wallLengthM", "wallHeightM", "claddingCoverageMm", "battenSpacingMm", "timberStockLengthM"]);
   if (invalid) return invalid;
-  const wallLengthM = sanitiseMeters(Number(input.wallLengthM));
-  const wallHeightM = sanitiseMeters(
-    input.wallHeightM ?? CLADDING_DEFAULTS.wallHeightM,
-  );
+  const refused = metresProblems([
+    ["Cladding wall length", input.wallLengthM, "edge"],
+    ["Wall height", input.wallHeightM ?? CLADDING_DEFAULTS.wallHeightM, "wallHeight"],
+  ]);
+  if (refused.length > 0) return refusedTakeoff(refused);
+  const wallLengthM = Number(input.wallLengthM);
+  const wallHeightM = Number(input.wallHeightM ?? CLADDING_DEFAULTS.wallHeightM);
   const openingAreaM2 =
     input.openingAreaM2 ?? CLADDING_DEFAULTS.openingAreaM2;
   const claddingCoverageMm =
@@ -961,8 +980,13 @@ export function calculateSubfloorTakeoff(
 ): MaterialTakeoffResult {
   const invalid = invalidTakeoff(input, ["floorLengthM", "floorWidthM"], ["floorLengthM", "floorWidthM", "joistSpacingMm", "bearerSpacingM", "pileSpacingM", "timberStockLengthM", "plywoodSheetWidthM", "plywoodSheetHeightM"]);
   if (invalid) return invalid;
-  const floorLengthM = sanitiseMeters(Number(input.floorLengthM));
-  const floorWidthM = sanitiseMeters(Number(input.floorWidthM));
+  const refused = metresProblems([
+    ["Floor length", input.floorLengthM, "edge"],
+    ["Floor width", input.floorWidthM, "edge"],
+  ]);
+  if (refused.length > 0) return refusedTakeoff(refused);
+  const floorLengthM = Number(input.floorLengthM);
+  const floorWidthM = Number(input.floorWidthM);
   const joistSpacingMm =
     input.joistSpacingMm ?? SUBFLOOR_DEFAULTS.joistSpacingMm;
   const bearerSpacingM =

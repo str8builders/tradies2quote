@@ -10,12 +10,15 @@
 // ─────────────────────────────────────────────────────────────────────────
 
 import { round2, safeCeil } from "../quantity-maths";
+import { bareLengthToMetres } from "./plausibility";
 
 /**
- * Convert a length value to metres. The caller hints at the unit but
- * the function also applies a "NZ trade reasonableness" clamp: anything
- * above 50 in metres-named fields is almost certainly millimetres
- * written without a suffix (4800 → 4.8 m).
+ * Convert a length value to metres. A stated unit is always honoured —
+ * "4800 m" stays 4800 m and is then refused by the shared plausibility rule
+ * (takeoff/plausibility.ts), never quietly read as 4.8 m. With NO unit the
+ * shared bare-number convention applies: 100 or more is millimetres
+ * (4800 → 4.8 m), anything smaller is metres as stated (62 → 62 m; the old
+ * "over 50 means mm" rule made it 0.062 m).
  *
  * Returns NaN for non-finite or non-positive inputs so callers can
  * branch on Number.isFinite + the validator can flag it.
@@ -27,12 +30,14 @@ export function toMetres(value: number, unit?: string): number {
     return value / 1000;
   }
   if (u === "cm") return value / 100;
-  if (u === "m" || u === "metre" || u === "metres") return value;
-  // No / unknown unit → reasonableness clamp.
-  return value > 50 ? value / 1000 : value;
+  if (u === "m" || u === "metre" || u === "metres" || u === "meter" || u === "meters") {
+    return value;
+  }
+  // No / unknown unit → the shared bare-number convention.
+  return bareLengthToMetres(value);
 }
 
-/** Convert to millimetres with the same reasonableness clamp. */
+/** Convert to millimetres with the same unit handling as toMetres. */
 export function toMillimetres(value: number, unit?: string): number {
   if (!Number.isFinite(value) || value <= 0) return NaN;
   const m = toMetres(value, unit);
