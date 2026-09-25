@@ -296,7 +296,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const plan = sanitisePlan(parsed.plan);
+  // The wall-run totals are re-added in code from the segments listed in
+  // the dimensions text (the model's own arithmetic isn't trusted).
+  const plan = sanitisePlan(parsed.plan, { dimensionsText: dimensions || legacyTranscript });
   // Prepend deterministic geometry for composite/primitive shapes so the
   // downstream takeoff uses the true area/perimeter, not a bounding box.
   const preamble = geometryPreamble(plan);

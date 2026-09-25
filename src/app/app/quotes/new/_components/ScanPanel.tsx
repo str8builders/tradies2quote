@@ -1266,6 +1266,17 @@ function DimensionReview({
         </div>
       )}
 
+      {plan?.review_flags && plan.review_flags.length > 0 && (
+        <ul
+          data-testid="scan-review-flags"
+          className="mt-3 space-y-1 rounded-sm border border-hivis/40 bg-hivis/10 px-3 py-2 text-xs text-hivis"
+        >
+          {plan.review_flags.map((f, i) => (
+            <li key={i}>{f}</li>
+          ))}
+        </ul>
+      )}
+
       {plan && (
         <div
           data-testid="floor-plan-wrapper"
