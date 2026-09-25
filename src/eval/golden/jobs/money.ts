@@ -71,6 +71,7 @@ function supplierScanJob(spec: {
       tax_amount: q.tax_amount,
       total: q.total,
       reconciliation: q.supplier_source?.reconciliation_status,
+      notes: q.notes.join(" | "),
     };
     q.line_items.forEach((l, i) => {
       actual[`line:${i + 1}`] = l.line_total;
@@ -273,10 +274,29 @@ export const MONEY_JOBS: GoldenJob[] = [
   }),
 
   // ───────────────────────────────────────────────────────────────────────
+  // M02 — $1,231.30 can't be charged to the cent, so the expectation is the
+  // documented behaviour: the nearest reachable total, 1 c off, with a note.
+  //
+  // The quote stores its lines ex-GST and adds GST = 15 % of the ex-GST
+  // subtotal S (whole cents), rounded half-up, so the total is
+  //   T(S) = S + round½↑(0.15 × S).
+  // From S to S + 1, S grows by 1 c and the rounded GST by 0 or 1 c (0.15 × S
+  // grows by 0.15 < 1 and half-up rounding never goes down), so T never falls
+  // and never jumps by more than 2 c. Around the printed total:
+  //   S = 107,069 c: 0.15 × 107,069 = 16,060.35 → 16,060 → T = 123,129 c ($1,231.29)
+  //   S = 107,070 c: 0.15 × 107,070 = 16,060.50 → 16,061 → T = 123,131 c ($1,231.31)
+  // Every S ≤ 107,069 gives T ≤ 123,129 and every S ≥ 107,070 gives
+  // T ≥ 123,131, so NO ex-GST subtotal reaches 123,130 c — $1,231.30 is one of
+  // the totals the cent rounding skips. Both neighbours are 1 c off; the
+  // documented rule (materials/estimateToQuote.exGstSubtotalForTotal) takes
+  // the subtotal nearest the exact 1,231.30 ÷ 1.15 = 1,070.6957 → $1,070.70,
+  // so the mirror charges $1,231.31, and gstRoundingNotes tells the tradie the
+  // printed total can't be matched to the cent. The storage model (ex-GST
+  // lines + GST on the subtotal) is deliberately left as it is.
   supplierScanJob({
     id: "M02-supplier-scan-5-lines-gst-inclusive",
-    title: "PlaceMakers quote, 5 lines, prices INCLUDE GST — mirror must charge $1,231.30",
-    structured: "5 GST-inclusive lines, printed total $1,231.30 incl GST ($160.60 GST), markup 0",
+    title: "PlaceMakers quote, 5 lines, prices INCLUDE GST — $1,231.30 is unreachable: nearest $1,231.31, with a note",
+    structured: "5 GST-inclusive lines, printed total $1,231.30 incl GST ($160.60 GST), markup 0 — a total no ex-GST subtotal + 15 % GST can reach",
     gstInclusive: true,
     rows: [
       ["90x45 H1.2 SG8 framing 4.8m", "length", 12, 28.75, 345.0],
@@ -292,17 +312,15 @@ export const MONEY_JOBS: GoldenJob[] = [
       "line:3": money("34.74", "39.95 ÷ 1.15 = 34.739 → 34.74"),
       "line:4": money("63.00", "72.45 ÷ 1.15 = 63.00"),
       "line:5": money("43.39", "49.90 ÷ 1.15 = 43.391 → 43.39"),
-      materials_subtotal: money("1070.70", "1231.30 − 160.60 (and = the sum of the ex-GST lines)"),
+      materials_subtotal: money("1070.70", "the ex-GST subtotal nearest 1231.30 ÷ 1.15 = 1070.6957 → 107,070 c (= the sum of the five ex-GST lines)"),
       subtotal_before_tax: money("1070.70", "markup 0 → same as materials"),
-      tax_amount: money("160.60", "GST inside $1,231.30 = 1231.30 × 3/23 = 160.604 → 160.60 (what the supplier printed)"),
-      total: money("1231.30", "a faithful mirror charges exactly the supplier's GST-inclusive total"),
+      tax_amount: money("160.61", "15 % × 1070.70 = 160.605 → half-up 160.61 — the quote's GST is 15 % of its own ex-GST subtotal (the supplier printed 160.60)"),
+      total: money("1231.31", "1070.70 + 160.61 — the nearest reachable total: $1,231.30 itself can't be reached (proof above); $1,231.29 and $1,231.31 are both 1 c off and the subtotal nearest the exact value wins"),
       reconciliation: text("ok", "the supplier's own figures add up (lines = subtotal, GST = 3/23 of total)"),
-    },
-    knownBugs: {
-      tax_amount:
-        "KNOWN BUG: materials/scanToQuote.buildScanQuote re-adds 15 % on the ex-GST subtotal (computeQuoteTotals) instead of carrying the GST the inclusive total contains — expected 160.60 (1231.30 × 3/23), code gives 160.61 (15 % × 1070.70 = 160.605 → up)",
-      total:
-        "KNOWN BUG: same cause — the mirror claims 'the quote total equals the supplier quote total' — expected 1231.30, code gives 1231.31 (the customer pays 1 c more than the supplier charged, and reconciliation still says ok)",
+      notes: text(
+        "The supplier's printed total of $1,231.30 can't be matched to the cent with 15% GST added to an ex-GST subtotal — the nearest is $1,231.31.",
+        "estimateToQuote.gstRoundingNotes — the unavoidable 1 c gap is said out loud on the quote, never hidden",
+      ),
     },
   }),
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildScanQuote, type ScanQuoteLine } from "./scanToQuote";
+import { exGstSubtotalForTotal } from "./estimateToQuote";
 import { assessQuoteTakeoffSafety } from "../quote-validation";
 import { computeQuoteTotals, round2 } from "../quote-defaults";
 
@@ -69,6 +70,25 @@ describe("GST-inclusive mirror adds back to the printed total to the cent", () =
     expect(q.quoteData.notes.join(" ")).toMatch(
       /The supplier's printed total of \$999\.00 can't be matched to the cent with 15% GST added to an ex-GST subtotal — the nearest is \$999\.0[01]\./,
     );
+  });
+
+  it("$1,231.30 (golden M02) is unreachable: the total steps 123,129 c → 123,131 c between S = 107,069 and 107,070 c", () => {
+    // The quote's own total for an ex-GST subtotal S (cents): S + 15 % GST, half-up.
+    const totalFor = (s: number) =>
+      Math.round(computeQuoteTotals([{ type: "material", quantity: 1, unit_price: s / 100 }], 0, 15).total * 100);
+    expect(totalFor(107_069)).toBe(123_129); // 16,060.35 → 16,060
+    expect(totalFor(107_070)).toBe(123_131); // 16,060.50 → 16,061 (half-up)
+    // T never falls and steps by 1 or 2 c, so nothing either side reaches it.
+    let prev = totalFor(106_000);
+    for (let s = 106_001; s <= 108_000; s++) {
+      const t = totalFor(s);
+      expect(t - prev === 1 || t - prev === 2).toBe(true);
+      expect(t).not.toBe(123_130);
+      prev = t;
+    }
+    // Nearest reachable: both neighbours are 1 c off; the subtotal nearest
+    // 123,130 ÷ 1.15 = 107,069.57 wins → $1,070.70 ex, $1,231.31 total.
+    expect(exGstSubtotalForTotal(123_130, 0.15)).toEqual({ cents: 107_070, exact: false });
   });
 
   it("property: over 300 mixed carts (5–25 lines, discounts included) the total equals the printed total whenever any ex-GST subtotal can reach it, else is within 1¢", () => {
