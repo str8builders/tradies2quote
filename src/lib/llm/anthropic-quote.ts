@@ -1,6 +1,14 @@
 import "server-only";
 
-import { fetchWithTimeout, FetchTimeoutError, TIMEOUTS } from "@/lib/fetchTimeout";
+import { TIMEOUTS } from "@/lib/fetchTimeout";
+import { AI_MODEL_DEFAULTS, aiModel } from "@/lib/ai/models";
+import {
+  callAnthropic,
+  type AiUsage,
+  type AnthropicTextBlock,
+} from "@/lib/ai/anthropic";
+import { AiError } from "@/lib/ai/errors";
+import type { RetryOptions } from "@/lib/ai/http";
 
 /**
  * Hosted quote generation on Anthropic Claude.
@@ -10,26 +18,34 @@ import { fetchWithTimeout, FetchTimeoutError, TIMEOUTS } from "@/lib/fetchTimeou
  * TEXT_AI_PROVIDER is anything other than "local" and ANTHROPIC_API_KEY is
  * present. A hosted model answers a full quote in seconds; the CPU-only Qwen
  * server on the VPS needs 5–15 minutes for the same job.
+ *
+ * Transport, retries (429/5xx/529/network, with backoff inside a time
+ * budget) and error typing come from the shared AI client (src/lib/ai).
  */
 
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-export const DEFAULT_ANTHROPIC_QUOTE_MODEL = "claude-sonnet-5";
+/** The id lives in src/lib/ai/models.ts (role "quote", env ANTHROPIC_QUOTE_MODEL). */
+export const DEFAULT_ANTHROPIC_QUOTE_MODEL = AI_MODEL_DEFAULTS.quote;
 // A long quote with 40+ line items, labour breakdowns, notes and compliance
 // review can plausibly push past 8192 output tokens; 16384 keeps headroom.
 // max_tokens is a CAP not a minimum — normal quotes cost the same.
 export const ANTHROPIC_QUOTE_MAX_TOKENS = 16384;
 
-// Anthropic intermittently returns 429 (rate limit), 500, 503 and 529
-// (overloaded). Retry transient failures server-side with exponential
-// backoff so a blip is invisible to the tradie.
-const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 529]);
-
-export type AnthropicQuoteOptions = {
+export type AnthropicQuoteOptions = RetryOptions & {
   apiKey: string;
-  system: string;
+  /**
+   * The system prompt: a string, or text blocks. The quote pipeline sends
+   * the stable rules block (with cache_control) and then the tradie's block.
+   */
+  system: string | AnthropicTextBlock[];
   user: string;
   model?: string;
   maxTokens?: number;
+  /**
+   * JSON Schema for structured outputs (`output_config.format`): the reply
+   * is then guaranteed to parse as that shape — unless it was cut off at
+   * max_tokens, which comes back as `truncated: true`.
+   */
+  outputSchema?: Record<string, unknown>;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
 };
@@ -37,91 +53,85 @@ export type AnthropicQuoteOptions = {
 export type AnthropicQuoteResult = {
   text: string;
   model: string;
-  /** "end_turn" | "max_tokens" | "refusal" | … */
+  /** "end_turn" | "max_tokens" | … ("refusal" throws a typed AiError). */
   stopReason: string | null;
-  usage: { inputTokens: number; outputTokens: number };
+  /** The reply stopped at max_tokens, so its JSON is incomplete. */
+  truncated: boolean;
+  usage: AiUsage;
+  /** HTTP attempts the shared client made. */
+  attempts: number;
 };
 
 export function resolveAnthropicQuoteModel(
   env: Record<string, string | undefined> = process.env,
 ): string {
-  return env.ANTHROPIC_QUOTE_MODEL?.trim() || DEFAULT_ANTHROPIC_QUOTE_MODEL;
+  return aiModel("quote", env);
 }
 
-async function fetchWithRetry(
-  url: string,
-  init: RequestInit,
-  timeoutMs: number,
-  fetchImpl: typeof fetch,
-  { attempts = 3, baseDelayMs = 500 }: { attempts?: number; baseDelayMs?: number } = {},
-): Promise<Response> {
-  for (let i = 0; i < attempts; i++) {
-    const isLast = i === attempts - 1;
-    try {
-      const res = await fetchWithTimeout(url, init, timeoutMs, fetchImpl);
-      if (res.ok || !RETRYABLE_STATUSES.has(res.status) || isLast) {
-        return res;
-      }
-      console.warn(`Claude API ${res.status}; retrying (${i + 1}/${attempts - 1})`);
-    } catch (e) {
-      // A timed-out attempt already spent the request budget — retrying
-      // would just leave the client hanging past its own abort.
-      if (e instanceof FetchTimeoutError) throw e;
-      if (isLast) throw e;
-      console.warn(`Claude API network error; retrying (${i + 1}/${attempts - 1})`, e);
-    }
-    await new Promise((r) => setTimeout(r, baseDelayMs * 2 ** i));
-  }
-  throw new Error("fetchWithRetry exhausted all attempts");
+/** The Messages API body. Pure — exported for tests. */
+export function buildAnthropicQuoteBody(opts: {
+  model: string;
+  maxTokens: number;
+  system: string | AnthropicTextBlock[];
+  user: string;
+  outputSchema?: Record<string, unknown>;
+}): Record<string, unknown> {
+  return {
+    model: opts.model,
+    max_tokens: opts.maxTokens,
+    // Current Claude models reject non-default `temperature` and assistant
+    // prefills (both 400); structured outputs replace the old JSON prefill.
+    system: opts.system,
+    messages: [{ role: "user", content: opts.user }],
+    ...(opts.outputSchema
+      ? {
+          output_config: {
+            format: { type: "json_schema", schema: opts.outputSchema },
+          },
+        }
+      : {}),
+  };
 }
 
 export async function runAnthropicQuoteCompletion(
   opts: AnthropicQuoteOptions,
 ): Promise<AnthropicQuoteResult> {
   const model = opts.model ?? resolveAnthropicQuoteModel();
-  const res = await fetchWithRetry(
-    ANTHROPIC_URL,
-    {
-      method: "POST",
-      headers: {
-        "x-api-key": opts.apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      // Current Claude models reject non-default `temperature` and
-      // assistant prefills (both 400) — parseModelJsonObject handles fences.
-      body: JSON.stringify({
-        model,
-        max_tokens: opts.maxTokens ?? ANTHROPIC_QUOTE_MAX_TOKENS,
-        system: opts.system,
-        messages: [{ role: "user", content: opts.user }],
-      }),
-    },
-    opts.timeoutMs ?? TIMEOUTS.generation,
-    opts.fetchImpl ?? fetch,
-  );
+  const reply = await callAnthropic({
+    apiKey: opts.apiKey,
+    body: buildAnthropicQuoteBody({
+      model,
+      maxTokens: opts.maxTokens ?? ANTHROPIC_QUOTE_MAX_TOKENS,
+      system: opts.system,
+      user: opts.user,
+      outputSchema: opts.outputSchema,
+    }),
+    timeoutMs: opts.timeoutMs ?? TIMEOUTS.generation,
+    fetchImpl: opts.fetchImpl,
+    // The pipeline repairs a cut-off reply once, so hand it back.
+    onTruncated: "return",
+    maxAttempts: opts.maxAttempts,
+    budgetMs: opts.budgetMs,
+    sleep: opts.sleep,
+    random: opts.random,
+    now: opts.now,
+    onRetry: opts.onRetry,
+  });
 
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new Error(`Claude API ${res.status}: ${detail.slice(0, 200)}`);
-  }
-
-  const payload = (await res.json()) as {
-    content?: Array<{ type: string; text?: string }>;
-    stop_reason?: string | null;
-    usage?: { input_tokens?: number; output_tokens?: number };
-  };
-  const text = payload.content?.find((c) => c.type === "text")?.text ?? "";
-  if (!text.trim()) {
-    throw new Error("Claude returned an empty response.");
+  if (!reply.text.trim() && !reply.truncated) {
+    throw new AiError({
+      kind: "invalid_output",
+      provider: "anthropic",
+      attempts: reply.attempts,
+      message: "Claude returned an empty response.",
+    });
   }
   return {
-    text,
+    text: reply.text,
     model,
-    stopReason: payload.stop_reason ?? null,
-    usage: {
-      inputTokens: payload.usage?.input_tokens ?? 0,
-      outputTokens: payload.usage?.output_tokens ?? 0,
-    },
+    stopReason: reply.stopReason,
+    truncated: reply.truncated,
+    usage: reply.usage,
+    attempts: reply.attempts,
   };
 }

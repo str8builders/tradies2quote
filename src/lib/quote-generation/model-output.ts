@@ -18,6 +18,101 @@ import type {
 const MAX_LINES = 200;
 const MAX_NOTES = 40;
 
+// ── Structured output contract (hosted path) ──────────────────────────────
+
+const nullableString = { anyOf: [{ type: "string" }, { type: "null" }] } as const;
+
+/**
+ * JSON Schema for the quote reply, sent as `output_config.format` on the
+ * Anthropic path so the reply is always parseable JSON of this shape. It is
+ * exactly the object the system prompt describes (JSON_INSTRUCTIONS in
+ * src/lib/quote-prompt.ts), so the prompt and the constraint never disagree.
+ *
+ * It constrains SHAPE only. Everything is still untrusted: the sanitiser
+ * below whitelists the fields that are read, and the server recomputes every
+ * total. Structured-output limits apply: every object closes with
+ * `additionalProperties: false`, and there are no numeric / length bounds.
+ */
+export const QUOTE_MODEL_OUTPUT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "client",
+    "job_summary",
+    "line_items",
+    "materials_subtotal",
+    "labour_subtotal",
+    "markup_pct",
+    "markup_amount",
+    "subtotal_before_tax",
+    "tax_amount",
+    "total",
+    "currency",
+    "tax_label",
+    "tax_rate",
+    "terms",
+    "notes",
+  ],
+  properties: {
+    client: {
+      type: "object",
+      additionalProperties: false,
+      required: ["name", "address", "email", "phone"],
+      properties: {
+        name: { type: "string" },
+        address: nullableString,
+        email: nullableString,
+        phone: nullableString,
+      },
+    },
+    job_summary: { type: "string" },
+    line_items: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["type", "description", "quantity", "unit", "unit_price", "line_total"],
+        properties: {
+          type: { type: "string", enum: ["material", "labour", "other"] },
+          description: { type: "string" },
+          quantity: { type: "number" },
+          unit: { type: "string" },
+          unit_price: { type: "number" },
+          line_total: { type: "number" },
+        },
+      },
+    },
+    materials_subtotal: { type: "number" },
+    labour_subtotal: { type: "number" },
+    markup_pct: { type: "number" },
+    markup_amount: { type: "number" },
+    subtotal_before_tax: { type: "number" },
+    tax_amount: { type: "number" },
+    total: { type: "number" },
+    currency: { type: "string" },
+    tax_label: { type: "string" },
+    tax_rate: { type: "number" },
+    terms: { type: "string" },
+    notes: { type: "array", items: { type: "string" } },
+  },
+} as const;
+
+/**
+ * The minimum a reply needs before the pipeline can use it: a JSON object
+ * with a `line_items` array. Returns null when usable, else a short reason
+ * that the repair retry quotes back to the model. (The self-hosted model has
+ * no schema enforcement; on the hosted path this is a belt-and-braces check.)
+ */
+export function checkModelQuoteShape(raw: unknown): string | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return "the reply was not a single JSON object";
+  }
+  if (!Array.isArray((raw as { line_items?: unknown }).line_items)) {
+    return 'the object had no "line_items" array';
+  }
+  return null;
+}
+
 export type SanitisedModelQuote = {
   client: QuoteClient;
   job_summary: string;

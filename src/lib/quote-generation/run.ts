@@ -1,9 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/supabase/database.types";
-import { captureError } from "@/lib/observability";
-import { parseModelJsonObject } from "@/lib/modelJson";
-import { FetchTimeoutError } from "@/lib/fetchTimeout";
-import { isAiError } from "@/lib/ai/errors";
 import { DEFAULT_NZ_CONTRACT_TERMS } from "@/lib/default-contract";
 import {
   NZ_DEFAULTS,
@@ -13,7 +9,7 @@ import {
   resolveTaxRate,
   round2,
 } from "@/lib/quote-defaults";
-import { buildQuotePrompt, type PastQuoteSummary } from "@/lib/quote-prompt";
+import { buildQuotePromptParts, type PastQuoteSummary } from "@/lib/quote-prompt";
 import { libraryPriceForLine, matchToLibrary } from "@/lib/materials";
 import {
   canRunCalculator,
@@ -52,11 +48,6 @@ import type {
   QuoteProfile,
   TakeoffInputsSnapshot,
 } from "@/lib/quote-types";
-import { runLocalChatCompletion } from "@/lib/llm/local-chat";
-import {
-  ANTHROPIC_QUOTE_MAX_TOKENS,
-  runAnthropicQuoteCompletion,
-} from "@/lib/llm/anthropic-quote";
 import type { QuoteTextProvider } from "@/lib/llm/quote-text-provider";
 import {
   flushAgentRun,
@@ -64,6 +55,9 @@ import {
   logAgentRunStart,
   newRunId,
 } from "@/lib/agent-monitor/logger";
+import { usageSummary } from "@/lib/agent-monitor/track";
+import type { AiUsage } from "@/lib/ai/anthropic";
+import { callQuoteModel } from "./model-call";
 
 
 /**
@@ -154,10 +148,6 @@ function looksLikeTakeoffMaterial(description: string): boolean {
 // transcript-summary call after the main quote. Keep the platform declaration
 // honest even though the current systemd deployment does not enforce it.
 
-// The live llama.cpp service is capped at 2,048 generated tokens. Asking for
-// more cannot increase the output and makes truncation expectations misleading.
-const MAX_TOKENS = 2048;
-
 
 export interface GenerateQuoteOptions {
   db: SupabaseClient<Database>;
@@ -206,8 +196,13 @@ export async function generateQuoteForUser(
     userId: opts.userId,
   });
 
+  const stats: PipelineStats = { model: null };
   try {
-    const result = await runQuotePipeline(opts);
+    const result = await runQuotePipeline(opts, { runId, stats });
+    // Token and prompt-cache usage for the operator (numbers only).
+    const usage = stats.model
+      ? ` · ${usageSummary(stats.model.usage, stats.model.tries)}`
+      : "";
     logAgentRunFinish({
       agentName: QUOTE_PIPELINE_AGENT_NAME,
       runId,
@@ -216,8 +211,8 @@ export async function generateQuoteForUser(
       // Status code only — the failure bodies are user-facing copy and a
       // future one could carry quote detail we must not log.
       message: result.ok
-        ? "Quote saved"
-        : `Stopped with HTTP ${result.status}`,
+        ? `Quote saved${usage}`
+        : `Stopped with HTTP ${result.status}${usage}`,
       quoteId: opts.quoteId,
       durationMs: Date.now() - startedAt,
     });
@@ -245,8 +240,14 @@ export async function generateQuoteForUser(
   }
 }
 
+/** Filled in by the pipeline for the run.finish summary. */
+type PipelineStats = {
+  model: { tries: number; usage: AiUsage } | null;
+};
+
 async function runQuotePipeline(
   opts: GenerateQuoteOptions,
+  ctx: { runId: string; stats: PipelineStats },
 ): Promise<QuoteGenerationResult> {
   const { db, userId, quoteId, textProvider } = opts;
   const asAdmin = opts.asAdmin === true;
@@ -442,7 +443,9 @@ async function runQuotePipeline(
   // scan instruction can't raise a phantom blocked framing line.
   const legacyCovers = legacyScopeCoverage(parsedTakeoff.type, useCalculator);
 
-  const systemPrompt = buildQuotePrompt(profile, library, {
+  // Two parts: the stable rules/example block (cached across tradies on the
+  // hosted path) and this tradie's settings, library and recent quotes.
+  const promptParts = buildQuotePromptParts(profile, library, {
     skipTakeoffMaterials: useCalculator,
     pastQuotes,
   });
@@ -457,81 +460,21 @@ async function runQuotePipeline(
     `<job_transcript>\n${transcript}\n</job_transcript>`,
   ].join("\n\n");
 
-  // Normalised across providers: the JSON text plus whether the model hit
-  // its output cap (a truncated response can never parse, so it gets its
-  // own actionable message below instead of a generic "malformed").
-  let modelResult: { text: string; finishReason: string | null; truncated: boolean };
-  try {
-    if (textProvider === "anthropic") {
-      const r = await runAnthropicQuoteCompletion({
-        apiKey: process.env.ANTHROPIC_API_KEY!,
-        system: systemPrompt,
-        user: userMessage,
-        maxTokens: ANTHROPIC_QUOTE_MAX_TOKENS,
-      });
-      modelResult = {
-        text: r.text,
-        finishReason: r.stopReason,
-        truncated: r.stopReason === "max_tokens",
-      };
-    } else {
-      const r = await runLocalChatCompletion({
-        system: systemPrompt,
-        user: userMessage,
-        maxTokens: MAX_TOKENS,
-        temperature: 0,
-        responseSchema: {
-          name: "tradies2quote_quote",
-          description: "A structured quote matching the format in the system prompt.",
-          schema: { type: "object" },
-        },
-      });
-      modelResult = {
-        text: r.text,
-        finishReason: r.finishReason,
-        truncated: r.finishReason === "length",
-      };
-    }
-  } catch (e) {
-    console.error(`Quote model (${textProvider}) unreachable`, e);
-    captureError(e, { route: "/api/quotes/generate" });
-    const timedOut =
-      e instanceof FetchTimeoutError || (isAiError(e) && e.kind === "timeout");
-    return fail(timedOut ? 504 : 502, {
-        error: timedOut
-          ? "Quote generation took too long. Please try again."
-          : "Quote generation failed. Please try again.",
-      });
+  // One reply, schema-constrained on the hosted path; a cut-off or unusable
+  // reply gets ONE repair retry that says what was wrong; then a plain
+  // failure (see model-call.ts). Provider blips are retried below that, by
+  // the shared AI client.
+  const modelCall = await callQuoteModel({
+    textProvider,
+    prompt: promptParts,
+    userMessage,
+    monitor: { agentName: QUOTE_PIPELINE_AGENT_NAME, runId: ctx.runId, quoteId: id },
+  });
+  ctx.stats.model = { tries: modelCall.tries, usage: modelCall.usage };
+  if (!modelCall.ok) {
+    return fail(modelCall.status, modelCall.body);
   }
-
-  const text = modelResult.text;
-  if (!text) {
-    return fail(502, { error: "Empty response from quote model. Please try again." });
-  }
-  // A truncated response (`length`) can never parse as complete
-  // JSON, so a retry just reproduces the failure — surface a distinct,
-  // actionable message instead of the generic "malformed" one.
-  if (modelResult.truncated) {
-    return fail(502, {
-        error:
-          "This job was too long to quote in one go. Shorten the description or split it into separate quotes.",
-      });
-  }
-  let modelJson: unknown;
-  try {
-    modelJson = parseModelJsonObject<unknown>(text);
-  } catch (e) {
-    captureError(e, { route: "quotes/generate" });
-    console.error(
-      `Failed to parse quote model (${textProvider}) JSON`,
-      e,
-      "finish_reason:",
-      modelResult.finishReason,
-      "raw (first 800):",
-      text.slice(0, 800),
-    );
-    return fail(502, { error: "Quote response was malformed. Please try again." });
-  }
+  const modelJson: unknown = modelCall.json;
 
   // WHITELIST the model's output (see model-output.ts): only client /
   // job_summary / notes / terms text and each line's type, description,

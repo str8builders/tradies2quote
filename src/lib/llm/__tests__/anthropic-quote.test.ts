@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   ANTHROPIC_QUOTE_MAX_TOKENS,
   DEFAULT_ANTHROPIC_QUOTE_MODEL,
@@ -6,6 +6,10 @@ import {
   runAnthropicQuoteCompletion,
 } from "@/lib/llm/anthropic-quote";
 import { resolveQuoteTextProvider } from "@/lib/llm/quote-text-provider";
+import { AiError } from "@/lib/ai/errors";
+import { QUOTE_MODEL_OUTPUT_SCHEMA } from "@/lib/quote-generation/model-output";
+
+const noWait = async () => {};
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -80,7 +84,7 @@ describe("runAnthropicQuoteCompletion", () => {
     });
   });
 
-  it("retries transient upstream failures before succeeding", async () => {
+  it("retries transient upstream failures and hands back a cut-off reply", async () => {
     let calls = 0;
     const fetchImpl: typeof fetch = async () => {
       calls += 1;
@@ -95,24 +99,122 @@ describe("runAnthropicQuoteCompletion", () => {
       system: "s",
       user: "u",
       fetchImpl,
+      sleep: noWait,
     });
     expect(calls).toBe(2);
     expect(result.stopReason).toBe("max_tokens");
+    expect(result.truncated).toBe(true);
+    expect(result.attempts).toBe(2);
   });
 
-  it("surfaces non-retryable errors without leaking the key", async () => {
-    const fetchImpl: typeof fetch = async () =>
-      jsonResponse({ error: { message: "invalid x-api-key" } }, 401);
-    await expect(
-      runAnthropicQuoteCompletion({ apiKey: "sk-secret", system: "s", user: "u", fetchImpl }),
-    ).rejects.toThrow(/Claude API 401/);
+  it("surfaces non-retryable errors as typed, without leaking the key", async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({ error: { type: "authentication_error", message: "invalid x-api-key" } }, 401),
+    ) as unknown as typeof fetch;
+    const err = await runAnthropicQuoteCompletion({ apiKey: "sk-secret-123456", system: "s", user: "u", fetchImpl }).catch((e) => e);
+    expect(err).toBeInstanceOf(AiError);
+    expect(err.kind).toBe("auth");
+    expect(err.status).toBe(401);
+    expect(`${err.message} ${err.detail}`).not.toContain("sk-secret-123456");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
   it("rejects an empty response", async () => {
     const fetchImpl: typeof fetch = async () =>
       jsonResponse({ content: [], stop_reason: "end_turn" });
+    const err = await runAnthropicQuoteCompletion({ apiKey: "k", system: "s", user: "u", fetchImpl }).catch((e) => e);
+    expect(err).toBeInstanceOf(AiError);
+    expect(err.kind).toBe("invalid_output");
+    expect(err.message).toMatch(/empty response/);
+  });
+
+  it("types a refusal", async () => {
+    const fetchImpl: typeof fetch = async () => jsonResponse({ content: [], stop_reason: "refusal" });
     await expect(
       runAnthropicQuoteCompletion({ apiKey: "k", system: "s", user: "u", fetchImpl }),
-    ).rejects.toThrow(/empty response/);
+    ).rejects.toMatchObject({ kind: "refused" });
+  });
+});
+
+describe("runAnthropicQuoteCompletion — structured output + cached system block", () => {
+  it("sends the schema as output_config.format and the system as blocks", async () => {
+    let body: Record<string, unknown> = {};
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return jsonResponse({
+        content: [{ type: "text", text: '{"line_items":[]}' }],
+        stop_reason: "end_turn",
+        usage: { input_tokens: 400, output_tokens: 30, cache_read_input_tokens: 2900, cache_creation_input_tokens: 0 },
+      });
+    };
+    const result = await runAnthropicQuoteCompletion({
+      apiKey: "k",
+      system: [
+        { type: "text", text: "STABLE RULES", cache_control: { type: "ephemeral" } },
+        { type: "text", text: "TRADIE PART" },
+      ],
+      user: "job",
+      outputSchema: QUOTE_MODEL_OUTPUT_SCHEMA,
+      fetchImpl,
+    });
+    expect(body.output_config).toEqual({
+      format: { type: "json_schema", schema: QUOTE_MODEL_OUTPUT_SCHEMA },
+    });
+    expect(body.system).toEqual([
+      { type: "text", text: "STABLE RULES", cache_control: { type: "ephemeral" } },
+      { type: "text", text: "TRADIE PART" },
+    ]);
+    expect(body).not.toHaveProperty("temperature");
+    expect(result.usage).toEqual({ inputTokens: 400, outputTokens: 30, cacheReadTokens: 2900, cacheCreationTokens: 0 });
+  });
+
+  it("omits output_config when no schema is given", async () => {
+    let body: Record<string, unknown> = {};
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return jsonResponse({ content: [{ type: "text", text: "{}" }], stop_reason: "end_turn" });
+    };
+    await runAnthropicQuoteCompletion({ apiKey: "k", system: "s", user: "u", fetchImpl });
+    expect(body).not.toHaveProperty("output_config");
+  });
+});
+
+describe("QUOTE_MODEL_OUTPUT_SCHEMA", () => {
+  /** Walk every object node: structured outputs require them all closed. */
+  function objects(node: unknown, path = "$"): Array<[string, Record<string, unknown>]> {
+    if (!node || typeof node !== "object") return [];
+    const n = node as Record<string, unknown>;
+    const here: Array<[string, Record<string, unknown>]> = n.type === "object" ? [[path, n]] : [];
+    const kids = [
+      ...Object.entries((n.properties as Record<string, unknown>) ?? {}).map(([k, v]) => objects(v, `${path}.${k}`)),
+      objects(n.items, `${path}[]`),
+      ...((n.anyOf as unknown[]) ?? []).map((v, i) => objects(v, `${path}|${i}`)),
+    ];
+    return [...here, ...kids.flat()];
+  }
+
+  it("closes every object and requires every property", () => {
+    for (const [path, obj] of objects(QUOTE_MODEL_OUTPUT_SCHEMA)) {
+      expect(obj.additionalProperties, path).toBe(false);
+      expect([...(obj.required as string[])].sort(), path).toEqual(Object.keys(obj.properties as object).sort());
+    }
+  });
+
+  it("uses no constraints structured outputs rejects", () => {
+    const json = JSON.stringify(QUOTE_MODEL_OUTPUT_SCHEMA);
+    for (const k of ["minimum", "maximum", "minLength", "maxLength", "multipleOf", "$ref", "pattern"]) {
+      expect(json).not.toContain(`"${k}"`);
+    }
+  });
+
+  it("matches the fields the sanitiser reads", () => {
+    const props = QUOTE_MODEL_OUTPUT_SCHEMA.properties;
+    expect(Object.keys(props.client.properties).sort()).toEqual(["address", "email", "name", "phone"]);
+    expect(Object.keys(props.line_items.items.properties)).toEqual(
+      expect.arrayContaining(["type", "description", "quantity", "unit", "unit_price"]),
+    );
+    expect(props.line_items.items.properties.type.enum).toEqual(["material", "labour", "other"]);
+    expect(props.notes).toEqual({ type: "array", items: { type: "string" } });
+    expect(props.terms).toEqual({ type: "string" });
   });
 });

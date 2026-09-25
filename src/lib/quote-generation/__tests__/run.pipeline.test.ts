@@ -13,12 +13,16 @@ import { DEFAULT_NZ_CONTRACT_TERMS } from "@/lib/default-contract";
 
 const provider = vi.hoisted(() => ({
   output: {} as unknown,
-  calls: [] as Array<{ system: string; user: string }>,
+  calls: [] as Array<{ system: unknown; user: string; outputSchema?: unknown }>,
+  /** Replies served before `output` (e.g. a cut-off one to repair). */
+  queue: [] as Array<{ text: string; stopReason: string }>,
 }));
 vi.mock("@/lib/llm/anthropic-quote", () => ({
   ANTHROPIC_QUOTE_MAX_TOKENS: 16384,
-  runAnthropicQuoteCompletion: async (args: { system: string; user: string }) => {
-    provider.calls.push({ system: args.system, user: args.user });
+  runAnthropicQuoteCompletion: async (args: { system: unknown; user: string; outputSchema?: unknown }) => {
+    provider.calls.push({ system: args.system, user: args.user, outputSchema: args.outputSchema });
+    const queued = provider.queue.shift();
+    if (queued) return { ...queued, model: "mock" };
     return {
       text: JSON.stringify(provider.output),
       model: "mock",
@@ -191,6 +195,7 @@ beforeEach(() => {
   delete process.env.NZ_COMPLIANCE_REVIEW_ENABLED;
   delete process.env.TEXT_AI_PROVIDER;
   provider.calls.length = 0;
+  provider.queue.length = 0;
   critic.calls.length = 0;
   critic.fail = false;
   vi.spyOn(console, "log").mockImplementation(() => {});
@@ -410,5 +415,57 @@ describe("item 7 — the verifier runs on every generated quote", () => {
     critic.fail = true;
     const { qd } = await generate({ transcript: "Reseal the windows and paint the trim.", model, profile: ukProfile, library });
     expect((qd.verification as { checkedBy: string[] }).checkedBy).toEqual(["deterministic"]);
+  });
+});
+
+describe("model call — structured output, cache split, one repair", () => {
+  const MODEL_OUT = {
+    client: { name: "Dave", address: null, email: null, phone: null },
+    job_summary: "Paint a fence",
+    line_items: [{ type: "labour", description: "Paint fence", quantity: 4, unit: "hour", unit_price: 75, line_total: 300 }],
+    terms: "",
+    notes: [],
+  };
+
+  it("sends the stable rules as a cached block, then the tradie's part, with the schema", async () => {
+    await generate({ transcript: "Paint Dave's fence, about 4 hours", model: MODEL_OUT });
+    expect(provider.calls).toHaveLength(1);
+    const system = provider.calls[0].system as Array<{ type: string; text: string; cache_control?: unknown }>;
+    expect(system).toHaveLength(2);
+    expect(system[0].cache_control).toEqual({ type: "ephemeral" });
+    expect(system[0].text).toMatch(/^Common Whisper transcription mistakes/);
+    expect(system[1].cache_control).toBeUndefined();
+    expect(system[1].text).toMatch(/^You are a senior estimator helping a New Zealand tradie/);
+    expect(system[1].text).toContain("Default labour rate: NZD 75/hour");
+    expect(provider.calls[0].outputSchema).toMatchObject({ type: "object", additionalProperties: false });
+  });
+
+  it("repairs a cut-off first reply once and saves the quote", async () => {
+    provider.queue.push({ text: '{"client":{"name":"Da', stopReason: "max_tokens" });
+    const { qd } = await generate({ transcript: "Paint Dave's fence, about 4 hours", model: MODEL_OUT });
+    expect(provider.calls).toHaveLength(2);
+    expect(provider.calls[1].user).toMatch(/cut off by the output limit/);
+    expect(qd.line_items.some((l) => /Paint fence/.test(l.description))).toBe(true);
+  });
+
+  it("answers a plain 502 when the repair is cut off too, saving nothing", async () => {
+    provider.queue.push(
+      { text: "{", stopReason: "max_tokens" },
+      { text: "{", stopReason: "max_tokens" },
+    );
+    const { db, saved } = makeDb({ transcript: "A very long job", profile: NZ_PROFILE });
+    const result = await generateQuoteForUser({
+      db,
+      userId: "11111111-1111-1111-1111-111111111111",
+      quoteId: "q-1",
+      textProvider: "anthropic",
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      status: 502,
+      body: { error: expect.stringMatching(/too long to quote in one go/) },
+    });
+    expect(saved.quote?.quote_data).toBeUndefined();
+    expect(saved.items).toBeUndefined();
   });
 });

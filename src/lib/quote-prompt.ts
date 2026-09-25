@@ -60,7 +60,7 @@ Scan every value of line_items[].description and notes[]. Replace ALL of the fol
 
 After this scan, your output MUST NOT contain any lowercase "jib" or "gibb" anywhere. The string "GIB" or "GIB-line" should appear in their place.`;
 
-const WORKED_EXAMPLE = `WORKED EXAMPLE — this shows the expected shape and level of itemisation. The settings shown here (NZD, GST 15%, $75/hour labour, 20% markup) are illustrative only — ALWAYS use the tradie's actual settings from the top of this prompt.
+const WORKED_EXAMPLE = `WORKED EXAMPLE — this shows the expected shape and level of itemisation. The settings shown here (NZD, GST 15%, $75/hour labour, 20% markup) are illustrative only — ALWAYS use the tradie's actual settings given under "The tradie's settings".
 
 Input job description:
 "This one's for Dave over on Maple Street — small back deck, looks like about eight of the deck boards are rotted through. Need to lift those out and put new ones in, H3.2 ninety by nineteen to match. Reckon about three hours."
@@ -93,114 +93,12 @@ Correct output:
 
 Note how: the client name and street were pulled from the transcript; materials and labour are separate line items; markup is a separate top-level number, never baked into a line_total; the 50% deposit term is omitted because the job is under $5,000; and the two genuine assumptions are flagged in notes.`;
 
-/** A trimmed past quote — scope + line items only, no client PII. */
-export type PastQuoteSummary = {
-  jobSummary: string;
-  lineItems: Array<{
-    type: string;
-    description: string;
-    quantity: number;
-    unit: string;
-    unit_price: number;
-  }>;
-};
-
-export type BuildPromptOptions = {
-  skipTakeoffMaterials?: boolean;
-  /**
-   * A few of the tradie's most recent quotes (scope + line items only).
-   * Shown to the model as a "how this tradie quotes" reference so its
-   * wording, units and pricing lean toward this tradie's real habits.
-   */
-  pastQuotes?: PastQuoteSummary[];
-};
-
 /**
- * Format a handful of the tradie's recent quotes into a compact
- * reference block. Returns "" when there are none (e.g. a new tradie).
+ * Everything in the quote prompt that is identical for every tradie. Keep it
+ * free of interpolation: one tradie-specific byte here would make the cached
+ * prefix unique per tradie again.
  */
-function formatPastQuotesForPrompt(pastQuotes: PastQuoteSummary[]): string {
-  if (pastQuotes.length === 0) return "";
-  const lines = pastQuotes.map((q, i) => {
-    const items = q.lineItems
-      .map(
-        (it) =>
-          `${it.description} (${it.quantity} ${it.unit} @ ${it.unit_price}, ${it.type})`,
-      )
-      .join("; ");
-    return `${i + 1}. ${q.jobSummary}\n   Lines: ${items || "none"}`;
-  });
-  return `HOW THIS TRADIE HAS QUOTED RECENTLY — their last ${
-    pastQuotes.length
-  } quote${
-    pastQuotes.length === 1 ? "" : "s"
-  }, scope + line items only. Use these to match THIS tradie's wording, units, level of itemisation and pricing habits — do NOT copy them as templates:
-
-${lines.join("\n")}`;
-}
-
-export function buildQuotePrompt(
-  profile: QuoteProfile,
-  library: LibraryMaterial[] = [],
-  options: BuildPromptOptions = {},
-): string {
-  const skipTakeoffMaterials = options.skipTakeoffMaterials === true;
-  const countryName =
-    profile.country === "NZ"
-      ? "New Zealand"
-      : profile.country === "AU"
-        ? "Australia"
-        : profile.country === "UK"
-          ? "United Kingdom"
-          : profile.country === "US"
-            ? "United States"
-            : profile.country === "CA"
-              ? "Canada"
-              : profile.country;
-
-  const libraryBlock = `THE TRADIE'S MATERIALS LIBRARY — use these prices and descriptions whenever a material in the job description matches an entry below:
-
-${formatLibraryForPrompt(library, profile.currency)}
-
-Library priority rules:
-- For each material the tradie describes: if it clearly matches an entry above (same product, even if worded differently), USE the library's exact name as the line_item description and the library's price as unit_price.
-- For materials NOT in the library, generate your best-guess unit_price based on typical ${countryName} retail pricing.
-- Library prices are post-trade-discount but pre-markup; do not double-apply markup.`;
-
-  const takeoffExclusionBlock = skipTakeoffMaterials
-    ? `TAKEOFF MATERIALS ARE BEING CALCULATED SEPARATELY — DO NOT GENERATE THEM:
-A deterministic takeoff calculator will produce all of the following materials and add them to the quote AFTER your response:
-- Framing timber (90x45 SG8 studs, plates, nogs)
-- 10mm GIB Board sheets, GIB screws, GIB adhesive
-- Pink Batts insulation
-- Skirting, architraves
-- Framing nails
-
-For this job, your line_items array MUST NOT include any of those. Generate ONLY:
-- labour line items (one or more), priced at the default labour rate unless the transcript says otherwise
-- non-takeoff materials such as paint, primer, sealants, fasteners that aren't framing nails, sandpaper, dropsheets, sundries, etc.
-- "other" type items if relevant
-
-If you list any of the excluded materials, the calculator will overwrite them — please do not waste tokens on them.`
-    : "";
-
-  const pastQuotesBlock = formatPastQuotesForPrompt(options.pastQuotes ?? []);
-
-  return `You are a senior estimator helping a ${countryName} tradie produce a professional quote from a voice memo or typed description of a job.
-
-The tradie's settings:
-- Country: ${profile.country} (${countryName})
-- Currency: ${profile.currency}
-- Tax: ${profile.tax_label} at ${profile.tax_rate}% (apply to the post-markup subtotal)
-- Default labour rate: ${profile.currency} ${profile.default_labour_rate}/hour (use unless the transcript specifies otherwise)
-- Default materials markup: ${profile.default_markup_pct}% (apply ONLY to materials, not to labour)
-
-${TRADIE_TERMS}
-
-${libraryBlock}
-${pastQuotesBlock ? `\n${pastQuotesBlock}\n` : ""}
-${takeoffExclusionBlock ? `\n${takeoffExclusionBlock}\n` : ""}
-Use ${countryName} spelling and trade vocabulary. Use realistic units (m, m², m³, kg, L, hour, day, each, lot).
+export const QUOTE_PROMPT_STABLE = `${TRADIE_TERMS}
 
 Building the line items:
 - Itemise materials separately, each with a realistic quantity, unit, and unit_price
@@ -268,16 +166,160 @@ Never quote a consent fee inside line_items; the customer pays
 council directly. The standard term "Excludes consents and council
 fees unless specifically noted" already covers cost.
 
-Standard terms — include these unless the transcript suggests otherwise:
-- Quote valid 30 days from issue
-- 50% deposit required on acceptance for jobs over ${profile.currency} 5,000
-- Final payment due on completion
-- Variations to be agreed in writing before work proceeds
-- Excludes consents and council fees unless specifically noted
-
 ${JSON_INSTRUCTIONS}
 
 ${WORKED_EXAMPLE}
 
 ${FINAL_VALIDATION}`;
+
+export type QuotePromptParts = {
+  /** Identical for every tradie — sent with cache_control. */
+  stable: string;
+  /** Per-tradie / per-job part, sent after the stable block. */
+  tradie: string;
+};
+
+/** A trimmed past quote — scope + line items only, no client PII. */
+export type PastQuoteSummary = {
+  jobSummary: string;
+  lineItems: Array<{
+    type: string;
+    description: string;
+    quantity: number;
+    unit: string;
+    unit_price: number;
+  }>;
+};
+
+export type BuildPromptOptions = {
+  skipTakeoffMaterials?: boolean;
+  /**
+   * A few of the tradie's most recent quotes (scope + line items only).
+   * Shown to the model as a "how this tradie quotes" reference so its
+   * wording, units and pricing lean toward this tradie's real habits.
+   */
+  pastQuotes?: PastQuoteSummary[];
+};
+
+/**
+ * Format a handful of the tradie's recent quotes into a compact
+ * reference block. Returns "" when there are none (e.g. a new tradie).
+ */
+function formatPastQuotesForPrompt(pastQuotes: PastQuoteSummary[]): string {
+  if (pastQuotes.length === 0) return "";
+  const lines = pastQuotes.map((q, i) => {
+    const items = q.lineItems
+      .map(
+        (it) =>
+          `${it.description} (${it.quantity} ${it.unit} @ ${it.unit_price}, ${it.type})`,
+      )
+      .join("; ");
+    return `${i + 1}. ${q.jobSummary}\n   Lines: ${items || "none"}`;
+  });
+  return `HOW THIS TRADIE HAS QUOTED RECENTLY — their last ${
+    pastQuotes.length
+  } quote${
+    pastQuotes.length === 1 ? "" : "s"
+  }, scope + line items only. Use these to match THIS tradie's wording, units, level of itemisation and pricing habits — do NOT copy them as templates:
+
+${lines.join("\n")}`;
+}
+
+/**
+ * The quote system prompt in two parts, for prompt caching:
+ *  - `stable`: rules, output contract, worked example and final check. The
+ *    same bytes for every tradie, so the hosted path marks it `cache_control`
+ *    and the prefix is reused across tradies (5-minute TTL).
+ *  - `tradie`: role + settings, their materials library, recent quotes, the
+ *    takeoff exclusion, spelling and standard terms — everything that varies.
+ * The sections are the same text as before the split, stable ones first.
+ */
+export function buildQuotePromptParts(
+  profile: QuoteProfile,
+  library: LibraryMaterial[] = [],
+  options: BuildPromptOptions = {},
+): QuotePromptParts {
+  const skipTakeoffMaterials = options.skipTakeoffMaterials === true;
+  const countryName =
+    profile.country === "NZ"
+      ? "New Zealand"
+      : profile.country === "AU"
+        ? "Australia"
+        : profile.country === "UK"
+          ? "United Kingdom"
+          : profile.country === "US"
+            ? "United States"
+            : profile.country === "CA"
+              ? "Canada"
+              : profile.country;
+
+  const libraryBlock = `THE TRADIE'S MATERIALS LIBRARY — use these prices and descriptions whenever a material in the job description matches an entry below:
+
+${formatLibraryForPrompt(library, profile.currency)}
+
+Library priority rules:
+- For each material the tradie describes: if it clearly matches an entry above (same product, even if worded differently), USE the library's exact name as the line_item description and the library's price as unit_price.
+- For materials NOT in the library, generate your best-guess unit_price based on typical ${countryName} retail pricing.
+- Library prices are post-trade-discount but pre-markup; do not double-apply markup.`;
+
+  const takeoffExclusionBlock = skipTakeoffMaterials
+    ? `TAKEOFF MATERIALS ARE BEING CALCULATED SEPARATELY — DO NOT GENERATE THEM:
+A deterministic takeoff calculator will produce all of the following materials and add them to the quote AFTER your response:
+- Framing timber (90x45 SG8 studs, plates, nogs)
+- 10mm GIB Board sheets, GIB screws, GIB adhesive
+- Pink Batts insulation
+- Skirting, architraves
+- Framing nails
+
+For this job, your line_items array MUST NOT include any of those. Generate ONLY:
+- labour line items (one or more), priced at the default labour rate unless the transcript says otherwise
+- non-takeoff materials such as paint, primer, sealants, fasteners that aren't framing nails, sandpaper, dropsheets, sundries, etc.
+- "other" type items if relevant
+
+If you list any of the excluded materials, the calculator will overwrite them — please do not waste tokens on them.`
+    : "";
+
+  const pastQuotesBlock = formatPastQuotesForPrompt(options.pastQuotes ?? []);
+
+  return {
+    stable: QUOTE_PROMPT_STABLE,
+    tradie: `You are a senior estimator helping a ${countryName} tradie produce a professional quote from a voice memo or typed description of a job.
+
+The tradie's settings:
+- Country: ${profile.country} (${countryName})
+- Currency: ${profile.currency}
+- Tax: ${profile.tax_label} at ${profile.tax_rate}% (apply to the post-markup subtotal)
+- Default labour rate: ${profile.currency} ${profile.default_labour_rate}/hour (use unless the transcript specifies otherwise)
+- Default materials markup: ${profile.default_markup_pct}% (apply ONLY to materials, not to labour)
+
+${libraryBlock}
+${pastQuotesBlock ? `\n${pastQuotesBlock}\n` : ""}
+${takeoffExclusionBlock ? `\n${takeoffExclusionBlock}\n` : ""}
+Use ${countryName} spelling and trade vocabulary. Use realistic units (m, m², m³, kg, L, hour, day, each, lot).
+
+Standard terms — include these unless the transcript suggests otherwise:
+- Quote valid 30 days from issue
+- 50% deposit required on acceptance for jobs over ${profile.currency} 5,000
+- Final payment due on completion
+- Variations to be agreed in writing before work proceeds
+- Excludes consents and council fees unless specifically noted`,
+  };
+}
+
+/** The whole system prompt as one string: the stable block, then the tradie's. */
+export function renderQuotePrompt(parts: QuotePromptParts): string {
+  return `${parts.stable}\n\n${parts.tradie}`;
+}
+
+/**
+ * The quote system prompt as a single string (the self-hosted model and
+ * tests). The hosted path sends `buildQuotePromptParts` as two system blocks
+ * so the stable one can be cached; the text is the same either way.
+ */
+export function buildQuotePrompt(
+  profile: QuoteProfile,
+  library: LibraryMaterial[] = [],
+  options: BuildPromptOptions = {},
+): string {
+  return renderQuotePrompt(buildQuotePromptParts(profile, library, options));
 }
