@@ -133,6 +133,10 @@ describe("POST /api/suppliers/extract", () => {
     expect(
       opts.parse({ found: true, name: "  Pine 90x45 ", price: 19.499, unit: "" }),
     ).toEqual({ ok: true, value: { name: "Pine 90x45", price: 19.5, unit: "each" } });
+    // To the cent, exact half-up: $8.075 is $8.08 (float rounding gave $8.07).
+    expect(
+      opts.parse({ found: true, name: "Tek screw", price: 8.075, unit: "each" }),
+    ).toEqual({ ok: true, value: { name: "Tek screw", price: 8.08, unit: "each" } });
     expect(opts.parse({ found: false })).toEqual({ ok: true, value: null });
     expect(opts.parse({ found: true, name: "Pine" }).ok).toBe(false);
   });

@@ -19,6 +19,7 @@ import {
   formatIssueDate,
   isPlaceholderClientName,
   resolveTaxLabel,
+  round2,
 } from "../quote-defaults.ts";
 import { QUOTE_VIDEO_MAX_ITEMS } from "./constants.ts";
 
@@ -109,8 +110,6 @@ function toNumber(value: unknown): number {
   if (typeof value === "string" && value.trim() !== "") return Number(value);
   return Number.NaN;
 }
-
-const round2 = (n: number) => Math.round(n * 100) / 100;
 
 function currencyCode(value: unknown): string | null {
   if (typeof value !== "string") return null;

@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { round2 } from "@/lib/quote-defaults";
 import { createClient } from "@/lib/supabase/server";
 import { STARTER_MATERIALS } from "./_data";
 
@@ -15,7 +16,8 @@ function parsePrice(raw: FormDataEntryValue | null): number | null {
   if (trimmed.length === 0) return null;
   const n = Number(trimmed);
   if (!Number.isFinite(n) || n <= 0) return null;
-  return Math.round(n * 100) / 100;
+  // To the cent, exact half-up — the app's one money rounding rule.
+  return round2(n);
 }
 
 export async function saveQuickStartMaterials(

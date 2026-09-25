@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { round2 } from "@/lib/quote-defaults";
 import { createMaterial } from "../../actions";
 import { ACTION_INITIAL, type ActionResult } from "../../_state";
 import { supplierFromUrl } from "../_lib/supplier-from-url";
@@ -86,13 +87,12 @@ export function CaptureForm({
     return () => clearTimeout(t);
   }, [url, supplierEdited]);
 
-  // GST math for save value + the inline preview.
+  // GST math for save value + the inline preview — to the cent, exact
+  // half-up (the app's one money rounding rule).
   const priceNum = Number(displayPrice);
   const isValidPrice = Number.isFinite(priceNum) && priceNum >= 0;
   const finalPrice = isValidPrice
-    ? incGst
-      ? Math.round((priceNum / (1 + taxRate)) * 100) / 100
-      : Math.round(priceNum * 100) / 100
+    ? round2(incGst ? priceNum / (1 + taxRate) : priceNum)
     : null;
 
   const canConfirm =

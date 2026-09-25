@@ -4,6 +4,7 @@ import { safeGetText, UnsafeUrlError, assertSafeUrl } from "@/lib/net/safeFetch"
 import { parseModelJsonObject } from "@/lib/modelJson";
 import { createClient } from "@/lib/supabase/server";
 import { isOwnerEmail } from "@/lib/owner";
+import { round2 } from "@/lib/quote-defaults";
 import {
   resolveLocalLlmConfig,
   runLocalChatCompletion,
@@ -110,7 +111,9 @@ function normaliseExtractedProduct(parsed: unknown): ExtractedProduct | null {
       ? obj.unit.trim()
       : "each";
   if (!name || !Number.isFinite(price) || price < 0) return null;
-  return { name, price: Math.round(price * 100) / 100, unit };
+  // To the cent, exact half-up (plain float rounding turned $8.075 into
+  // $8.07).
+  return { name, price: round2(price), unit };
 }
 
 /**

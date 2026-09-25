@@ -118,6 +118,12 @@ describe("keyItems — top lines by amount", () => {
     expect(result.items.map((i) => i.label)).toEqual(["Labour", "Second", "Other costs"]);
   });
 
+  it("rounds a half cent up, like every money figure (a 1.005 line showed $1.00)", () => {
+    expect(
+      keyItems([{ type: "material", description: "Galv washer", line_total: 1.005 }], "NZD").items,
+    ).toEqual([{ label: "Galv washer", amount: "$1.01" }]);
+  });
+
   it("copes with missing or malformed line items", () => {
     expect(keyItems(undefined, "NZD")).toEqual({ items: [], moreItems: 0 });
     expect(keyItems([null, "x", 3], "NZD")).toEqual({ items: [], moreItems: 0 });
@@ -180,6 +186,11 @@ describe("buildQuoteVideoProps", () => {
       taxNote: "incl. GST",
       validUntil: "24 Oct 2026",
     });
+  });
+
+  it("rounds a half-cent total up (4.015 showed $4.01 — 401.49999999999994 in floats)", () => {
+    const props = buildQuoteVideoProps(quote({}, { total_amount: 4.015, currency: "NZD" }), null);
+    expect(props.total).toEqual({ value: 4.02, text: "$4.02", currency: "NZD" });
   });
 
   it("uses the quote's total and currency columns first, as the client's quote link does", () => {

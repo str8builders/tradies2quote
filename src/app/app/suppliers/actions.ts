@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { round2 } from "@/lib/quote-defaults";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -20,7 +21,8 @@ export type SupplierSaveResult =
 function parsePrice(raw: unknown): number | null {
   const n = typeof raw === "number" ? raw : Number(raw);
   if (!Number.isFinite(n) || n < 0) return null;
-  return Math.round(n * 100) / 100;
+  // To the cent, exact half-up — the app's one money rounding rule.
+  return round2(n);
 }
 
 function parseString(raw: unknown): string {

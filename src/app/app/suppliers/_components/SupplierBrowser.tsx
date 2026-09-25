@@ -10,6 +10,7 @@ import {
   Storefront,
   X,
 } from "@phosphor-icons/react";
+import { round2 } from "@/lib/quote-defaults";
 import { saveSupplierMaterial } from "../actions";
 import { supplierFromUrl } from "../../materials/capture/_lib/supplier-from-url";
 
@@ -188,9 +189,8 @@ export function SupplierBrowser({ initialUrl }: { initialUrl: string }) {
       price: phase.product.price,
       gstInclusive: phase.gstInclusive,
     };
-    const exGstPrice = final.gstInclusive
-      ? Math.round((final.price / 1.15) * 100) / 100
-      : Math.round(final.price * 100) / 100;
+    // To the cent, exact half-up (the app's one money rounding rule).
+    const exGstPrice = round2(final.gstInclusive ? final.price / 1.15 : final.price);
     setPhase({ ...phase, saving: true, saveError: null });
     const result = await saveSupplierMaterial({
       name: final.name,
@@ -460,9 +460,7 @@ function ReviewSheet({
   const priceNum = Number(price);
   const validPrice = Number.isFinite(priceNum) && priceNum >= 0;
   const exGst = validPrice
-    ? phase.gstInclusive
-      ? Math.round((priceNum / 1.15) * 100) / 100
-      : Math.round(priceNum * 100) / 100
+    ? round2(phase.gstInclusive ? priceNum / 1.15 : priceNum)
     : null;
   const canSave =
     !phase.saving && name.trim().length > 0 && unit.trim().length > 0 && validPrice;
