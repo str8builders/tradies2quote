@@ -1336,6 +1336,7 @@ export type Database = {
           deleted_at: string | null
           expires_at: string | null
           follow_up_sent_at: string | null
+          generation_started_at: string | null
           id: string
           pdf_path: string | null
           pdf_version: number | null
@@ -1373,6 +1374,7 @@ export type Database = {
           deleted_at?: string | null
           expires_at?: string | null
           follow_up_sent_at?: string | null
+          generation_started_at?: string | null
           id?: string
           pdf_path?: string | null
           pdf_version?: number | null
@@ -1410,6 +1412,7 @@ export type Database = {
           deleted_at?: string | null
           expires_at?: string | null
           follow_up_sent_at?: string | null
+          generation_started_at?: string | null
           id?: string
           pdf_path?: string | null
           pdf_version?: number | null

@@ -17,13 +17,21 @@ export function QuoteGenerator({ id }: { id: string }) {
   const [pending, setPending] = useState<boolean>(true);
   const [elapsedS, setElapsedS] = useState<number>(0);
   const [complete, setComplete] = useState(false);
+  // Set while another request (a second tab, an earlier visit) is already
+  // writing this quote — we wait for it instead of starting a second run.
+  const [waitingNote, setWaitingNote] = useState<string>("");
   const startedRef = useRef<boolean>(false);
+  const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
     void generate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => () => {
+    if (retryRef.current) clearTimeout(retryRef.current);
   }, []);
 
   // The elapsed clock remains useful when motion is reduced.
@@ -33,9 +41,9 @@ export function QuoteGenerator({ id }: { id: string }) {
     return () => clearInterval(t);
   }, [pending, complete]);
 
-  async function generate() {
+  async function generate(opts: { keepClock?: boolean } = {}) {
     setError("");
-    setElapsedS(0);
+    if (!opts.keepClock) setElapsedS(0);
     setComplete(false);
     setPending(true);
     try {
@@ -47,9 +55,26 @@ export function QuoteGenerator({ id }: { id: string }) {
         signal: AbortSignal.timeout(30 * 60 * 1000),
       });
       if (res.status === 409) {
+        const data = (await res.json().catch(() => ({}))) as {
+          code?: string;
+          error?: string;
+          retry_after_s?: number;
+        };
+        if (data.code === "generation_in_progress") {
+          // Ask again shortly: the answer is then the finished quote (409 →
+          // refresh), still busy, or — if that request died — a fresh start.
+          setWaitingNote(data.error || "We're already writing this quote.");
+          const waitS = Math.min(30, Math.max(5, Number(data.retry_after_s) || 10));
+          retryRef.current = setTimeout(() => {
+            router.refresh();
+            void generate({ keepClock: true });
+          }, waitS * 1000);
+          return;
+        }
         router.refresh();
         return;
       }
+      setWaitingNote("");
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
         setError(data.message || data.error || `Generation failed (${res.status}).`);
@@ -79,9 +104,11 @@ export function QuoteGenerator({ id }: { id: string }) {
             aria-live="polite"
             className="mt-3 max-w-sm text-sm text-ink-300 sm:text-base"
           >
-            {complete ? "Opening your review." : elapsedS >= 60
-              ? "Still working. Your job details are saved."
-              : "Turning your job details into materials, labour and a total for you to check."}
+            {complete ? "Opening your review." : waitingNote
+              ? waitingNote
+              : elapsedS >= 60
+                ? "Still working. Your job details are saved."
+                : "Turning your job details into materials, labour and a total for you to check."}
           </p>
           <p className="mt-4 text-xs tabular-nums text-ink-400">
             {`${fmtElapsed(elapsedS)} elapsed`}

@@ -58,6 +58,13 @@ import {
 import { usageSummary } from "@/lib/agent-monitor/track";
 import type { AiUsage } from "@/lib/ai/anthropic";
 import { callQuoteModel } from "./model-call";
+import {
+  claimGenerationLease,
+  generationInProgressBody,
+  releaseGenerationLease,
+  startLeaseHeartbeat,
+  type GenerationLease,
+} from "./lease";
 
 
 /**
@@ -276,6 +283,55 @@ async function runQuotePipeline(
   if (existingData && Array.isArray(existingData.line_items)) {
     return fail(409, { error: "Quote has already been generated" });
   }
+
+  // Generation lease — one model run per quote at a time (./lease.ts). A
+  // second request while this one works (double tap, second tab, revisit)
+  // gets a plain "already writing this quote" status to wait on instead of
+  // paying for a second run. Fails open if the lease can't be written.
+  const claim = await claimGenerationLease(db, { quoteId: id, userId });
+  if (claim.kind === "generated") {
+    return fail(409, { error: "Quote has already been generated" });
+  }
+  if (claim.kind === "busy") {
+    return fail(409, generationInProgressBody());
+  }
+  const lease = claim.kind === "claimed" ? claim.lease : null;
+  const heartbeat = lease ? startLeaseHeartbeat(db, lease) : null;
+  const leaseState = { cleared: false };
+  try {
+    return await generateAndSaveQuote({
+      db,
+      userId,
+      textProvider,
+      asAdmin,
+      id,
+      quote,
+      rawTranscript,
+      lease,
+      leaseState,
+      ctx,
+    });
+  } finally {
+    await heartbeat?.stop();
+    // The save clears the lease itself; any other exit releases it here.
+    if (lease && !leaseState.cleared) await releaseGenerationLease(db, lease);
+  }
+}
+
+/** Everything after the lease: build the quote, call the model, save it. */
+async function generateAndSaveQuote(g: {
+  db: SupabaseClient<Database>;
+  userId: string;
+  textProvider: QuoteTextProvider;
+  asAdmin: boolean;
+  id: string;
+  quote: { id: string };
+  rawTranscript: string;
+  lease: GenerationLease | null;
+  leaseState: { cleared: boolean };
+  ctx: { runId: string; stats: PipelineStats };
+}): Promise<QuoteGenerationResult> {
+  const { db, userId, textProvider, asAdmin, id, quote, rawTranscript, lease, leaseState, ctx } = g;
 
   const { data: profileRow } = await db
     .from("profiles")
@@ -1046,10 +1102,10 @@ async function runQuotePipeline(
   if (verification) parsed.verification = verification;
 
   if (parsed.line_items.length > 0) {
-    // Two rapid POSTs for the same quote can both pass the early
-    // "already generated" check (the LLM call sits in the window) — a
-    // plain insert then doubles every row. Delete-before-insert makes
-    // the last writer land a single clean set, matching saveQuoteChanges.
+    // The generation lease stops a second run for the same quote; if it
+    // couldn't be taken (fail-open) two runs can still race here and a
+    // plain insert would double every row. Delete-before-insert makes the
+    // last writer land a single clean set, matching saveQuoteChanges.
     await db.from("quote_items").delete().eq("quote_id", quote.id);
     const { error: iErr } = await db.from("quote_items").insert(
       parsed.line_items.map((it) => ({
@@ -1077,6 +1133,8 @@ async function runQuotePipeline(
       ai_snapshot: parsed as unknown as Json,
       total_amount: parsed.total,
       currency: parsed.currency,
+      // The same write clears the generation lease (./lease.ts).
+      ...(lease ? { generation_started_at: null } : {}),
     })
     .eq("id", quote.id)
     .eq("user_id", userId);
@@ -1084,6 +1142,7 @@ async function runQuotePipeline(
     console.error("quotes update failed", uErr);
     return fail(500, { error: "Failed to save quote" });
   }
+  leaseState.cleared = true;
 
   if (usedLibraryIds.size > 0) {
     const ids = Array.from(usedLibraryIds);

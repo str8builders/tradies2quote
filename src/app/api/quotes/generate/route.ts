@@ -84,7 +84,13 @@ export async function POST(request: NextRequest) {
     textProvider,
   });
   if (!result.ok) {
-    return NextResponse.json(result.body, { status: result.status });
+    // A 409 "generation_in_progress" tells the client when to ask again.
+    const retryAfter = result.body.retry_after_s;
+    return NextResponse.json(result.body, {
+      status: result.status,
+      headers:
+        typeof retryAfter === "number" ? { "retry-after": String(retryAfter) } : undefined,
+    });
   }
   return NextResponse.json({ ok: true });
 }

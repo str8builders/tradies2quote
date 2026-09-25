@@ -13,10 +13,12 @@ export function GenerateRequestButton({ quoteId }: { quoteId: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [note, setNote] = useState("");
 
   async function generate() {
     setBusy(true);
     setError("");
+    setNote("");
     try {
       const res = await fetch("/api/quotes/generate", {
         method: "POST",
@@ -24,11 +26,13 @@ export function GenerateRequestButton({ quoteId }: { quoteId: string }) {
         body: JSON.stringify({ id: quoteId }),
         signal: AbortSignal.timeout(180_000),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
       if (!res.ok && res.status !== 409) {
         setError(data.error || "Couldn't generate the draft. Open it and try again.");
         return;
       }
+      // Another request is already writing it (e.g. the automatic run).
+      if (data.code === "generation_in_progress") setNote(data.error || "Already being written.");
       router.refresh();
     } catch {
       setError("Couldn't reach the server. Try again in a moment.");
@@ -50,6 +54,7 @@ export function GenerateRequestButton({ quoteId }: { quoteId: string }) {
         {busy ? "Generating…" : "Generate draft now"}
       </button>
       {error ? <span className="text-xs text-red-300">{error}</span> : null}
+      {note ? <span className="text-xs text-ink-300">{note}</span> : null}
     </div>
   );
 }
