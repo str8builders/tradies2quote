@@ -1594,6 +1594,7 @@ export type Database = {
           invoice_id: string | null
           note: string | null
           owner_id: string
+          session_id: string | null
           start_time: string
           updated_at: string
           user_id: string
@@ -1635,6 +1636,159 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      job_sites: {
+        Row: {
+          address: string | null
+          client_id: string
+          latitude: number
+          longitude: number
+          owner_id: string
+          radius_m: number
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          client_id: string
+          latitude: number
+          longitude: number
+          owner_id: string
+          radius_m?: number
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          latitude?: number
+          longitude?: number
+          radius_m?: number
+          source?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      location_consents: {
+        Row: {
+          auto_clock: boolean
+          granted: boolean
+          granted_at: string | null
+          owner_id: string
+          revoked_at: string | null
+          updated_at: string
+          user_id: string
+          work_days: number[]
+          work_end: string
+          work_start: string
+        }
+        Insert: {
+          auto_clock?: boolean
+          granted?: boolean
+          granted_at?: string | null
+          owner_id: string
+          revoked_at?: string | null
+          updated_at?: string
+          user_id: string
+          work_days?: number[]
+          work_end?: string
+          work_start?: string
+        }
+        Update: {
+          auto_clock?: boolean
+          granted?: boolean
+          granted_at?: string | null
+          owner_id?: string
+          revoked_at?: string | null
+          updated_at?: string
+          work_days?: number[]
+          work_end?: string
+          work_start?: string
+        }
+        Relationships: []
+      }
+      location_devices: {
+        Row: {
+          created_at: string
+          id: string
+          last_seen_at: string | null
+          revoked_at: string | null
+          token_hash: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_seen_at?: string | null
+          revoked_at?: string | null
+          token_hash: string
+          user_id: string
+        }
+        Update: {
+          last_seen_at?: string | null
+          revoked_at?: string | null
+        }
+        Relationships: []
+      }
+      location_points: {
+        Row: {
+          accuracy: number | null
+          id: number
+          latitude: number
+          longitude: number
+          owner_id: string
+          recorded_at: string
+          session_id: string
+          speed: number | null
+          user_id: string
+        }
+        Insert: {
+          accuracy?: number | null
+          latitude: number
+          longitude: number
+          owner_id: string
+          recorded_at: string
+          session_id: string
+          speed?: number | null
+          user_id: string
+        }
+        Update: {
+          accuracy?: number | null
+        }
+        Relationships: []
+      }
+      work_sessions: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          end_accuracy: number | null
+          end_lat: number | null
+          end_lng: number | null
+          end_place: string | null
+          ended_at: string | null
+          id: string
+          owner_id: string
+          source: string
+          start_accuracy: number | null
+          start_lat: number | null
+          start_lng: number | null
+          start_place: string | null
+          started_at: string
+          time_entry_id: string | null
+          user_id: string
+        }
+        Insert: {
+          client_id?: string | null
+          ended_at?: string | null
+          id?: string
+          owner_id: string
+          source?: string
+          started_at: string
+          user_id: string
+        }
+        Update: {
+          ended_at?: string | null
+        }
+        Relationships: []
       }
       weather_alerts_cache: {
         Row: {
@@ -1743,6 +1897,36 @@ export type Database = {
         Args: { p_quote_id: string }
         Returns: string
       }
+      add_location_points: {
+        Args: { p_user: string | null; p_points: Json }
+        Returns: number
+      }
+      clock_in: {
+        Args: {
+          p_at?: string | null
+          p_lat?: number | null
+          p_lng?: number | null
+          p_accuracy?: number | null
+          p_place?: string | null
+          p_client_id?: string | null
+          p_source?: string
+        }
+        Returns: string
+      }
+      clock_out: {
+        Args: {
+          p_at?: string | null
+          p_lat?: number | null
+          p_lng?: number | null
+          p_accuracy?: number | null
+          p_place?: string | null
+          p_client_id?: string | null
+          p_break_minutes?: number
+          p_time_zone?: string
+        }
+        Returns: Json
+      }
+      purge_location_history: { Args: Record<PropertyKey, never>; Returns: Json }
       create_timesheet_invoice: {
         Args: { p_entry_ids: string[]; p_client_id: string; p_quote_data: Json }
         Returns: Json

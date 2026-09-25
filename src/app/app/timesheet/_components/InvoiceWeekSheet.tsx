@@ -11,7 +11,8 @@ import { Money } from "@/components/ui/money";
 import { NumberField } from "@/components/ui/text-field";
 import { TAP } from "@/components/ui/styles";
 import { formatHours } from "@/lib/timesheet/hours";
-import { buildTimesheetInvoice, parseRate } from "@/lib/timesheet/invoice";
+import { buildTimesheetInvoice, parseKmRate, parseRate } from "@/lib/timesheet/invoice";
+import { Toggle } from "@/components/ui/toggle";
 import { weekLabel } from "@/lib/timesheet/week";
 import { createTimesheetInvoice } from "../actions";
 import type { TimesheetData } from "../_lib/types";
@@ -43,25 +44,34 @@ function InvoiceForm({ data }: { data: TimesheetData }) {
   const choices = useMemo(() => unbilledByClient(data.entries), [data.entries]);
   const [clientId, setClientId] = useState<string | null>(choices[0]?.clientId ?? null);
   const [rateText, setRateText] = useState(data.labourRate > 0 ? String(data.labourRate) : "");
+  const [travelOn, setTravelOn] = useState(false);
+  const [kmRateText, setKmRateText] = useState(data.travelRate ? String(data.travelRate) : "");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const client = data.clients.find((c) => c.id === clientId) ?? null;
   const rate = parseRate(rateText);
+  const kmRate = parseKmRate(kmRateText);
+  const clientKm =
+    Math.round(
+      data.entries.filter((e) => e.clientId === clientId && !e.invoice).reduce((t, e) => t + (e.km ?? 0), 0) * 10,
+    ) / 10;
+  const travelRate = travelOn && clientKm > 0 ? (kmRate ?? 0) : null;
   const preview = useMemo(() => {
     if (!client) return null;
     return buildTimesheetInvoice({
       entries: data.entries
         .filter((e) => e.clientId === client.id && !e.invoice)
-        .map((e) => ({ id: e.id, workDate: e.workDate, hours: e.hours, note: e.note, person: e.person })),
+        .map((e) => ({ id: e.id, workDate: e.workDate, hours: e.hours, note: e.note, person: e.person, km: e.km })),
       rate: rate ?? 0,
       client: { name: client.name, email: client.email, address: client.address, phone: client.phone },
       period: weekLabel(data.weekStart),
       currency: data.currency,
       taxLabel: data.taxLabel,
       taxRate: data.taxRate,
+      travelRate,
     });
-  }, [client, data, rate]);
+  }, [client, data, rate, travelRate]);
 
   if (choices.length === 0) {
     return (
@@ -75,9 +85,15 @@ function InvoiceForm({ data }: { data: TimesheetData }) {
     setError(null);
     if (!clientId) return setError("Pick a client.");
     if (rate === null) return setError("Put in an hourly rate above $0.");
+    if (travelOn && clientKm > 0 && kmRate === null) return setError("Put in a travel rate per km (up to $20).");
     startTransition(async () => {
       try {
-        const result = await createTimesheetInvoice({ clientId, weekStart: data.weekStart, rate });
+        const result = await createTimesheetInvoice({
+          clientId,
+          weekStart: data.weekStart,
+          rate,
+          travelRate: travelOn && clientKm > 0 ? kmRate : null,
+        });
         if (!result.ok) {
           setError(result.error);
           return;
@@ -127,15 +143,37 @@ function InvoiceForm({ data }: { data: TimesheetData }) {
         hint={data.labourRate > 0 ? "From your labour rate. Change it for this invoice if you need to." : "Set a labour rate in Rates and quotes to fill this in."}
       />
 
+      {clientKm > 0 ? (
+        <div className="space-y-3 rounded-ui-lg border border-ui-line p-3">
+          <Toggle
+            checked={travelOn}
+            onChange={setTravelOn}
+            label={`Add travel (${clientKm} km)`}
+            description="Kilometres driven while clocked in for this client, one line per day."
+          />
+          {travelOn ? (
+            <NumberField
+              label="Travel rate"
+              value={kmRateText}
+              onValueChange={setKmRateText}
+              decimals={2}
+              prefix="$"
+              suffix="per km"
+            />
+          ) : null}
+        </div>
+      ) : null}
+
       {preview && preview.ok ? (
         <Card padding="none" data-testid="timesheet-invoice-preview">
           <ul className="divide-y divide-ui-line">
             {preview.quoteData.line_items.map((line) => (
               <li key={line.description} className="flex items-center justify-between gap-3 px-4 py-3 text-ui-base">
                 <span>
-                  <span className="block font-semibold">{line.description.replace(/^Labour, /, "")}</span>
+                  <span className="block font-semibold">{line.description}</span>
                   <span className="block text-ui-sm text-ui-muted">
-                    {formatHours(line.quantity)} at <Money amount={line.unit_price} currency={data.currency} />
+                    {line.unit === "km" ? `${line.quantity} km` : formatHours(line.quantity)} at{" "}
+                    <Money amount={line.unit_price} currency={data.currency} />
                   </span>
                 </span>
                 <Money amount={line.line_total} currency={data.currency} className="font-semibold tabular-nums" />

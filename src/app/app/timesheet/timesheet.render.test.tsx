@@ -28,6 +28,8 @@ const entry = (over: Partial<TimesheetEntry>): TimesheetEntry => ({
   person: "You",
   mine: true,
   invoice: null,
+  pins: null,
+  km: null,
   ...over,
 });
 
@@ -50,6 +52,7 @@ const data = (over: Partial<TimesheetData> = {}): TimesheetData => ({
   taxLabel: "GST",
   taxRate: 15,
   failed: false,
+  travelRate: null,
   ...over,
 });
 

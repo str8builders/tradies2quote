@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { CaretLeft, CaretRight, LockSimple, Plus, Receipt, Timer } from "@phosphor-icons/react/dist/ssr";
-import { Button } from "@/components/ui/button";
+import { CaretLeft, CaretRight, Car, LockSimple, MapPin, MapTrifold, Plus, Receipt, Timer } from "@phosphor-icons/react/dist/ssr";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
 import { Card } from "@/components/ui/card";
 import { cx } from "@/components/ui/cx";
@@ -13,8 +13,10 @@ import { StatusPill } from "@/components/ui/status-pill";
 import { PRESS, TAP, UI_TEXT } from "@/components/ui/styles";
 import { formatHours, formatTime } from "@/lib/timesheet/hours";
 import { addDays, dayLabel, weekLabel } from "@/lib/timesheet/week";
+import type { LocationState } from "../_lib/location-types";
 import type { TimesheetData, TimesheetEntry } from "../_lib/types";
 import { forPerson, groupByDay, unbilledByClient, weekTotals } from "../_lib/view";
+import { ClockCard } from "./ClockCard";
 import { EntrySheet, draftFrom, newDraft, type EntryDraft } from "./EntrySheet";
 import { InvoiceWeekSheet } from "./InvoiceWeekSheet";
 
@@ -52,6 +54,22 @@ function EntryRow({ entry, onOpen }: { entry: TimesheetEntry; onOpen: (entry: Ti
         <span className="block font-semibold break-words text-ui-text">{entry.clientName ?? "No client"}</span>
         <span className="block text-ui-sm text-ui-muted">{detail}</span>
         {entry.note ? <span className="block text-ui-sm break-words text-ui-muted">{entry.note}</span> : null}
+        {entry.pins?.start || entry.pins?.end || entry.km ? (
+          <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-ui-sm text-ui-muted" data-testid="entry-location">
+            {entry.pins?.start ? (
+              <span className="inline-flex items-center gap-1">
+                <MapPin aria-hidden="true" weight="duotone" className="text-ui-info" />
+                {entry.pins.start === entry.pins.end || !entry.pins.end ? entry.pins.start : `${entry.pins.start}, finished ${entry.pins.end.replace(/^At /, "at ").replace(/^Not /, "not ")}`}
+              </span>
+            ) : null}
+            {entry.km ? (
+              <span className="inline-flex items-center gap-1">
+                <Car aria-hidden="true" weight="duotone" className="text-ui-info" />
+                {entry.km} km
+              </span>
+            ) : null}
+          </span>
+        ) : null}
         {entry.invoice ? (
           <span className="mt-1.5 inline-flex">
             <StatusPill tone="ok" icon={<LockSimple weight="bold" />}>
@@ -81,7 +99,16 @@ function EntryRow({ entry, onOpen }: { entry: TimesheetEntry; onOpen: (entry: Ti
  * whole team's hours, can show one person's, and invoices a client for the
  * week.
  */
-export function TimesheetView({ data, openAdd = false }: { data: TimesheetData; openAdd?: boolean }) {
+export function TimesheetView({
+  data,
+  location,
+  openAdd = false,
+}: {
+  data: TimesheetData;
+  /** Your location setting and clock (null: couldn't be read, so no clock card). */
+  location?: LocationState | null;
+  openAdd?: boolean;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const [person, setPerson] = useState<string | null>(null);
@@ -104,6 +131,8 @@ export function TimesheetView({ data, openAdd = false }: { data: TimesheetData; 
 
   return (
     <div className={cx("mt-5 space-y-5", UI_TEXT)} data-testid="timesheet">
+      {location ? <ClockCard state={location} clients={data.clients} canInvoice={data.canInvoice} /> : null}
+
       <WeekNav weekStart={data.weekStart} today={data.today} />
 
       {data.failed ? (
@@ -149,6 +178,11 @@ export function TimesheetView({ data, openAdd = false }: { data: TimesheetData; 
         <Button fullWidth icon={<Plus weight="bold" />} onClick={() => setDraft(newDraft(defaultDay, lastClient))} data-testid="timesheet-add">
           Add hours
         </Button>
+        {data.canInvoice && data.people.length > 1 ? (
+          <ButtonLink href="/app/timesheet/team" variant="secondary" fullWidth icon={<MapTrifold weight="bold" />}>
+            Team map
+          </ButtonLink>
+        ) : null}
         {data.canInvoice ? (
           <Button
             variant="secondary"
@@ -172,7 +206,10 @@ export function TimesheetView({ data, openAdd = false }: { data: TimesheetData; 
                   {dayLabel(group.day)}
                   {group.day === data.today ? <span className="text-ui-sm font-normal text-ui-muted"> · today</span> : null}
                 </h2>
-                <span className="text-ui-sm tabular-nums text-ui-muted">{group.hours > 0 ? formatHours(group.hours) : ""}</span>
+                <span className="text-ui-sm tabular-nums text-ui-muted">
+                  {group.hours > 0 ? formatHours(group.hours) : ""}
+                  {group.km > 0 ? ` · ${group.km} km` : ""}
+                </span>
               </div>
               {group.entries.length > 0 ? (
                 <ul className="divide-y divide-ui-line">

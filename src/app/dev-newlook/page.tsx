@@ -160,7 +160,7 @@ const timesheet: TimesheetData = {
       userId: "me",
       person: "You",
       mine: true,
-      invoice: null,
+      invoice: null, pins: null, km: null
     },
     {
       id: "e2",
@@ -175,7 +175,7 @@ const timesheet: TimesheetData = {
       userId: "s",
       person: "Sione",
       mine: false,
-      invoice: null,
+      invoice: null, pins: null, km: null
     },
     {
       id: "e3",
@@ -190,7 +190,7 @@ const timesheet: TimesheetData = {
       userId: "me",
       person: "You",
       mine: true,
-      invoice: null,
+      invoice: null, pins: null, km: null
     },
     {
       id: "e4",
@@ -205,7 +205,7 @@ const timesheet: TimesheetData = {
       userId: "me",
       person: "You",
       mine: true,
-      invoice: { id: "i1", number: "INV-3F9A21C0" },
+      invoice: { id: "i1", number: "INV-3F9A21C0" }, pins: null, km: null
     },
   ],
   clients: [
@@ -228,6 +228,7 @@ const timesheet: TimesheetData = {
   taxLabel: "GST",
   taxRate: 15,
   failed: false,
+  travelRate: null,
 };
 
 /**

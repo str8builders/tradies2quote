@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NOTE_MAX, workedTime } from "@/lib/timesheet/hours";
 import { buildTimesheetInvoice, type BillableEntry } from "@/lib/timesheet/invoice";
 import { addDays, parseDayKey, weekLabel, weekStart as mondayOf } from "@/lib/timesheet/week";
-import { businessOwnerFor } from "./_lib/load";
+import { businessOwnerFor, sessionFacts } from "./_lib/load";
 import { nameFromEmail } from "./_lib/people";
 
 export type TimesheetResult = { ok: true } | { ok: false; error: string };
@@ -123,6 +123,8 @@ export async function createTimesheetInvoice(input: {
   clientId: string;
   weekStart: string;
   rate: number;
+  /** $ per km to add travel lines (kilometres from the routes), or null. */
+  travelRate?: number | null;
 }): Promise<InvoiceResult> {
   const start = parseDayKey(input?.weekStart);
   if (!start || mondayOf(start) !== start) return { ok: false, error: "Pick a week." };
@@ -136,7 +138,7 @@ export async function createTimesheetInvoice(input: {
   const [entriesResult, clientResult, profileResult, rosterResult] = await Promise.all([
     supabase
       .from("time_entries")
-      .select("id, user_id, work_date, start_time, end_time, break_minutes, note, invoice_id")
+      .select("id, user_id, work_date, start_time, end_time, break_minutes, note, invoice_id, session_id")
       .eq("owner_id", user.id)
       .eq("client_id", input.clientId)
       .gte("work_date", start)
@@ -165,6 +167,11 @@ export async function createTimesheetInvoice(input: {
   const person = (id: string) =>
     id === user.id ? "you" : nameFromEmail(members.find((m) => m.user_id === id)?.email ?? null);
 
+  // Kilometres come from the saved routes, never from the page.
+  const facts = await sessionFacts(
+    supabase,
+    rows.map((r) => r.session_id).filter((v): v is string => typeof v === "string"),
+  );
   const entries: BillableEntry[] = [];
   for (const r of rows) {
     if (typeof r.invoice_id === "string" && billed.has(r.invoice_id)) continue;
@@ -176,6 +183,7 @@ export async function createTimesheetInvoice(input: {
       hours: worked.hours,
       note: (r.note as string | null) ?? null,
       person: person(String(r.user_id)),
+      km: typeof r.session_id === "string" ? (facts.get(r.session_id)?.km ?? null) : null,
     });
   }
 
@@ -191,6 +199,7 @@ export async function createTimesheetInvoice(input: {
     currency,
     taxLabel: resolveTaxLabel(profile.tax_label as string | null, country, currency),
     taxRate: resolveTaxRate(profile.tax_rate, country, currency),
+    travelRate: input.travelRate ?? null,
   });
   if (!built.ok) return built;
 

@@ -18,6 +18,10 @@ export interface TimesheetEntry {
   mine: boolean;
   /** On a live invoice: locked. */
   invoice: { id: string; number: string } | null;
+  /** From clocking in and out: where the start and finish pins were. */
+  pins: { start: string | null; end: string | null } | null;
+  /** Kilometres travelled while clocked in (from the route), or null. */
+  km: number | null;
 }
 
 export interface TimesheetClient {
@@ -49,4 +53,6 @@ export interface TimesheetData {
   taxRate: number;
   /** The week's hours couldn't be read: say so, don't show an empty week. */
   failed: boolean;
+  /** Your last travel rate on an invoice ($ per km), to fill the field. */
+  travelRate: number | null;
 }

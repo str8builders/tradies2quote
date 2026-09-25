@@ -2,6 +2,7 @@ import "server-only";
 import { resolveTaxLabel, resolveTaxRate } from "@/lib/quote-defaults";
 import { createClient } from "@/lib/supabase/server";
 import { getTeamContext } from "@/lib/team";
+import { routeKm } from "@/lib/location/geo";
 import { workedTime } from "@/lib/timesheet/hours";
 import { addDays } from "@/lib/timesheet/week";
 import { nameFromEmail } from "./people";
@@ -9,7 +10,7 @@ import type { TimesheetClient, TimesheetData, TimesheetEntry, TimesheetPerson } 
 
 type Db = Awaited<ReturnType<typeof createClient>>;
 
-const ENTRY_COLUMNS = "id, owner_id, user_id, client_id, work_date, start_time, end_time, break_minutes, note, invoice_id";
+const ENTRY_COLUMNS = "id, owner_id, user_id, client_id, work_date, start_time, end_time, break_minutes, note, invoice_id, session_id";
 
 const hhmm = (value: unknown) => String(value ?? "").slice(0, 5);
 
@@ -90,6 +91,9 @@ export async function loadTimesheet({
     }
   }
 
+  // Pins and kilometres for hours made by clocking in and out.
+  const sessions = await sessionFacts(db, rows.map((r) => r.session_id).filter((v): v is string => typeof v === "string"));
+
   const entries: TimesheetEntry[] = rows.map((r) => {
     const start = hhmm(r.start_time);
     const finish = hhmm(r.end_time);
@@ -111,6 +115,8 @@ export async function loadTimesheet({
       person: names.get(who) ?? "Team member",
       mine: who === userId,
       invoice: invoiceId ? { id: invoiceId, number: live.get(invoiceId)! } : null,
+      pins: typeof r.session_id === "string" ? (sessions.get(r.session_id)?.pins ?? null) : null,
+      km: typeof r.session_id === "string" ? (sessions.get(r.session_id)?.km ?? null) : null,
     };
   });
 
@@ -132,5 +138,41 @@ export async function loadTimesheet({
     taxLabel: resolveTaxLabel(profile.tax_label as string | null, country, currency),
     taxRate: resolveTaxRate(profile.tax_rate, country, currency),
     failed: Boolean(entriesResult.error),
+    travelRate: null,
   };
+}
+
+/**
+ * For each clocked session: its start and finish pins, and the kilometres
+ * along its route (points the person's location setting allowed).
+ */
+export async function sessionFacts(
+  db: Db,
+  ids: readonly string[],
+): Promise<Map<string, { pins: { start: string | null; end: string | null }; km: number | null }>> {
+  const out = new Map<string, { pins: { start: string | null; end: string | null }; km: number | null }>();
+  if (ids.length === 0) return out;
+  const [sessionsResult, pointsResult] = await Promise.all([
+    db.from("work_sessions").select("id, start_place, end_place").in("id", ids),
+    db
+      .from("location_points")
+      .select("session_id, recorded_at, latitude, longitude, accuracy")
+      .in("session_id", ids)
+      .order("recorded_at", { ascending: true })
+      .limit(20000),
+  ]);
+  const bySession = new Map<string, Array<{ t: number; lat: number; lng: number; acc: number | null }>>();
+  for (const p of pointsResult.data ?? []) {
+    const list = bySession.get(p.session_id) ?? [];
+    list.push({ t: Date.parse(p.recorded_at), lat: p.latitude, lng: p.longitude, acc: p.accuracy });
+    bySession.set(p.session_id, list);
+  }
+  for (const s of sessionsResult.data ?? []) {
+    const points = bySession.get(s.id) ?? [];
+    out.set(s.id, {
+      pins: { start: s.start_place, end: s.end_place },
+      km: points.length > 1 ? routeKm(points) : null,
+    });
+  }
+  return out;
 }

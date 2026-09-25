@@ -6,6 +6,7 @@ import { TopProgressBar } from "../../_components/TopProgressBar";
 import { TrialBanner } from "../../_components/TrialBanner";
 import { AppContent } from "./AppContent";
 import { AppNav } from "./AppNav";
+import { LocationBridge } from "./LocationBridge";
 
 /**
  * The site-wide "pause motion" choice (landing footer toggle →

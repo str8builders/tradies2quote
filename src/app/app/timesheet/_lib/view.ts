@@ -8,6 +8,8 @@ export interface DayGroup {
   day: string;
   entries: TimesheetEntry[];
   hours: number;
+  /** Kilometres travelled while clocked in that day (0.1 km). */
+  km: number;
 }
 
 /** Only one person's hours, or everyone's (null). */
@@ -19,7 +21,8 @@ export function forPerson(entries: readonly TimesheetEntry[], userId: string | n
 export function groupByDay(weekStart: string, entries: readonly TimesheetEntry[]): DayGroup[] {
   return weekDays(weekStart).map((day) => {
     const list = entries.filter((e) => e.workDate === day).sort((a, b) => a.start.localeCompare(b.start));
-    return { day, entries: list, hours: sumHours(list.map((e) => e.hours)) };
+    const km = Math.round(list.reduce((t, e) => t + (e.km ?? 0), 0) * 10) / 10;
+    return { day, entries: list, hours: sumHours(list.map((e) => e.hours)), km };
   });
 }
 
