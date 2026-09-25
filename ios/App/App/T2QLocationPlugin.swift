@@ -136,9 +136,15 @@ public class T2QLocationPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDe
         store.set(call.getBool("tracking") ?? false, forKey: Key.tracking)
         let autoClock = call.getBool("autoClock") ?? false
         store.set(autoClock, forKey: Key.autoClock)
-        store.set(call.getArray("sites", JSObject.self) ?? [], forKey: Key.sites)
-        store.set(call.getObject("window") ?? [:], forKey: Key.window)
-        if let open = call.getObject("openSite") { store.set(open, forKey: Key.openSite) } else { store.removeObject(forKey: Key.openSite) }
+        // Only plain values reach UserDefaults: a JavaScript null arrives as
+        // NSNull, which UserDefaults refuses by crashing the app.
+        store.set(Plist.clean(call.getArray("sites", JSObject.self) ?? []) ?? [], forKey: Key.sites)
+        store.set(Plist.clean(call.getObject("window") ?? [:]) ?? [:], forKey: Key.window)
+        if let open = call.getObject("openSite"), let clean = Plist.clean(open) {
+            store.set(clean, forKey: Key.openSite)
+        } else {
+            store.removeObject(forKey: Key.openSite)
+        }
         if autoClock {
             UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         }
@@ -185,17 +191,18 @@ public class T2QLocationPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDe
         let autoClock = store.bool(forKey: Key.autoClock)
 
         // Job-site regions (automatic clock-in needs "Always").
-        let wanted: [String: CLCircularRegion]
+        var wanted: [String: CLCircularRegion] = [:]
         if autoClock, status == .authorizedAlways, CLLocationManager.isMonitoringAvailable(for: CLCircularRegion.self) {
-            wanted = Dictionary(uniqueKeysWithValues: sites().prefix(18).map { site in
+            for site in sites() where wanted.count < 18 {
+                let center = CLLocationCoordinate2D(latitude: site.lat, longitude: site.lng)
+                let id = regionPrefix + site.id
+                guard wanted[id] == nil, CLLocationCoordinate2DIsValid(center) else { continue }
                 let radius = min(max(site.radius, 100), manager.maximumRegionMonitoringDistance)
-                let region = CLCircularRegion(center: CLLocationCoordinate2D(latitude: site.lat, longitude: site.lng), radius: radius, identifier: regionPrefix + site.id)
+                let region = CLCircularRegion(center: center, radius: radius, identifier: id)
                 region.notifyOnEntry = true
                 region.notifyOnExit = true
-                return (region.identifier, region)
-            })
-        } else {
-            wanted = [:]
+                wanted[id] = region
+            }
         }
         for region in ourRegions() where wanted[region.identifier] == nil { manager.stopMonitoring(for: region) }
         let watching = Set(ourRegions().map(\.identifier))
@@ -203,15 +210,19 @@ public class T2QLocationPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDe
 
         // The route while clocked in.
         if tracking, status == .authorizedAlways || status == .authorizedWhenInUse {
-            manager.allowsBackgroundLocationUpdates = true
-            manager.showsBackgroundLocationIndicator = true
+            // Turning this on without the "location" background mode in
+            // Info.plist is a crash, so check rather than assume.
+            if Self.hasBackgroundLocationMode {
+                manager.allowsBackgroundLocationUpdates = true
+                manager.showsBackgroundLocationIndicator = true
+            }
             manager.startUpdatingLocation()
             if flushTimer == nil {
                 flushTimer = Timer.scheduledTimer(withTimeInterval: 120, repeats: true) { [weak self] _ in self?.flush() }
             }
         } else {
             manager.stopUpdatingLocation()
-            manager.allowsBackgroundLocationUpdates = false
+            if Self.hasBackgroundLocationMode { manager.allowsBackgroundLocationUpdates = false }
             flushTimer?.invalidate()
             flushTimer = nil
             flush()
@@ -253,13 +264,16 @@ public class T2QLocationPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDe
         guard store.bool(forKey: Key.tracking) else { return }
         var buffer = store.array(forKey: Key.buffer) as? [[String: Any]] ?? []
         for location in locations where location.horizontalAccuracy > 0 && location.horizontalAccuracy <= 100 {
-            buffer.append([
+            var point: [String: Any] = [
                 "t": location.timestamp.timeIntervalSince1970 * 1000,
                 "lat": location.coordinate.latitude,
                 "lng": location.coordinate.longitude,
                 "acc": location.horizontalAccuracy,
-                "speed": location.speed >= 0 ? location.speed : NSNull(),
-            ])
+            ]
+            // Speed is -1 when iOS doesn't know it (standing still); leave it
+            // out, never NSNull, which UserDefaults can't hold.
+            if location.speed >= 0 { point["speed"] = location.speed }
+            buffer.append(point)
         }
         store.set(Array(buffer.suffix(2000)), forKey: Key.buffer)
         if buffer.count >= 30 { flush() }
@@ -349,6 +363,9 @@ public class T2QLocationPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDe
 
     // MARK: - Helpers
 
+    private static let hasBackgroundLocationMode: Bool =
+        (Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String])?.contains("location") == true
+
     private struct Site {
         let id: String
         let name: String
@@ -427,6 +444,31 @@ public class T2QLocationPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDe
         case .denied: return "denied"
         case .restricted: return "restricted"
         default: return "notDetermined"
+        }
+    }
+}
+
+/// Turns values from the page into ones UserDefaults accepts (strings,
+/// numbers, booleans, dates, arrays and dictionaries), dropping nulls.
+private enum Plist {
+    static func clean(_ value: Any) -> Any? {
+        switch value {
+        case is NSNull:
+            return nil
+        case let text as String:
+            return text
+        case let number as NSNumber:
+            return number
+        case let date as Date:
+            return date
+        case let dict as [String: Any]:
+            var out: [String: Any] = [:]
+            for (key, item) in dict { if let item = clean(item) { out[key] = item } }
+            return out
+        case let list as [Any]:
+            return list.compactMap { clean($0) }
+        default:
+            return nil
         }
     }
 }
