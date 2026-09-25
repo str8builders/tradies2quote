@@ -18,7 +18,7 @@
  * itself yet).
  */
 
-import type { Tone } from "@/components/ui/styles";
+import type { IconTone, Tone } from "@/components/ui/styles";
 import { displayClientName, isPlaceholderClientName } from "@/lib/quote-defaults";
 import type { QuoteStatus } from "@/lib/quote-types";
 import type { InvoiceStatus } from "@/lib/types/invoice";
@@ -458,4 +458,38 @@ export function oldLookHrefForJobs(filter: JobFilter): string {
     default:
       return "/app/quotes";
   }
+}
+
+// ── Colour and counts (new look round two) ──────────────────────────────────
+
+/** Each filter's colour (IconTone meanings): quotes to send orange, waiting amber, booked blue, unpaid red, paid green. */
+export const FILTER_TONE: Readonly<Record<JobFilter, IconTone>> = {
+  all: "neutral",
+  "to-send": "brand",
+  waiting: "warn",
+  booked: "info",
+  unpaid: "bad",
+  done: "ok",
+};
+
+/** Up to two capital letters for a client ("Hemi Walker" → "HW"); "?" with no name. */
+export function clientInitials(client: string): string {
+  if (!client.trim() || client === NO_CLIENT_NAME) return "?";
+  const words = client
+    .replace(/[^\p{L}\p{N}\s'-]/gu, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+  const letters = words.length > 1 ? [words[0], words[words.length - 1]] : words.slice(0, 1);
+  const out = letters.map((w) => [...w][0] ?? "").join("").toLocaleUpperCase();
+  return out || "?";
+}
+
+const CLIENT_TONES: readonly IconTone[] = ["violet", "info", "ok", "warn", "brand"];
+
+/** A steady colour per client name, so the same client always looks the same. */
+export function clientTone(client: string): IconTone {
+  if (!client.trim() || client === NO_CLIENT_NAME) return "neutral";
+  let hash = 0;
+  for (const ch of client.toLocaleLowerCase()) hash = (hash * 31 + (ch.codePointAt(0) ?? 0)) >>> 0;
+  return CLIENT_TONES[hash % CLIENT_TONES.length];
 }

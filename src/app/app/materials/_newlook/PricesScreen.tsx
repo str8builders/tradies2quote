@@ -122,7 +122,7 @@ export async function PricesBody({ userId }: { userId: string }) {
       {empty ? (
         <Card padding="none">
           <EmptyState
-            icon={<Tag weight="bold" />}
+            icon={<Tag weight="duotone" />}
             title="No prices yet"
             action={
               <ButtonLink href="/app/materials/quick-start" fullWidth icon={<Lightning weight="bold" />}>
@@ -176,7 +176,8 @@ export async function PricesBody({ userId }: { userId: string }) {
             <li>
               <ListRow
                 href="/app/materials/capture"
-                icon={<LinkSimple weight="bold" />}
+                icon={<LinkSimple weight="duotone" />}
+                iconTone="info"
                 title="Copy from a supplier's website"
                 subtitle="Paste a product link and we save the price."
               />
@@ -184,7 +185,8 @@ export async function PricesBody({ userId }: { userId: string }) {
             <li>
               <ListRow
                 href="/app/suppliers"
-                icon={<Storefront weight="bold" />}
+                icon={<Storefront weight="duotone" />}
+                iconTone="ok"
                 title="Shop supplier websites"
                 subtitle="Mitre 10, Bunnings, ITM and PlaceMakers, inside the app."
               />
@@ -193,7 +195,8 @@ export async function PricesBody({ userId }: { userId: string }) {
               <li>
                 <ListRow
                   href="/app/materials/kits"
-                  icon={<Stack weight="bold" />}
+                  icon={<Stack weight="duotone" />}
+                  iconTone="tools"
                   title="Kits"
                   subtitle="Save a standard job once, then add it to a quote in one tap."
                 />

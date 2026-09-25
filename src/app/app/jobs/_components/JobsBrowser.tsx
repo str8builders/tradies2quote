@@ -12,7 +12,14 @@ import { StatusPill } from "@/components/ui/status-pill";
 import { TextField } from "@/components/ui/text-field";
 import { NEW_QUOTE_PATH } from "../../_v2/lib/app-nav";
 import { countOf } from "../../_v2/lib/dates";
+import { cx } from "@/components/ui/cx";
+import { TONE_STRIPE } from "@/components/ui/styles";
 import {
+  FILTER_TONE,
+  JOB_FILTERS,
+  clientInitials,
+  clientTone,
+  filterCounts,
   matchesSearch,
   normalizeSearch,
   parseJobFilter,
@@ -46,10 +53,39 @@ function writeUrl(filter: JobFilter, query: string): void {
   window.history.replaceState(null, "", `${window.location.pathname}${search ? `?${search}` : ""}`);
 }
 
+/**
+ * Where the jobs are, as one bar in the filter colours, with the counts in
+ * words underneath (the bar alone is never the only way to read it).
+ */
+export function StageBar({ counts }: { counts: Readonly<Record<JobFilter, number>> }) {
+  const stages = JOB_FILTERS.filter((f) => f.id !== "all" && counts[f.id] > 0);
+  const total = stages.reduce((sum, f) => sum + counts[f.id], 0);
+  if (total === 0) return null;
+  return (
+    <section aria-label="Where your jobs are" data-testid="jobs-stage-bar" className="space-y-2">
+      <div aria-hidden="true" className="flex h-2.5 gap-0.5 overflow-hidden rounded-full">
+        {stages.map((f) => (
+          <span key={f.id} className={TONE_STRIPE[FILTER_TONE[f.id]]} style={{ flexGrow: counts[f.id] }} />
+        ))}
+      </div>
+      <p className="flex flex-wrap gap-x-3 gap-y-1 text-ui-xs text-ui-muted">
+        {stages.map((f) => (
+          <span key={f.id} className="inline-flex items-center gap-1.5">
+            <span aria-hidden="true" className={cx("h-2 w-2 rounded-full", TONE_STRIPE[FILTER_TONE[f.id]])} />
+            {counts[f.id]} {f.label.toLocaleLowerCase()}
+          </span>
+        ))}
+      </p>
+    </section>
+  );
+}
+
 function JobRowItem({ row }: { row: JobRow }) {
   return (
     <ListRow
       href={row.href}
+      icon={<span className="text-ui-sm font-bold">{clientInitials(row.client)}</span>}
+      iconTone={clientTone(row.client)}
       title={row.client}
       subtitle={
         <>
@@ -86,6 +122,7 @@ export function JobsBrowser({ rows }: { rows: JobRow[] }) {
     setShown(JOBS_PAGE_SIZE);
   }
 
+  const counts = useMemo(() => filterCounts(rows), [rows]);
   const inFilter = useMemo(() => rowsForFilter(rows, filter), [rows, filter]);
   const matches = useMemo(() => inFilter.filter((row) => matchesSearch(row, query)), [inFilter, query]);
   const visible = matches.slice(0, shown);
@@ -119,7 +156,8 @@ export function JobsBrowser({ rows }: { rows: JobRow[] }) {
         enterKeyHint="search"
         autoComplete="off"
       />
-      <FilterChips value={filter} onChange={pick} />
+      <StageBar counts={counts} />
+      <FilterChips value={filter} onChange={pick} counts={counts} />
       <p aria-live="polite" data-testid="jobs-count" className="text-ui-sm text-ui-muted">
         {summary}
       </p>
@@ -136,7 +174,7 @@ export function JobsBrowser({ rows }: { rows: JobRow[] }) {
         </Card>
       ) : rows.length === 0 ? (
         <EmptyState
-          icon={<Briefcase weight="bold" />}
+          icon={<Briefcase weight="duotone" />}
           title="No jobs yet"
           action={
             <ButtonLink href={NEW_QUOTE_PATH} icon={<Plus weight="bold" />} fullWidth>

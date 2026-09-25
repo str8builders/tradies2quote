@@ -5,6 +5,10 @@ import {
   buildJobRows,
   clientFirstName,
   filterCounts,
+  FILTER_TONE,
+  clientInitials,
+  clientTone,
+  NO_CLIENT_NAME,
   invoiceLateDays,
   jobState,
   jobsFilterForInvoiceStatus,
@@ -275,5 +279,25 @@ describe("filters and links", () => {
     expect(oldLookHrefForJobs("booked")).toBe("/app/quotes");
     expect(oldLookHrefForJobs("unpaid")).toBe("/app/invoices");
     expect(oldLookHrefForJobs("done")).toBe("/app/invoices?status=paid");
+  });
+});
+
+describe("colour and initials (round two)", () => {
+  it("every filter has its colour; All stays neutral", () => {
+    expect(FILTER_TONE).toEqual({ all: "neutral", "to-send": "brand", waiting: "warn", booked: "info", unpaid: "bad", done: "ok" });
+  });
+  it("client initials: first and last word, capitals, ? with no name", () => {
+    expect(clientInitials("Hemi Walker")).toBe("HW");
+    expect(clientInitials("sarah jane tane")).toBe("ST");
+    expect(clientInitials("Bunnings")).toBe("B");
+    expect(clientInitials("Ōtūmoetai School")).toBe("ŌS");
+    expect(clientInitials(NO_CLIENT_NAME)).toBe("?");
+    expect(clientInitials("   ")).toBe("?");
+    expect(clientInitials("(Mr) Ben & Co")).toBe("MC");
+  });
+  it("a client keeps one colour; no name is neutral", () => {
+    expect(clientTone("Hemi Walker")).toBe(clientTone("hemi walker"));
+    expect(["violet", "info", "ok", "warn", "brand"]).toContain(clientTone("Hemi Walker"));
+    expect(clientTone(NO_CLIENT_NAME)).toBe("neutral");
   });
 });

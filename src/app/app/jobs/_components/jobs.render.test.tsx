@@ -52,8 +52,18 @@ describe("FilterChips", () => {
     expect(out.match(/aria-checked="true"/g)).toHaveLength(1);
     expect(out).toMatch(/aria-checked="true" tabindex="0" data-filter="unpaid"/);
     expect(out.match(/tabindex="-1"/g)).toHaveLength(5);
-    for (const label of ["All", "To send", "Waiting", "Booked", "Unpaid", "Done"]) expect(out).toContain(`>${label}</button>`);
+    for (const label of ["All", "To send", "Waiting", "Booked", "Unpaid", "Done"]) expect(out).toContain(`<span>${label}</span>`);
     expect(out).toContain("min-h-12");
+    // The chosen chip wears its own colour (Unpaid: red); the rest show a dot.
+    expect(out).toMatch(/data-filter="unpaid" class="[^"]*border-ui-bad[^"]*bg-ui-bad-soft/);
+    expect(out.match(/rounded-full bg-ui-/g)).toHaveLength(4);
+  });
+
+  it("shows how many jobs each filter holds", () => {
+    const counts = { all: 9, "to-send": 2, waiting: 1, booked: 3, unpaid: 2, done: 1 } as const;
+    const out = html(<FilterChips value="all" onChange={() => {}} counts={counts} />);
+    expect(out).toMatch(/<span>To send<\/span><span[^>]*>2<\/span>/);
+    expect(out).toMatch(/<span>All<\/span><span[^>]*>9<\/span>/);
   });
 });
 

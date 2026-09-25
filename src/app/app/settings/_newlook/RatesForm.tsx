@@ -170,7 +170,8 @@ export function RatesForm({
           <li>
             <ListRow
               href="/app/templates"
-              icon={<FileText weight="bold" />}
+              icon={<FileText weight="duotone" />}
+              iconTone="brand"
               title="Terms templates"
               subtitle="Quotes are valid for 30 days. Save your own wording to use on quotes."
             />

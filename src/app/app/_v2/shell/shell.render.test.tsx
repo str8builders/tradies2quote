@@ -43,7 +43,8 @@ describe("AppNav: bottom bar on phones, side rail from sm", () => {
     ]);
     expect(out).toMatch(/<nav [^>]*aria-label="Main"/);
     expect(linkTo(out, "/app/quotes/new")).toContain('aria-label="New quote"');
-    expect(out).toContain("bg-ui-brand");
+    // The New tile: the orange gradient (its base colour is the brand fill).
+    expect(out).toContain("ui-brand-gradient");
     for (const label of ["Home", "Jobs", "Prices", "More"]) expect(out).toContain(`>${label}</span>`);
   });
 

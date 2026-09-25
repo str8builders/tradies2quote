@@ -37,8 +37,8 @@ function NavLink({ tab, current }: { tab: AppTab; current: boolean }) {
         <span
           aria-hidden="true"
           className={cx(
-            "-mt-5 inline-flex h-14 w-14 items-center justify-center rounded-ui-lg bg-ui-brand text-[1.625rem] text-ui-on-brand shadow-ui-raised sm:mt-0 sm:h-12 sm:w-12",
-            current && "ring-2 ring-ui-text ring-offset-2 ring-offset-ui-bg",
+            "ui-brand-gradient -mt-5 inline-flex h-14 w-14 items-center justify-center rounded-ui-lg text-[1.625rem] text-ui-on-brand shadow-ui-raised ring-4 ring-ui-bg sm:mt-0 sm:h-12 sm:w-12 sm:ring-0",
+            current && "outline-2 outline-offset-2 outline-ui-text",
           )}
         >
           <TabIcon weight="bold" />
@@ -64,7 +64,7 @@ function NavLink({ tab, current }: { tab: AppTab; current: boolean }) {
         current ? "text-ui-brand-text sm:bg-ui-surface-2" : "text-ui-muted hover:text-ui-text",
       )}
     >
-      <TabIcon aria-hidden="true" weight={current ? "fill" : "regular"} className="text-[1.5rem]" />
+      <TabIcon aria-hidden="true" weight={current ? "fill" : "duotone"} className="text-[1.5rem]" />
       <span className="max-w-full truncate">{tab.label}</span>
     </Link>
   );
