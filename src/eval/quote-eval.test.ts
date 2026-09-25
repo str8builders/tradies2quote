@@ -18,6 +18,7 @@ import { resolve } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { buildQuotePrompt } from "@/lib/quote-prompt";
 import { parseModelJsonObject } from "@/lib/modelJson";
+import { aiModel } from "@/lib/ai/models";
 import type {
   LibraryMaterial,
   QuoteData,
@@ -34,7 +35,8 @@ import {
 const ENABLED = process.env.RUN_QUOTE_EVAL === "1";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-sonnet-5";
+// The same model the pipeline uses (src/lib/ai/models.ts, role "quote").
+const MODEL = aiModel("quote");
 
 /** Pull ANTHROPIC_API_KEY from the shell env, falling back to `.env.local`. */
 function resolveApiKey(): string | null {

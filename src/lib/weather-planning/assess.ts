@@ -15,6 +15,8 @@
 
 import "server-only";
 import type { Json } from "@/lib/supabase/database.types";
+import { captureError } from "@/lib/observability";
+import { describeAiError } from "@/lib/ai/errors";
 import { adminClient } from "@/lib/supabase/admin";
 import { runPat } from "@/lib/agents/pat";
 import { runWilla } from "@/lib/agents/willa";
@@ -221,7 +223,9 @@ export async function assessJob(input: AssessJobInput): Promise<AssessJobResult>
       }
     } catch (err) {
       // Agents are best-effort: a deterministic assessment is already stored.
-      console.error("weather-planning agents failed", input.quoteId, err);
+      // Reported (never silent): the typed AiError says which call failed.
+      console.error("weather-planning agents failed", input.quoteId, describeAiError(err));
+      captureError(err, { route: "weather-planning/assess" });
     }
   }
 

@@ -10,6 +10,8 @@
 
 import "server-only";
 import { adminClient } from "@/lib/supabase/admin";
+import { captureError } from "@/lib/observability";
+import { describeAiError } from "@/lib/ai/errors";
 import { assessJob, type TriggerSource } from "./assess";
 
 export interface SweepArgs {
@@ -70,7 +72,8 @@ export async function runWeatherSweep(args: SweepArgs): Promise<SweepResult> {
       }
     } catch (err) {
       result.errors += 1;
-      console.error("weather sweep job failed", job.id, err);
+      console.error("weather sweep job failed", job.id, describeAiError(err));
+      captureError(err, { route: `weather-planning/cron:${args.triggerSource}` });
     }
   }
   return result;
