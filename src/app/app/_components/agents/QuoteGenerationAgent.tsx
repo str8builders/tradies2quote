@@ -56,7 +56,7 @@ function quoteToText(q: GeneratedQuote): string {
   for (const l of q.lineItems) {
     const qty = `${l.quantity} ${l.unit}`;
     lines.push(
-      `[${CATEGORY_LABELS[l.category]}] ${l.description} · ${qty} × ${formatNZD(l.unitPrice)} = ${formatNZD(l.lineTotal)}`,
+      `[${CATEGORY_LABELS[l.category]}] ${l.description} · ${qty} × ${formatNZD(l.unitPrice)}${l.priceIsEstimate ? " (estimate — confirm)" : ""} = ${formatNZD(l.lineTotal)}`,
     );
   }
   lines.push("");
@@ -302,6 +302,11 @@ export function QuoteGenerationAgent() {
                       </td>
                       <td className="px-3 py-2 tabular-nums text-ink-200">
                         {formatNZD(l.unitPrice)}
+                        {l.priceIsEstimate && (
+                          <span className="ml-1.5 font-mono text-[9px] uppercase tracking-[0.2em] text-hivis">
+                            estimate
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums text-white">
                         {formatNZD(l.lineTotal)}
