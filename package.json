@@ -31,6 +31,7 @@
     "@capacitor/share": "^8.0.1",
     "@capacitor/splash-screen": "^8.0.2",
     "@phosphor-icons/react": "^2.1.10",
+    "@react-three/fiber": "^9.8.1",
     "@remotion/player": "4.0.488",
     "@remotion/three": "4.0.488",
     "@sentry/nextjs": "^10.55.0",
