@@ -83,7 +83,7 @@ export async function loadHomeData({
   };
 }
 
-async function HomeBody({ userId, isOwner }: { userId: string; isOwner: boolean }) {
+async function HomeBody({ userId, isOwner, t2qcal }: { userId: string; isOwner: boolean; t2qcal: boolean }) {
   const { weather, ...view } = await loadHomeData({
     db: await createClient(),
     userId,
@@ -94,6 +94,7 @@ async function HomeBody({ userId, isOwner }: { userId: string; isOwner: boolean 
   return (
     <HomeView
       {...view}
+      t2qcal={t2qcal}
       weather={
         weather ? (
           <Suspense fallback={<Skeleton shape="line" className="h-9 w-48 rounded-full" />}>
@@ -117,7 +118,7 @@ export function NewHome({ userId, isOwner, bar }: { userId: string; isOwner: boo
         <TabTopBar data={bar} />
         <div className="mt-5">
           <Suspense fallback={<HomeSkeleton />}>
-            <HomeBody userId={userId} isOwner={isOwner} />
+            <HomeBody userId={userId} isOwner={isOwner} t2qcal={bar.t2qcal} />
           </Suspense>
         </div>
       </main>

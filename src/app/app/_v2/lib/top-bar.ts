@@ -1,9 +1,13 @@
 import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
+import { shouldOfferT2QCAL } from "@/lib/calculator-app";
+import { isNativeShellRequest } from "@/lib/native-shell";
+import { isOwnerEmail } from "@/lib/owner";
 import { avatarLetter, greetingName } from "@/lib/profile-name";
 import { getCachedAuthUser } from "@/lib/supabase/auth";
 import { getCachedTopBarProfile } from "@/lib/supabase/profile";
+import { getNewLookState } from "@/lib/ui/newLook";
 import { OUTDOOR_COOKIE, isOutdoorCookieValue } from "@/lib/ui/outdoor";
 import { businessTimeZone, greetingFor, type Greeting } from "./dates";
 
@@ -22,6 +26,12 @@ export interface TopBarData {
   businessName: string | null;
   /** The t2q-outdoor cookie, so the sheet's switch paints right first time. */
   outdoor: boolean;
+  /** Show the "Open T2QCAL" buttons (see shouldOfferT2QCAL). */
+  t2qcal: boolean;
+  /** The owner's tools go in the photo menu. */
+  isOwner: boolean;
+  /** The new-look preview switch goes in the photo menu. */
+  canChooseLook: boolean;
 }
 
 /** "Saturday 26 September" in a time zone; plain English whatever the device. */
@@ -44,12 +54,18 @@ function requestTime(): Date {
  * greeting on its own and the email's initial.
  */
 export const loadTopBarData = cache(async (): Promise<TopBarData> => {
-  const [{ user }, cookieStore] = await Promise.all([getCachedAuthUser(), cookies()]);
+  const [{ user }, cookieStore, nativeShell, look] = await Promise.all([
+    getCachedAuthUser(),
+    cookies(),
+    isNativeShellRequest(),
+    getNewLookState(),
+  ]);
   const profile = user
     ? await getCachedTopBarProfile(user.id)
     : { firstName: null, businessName: null, avatarUrl: null, country: null, currency: null };
   const name = greetingName(profile);
   const email = user?.email ?? null;
+  const isOwner = isOwnerEmail(email);
   const now = requestTime();
   const timeZone = businessTimeZone(profile.country, profile.currency);
   return {
@@ -61,5 +77,8 @@ export const loadTopBarData = cache(async (): Promise<TopBarData> => {
     email,
     businessName: profile.businessName,
     outdoor: isOutdoorCookieValue(cookieStore.get(OUTDOOR_COOKIE)?.value),
+    t2qcal: shouldOfferT2QCAL({ nativeShell, appStoreUrl: process.env.NEXT_PUBLIC_T2QCAL_APPSTORE_URL, isOwner }),
+    isOwner,
+    canChooseLook: look.canChoose,
   };
 });

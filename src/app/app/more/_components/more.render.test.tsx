@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("../../settings/new-look-actions", () => ({ setNewLookAction: vi.fn() }));
 
 import { TOP_BAR_FIXTURE } from "../../_v2/lib/fixtures";
-import { accountSheetItems, moreMenu } from "../_lib/menu";
+import { accountMenuSections, moreMenu, ownerMenu } from "../_lib/menu";
 import { MoreView } from "./MoreView";
 
 const hrefs = (markup: string) => [...markup.matchAll(/<a [^>]*href="([^"]+)"/g)].map((m) => m[1]);
@@ -23,7 +23,6 @@ describe("More menu (data)", () => {
       ["Payments", "/app/settings/payments"],
       ["Account", "/app/settings/account"],
       ["Team", "/app/team"],
-      ["Calculators", "/t2qcal/calculators"],
       ["Help", "/help"],
       ["Send feedback", "/app/beta"],
     ]);
@@ -40,20 +39,27 @@ describe("More menu (data)", () => {
   });
 
   it("no plan or price talk anywhere (same list inside the iOS app)", () => {
-    const text = JSON.stringify([moreMenu({ isOwner: true }), accountSheetItems()]);
+    const text = JSON.stringify([moreMenu({ isOwner: true }), accountMenuSections()]);
     expect(text).not.toMatch(/plan|subscri|upgrade|\$/i);
   });
 
-  it("the account sheet: your settings, then help, from the same rows", () => {
-    expect(accountSheetItems().map((i) => [i.label, i.href])).toEqual([
-      ["Your profile", "/app/settings/account"],
-      ["Business details", "/app/settings/business"],
-      ["Rates and quotes", "/app/settings/rates"],
-      ["Payments", "/app/settings/payments"],
-      ["Team", "/app/team"],
-      ["Help", "/help"],
-      ["Send feedback", "/app/beta"],
+  it("the photo menu (More's replacement): three groups from the same rows, no T2QCAL web link", () => {
+    expect(accountMenuSections().map((g) => [g.title, g.items.map((i) => [i.label, i.href])])).toEqual([
+      [
+        "You and your business",
+        [
+          ["Your profile", "/app/settings/account"],
+          ["Business details", "/app/settings/business"],
+          ["Rates and quotes", "/app/settings/rates"],
+          ["Payments", "/app/settings/payments"],
+        ],
+      ],
+      ["Work", [["Clients", "/app/clients"], ["Calendar", "/app/calendar"], ["Team", "/app/team"]]],
+      ["Help", [["Help", "/help"], ["Send feedback", "/app/beta"]]],
     ]);
+    expect(JSON.stringify(accountMenuSections())).not.toContain("/t2qcal");
+    expect(ownerMenu(false)).toBeNull();
+    expect(ownerMenu(true)?.items).toHaveLength(4);
   });
 });
 
@@ -63,18 +69,15 @@ describe("MoreView", () => {
       <MoreView bar={TOP_BAR_FIXTURE} isOwner={false} outdoor={false} canChooseLook={false} {...over} />,
     );
 
-  it("the top bar, T2QCAL first, then big rows to every place", () => {
+  it("the top bar, Open T2QCAL (the app, not the web copy), then big rows to every place", () => {
     const out = view();
     expect(out).toMatch(/<h1 [^>]*>More<\/h1>/);
     expect(out).toContain('aria-label="Your account and settings"');
-    expect(hrefs(out).slice(0, 4)).toEqual([
-      "/t2qcal/calculators",
-      "/t2qcal/calculators",
-      "/t2qcal/measure",
-      "/t2qcal/takeoff",
-    ]);
+    expect(out).toContain('data-testid="account-sheet-t2qcal"');
+    expect(out).not.toContain('href="/t2qcal');
     expect(out.indexOf('data-testid="more-t2qcal"')).toBeLessThan(out.indexOf("Your business"));
-    expect(hrefs(out).slice(4)).toEqual([
+    expect(view({ bar: { ...TOP_BAR_FIXTURE, t2qcal: false } })).not.toContain("more-t2qcal");
+    expect(hrefs(out)).toEqual([
       "/app/clients",
       "/app/materials",
       "/app/calendar",
@@ -83,11 +86,10 @@ describe("MoreView", () => {
       "/app/settings/payments",
       "/app/settings/account",
       "/app/team",
-      "/t2qcal/calculators",
       "/help",
       "/app/beta",
     ]);
-    expect(out.match(/min-h-16/g)?.length).toBeGreaterThanOrEqual(11);
+    expect(out.match(/min-h-16/g)?.length).toBeGreaterThanOrEqual(10);
   });
 
   it("outdoor mode, explained in one line, showing this device's setting", () => {

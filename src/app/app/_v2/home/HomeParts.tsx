@@ -15,8 +15,8 @@ import {
   PaperPlaneTilt,
   Plus,
   Receipt,
-  Ruler,
   Scan,
+  Timer,
 } from "@phosphor-icons/react/dist/ssr";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
@@ -29,7 +29,7 @@ import { SectionTitle } from "@/components/ui/section-title";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ICON_CHIP, PRESS, TAP, TONE_STRIPE, UI_TEXT, type IconTone } from "@/components/ui/styles";
 import { NEW_QUOTE_PATH } from "../lib/app-nav";
-import { T2QCAL_HREF } from "../shell/T2QCALLink";
+import { T2QCALTile } from "../shell/T2QCALLauncher";
 import { countOf } from "../lib/dates";
 import { HOME_TODO_LIMIT, type MoneyTotal, type Todo, type TodoKind } from "../lib/home-todos";
 import { jobsHref } from "../lib/job-board";
@@ -321,30 +321,17 @@ export function HomeHero({
 
 type QuickAction =
   | { href: string; label: string; kind: "talk" }
-  | { href: string; label: string; kind: "t2qcal" }
   | { href: string; label: string; kind: "tile"; icon: Icon; tone: IconTone };
 
-const QUICK_ACTIONS: readonly QuickAction[] = [
-  { href: `${NEW_QUOTE_PATH}?start=talk`, label: "Talk a quote", kind: "talk" },
-  { href: T2QCAL_HREF, label: "Calculators", kind: "t2qcal" },
-  { href: "/t2qcal/measure", label: "Measure", kind: "tile", icon: Ruler, tone: "info" },
-  { href: "/app/materials/import-quote", label: "Scan a doc", kind: "tile", icon: Scan, tone: "ok" },
-];
+const TALK: QuickAction = { href: `${NEW_QUOTE_PATH}?start=talk`, label: "Talk a quote", kind: "talk" };
+const LOG_HOURS: QuickAction = { href: "/app/timesheet?add=today", label: "Log hours", kind: "tile", icon: Timer, tone: "info" };
+const SCAN: QuickAction = { href: "/app/materials/import-quote", label: "Scan a doc", kind: "tile", icon: Scan, tone: "ok" };
 
 const QUICK_TILE = "aspect-square w-full max-w-16 rounded-ui-lg";
+const QUICK_LINK =
+  "ui-focus-ring flex min-h-12 w-full flex-col items-center gap-1.5 rounded-ui-lg p-1 text-center text-ui-xs font-semibold text-ui-text no-underline";
 
 function QuickTile({ action }: { action: QuickAction }) {
-  if (action.kind === "t2qcal") {
-    return (
-      <Image
-        src="/t2qcal/native-icon.png"
-        alt=""
-        width={64}
-        height={64}
-        className={cx(QUICK_TILE, "border border-ui-line")}
-      />
-    );
-  }
   if (action.kind === "talk") {
     return (
       <span
@@ -369,31 +356,42 @@ function QuickTile({ action }: { action: QuickAction }) {
   );
 }
 
+function QuickLink({ action }: { action: QuickAction }) {
+  return (
+    <Link
+      href={action.href}
+      data-quick={action.kind === "tile" ? action.tone : action.kind}
+      className={cx(QUICK_LINK, TAP, PRESS)}
+    >
+      <QuickTile action={action} />
+      <span>{action.label}</span>
+    </Link>
+  );
+}
+
 /**
- * Four big buttons under the hero: talk a quote (straight to the mic),
- * T2QCAL's calculators and measuring, and scanning a supplier document.
- * Each a coloured tile with its name under it.
+ * Big buttons under the hero: talk a quote (straight to the mic), log
+ * today's hours, open the T2QCAL app (when offered: see shouldOfferT2QCAL)
+ * and scan a supplier document. Each a coloured tile with its name under it.
  */
-export function QuickActions() {
+export function QuickActions({ t2qcal = false }: { t2qcal?: boolean }) {
   return (
     <nav aria-label="Quick actions" data-testid="home-quick" className={UI_TEXT}>
-      <ul className="grid grid-cols-4 gap-2 sm:gap-3">
-        {QUICK_ACTIONS.map((action) => (
-          <li key={action.href}>
-            <Link
-              href={action.href}
-              data-quick={action.kind === "tile" ? action.tone : action.kind}
-              className={cx(
-                "ui-focus-ring flex min-h-12 flex-col items-center gap-1.5 rounded-ui-lg p-1 text-center text-ui-xs font-semibold text-ui-text no-underline",
-                TAP,
-                PRESS,
-              )}
-            >
-              <QuickTile action={action} />
-              <span>{action.label}</span>
-            </Link>
+      <ul className={cx("grid gap-2 sm:gap-3", t2qcal ? "grid-cols-4" : "grid-cols-3")}>
+        <li>
+          <QuickLink action={TALK} />
+        </li>
+        <li>
+          <QuickLink action={LOG_HOURS} />
+        </li>
+        {t2qcal ? (
+          <li>
+            <T2QCALTile />
           </li>
-        ))}
+        ) : null}
+        <li>
+          <QuickLink action={SCAN} />
+        </li>
       </ul>
     </nav>
   );
@@ -413,6 +411,8 @@ export interface HomeViewProps {
   tiles: { owed: MoneyTotal; paidThisMonth: MoneyTotal } | null;
   /** The jobs could not be read: say so rather than show a wrong board. */
   failed: boolean;
+  /** Offer the Open T2QCAL tile (see shouldOfferT2QCAL). */
+  t2qcal?: boolean;
 }
 
 /**
@@ -421,11 +421,11 @@ export interface HomeViewProps {
  * quote action is the raised (+) at the thumb; "Talk a quote" opens the
  * mic directly.
  */
-export function HomeView({ summary, weather, setup, todos, hasJobs, tiles, failed }: HomeViewProps) {
+export function HomeView({ summary, weather, setup, todos, hasJobs, tiles, failed, t2qcal = false }: HomeViewProps) {
   return (
     <div className="space-y-6">
       <HomeHero summary={summary} weather={weather} owed={tiles?.owed ?? null} />
-      <QuickActions />
+      <QuickActions t2qcal={t2qcal} />
       {failed ? (
         <Callout
           tone="bad"

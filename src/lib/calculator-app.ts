@@ -25,6 +25,31 @@ export function shouldOfferCalculatorApp(options: {
   return !options.nativeShell || published;
 }
 
+/**
+ * Whether Tradies2Quote shows a T2QCAL button for this person. The 2.5.2 rule
+ * above, with one exception: the owner, who installs T2QCAL on their own
+ * phone for testing before it is on the App Store. Nobody else sees the
+ * button inside the iOS app until the App Store URL is configured.
+ */
+export function shouldOfferT2QCAL(options: {
+  nativeShell: boolean;
+  appStoreUrl?: string | null;
+  isOwner: boolean;
+}): boolean {
+  return options.isOwner || shouldOfferCalculatorApp(options);
+}
+
+/**
+ * Places the native app opens (T2QCAL's DeepLink.swift handles
+ * tool/<slug>, tools, measure, jobs and resources; anything else just opens
+ * the app).
+ */
+export const T2QCAL_ROUTES = { tools: "tools", measure: "measure" } as const;
+export type T2QCALRoute = (typeof T2QCAL_ROUTES)[keyof typeof T2QCAL_ROUTES];
+
+/** How long to wait for T2QCAL to take over before saying it isn't installed. */
+export const T2QCAL_LAUNCH_WAIT_MS = 1200;
+
 /** The scheme T2QCAL registers. Nothing secret ever travels through it. */
 export const T2QCAL_SCHEME = "t2qcal";
 

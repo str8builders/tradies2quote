@@ -2,7 +2,6 @@ import type { Icon } from "@phosphor-icons/react";
 import {
   AddressBook,
   Bug,
-  Calculator,
   CalendarBlank,
   ChatCircleDots,
   CreditCard,
@@ -28,7 +27,6 @@ export const MORE_ICON: Readonly<Record<MoreItemId, Icon>> = {
   payments: CreditCard,
   account: UserCircle,
   team: UsersThree,
-  calculators: Calculator,
   help: Lifebuoy,
   feedback: ChatCircleDots,
   agents: Robot,
