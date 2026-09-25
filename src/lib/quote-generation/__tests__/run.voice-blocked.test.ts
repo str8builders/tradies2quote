@@ -190,6 +190,35 @@ describe("voice: a calculator job with a size missing", () => {
   });
 });
 
+describe("voice: the tradie's own counts need no sizes", () => {
+  it("'14 sheets of GIB and 2 boxes of screws': no blocked line, the counted lines stay (quantities still to confirm)", async () => {
+    const qd = await generate(
+      "Supply and fix 14 sheets of 10mm GIB at $31.50 a sheet and 2 boxes of GIB screws at $35 a box. One day labour at $650.",
+      {
+        client: { name: "Kim", address: null, email: null, phone: null },
+        job_summary: "Supply and fix GIB",
+        line_items: [
+          { type: "material", description: "10mm GIB Board 2400x1200", quantity: 14, unit: "sheets", unit_price: 31.5 },
+          { type: "material", description: "GIB screws", quantity: 2, unit: "box", unit_price: 35 },
+          { type: "labour", description: "Fix GIB", quantity: 1, unit: "day", unit_price: 650 },
+        ],
+        notes: [],
+        terms: "",
+      },
+    );
+    expect(blocked(qd)).toEqual([]);
+    expect(described(qd, /GIB Board/)).toMatchObject([{ quantity: 14, unit_price: 31.5, line_total: 441, quantity_confirmed: false }]);
+    expect(described(qd, /screws/)).toMatchObject([{ quantity: 2, unit_price: 35, line_total: 70 }]);
+    expect(qd.notes.join(" ")).not.toMatch(/Left out/);
+  });
+
+  it("a count the model made up ('Hang GIB', 20 sheets never said) is still blocked", async () => {
+    const qd = await generate("Hang GIB in the lounge, 2 boxes of screws, about 16 hours.", WALL_MODEL);
+    expect(described(qd, /GIB Board/)).toEqual([]);
+    expect(blocked(qd)).toHaveLength(1);
+  });
+});
+
 describe("voice: no false alarms for jobs that aren't calculator takeoffs", () => {
   it("a retaining wall (the word 'wall', no lining/framing) gets no blocked line", async () => {
     const qd = await generate("Retaining wall for Sam. Labour 2 days @ $600 to dig out.", {

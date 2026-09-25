@@ -1,6 +1,7 @@
 import "server-only";
 import { matchMaterial, type MaterialMatch } from "./materialMatcher";
 import { round2 } from "./quote-defaults";
+import { matchesStatedAmount } from "./quote-generation/pricing";
 import { convertUnitPrice } from "./units";
 import type {
   PriceConfidence,
@@ -47,6 +48,11 @@ export type EnrichmentOptions = {
   matcher?: MatcherFn;
   /** Search the catalogue as the service role (no signed-in request). */
   asAdmin?: boolean;
+  /**
+   * Prices the tradie SAID in their own transcript (extractStatedAmounts).
+   * A line at one of them keeps it: the catalogue never replaces it.
+   */
+  statedAmounts?: readonly number[];
 };
 
 function confidenceFromScore(score: number): PriceConfidence {
@@ -88,6 +94,19 @@ export async function enrichLineItemsWithCatalogue(
       item.price_source === "user_library" &&
       item.price_confidence === "high" &&
       Number(item.unit_price) > 0
+    ) {
+      out.push(item);
+      continue;
+    }
+
+    // Nor may it replace a price the tradie SAID for this job ("GIB at
+    // $31.50 a sheet" when their library or the catalogue has $28.50).
+    if (
+      matchesStatedAmount(
+        Number(item.unit_price) || 0,
+        Number(item.quantity) || 0,
+        options.statedAmounts ?? [],
+      )
     ) {
       out.push(item);
       continue;

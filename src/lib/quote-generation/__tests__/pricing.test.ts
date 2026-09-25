@@ -3,6 +3,7 @@ import type { LibraryMaterial, QuoteLineItem } from "@/lib/quote-types";
 import {
   applyPricingPolicy,
   extractStatedAmounts,
+  matchesStatedAmount,
   priceLabourLine,
 } from "../pricing";
 
@@ -153,5 +154,88 @@ describe("applyPricingPolicy", () => {
     expect(items[0]).toMatchObject({ unit_price: 0, is_missing_price: true });
     expect(items[1]).toMatchObject({ unit_price: 600, line_total: 1200, is_missing_price: false });
     expect(items[2]).toMatchObject({ unit_price: 75, line_total: 450, is_missing_price: false });
+  });
+});
+
+describe("applyPricingPolicy — a price the tradie SAYS for this job is theirs", () => {
+  const said =
+    "Supply and fix 14 sheets of 10mm GIB at $31.50 a sheet and 2 boxes of GIB screws for $70. $150 to deliver. One day labour at $650.";
+  const ctx = { hourlyRate: 75, statedAmounts: extractStatedAmounts(said), library: [lib({})] };
+
+  it("matchesStatedAmount reads the unit price or the line total", () => {
+    const stated = extractStatedAmounts(said);
+    expect(matchesStatedAmount(31.5, 14, stated)).toBe(true);
+    expect(matchesStatedAmount(35, 2, stated)).toBe(true); // 2 × $35 = the $70 said
+    expect(matchesStatedAmount(28.5, 14, stated)).toBe(false);
+    expect(matchesStatedAmount(0, 1, stated)).toBe(false);
+    expect(matchesStatedAmount(31.5, 14, [])).toBe(false);
+  });
+
+  it("GIB at $31.50 a sheet keeps $31.50 — 14 sheets = $441.00", () => {
+    const items: QuoteLineItem[] = [
+      { type: "material", description: "GIB Standard 10mm", quantity: 14, unit: "sheet", unit_price: 31.5, line_total: 0 },
+    ];
+    applyPricingPolicy(items, ctx);
+    expect(items[0]).toMatchObject({ unit_price: 31.5, line_total: 441, is_missing_price: false, is_ai_estimated: false });
+    expect(items[0].price_source).toBeUndefined();
+  });
+
+  it("a stated line total counts too (2 boxes for $70 → $35 a box)", () => {
+    const items: QuoteLineItem[] = [
+      { type: "material", description: "GIB screws", quantity: 2, unit: "box", unit_price: 35, line_total: 0 },
+    ];
+    applyPricingPolicy(items, ctx);
+    expect(items[0]).toMatchObject({ unit_price: 35, line_total: 70, is_missing_price: false });
+  });
+
+  it("a stated fee on an 'other' line is kept ($150 to deliver)", () => {
+    const items: QuoteLineItem[] = [
+      { type: "other", description: "Delivery", quantity: 1, unit: "each", unit_price: 150, line_total: 150 },
+    ];
+    applyPricingPolicy(items, ctx);
+    expect(items[0]).toMatchObject({ unit_price: 150, line_total: 150, is_missing_price: false });
+  });
+
+  it("beats a different library price and drops the library tag", () => {
+    const items: QuoteLineItem[] = [
+      {
+        type: "material", description: "H3.2 joist 140x45", quantity: 10, unit: "m",
+        unit_price: 31.5, line_total: 0, library_id: "lib-1", // library says $11.20
+        price_source: "user_library", price_confidence: "high",
+      },
+    ];
+    applyPricingPolicy(items, ctx);
+    expect(items[0]).toMatchObject({ unit_price: 31.5, line_total: 315, is_missing_price: false, library_id: "lib-1" });
+    expect(items[0].price_source).toBeUndefined();
+    expect(items[0].price_confidence).toBeUndefined();
+  });
+
+  it("a stated price that IS the library price keeps the library tag", () => {
+    const items: QuoteLineItem[] = [
+      {
+        type: "material", description: "H3.2 joist 140x45", quantity: 10, unit: "m",
+        unit_price: 11.2, line_total: 0, library_id: "lib-1",
+        price_source: "user_library", price_confidence: "high",
+      },
+    ];
+    applyPricingPolicy(items, { ...ctx, statedAmounts: [11.2] });
+    expect(items[0]).toMatchObject({ unit_price: 11.2, line_total: 112, price_source: "user_library", price_confidence: "high" });
+  });
+
+  it("an unstated AI material price is still wiped", () => {
+    const items: QuoteLineItem[] = [
+      { type: "material", description: "Stopping compound", quantity: 1, unit: "bag", unit_price: 42, line_total: 42 },
+    ];
+    applyPricingPolicy(items, ctx);
+    expect(items[0]).toMatchObject({ unit_price: 0, line_total: 0, is_missing_price: true, price_source: "missing_price" });
+  });
+
+  it("with no stated amounts (the customer's own words) nothing is kept", () => {
+    const items: QuoteLineItem[] = [
+      { type: "material", description: "GIB Standard 10mm", quantity: 14, unit: "sheet", unit_price: 31.5, line_total: 441 },
+      { type: "other", description: "Delivery", quantity: 1, unit: "each", unit_price: 150, line_total: 150 },
+    ];
+    applyPricingPolicy(items, { ...ctx, statedAmounts: [] });
+    for (const it of items) expect(it).toMatchObject({ unit_price: 0, is_missing_price: true });
   });
 });

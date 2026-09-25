@@ -12,7 +12,10 @@ import { normaliseUnit } from "@/lib/units";
  *      $600", "$2,500 fixed"), else the profile hourly rate on HOUR lines
  *      only. A day/lot/each labour line is never repriced with the hourly
  *      rate ("2 days @ $600" used to become 2 × $75 = $150).
- *   2. MATERIALS strongly matched to the tradie's library, re-verified
+ *   2. MATERIALS AND OTHER LINES at a price the tradie's own transcript
+ *      states for this job ("GIB at $31.50 a sheet", "$150 for delivery").
+ *      It beats a different library price: it's their price for this job.
+ *   3. MATERIALS strongly matched to the tradie's library, re-verified
  *      against the library row itself (a stored "user_library" tag is never
  *      trusted on its own — the model could have written it).
  * Everything else is left price-pending ($0, is_missing_price) and the send
@@ -53,6 +56,26 @@ export function extractStatedAmounts(text: string): number[] {
   return [...out];
 }
 
+/**
+ * Whether a line's unit price — or its line total — is an amount the
+ * tradie's own transcript states ("GIB at $31.50 a sheet", "2 boxes for
+ * $70", "2 days @ $600"): their number, not an AI guess.
+ */
+export function matchesStatedAmount(
+  unitPrice: number,
+  quantity: number,
+  statedAmounts: readonly number[],
+): boolean {
+  return (
+    unitPrice > 0 &&
+    statedAmounts.some(
+      (a) =>
+        moneyEquals(a, unitPrice) ||
+        (quantity > 0 && moneyEquals(a, round2(quantity * unitPrice))),
+    )
+  );
+}
+
 export type LabourPricingContext = {
   /** profiles.default_labour_rate (per hour). */
   hourlyRate: number;
@@ -84,14 +107,7 @@ export function priceLabourLine(
 
   // 1. The transcript states this rate (or this line's total) — the
   //    tradie's own number, whatever the unit.
-  if (
-    modelPrice > 0 &&
-    ctx.statedAmounts.some(
-      (a) =>
-        moneyEquals(a, modelPrice) ||
-        (qty > 0 && moneyEquals(a, round2(qty * modelPrice))),
-    )
-  ) {
+  if (matchesStatedAmount(modelPrice, qty, ctx.statedAmounts)) {
     return { unit_price: modelPrice, is_missing_price: false, basis: "stated" };
   }
 
@@ -155,6 +171,21 @@ export function applyPricingPolicy(
         it.price_source = "missing_price";
         it.price_confidence = undefined;
       }
+      continue;
+    }
+
+    // The tradie SAID this price for this job — kept, even over a different
+    // library price (run.ts leaves such a line unpriced by the library).
+    const modelPrice = Number(it.unit_price) || 0;
+    if (matchesStatedAmount(modelPrice, qty, ctx.statedAmounts)) {
+      const libraryPrice =
+        it.price_source === "user_library" ? verifiedLibraryUnitPrice(it, ctx.library) : null;
+      const fromLibrary = libraryPrice !== null && moneyEquals(libraryPrice, modelPrice);
+      it.unit_price = modelPrice;
+      it.line_total = round2(qty * modelPrice);
+      it.is_missing_price = false;
+      it.price_source = fromLibrary ? "user_library" : undefined;
+      it.price_confidence = fromLibrary ? "high" : undefined;
       continue;
     }
 

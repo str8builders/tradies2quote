@@ -258,7 +258,7 @@ export function buildQuotePromptParts(
 ${formatLibraryForPrompt(library, profile.currency)}
 
 Library priority rules:
-- For each material the tradie describes: if it clearly matches an entry above (same product, even if worded differently), USE the library's exact name as the line_item description and the library's price as unit_price.
+- For each material the tradie describes: if it clearly matches an entry above (same product, even if worded differently), USE the library's exact name as the line_item description and the library's price as unit_price — unless the tradie states a price for it in this job ("GIB at $31.50 a sheet"): then use exactly the stated price, because their price for this job beats the library price.
 - For materials NOT in the library, generate your best-guess unit_price based on typical ${countryName} retail pricing.
 - Library prices are post-trade-discount but pre-markup; do not double-apply markup.`;
 

@@ -41,6 +41,12 @@ const CASES = {
 
 const POINTER_BEFORE = "ALWAYS use the tradie's actual settings from the top of this prompt.";
 const POINTER_AFTER = `ALWAYS use the tradie's actual settings given under "The tradie's settings".`;
+// Deliberate change since the fixture: a price the tradie states for this job
+// beats the library price (src/lib/quote-generation/pricing.ts keeps it).
+const LIBRARY_RULE_BEFORE =
+  "USE the library's exact name as the line_item description and the library's price as unit_price.";
+const LIBRARY_RULE_AFTER =
+  'USE the library\'s exact name as the line_item description and the library\'s price as unit_price — unless the tradie states a price for it in this job ("GIB at $31.50 a sheet"): then use exactly the stated price, because their price for this job beats the library price.';
 
 /** Non-empty lines as a sorted multiset. */
 const lines = (text: string) =>
@@ -53,7 +59,9 @@ describe("quote prompt cache split", () => {
   it.each(Object.keys(CASES) as Array<keyof typeof CASES>)(
     "%s renders the same lines as before the split",
     (key) => {
-      const before = FIXTURE[key].replace(POINTER_BEFORE, POINTER_AFTER);
+      const before = FIXTURE[key]
+        .replace(POINTER_BEFORE, POINTER_AFTER)
+        .replace(LIBRARY_RULE_BEFORE, LIBRARY_RULE_AFTER);
       expect(lines(CASES[key]())).toEqual(lines(before));
       expect(CASES[key]().length).toBe(before.length);
     },

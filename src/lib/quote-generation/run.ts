@@ -5,6 +5,7 @@ import {
   NZ_DEFAULTS,
   clampMarkupPct,
   computeQuoteTotals,
+  moneyEquals,
   resolveTaxLabel,
   resolveTaxRate,
   round2,
@@ -40,7 +41,8 @@ import {
 import { loadUserVocab } from "@/lib/transcript/vocab";
 import { reportSummaryFailureToMonitor } from "@/lib/transcript/summaryMonitoring";
 import { aiTermsToNotes, sanitiseModelQuote } from "./model-output";
-import { applyPricingPolicy, extractStatedAmounts } from "./pricing";
+import { applyPricingPolicy, extractStatedAmounts, matchesStatedAmount } from "./pricing";
+import { extractStatedCounts, isStatedCount } from "./statedCounts";
 import { labourPlausibilityWarnings } from "@/lib/labour-plausibility";
 import { verifyGeneratedQuote } from "./verification";
 import type {
@@ -437,6 +439,9 @@ async function generateAndSaveQuote(g: {
   const transcript =
     applyDeterministicCorrections(rawTranscript, vocab).cleanedTranscript.trim() ||
     rawTranscript;
+  // Prices the tradie SAID ("GIB at $31.50 a sheet"). The public request
+  // form's text is the CUSTOMER's words, so nothing "stated" there counts.
+  const statedAmounts = asAdmin ? [] : extractStatedAmounts(transcript);
 
   const parsedTakeoff = parseTakeoffDescription(transcript);
   const useCalculator = canRunCalculator(parsedTakeoff);
@@ -777,8 +782,23 @@ async function generateAndSaveQuote(g: {
       blockedTakeoffLine(parsedTakeoff.type, parsedTakeoff.missingFields),
     );
   }
-  if (voiceSizesStillNeeded) {
-    calculatorItems.push(blockedTakeoffLine(parsedTakeoff.type, voiceSizesStillNeeded));
+  // …nor when the tradie counted it themselves: a model material line at a
+  // count the transcript states ("14 sheets of GIB", "2 boxes of screws") is
+  // their own takeoff, not a guess. Those lines stay, their quantities still
+  // unconfirmed until the tradie confirms them, like any model quantity.
+  const statedCounts = extractStatedCounts(transcript);
+  const voiceSizesOpen =
+    voiceSizesStillNeeded &&
+    !parsed.line_items.some(
+      (it) =>
+        it.type === "material" &&
+        looksLikeTakeoffMaterial(it.description) &&
+        isStatedCount(Number(it.quantity) || 0, statedCounts),
+    )
+      ? voiceSizesStillNeeded
+      : null;
+  if (voiceSizesOpen) {
+    calculatorItems.push(blockedTakeoffLine(parsedTakeoff.type, voiceSizesOpen));
   }
 
   // Wave 44 — also exclude AI lines that overlap with what the
@@ -835,11 +855,11 @@ async function generateAndSaveQuote(g: {
       continue;
     }
     if (
-      (useCalculator || voiceSizesStillNeeded) &&
+      (useCalculator || voiceSizesOpen) &&
       it.type === "material" &&
       looksLikeTakeoffMaterial(it.description)
     ) {
-      if (voiceSizesStillNeeded) droppedForSizes.push(it.description);
+      if (voiceSizesOpen) droppedForSizes.push(it.description);
       continue;
     }
     if (
@@ -869,12 +889,18 @@ async function generateAndSaveQuote(g: {
       // price for a specific (≥2 tokens), dimension-exact, unambiguous match
       // whose unit matches or converts exactly to this line's unit ($30/sheet
       // is never applied to 40 m²). Weaker matches keep the link, unpriced.
+      // A price the tradie SAID for this job beats a different library price
+      // ("GIB at $31.50" when the library has $28.50): the line keeps the
+      // link and its stated price, which the PRICES_OFF pass keeps.
       const hit = libraryPriceForLine(it, library);
       const match = hit?.match.item ?? null;
       if (match && hit) {
         it.library_id = match.id;
         it.is_ai_estimated = false;
-        if (hit.unitPrice !== null && hit.unitPrice > 0) {
+        const statedHere =
+          matchesStatedAmount(price, qty, statedAmounts) &&
+          !(hit.unitPrice !== null && moneyEquals(hit.unitPrice, price));
+        if (hit.unitPrice !== null && hit.unitPrice > 0 && !statedHere) {
           price = hit.unitPrice;
           it.price_source = "user_library";
           it.price_confidence = "high";
@@ -985,7 +1011,7 @@ async function generateAndSaveQuote(g: {
   // logs); never returned to the client or surfaced in the public quote.
   const enrichResult = await safelyEnrichLineItemsWithCatalogue(
     parsed.line_items,
-    { enabled: materialMatchingEnabledFromEnv(), asAdmin },
+    { enabled: materialMatchingEnabledFromEnv(), asAdmin, statedAmounts },
   );
   parsed.line_items = enrichResult.items;
 
@@ -1112,7 +1138,7 @@ async function generateAndSaveQuote(g: {
     applyPricingPolicy(parsed.line_items, {
       library,
       hourlyRate: Number(profile.default_labour_rate) || 0,
-      statedAmounts: asAdmin ? [] : extractStatedAmounts(transcript),
+      statedAmounts,
     });
   }
 

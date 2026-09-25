@@ -316,6 +316,40 @@ describe("item 4 — library prices need exact dimensions and compatible units",
   });
 });
 
+describe("a price the tradie SAYS for this job beats the library price", () => {
+  const said =
+    "Supply and fix 14 sheets of 10mm GIB at $31.50 a sheet and 3 tubes of Sikaflex. $150 to deliver. One day labour at $650.";
+  const library = [
+    lib("gib10", "GIB Standard 10mm 2400x1200", "sheet", 28.5),
+    lib("sika", "Sikaflex 11FC sealant", "each", 18.5),
+  ];
+  const model = {
+    job_summary: "Line the garage",
+    line_items: [
+      { type: "material", description: "GIB Standard 10mm 2400x1200", quantity: 14, unit: "sheet", unit_price: 31.5 },
+      { type: "material", description: "Sikaflex 11FC sealant", quantity: 3, unit: "each", unit_price: 20 },
+      { type: "other", description: "Delivery", quantity: 1, unit: "each", unit_price: 150 },
+      { type: "labour", description: "Labour — fix GIB", quantity: 1, unit: "day", unit_price: 650 },
+    ],
+  };
+
+  it("GIB stays $31.50 × 14 = $441 (library $28.50) and keeps the link; unstated lines follow the library", async () => {
+    const { qd } = await generate({ transcript: said, library, model });
+    const gib = line(qd, /GIB Standard/);
+    expect(gib).toMatchObject({ unit_price: 31.5, line_total: 441, is_missing_price: false, library_id: "gib10" });
+    expect(gib.price_source).toBeUndefined();
+    expect(line(qd, /Sikaflex/)).toMatchObject({ unit_price: 18.5, line_total: 55.5, price_source: "user_library" });
+    expect(line(qd, /Delivery/)).toMatchObject({ unit_price: 150, line_total: 150, is_missing_price: false });
+    expect(line(qd, /Labour/)).toMatchObject({ unit_price: 650, line_total: 650, is_missing_price: false });
+  });
+
+  it("public request form: prices in the CUSTOMER's text don't count — the library price stands", async () => {
+    const { qd } = await generate({ transcript: said, library, model, asAdmin: true });
+    expect(line(qd, /GIB Standard/)).toMatchObject({ unit_price: 28.5, line_total: 399, price_source: "user_library" });
+    expect(line(qd, /Delivery/)).toMatchObject({ unit_price: 0, is_missing_price: true });
+  });
+});
+
 describe("item 5 — the tradie's terms are kept", () => {
   it("AI terms never replace the template; job-specific ones become notes", async () => {
     const { qd } = await generate({

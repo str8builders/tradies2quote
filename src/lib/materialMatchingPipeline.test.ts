@@ -877,3 +877,23 @@ describe("enrichLineItemsWithCatalogue — units", () => {
     expect(out.is_missing_price).toBe(false);
   });
 });
+
+describe("enrichLineItemsWithCatalogue — a price the tradie said is never replaced", () => {
+  it("GIB at a stated $31.50 keeps $31.50 even though the library/catalogue has $28.50", async () => {
+    const matcher = vi.fn(async () =>
+      matchedResult(sampleHit({ id: "gib10", name: "GIB Standard 10mm", unit: "sheet", price: 28.5, match_source: "direct_user", match_score: 0.95 })),
+    );
+    const out = await enrichLineItemsWithCatalogue(
+      [
+        baseItem({ description: "GIB Standard 10mm", quantity: 14, unit: "sheet", unit_price: 31.5, line_total: 441 }),
+        baseItem({ description: "GIB Standard 13mm", quantity: 4, unit: "sheet", unit_price: 40, line_total: 160 }),
+      ],
+      { enabled: true, matcher, statedAmounts: [31.5, 650] },
+    );
+    expect(out[0]).toMatchObject({ unit_price: 31.5, line_total: 441 });
+    expect(out[0].price_source).toBeUndefined();
+    // The unstated line is still matched and repriced as before.
+    expect(out[1]).toMatchObject({ unit_price: 28.5, line_total: 114, price_source: "user_library" });
+    expect(matcher).toHaveBeenCalledTimes(1);
+  });
+});
