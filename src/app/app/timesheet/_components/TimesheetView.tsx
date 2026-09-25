@@ -85,7 +85,7 @@ export function TimesheetView({ data, openAdd = false }: { data: TimesheetData; 
   const router = useRouter();
   const pathname = usePathname();
   const [person, setPerson] = useState<string | null>(null);
-  const [draft, setDraft] = useState<EntryDraft | null>(null);
+
   const [invoicing, setInvoicing] = useState(false);
 
   const shown = useMemo(() => forPerson(data.entries, person), [data.entries, person]);
@@ -94,15 +94,13 @@ export function TimesheetView({ data, openAdd = false }: { data: TimesheetData; 
   const billable = unbilledByClient(data.entries).length > 0;
   const lastClient = [...data.entries].reverse().find((e) => e.mine && e.clientId)?.clientId ?? null;
   const defaultDay = data.weekStart <= data.today && data.today <= addDays(data.weekStart, 6) ? data.today : data.weekStart;
+  // Home's "Log hours" (?add=today) arrives with the add sheet already open.
+  const [draft, setDraft] = useState<EntryDraft | null>(() => (openAdd ? newDraft(defaultDay, lastClient) : null));
 
-  // Home's "Log hours" (?add=today) opens the sheet once, then tidies the address.
+  // ...and the address is tidied, so a refresh doesn't open it again.
   useEffect(() => {
-    if (!openAdd) return;
-    setDraft(newDraft(defaultDay, lastClient));
-    router.replace(pathname ?? "/app/timesheet", { scroll: false });
-    // Once per arrival.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openAdd]);
+    if (openAdd) router.replace(pathname ?? "/app/timesheet", { scroll: false });
+  }, [openAdd, pathname, router]);
 
   return (
     <div className={cx("mt-5 space-y-5", UI_TEXT)} data-testid="timesheet">
