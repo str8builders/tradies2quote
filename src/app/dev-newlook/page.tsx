@@ -10,6 +10,9 @@ import type { JobRow } from "@/app/app/_v2/lib/job-board";
 import { JobsBrowser } from "@/app/app/jobs/_components/JobsBrowser";
 import { MoreView } from "@/app/app/more/_components/MoreView";
 import { contrastAttributeValue } from "@/lib/ui/outdoor";
+import { TimesheetView } from "@/app/app/timesheet/_components/TimesheetView";
+import type { TimesheetData } from "@/app/app/timesheet/_lib/types";
+import { TalkLive } from "./TalkLive";
 import { TalkPreview } from "./TalkPreview";
 
 export const dynamic = "force-dynamic";
@@ -37,9 +40,33 @@ const rows: JobRow[] = [
   job("6", "Aroha Ngata", "Retaining wall", 5400, { text: "Paid", tone: "ok" }, "done"),
 ];
 
+const timesheet: TimesheetData = {
+  weekStart: "2026-09-21",
+  today: "2026-09-23",
+  entries: [
+    { id: "e1", workDate: "2026-09-21", start: "07:00", finish: "15:30", breakMinutes: 30, hours: 8, note: "Deck framing", clientId: "c1", clientName: "Hemi Walker", userId: "me", person: "You", mine: true, invoice: null },
+    { id: "e2", workDate: "2026-09-21", start: "07:30", finish: "15:30", breakMinutes: 30, hours: 7.5, note: null, clientId: "c1", clientName: "Hemi Walker", userId: "s", person: "Sione", mine: false, invoice: null },
+    { id: "e3", workDate: "2026-09-22", start: "06:45", finish: "15:05", breakMinutes: 20, hours: 8, note: "Joists and bearers", clientId: "c1", clientName: "Hemi Walker", userId: "me", person: "You", mine: true, invoice: null },
+    { id: "e4", workDate: "2026-09-23", start: "08:00", finish: "12:00", breakMinutes: 0, hours: 4, note: "Bathroom lining", clientId: "c2", clientName: "K. Patel", userId: "me", person: "You", mine: true, invoice: { id: "i1", number: "INV-3F9A21C0" } },
+  ],
+  clients: [
+    { id: "c1", name: "Hemi Walker", email: "hemi@example.test", address: null, phone: null },
+    { id: "c2", name: "K. Patel", email: null, address: null, phone: null },
+  ],
+  canInvoice: true,
+  people: [{ userId: "me", name: "You" }, { userId: "s", name: "Sione" }],
+  labourRate: 85,
+  currency: "NZD",
+  taxLabel: "GST",
+  taxRate: 15,
+  failed: false,
+};
+
 /**
  * Local-only look at the round-two new-look screens with made-up data
- * (?screen=home|jobs|more|talk|recording|welcome, &outdoor=1). Never served
+ * (?screen=home|jobs|more|timesheet|talk|recording|talk-live|welcome,
+ * &outdoor=1). talk-live is the real recorder and meter (for trying the mic
+ * in the iOS Simulator). Never served
  * in production.
  */
 export default async function DevNewLookPage({
@@ -60,6 +87,15 @@ export default async function DevNewLookPage({
     );
   } else if (screen === "more") {
     content = <MoreView bar={bar} isOwner={false} outdoor={outdoor === "1"} canChooseLook={false} />;
+  } else if (screen === "timesheet") {
+    content = (
+      <main className={main}>
+        <TabTopBar data={bar} title="Timesheet" description="Everyone's hours, and invoice a client for the week." />
+        <TimesheetView data={timesheet} />
+      </main>
+    );
+  } else if (screen === "talk-live") {
+    content = <TalkLive />;
   } else if (screen === "talk" || screen === "recording") {
     content = <TalkPreview phase={screen === "recording" ? "recording" : "idle"} />;
   } else {
@@ -77,6 +113,7 @@ export default async function DevNewLookPage({
             hasJobs
             tiles={{ owed, paidThisMonth: paid }}
             failed={false}
+            t2qcal
           />
         </div>
       </main>
@@ -92,7 +129,7 @@ export default async function DevNewLookPage({
       className="studio-app t2q-app-canvas min-h-dvh w-full max-w-full overflow-x-clip bg-ui-bg!"
     >
       <div className="t2q-app-scroll min-w-0 sm:pl-[calc(6rem+env(safe-area-inset-left))]">{content}</div>
-      {screen === "talk" || screen === "recording" ? null : <AppNav />}
+      {screen.startsWith("talk") || screen === "recording" ? null : <AppNav />}
       {screen === "welcome" ? <NewLookWelcome serverOpen data={{ greeting: "Good morning", name: "Challis", today: "Saturday 26 September" }} /> : null}
     </div>
   );
