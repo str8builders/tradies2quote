@@ -38,6 +38,7 @@ vi.mock("@/lib/agent-monitor/logger", () => ({
 vi.mock("@/lib/observability", () => ({ captureError: vi.fn() }));
 
 import { POST } from "./route";
+import { AI_ERROR_MESSAGES, AiError } from "@/lib/ai/errors";
 
 let sitePhoto: Buffer;
 beforeAll(async () => {
@@ -105,5 +106,58 @@ describe("POST /api/agents/photo-plan run ids", () => {
     const res = await post(new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]));
     expect(res.status).toBe(415);
     expect(mock.agent).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/agents/photo-plan error mapping — no upstream text reaches the client", () => {
+  beforeEach(() => {
+    mock.agent.mockClear();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  it("an overloaded provider → 503, plain sentence, retry-after, no detail", async () => {
+    mock.agent.mockRejectedValueOnce(
+      new AiError({
+        kind: "overloaded",
+        provider: "openai",
+        status: 529,
+        attempts: 3,
+        retryAfterMs: 7_000,
+        detail: 'overloaded_error: {"request_id":"req_secret"}',
+      }),
+    );
+    const res = await post();
+    expect(res.status).toBe(503);
+    expect(res.headers.get("retry-after")).toBe("7");
+    const body = await res.json();
+    expect(body).toEqual({ error: AI_ERROR_MESSAGES.overloaded, code: "overloaded" });
+    expect(JSON.stringify(body)).not.toMatch(/529|req_secret|overloaded_error|Anthropic|OpenAI/);
+  });
+
+  it("a plain upstream error string never leaks", async () => {
+    mock.agent.mockRejectedValueOnce(new Error('Anthropic 529: {"type":"error","error":{"type":"overloaded_error"}}'));
+    const res = await post();
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.code).toBe("unknown");
+    expect(JSON.stringify(body)).not.toMatch(/529|overloaded_error|Anthropic/);
+  });
+
+  it("a timeout → 504 with a plain sentence", async () => {
+    mock.agent.mockRejectedValueOnce(new AiError({ kind: "timeout", provider: "openai" }));
+    const res = await post();
+    expect(res.status).toBe(504);
+    expect((await res.json()).error).toMatch(/too long/);
+  });
+
+  it("missing configuration → 503", async () => {
+    mock.agent.mockRejectedValueOnce(
+      new AiError({ kind: "not_configured", provider: "openai", message: "ANTHROPIC_API_KEY is not configured." }),
+    );
+    const res = await post();
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.code).toBe("not_configured");
+    expect(JSON.stringify(body)).not.toContain("API_KEY");
   });
 });

@@ -1,16 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
 import {
   CUSTOMER_REPLY_AGENT_NAME,
   runCustomerReplyAgent,
   type CustomerReplyInput,
 } from "@/lib/agents/customer-reply";
-import {
-  flushAgentRun,
-  logAgentRunFinish,
-  newRunId,
-} from "@/lib/agent-monitor/logger";
+import { newRunId } from "@/lib/agent-monitor/logger";
+import { agentFailureResponse } from "@/lib/agents/routeErrors";
 import { isOwnerEmail } from "@/lib/owner";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
 
@@ -79,21 +75,14 @@ export async function POST(req: NextRequest) {
     );
     return NextResponse.json({ ok: true, result });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    captureError(err, { route: "/api/agents/customer-reply" });
-    logAgentRunFinish({
+    // Plain sentence + code to the client; the upstream detail stays in the
+    // server log, the error monitor and the operator-only agent monitor.
+    return agentFailureResponse(err, {
+      route: "/api/agents/customer-reply",
       agentName: CUSTOMER_REPLY_AGENT_NAME,
       runId,
-      stepName: "run.finish",
-      status: "failed",
-      message,
-      durationMs: Date.now() - startedAt,
+      startedAt,
+      fallbackMessage: "The AI couldn't draft a reply. Please try again.",
     });
-    await flushAgentRun(runId);
-    const isConfig = /not configured/i.test(message);
-    return NextResponse.json(
-      { error: message },
-      { status: isConfig ? 503 : 502 },
-    );
   }
 }

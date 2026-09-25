@@ -18,8 +18,10 @@ const BY_STATUS: Record<number, string> = {
   403: "Photo reading isn't available on this account.",
   413: "That photo is too large. Crop it or take a closer photo, then retry.",
   415: "That file isn't a photo we can read. Use a JPEG or PNG.",
+  422: "That photo couldn't be read. Try a clearer photo.",
   429: "You've reached today's limit for photo reading. It resets at midnight UTC.",
   503: "Photo reading isn't available right now. Please try again later.",
+  504: "Reading the photo took too long. Please try again.",
 };
 
 export function photoPlanErrorMessage(status: number, body: unknown): string {

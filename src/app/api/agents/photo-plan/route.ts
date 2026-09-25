@@ -13,11 +13,8 @@ import {
   isPreparedScanMime,
   sniffPreparedImageMime,
 } from "@/lib/imageUpload";
-import {
-  flushAgentRun,
-  logAgentRunFinish,
-  newRunId,
-} from "@/lib/agent-monitor/logger";
+import { newRunId } from "@/lib/agent-monitor/logger";
+import { agentFailureResponse } from "@/lib/agents/routeErrors";
 import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
 
@@ -161,21 +158,19 @@ export async function POST(req: NextRequest) {
     );
     return NextResponse.json({ ok: true, result });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    captureError(err, { route: "/api/agents/photo-plan" });
-    logAgentRunFinish({
+    // Plain sentence + code to the client; the upstream detail stays in the
+    // server log, the error monitor and the operator-only agent monitor.
+    return agentFailureResponse(err, {
+      route: "/api/agents/photo-plan",
       agentName: PHOTO_PLAN_AGENT_NAME,
       runId,
-      stepName: "run.finish",
-      status: "failed",
-      message,
-      durationMs: Date.now() - startedAt,
+      startedAt,
+      fallbackMessage: "Photo reading failed. Please try again.",
+      messages: {
+        timeout: "Reading the photo took too long. Please try again.",
+        refused: "That photo couldn't be read. Try a different photo.",
+        truncated: "That photo had too much in it to read in one go. Try a closer photo.",
+      },
     });
-    await flushAgentRun(runId);
-    const isConfig = /not configured/i.test(message);
-    return NextResponse.json(
-      { error: message },
-      { status: isConfig ? 503 : 502 },
-    );
   }
 }

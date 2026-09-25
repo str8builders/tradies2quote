@@ -270,6 +270,17 @@ export function aiErrorResponse(
       retryAfterSeconds,
     };
   }
+  // Older plain Errors that say so (e.g. "X_API_KEY is not configured.").
+  if (e instanceof Error && /\bnot configured\b/i.test(e.message)) {
+    return {
+      status: AI_ERROR_HTTP_STATUS.not_configured,
+      body: {
+        error: opts.messages?.not_configured ?? AI_ERROR_MESSAGES.not_configured,
+        code: "not_configured",
+      },
+      retryAfterSeconds: null,
+    };
+  }
   return {
     status: 502,
     body: {
