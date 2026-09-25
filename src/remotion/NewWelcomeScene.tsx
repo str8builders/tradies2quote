@@ -96,7 +96,7 @@ function Tape({ frame }: { frame: number }) {
         <circle cx={62} cy={y - 12} r={20} fill={INK} opacity={0.45} />
         <rect x={96 + length} y={y - 34} width={10} height={44} rx={2} fill="#9A9890" opacity={blade > 0 ? 1 : 0} />
       </g>
-      <text x={96 + length} y={y + 58} fill={HIVIS} fontFamily={SANS} fontSize={30} fontWeight={700} textAnchor="middle" opacity={lerp(frame, [22, 30, 150, 170], [0, 1, 1, 0])}>
+      <text x={Math.min(96 + length, NEW_WELCOME_WIDTH - 110)} y={y + 58} fill={HIVIS} fontFamily={SANS} fontSize={30} fontWeight={700} textAnchor="middle" opacity={lerp(frame, [22, 30, 150, 170], [0, 1, 1, 0])}>
         {reading} mm
       </text>
     </svg>
