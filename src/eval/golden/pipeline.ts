@@ -33,7 +33,7 @@ import {
   type ParsedTakeoffResult,
 } from "@/lib/aiTakeoffParser";
 import { runTakeoff as runOrchestratedTakeoff } from "@/lib/takeoff";
-import { legacyScopeCoverage } from "@/lib/takeoff/legacyCoverage";
+import { legacyScopeCoverage, orchestratorSizedLegacyJob } from "@/lib/takeoff/legacyCoverage";
 import { guardLinesForScope, scopeFamilyForType } from "@/lib/takeoff/scopeFamily";
 import type { TakeoffResult } from "@/lib/takeoff/schemas";
 import { applyDeterministicCorrections } from "@/lib/transcriptCleanup";
@@ -78,6 +78,10 @@ export function runDeterministicPipeline(rawTranscript: string): PipelineResult 
     licenseContext: { scanType: parsed.type },
   });
   const legacyCovers = legacyScopeCoverage(parsed.type, useCalculator);
+  const voiceSizesStillNeeded =
+    voiceSizesNeeded && !orchestratorSizedLegacyJob(parsed.type, orchestrated.scopes)
+      ? voiceSizesNeeded
+      : null;
 
   const lines: PipelineLine[] = [];
 
@@ -142,7 +146,7 @@ export function runDeterministicPipeline(rawTranscript: string): PipelineResult 
       status: "blocked",
     });
   }
-  if (voiceSizesNeeded) {
+  if (voiceSizesStillNeeded) {
     lines.push({
       id: `blocked:${parsed.type}`,
       source: `legacy:${parsed.type}`,

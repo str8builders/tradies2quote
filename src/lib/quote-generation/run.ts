@@ -31,7 +31,7 @@ import {
   runTakeoff as runOrchestratedTakeoff,
   type MaterialFamily,
 } from "@/lib/takeoff";
-import { legacyScopeCoverage } from "@/lib/takeoff/legacyCoverage";
+import { legacyScopeCoverage, orchestratorSizedLegacyJob } from "@/lib/takeoff/legacyCoverage";
 import { scopeFamilyForType, guardLinesForScope } from "@/lib/takeoff/scopeFamily";
 import {
   applyDeterministicCorrections,
@@ -509,6 +509,14 @@ async function generateAndSaveQuote(g: {
   // covers `framing`/`fixing` so the boilerplate "…board / stud / plate…"
   // scan instruction can't raise a phantom blocked framing line.
   const legacyCovers = legacyScopeCoverage(parsedTakeoff.type, useCalculator);
+  // The voice "sizes needed" line (audit item 2) only applies when nothing
+  // sized the job: if the orchestrator already counted it (a frame-only
+  // wall, a ceiling or partition lined by area), its lines stand and the
+  // blocked line would wrongly stop the quote being sent.
+  const voiceSizesStillNeeded =
+    voiceSizesNeeded && !orchestratorSizedLegacyJob(parsedTakeoff.type, orchestrated.scopes)
+      ? voiceSizesNeeded
+      : null;
 
   // Two parts: the stable rules/example block (cached across tradies on the
   // hosted path) and this tradie's settings, library and recent quotes.
@@ -769,8 +777,8 @@ async function generateAndSaveQuote(g: {
       blockedTakeoffLine(parsedTakeoff.type, parsedTakeoff.missingFields),
     );
   }
-  if (voiceSizesNeeded) {
-    calculatorItems.push(blockedTakeoffLine(parsedTakeoff.type, voiceSizesNeeded));
+  if (voiceSizesStillNeeded) {
+    calculatorItems.push(blockedTakeoffLine(parsedTakeoff.type, voiceSizesStillNeeded));
   }
 
   // Wave 44 — also exclude AI lines that overlap with what the
@@ -827,11 +835,11 @@ async function generateAndSaveQuote(g: {
       continue;
     }
     if (
-      (useCalculator || voiceSizesNeeded) &&
+      (useCalculator || voiceSizesStillNeeded) &&
       it.type === "material" &&
       looksLikeTakeoffMaterial(it.description)
     ) {
-      if (voiceSizesNeeded) droppedForSizes.push(it.description);
+      if (voiceSizesStillNeeded) droppedForSizes.push(it.description);
       continue;
     }
     if (

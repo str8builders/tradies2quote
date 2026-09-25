@@ -402,10 +402,6 @@ export const WALL_JOBS: GoldenJob[] = [
     },
     profile: NZ_PROFILE,
     labour: [labourHours(8, 75, "680.00")],
-    knownBugs: {
-      lines:
-        "KNOWN BUG: run.ts also adds a BLOCKED 'wall takeoff — needs dimensions' line (aiTakeoffParser.voiceTakeoffSizesNeeded: 'Wall length needed', 'GIB one side or both sides?') although the orchestrator's framing scope already sized this frame-only wall from '7.2 x 2.4' — a blocked line stops the quote being sent — expected only the 4 framing lines, code adds blocked:wall",
-    },
     totals: {
       materials_subtotal: money("468.10", "210.80 + 134.50 + 53.80 + 69.00"),
       labour_subtotal: money("680.00", "8 h × $85"),
@@ -431,10 +427,6 @@ export const WALL_JOBS: GoldenJob[] = [
     },
     profile: NZ_PROFILE,
     labour: [labourHours(5, 80, "425.00")],
-    knownBugs: {
-      lines:
-        "KNOWN BUG: run.ts also adds a BLOCKED 'wall takeoff — needs dimensions' line (aiTakeoffParser.voiceTakeoffSizesNeeded: 'Wall length needed', 'GIB one side or both sides?') to a CEILING the orchestrator's lining scope already sized from its 22.68 m² — a blocked line stops the quote being sent — expected only the 3 lining lines, code adds blocked:wall",
-    },
     totals: {
       materials_subtotal: money("336.06", "283.50 + 13.86 + 38.70"),
       labour_subtotal: money("425.00", "5 h × $85"),
@@ -460,10 +452,6 @@ export const WALL_JOBS: GoldenJob[] = [
       "lining-adhesive": { qty: count(5, "19 ÷ 4 = 4.75 → 5"), price: PRICE.gibAdhesive, total: money("64.50", "5 × $12.90") },
     },
     profile: NZ_PROFILE,
-    knownBugs: {
-      lines:
-        "KNOWN BUG: run.ts also adds a BLOCKED 'wall takeoff — needs dimensions' line (aiTakeoffParser.voiceTakeoffSizesNeeded: 'Wall length needed') although the orchestrator's lining scope already sized the partition from its 24 m² — a blocked line stops the quote being sent — expected only the 3 lining lines, code adds blocked:wall",
-    },
     totals: {
       materials_subtotal: money("692.26", "598.50 + 29.26 + 64.50"),
       labour_subtotal: money("0.00", "no labour"),

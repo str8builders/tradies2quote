@@ -45,3 +45,19 @@ export function legacyScopeCoverage(
     ? new Set(LEGACY_SCOPE_COVERAGE[legacyType] ?? [])
     : new Set<ScopeType>();
 }
+
+/**
+ * Whether the orchestrator already SIZED a voice/typed job of this legacy
+ * type: some scope that job type owns (fixings alone don't count) came back
+ * unblocked with counted lines. Then the job needs no "sizes needed" blocked
+ * line — e.g. a frame-only wall, or a ceiling or partition lined by area,
+ * which the legacy wall calculator can't size but the orchestrator can.
+ * Used by run.ts and mirrored by the golden-job pipeline.
+ */
+export function orchestratorSizedLegacyJob(
+  legacyType: string,
+  scopes: ReadonlyArray<{ scope: ScopeType; status: string; lines: ReadonlyArray<unknown> }>,
+): boolean {
+  const owned: readonly ScopeType[] = (LEGACY_SCOPE_COVERAGE[legacyType] ?? []).filter((s) => s !== "fixing");
+  return scopes.some((s) => s.status !== "blocked" && s.lines.length > 0 && owned.includes(s.scope));
+}
