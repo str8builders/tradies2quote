@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { NZ_DEFAULTS } from "@/lib/quote-defaults";
+import { resolveTaxLabel, resolveTaxRate } from "@/lib/quote-defaults";
 import { ImportClient } from "./_components/ImportClient";
 
 export const metadata: Metadata = {
@@ -18,11 +18,13 @@ export default async function ImportMaterialsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("tax_rate")
+    .select("tax_rate, tax_label, country, currency")
     .eq("id", user.id)
     .maybeSingle();
-  // Stored as a percentage (15 = 15 %); the client works in fractions.
-  const taxRate = Number(profile?.tax_rate ?? NZ_DEFAULTS.tax_rate) / 100;
+  // The tradie's own tax label and rate (a UK profile is VAT 20 %, never
+  // NZ's "GST" 15 %). Stored as a percentage; the client works in fractions.
+  const taxRate = resolveTaxRate(profile?.tax_rate, profile?.country, profile?.currency) / 100;
+  const taxLabel = resolveTaxLabel(profile?.tax_label, profile?.country, profile?.currency);
 
   return (
     <div className="min-h-screen text-white">
@@ -63,7 +65,7 @@ export default async function ImportMaterialsPage() {
           </div>
         </div>
 
-        <ImportClient taxRate={taxRate} />
+        <ImportClient taxRate={taxRate} taxLabel={taxLabel} />
       </main>
     </div>
   );

@@ -6,7 +6,7 @@ import * as Sentry from "@sentry/nextjs";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { NZ_DEFAULTS } from "@/lib/quote-defaults";
+import { NZ_DEFAULTS, resolveTaxLabel, resolveTaxRate } from "@/lib/quote-defaults";
 import { preciseUnitPrice, unitPriceExGst } from "@/lib/materials/quoteExtraction";
 import {
   buildScanQuote,
@@ -38,15 +38,18 @@ function parsePrice(raw: string): number | null {
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>;
 
-/** The tradie's tax rate as a fraction (profile stores a percentage). */
+/**
+ * The tradie's tax rate as a fraction (profile stores a percentage). A blank
+ * rate is the business country's default (UK 20 %), never NZ's 15 % for all —
+ * the same rule the import screens state to the tradie.
+ */
 async function profileTaxFraction(supabase: ServerClient, userId: string): Promise<number> {
   const { data } = await supabase
     .from("profiles")
-    .select("tax_rate")
+    .select("tax_rate, country, currency")
     .eq("id", userId)
     .maybeSingle();
-  const pct = Number(data?.tax_rate ?? NZ_DEFAULTS.tax_rate);
-  return Number.isFinite(pct) && pct >= 0 ? pct / 100 : NZ_DEFAULTS.tax_rate / 100;
+  return resolveTaxRate(data?.tax_rate, data?.country, data?.currency) / 100;
 }
 
 /**
@@ -510,12 +513,13 @@ export async function createQuoteFromScan(
 
   const { data: profileRow } = await supabase
     .from("profiles")
-    .select("tax_label, tax_rate, currency")
+    .select("tax_label, tax_rate, currency, country")
     .eq("id", user.id)
     .maybeSingle();
   const currency = profileRow?.currency ?? NZ_DEFAULTS.currency;
-  const taxLabel = profileRow?.tax_label ?? NZ_DEFAULTS.tax_label;
-  const taxRate = Number(profileRow?.tax_rate ?? NZ_DEFAULTS.tax_rate);
+  // The tradie's own label and rate by country (UK: VAT 20 %), not "GST" 15 %.
+  const taxLabel = resolveTaxLabel(profileRow?.tax_label, profileRow?.country, profileRow?.currency);
+  const taxRate = resolveTaxRate(profileRow?.tax_rate, profileRow?.country, profileRow?.currency);
 
   // Deterministic reconciliation + the 1:1 mirror — the server is the
   // authority for money. Unit prices keep full precision and the check

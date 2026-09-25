@@ -22,7 +22,15 @@ import {
 import { importMaterials } from "../../actions";
 import { csvGstStatement } from "@/lib/materials";
 
-export function ImportClient({ taxRate = 0.15 }: { /** Fraction, e.g. 0.15. */ taxRate?: number }) {
+export function ImportClient({
+  taxRate = 0.15,
+  taxLabel = "GST",
+}: {
+  /** Fraction, e.g. 0.15. */
+  taxRate?: number;
+  /** The tradie's own tax label ("GST", "VAT", "Tax"). */
+  taxLabel?: string;
+}) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [parsed, setParsed] = useState<CsvParseResult | null>(null);
@@ -315,10 +323,10 @@ export function ImportClient({ taxRate = 0.15 }: { /** Fraction, e.g. 0.15. */ t
               data-testid="csv-prices-include-gst"
               className="h-4 w-4 accent-brand"
             />
-            Prices in this file include GST
+            Prices in this file include {taxLabel}
           </label>
           <p data-testid="csv-gst-basis" className="mt-1 text-xs text-ink-300">
-            {csvGstStatement(pricesIncludeGst, taxRate)}
+            {csvGstStatement(pricesIncludeGst, taxRate, taxLabel)}
           </p>
           {(() => {
             const unpriced = parsed.valid.filter((r) => r.default_unit_price === null).length;
