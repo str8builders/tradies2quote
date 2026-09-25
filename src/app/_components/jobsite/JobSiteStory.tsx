@@ -61,8 +61,10 @@ export function JobSiteStory({ nativeShell }: { nativeShell: boolean }) {
       <main id="main-content" className="relative z-10">
         {/* 1 · The site at first light */}
         <section id="site" data-scene="site" className="jobsite-scene jobsite-scene--site" aria-labelledby="hero-heading">
-          <div className="jobsite-pin">
+          <div className="jobsite-backdrop" aria-hidden="true">
             <StillDawn className="jobsite-poster" />
+          </div>
+          <div className="jobsite-hero-screen">
             <div className="jobsite-scrim" aria-hidden="true" />
             <div className="jobsite-hero">
               <p className="jobsite-eyebrow">{"// "}{HERO.eyebrow}</p>
@@ -81,11 +83,14 @@ export function JobSiteStory({ nativeShell }: { nativeShell: boolean }) {
               </p>
             </div>
           </div>
+          <div className="jobsite-caption-track" aria-hidden="true">
+            <p className="jobsite-caption">{HERO.caption}</p>
+          </div>
         </section>
 
         {/* 2 · Into the phone */}
         <section id="portal" data-scene="portal" className="jobsite-scene jobsite-scene--portal" aria-label="Voice in, quote out">
-          <div className="jobsite-pin jobsite-pin--centre">
+          <div className="jobsite-portal-track">
             <p className="jobsite-portal-line">{PORTAL_LINE}</p>
           </div>
         </section>

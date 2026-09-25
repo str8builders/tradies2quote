@@ -19,7 +19,7 @@ import { sceneState } from "./scene-state";
 import { memberMatrix, seeded, slabTexture, woodTexture } from "./textures";
 import type { ThreeLevel } from "./types";
 
-const FOG = "#d49a73";
+const FOG = "#e2a67c";
 
 /**
  * Scene 1: a quiet New Zealand building site at first light. A concrete
@@ -52,10 +52,10 @@ export function DawnSite({ level }: { level: ThreeLevel }) {
 function Sky() {
   const geometry = useMemo(() => {
     const g = new SphereGeometry(150, 32, 20);
-    const zenith = new Color("#141a2b");
-    const mid = new Color("#4a3d4f");
+    const zenith = new Color("#2c3c5e");
+    const mid = new Color("#8f7584");
     const horizon = new Color(FOG);
-    const below = new Color("#6b4f3f");
+    const below = new Color("#7a5a45");
     const pos = g.attributes.position;
     const col = new Color();
     const out: number[] = [];
@@ -85,12 +85,14 @@ function Light({ level }: { level: ThreeLevel }) {
   }, []);
   return (
     <>
-      <hemisphereLight args={["#9fb0d8", "#3a2e24", 0.9]} />
+      <hemisphereLight args={["#b9c6e4", "#5a4636", 1.35]} />
+      {/* Soft fill from over the camera's shoulder, so the timber reads as timber. */}
+      <directionalLight position={[5, 5, -12]} color="#ffe6cc" intensity={1.1} />
       <directionalLight
         ref={sun}
         position={[-10, 3.6, 6]}
-        color="#ffc893"
-        intensity={3.2}
+        color="#ffc690"
+        intensity={3.8}
         castShadow={level === "full"}
         shadow-mapSize={[2048, 2048]}
         shadow-camera-left={-10}

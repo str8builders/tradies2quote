@@ -40,6 +40,8 @@
   padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 10px;
   background: linear-gradient(to bottom, rgba(10, 10, 10, 0.72), rgba(10, 10, 10, 0));
 }
+/* Solid in the chapters, so text scrolling under it never shows through. */
+.jobsite[data-in-chapters] .jobsite-header { background: rgba(10, 10, 10, 0.94); }
 .jobsite-header-link,
 .jobsite-header-start {
   display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px;
@@ -50,36 +52,42 @@
 .jobsite-header-link:focus-visible,
 .jobsite-header-start:focus-visible { outline: 2px solid var(--js-hivis); outline-offset: 2px; }
 
-/* ── Scenes 1–2: pinned over the 3D ────────────────────────────────── */
+/* ── Scenes 1–2: over the 3D ──────────────────────────────────────── */
 .jobsite-scene { position: relative; }
-.jobsite-pin { position: relative; display: flex; align-items: flex-end; min-height: 100svh; overflow: hidden; }
+/* Paced heights only when the 3D is on: the camera needs the scroll. */
 .jobsite[data-level="full"] .jobsite-scene--site,
 .jobsite[data-level="lite"] .jobsite-scene--site { height: 300svh; }
 .jobsite[data-level="full"] .jobsite-scene--portal,
 .jobsite[data-level="lite"] .jobsite-scene--portal { height: 260svh; }
-.jobsite[data-level="full"] .jobsite-pin,
-.jobsite[data-level="lite"] .jobsite-pin { position: sticky; top: 0; height: 100svh; min-height: 0; }
 
-.jobsite-poster { position: absolute; inset: 0; width: 100%; height: 100%; transition: opacity 0.8s ease; }
-.jobsite[data-ready] .jobsite-poster { opacity: 0; }
+/* The drawn still: the hero picture for the still version, and the
+   placeholder over the canvas until the first 3D frame is drawn. */
+.jobsite-backdrop { position: absolute; top: 0; left: 0; right: 0; height: 100svh; pointer-events: none; }
+.jobsite[data-level="full"] .jobsite-backdrop,
+.jobsite[data-level="lite"] .jobsite-backdrop { position: fixed; inset: 0; height: auto; }
+.jobsite-poster { position: absolute; inset: 0; width: 100%; height: 100%; transition: opacity 0.8s ease, visibility 0.8s; }
+.jobsite[data-ready] .jobsite-poster { opacity: 0; visibility: hidden; }
+
+/* The opening screen scrolls away and leaves the camera the view. */
+.jobsite-hero-screen { position: relative; display: flex; align-items: flex-end; min-height: 100svh; }
 .jobsite-scrim {
   position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(to top, rgba(10, 10, 10, 0.94) 0%, rgba(10, 10, 10, 0.55) 40%, rgba(10, 10, 10, 0) 72%);
+  background: linear-gradient(to top, rgba(10, 10, 10, 0.92) 0%, rgba(10, 10, 10, 0.5) 42%, rgba(10, 10, 10, 0) 74%);
 }
 .jobsite-hero {
   position: relative; z-index: 1; width: 100%; max-width: 1200px; margin: 0 auto;
-  padding: 0 16px calc(env(safe-area-inset-bottom, 0px) + 92px);
+  padding: 96px 16px calc(env(safe-area-inset-bottom, 0px) + 40px);
 }
-@media (min-width: 900px) { .jobsite-hero { padding-bottom: 72px; } }
+@media (min-width: 900px) { .jobsite-hero { padding-bottom: 64px; } }
 .jobsite-eyebrow {
   margin: 0; font: 500 12px/1.4 var(--font-mono); letter-spacing: 0.2em; text-transform: uppercase; color: #d9d2c7;
 }
 .jobsite-hero-title {
-  margin: 12px 0 16px; font-family: var(--font-display); font-weight: 400; text-transform: uppercase;
-  font-size: clamp(40px, 9.6vw, 108px); line-height: 0.92; letter-spacing: -0.01em; text-wrap: balance;
+  margin: 12px 0 16px; max-width: 12ch; font-family: var(--font-display); font-weight: 400; text-transform: uppercase;
+  font-size: clamp(36px, 6.2vw, 80px); line-height: 0.94; letter-spacing: -0.01em; text-wrap: balance;
 }
 .jobsite-hero-title span { color: var(--js-dawn); }
-.jobsite-lede { margin: 0; max-width: 40ch; font-size: clamp(17px, 2.1vw, 21px); line-height: 1.55; color: #e9e3da; }
+.jobsite-lede { margin: 0; max-width: 38ch; font-size: clamp(17px, 1.9vw, 20px); line-height: 1.55; color: #e9e3da; }
 .jobsite-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
 .jobsite-start {
   display: inline-flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 22px;
@@ -97,13 +105,24 @@
 .jobsite-secondary:focus-visible { outline: 2px solid var(--js-hivis); outline-offset: 3px; }
 .jobsite-assure { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; font-size: 15px; color: #ddd6cc; }
 
-.jobsite-pin--centre { align-items: center; justify-content: center; }
+/* Lines in the air: shown only while the 3D is on. */
+.jobsite-caption-track { display: none; }
+.jobsite[data-level="full"] .jobsite-caption-track,
+.jobsite[data-level="lite"] .jobsite-caption-track { display: block; height: 100svh; }
+.jobsite-caption,
 .jobsite-portal-line {
-  margin: 0; padding: 0 16px; text-align: center; font-family: var(--font-display); text-transform: uppercase;
-  font-size: clamp(34px, 8vw, 96px); line-height: 0.95; color: var(--js-text);
+  position: sticky; top: 42svh; margin: 0; padding: 0 16px; text-align: center;
+  font-family: var(--font-display); text-transform: uppercase; line-height: 0.95; color: var(--js-text);
   text-shadow: 0 2px 30px rgba(0, 0, 0, 0.65);
 }
-.jobsite[data-level="still"] .jobsite-scene--portal .jobsite-pin { min-height: 0; padding: 96px 0; }
+.jobsite-caption { max-width: 15ch; margin: 0 auto; font-size: clamp(26px, 5vw, 60px); }
+.jobsite-portal-line { font-size: clamp(34px, 8vw, 96px); }
+/* In the tunnel, not over the phone: the line only rises into view at the cut
+   (40svh into the section = t 0.25 of 160svh of travel). */
+.jobsite[data-level="full"] .jobsite-portal-track,
+.jobsite[data-level="lite"] .jobsite-portal-track { height: 100%; padding-top: 140svh; }
+.jobsite[data-level="still"] .jobsite-portal-track { padding: 96px 0; }
+.jobsite[data-level="still"] .jobsite-portal-line { position: static; }
 
 /* ── Scenes 3–6: the chapters ───────────────────────────────────────── */
 .jobsite-chapter {
@@ -217,7 +236,8 @@
 }
 .jobsite-steps a[aria-current="step"] { color: var(--js-ink); background: var(--js-accent); }
 .jobsite-steps a:focus-visible { outline: 2px solid var(--js-hivis); outline-offset: 2px; }
-@media (min-width: 1024px) {
+/* A column at the side only where it clears the 1200 px content. */
+@media (min-width: 1360px) {
   .jobsite-steps { left: auto; right: 20px; top: 50%; transform: translateY(-50%); }
   .jobsite-steps ol { flex-direction: column; align-items: flex-end; }
   .jobsite-steps a { font-size: 12px; padding: 0 12px; }

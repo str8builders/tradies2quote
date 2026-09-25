@@ -22,7 +22,9 @@ export const STEPS = [
 ] as const;
 
 export const HERO = {
-  eyebrow: "Built on site. Made for the trades.",
+  eyebrow: "AI quotes and invoices for NZ tradies",
+  /** The brief's second line, shown in the air as the camera walks the frame. */
+  caption: "Built on site. Made for the trades.",
   title: ["Great at the job.", "Done with the paperwork."],
   lede: "Talk through the job on site. Tradies2Quote writes it up as a professional quote with your rates and 15% GST. You check every line, send it, and get your evenings back.",
 } as const;

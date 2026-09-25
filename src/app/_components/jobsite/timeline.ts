@@ -138,7 +138,8 @@ export function shotAt({ scene, t }: Located): Shot {
     return { space: "site", pos: pos(SITE_KEYS), look: look(SITE_KEYS), flash: 0, fade: 0 };
   }
   if (scene === "portal") {
-    const flash = t < PORTAL_CUT ? smooth(0.12, PORTAL_CUT, t) : 1 - smooth(PORTAL_CUT, 0.36, t);
+    // A quick flash right at the cut, so the phone's screen is seen first.
+    const flash = t < PORTAL_CUT ? smooth(0.19, PORTAL_CUT, t) : 1 - smooth(PORTAL_CUT, 0.33, t);
     const fade = smooth(0.86, 1, t);
     return t < PORTAL_CUT
       ? { space: "site", pos: pos(PHONE_KEYS), look: look(PHONE_KEYS), flash, fade }

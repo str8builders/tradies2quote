@@ -9,7 +9,7 @@ import { damp, fovFor, locatedAt, progressOf, shotAt } from "../timeline";
 import { sceneState } from "./scene-state";
 import type { CanvasProps } from "./types";
 
-const DAWN = new Color("#d49a73");
+const DAWN = new Color("#e2a67c");
 const NIGHT = new Color("#0a0a0a");
 
 /**

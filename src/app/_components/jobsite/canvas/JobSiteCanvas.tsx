@@ -23,6 +23,9 @@ export default function JobSiteCanvas({ level, layer, flash, onReady, onLost }: 
       gl={{ antialias: level === "full", powerPreference: "high-performance" }}
       camera={{ fov: 45, near: 0.05, far: 260, position: [1.4, 1.8, -7.8] }}
       style={{ position: "absolute", inset: 0 }}
+      onCreated={({ gl }) => {
+        gl.toneMappingExposure = 1.15;
+      }}
     >
       <CameraRig level={level} layer={layer} flash={flash} onReady={onReady} />
       <DawnSite level={level} />
