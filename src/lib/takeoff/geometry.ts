@@ -17,6 +17,9 @@
 // Everything is pure + side-effect-free so it's trivially unit-testable.
 // ─────────────────────────────────────────────────────────────────────────
 
+// Areas/perimeters round exact half-up through the shared quantity maths.
+import { round2 } from "../quantity-maths";
+
 export type ShapeKind =
   | "rect"
   | "l_shape"
@@ -66,7 +69,6 @@ export interface PlanGeometry {
   composite: boolean;
 }
 
-const round2 = (n: number): number => Math.round(n * 100) / 100;
 const finitePos = (n: unknown): number => {
   const v = Number(n);
   return Number.isFinite(v) && v > 0 ? v : 0;

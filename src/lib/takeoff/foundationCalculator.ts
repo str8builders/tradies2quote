@@ -19,6 +19,9 @@
 // waste factor, and the rounding rule — so each quantity is auditable.
 // ─────────────────────────────────────────────────────────────────────────
 
+// Areas/volumes round exact half-up through the shared quantity maths.
+import { round2 } from "../quantity-maths";
+
 // ── Config (defaulted estimating template — NOT required measurements) ────
 
 export type FoundationConfig = {
@@ -122,8 +125,6 @@ const isPos = (v: unknown): v is number =>
 
 const isNonNeg = (v: unknown): v is number =>
   typeof v === "number" && Number.isFinite(v) && v >= 0;
-
-const round2 = (x: number): number => Math.round(x * 100) / 100;
 
 /** Round UP to a step (e.g. 0.1 m³), guarded against float drift. */
 const roundUpTo = (value: number, step: number): number => {

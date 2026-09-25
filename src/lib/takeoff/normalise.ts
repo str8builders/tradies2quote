@@ -9,6 +9,8 @@
 // Nothing here calls an LLM. Every function is pure and unit-testable.
 // ─────────────────────────────────────────────────────────────────────────
 
+import { round2, safeCeil } from "../quantity-maths";
+
 /**
  * Convert a length value to metres. The caller hints at the unit but
  * the function also applies a "NZ trade reasonableness" clamp: anything
@@ -44,20 +46,10 @@ export function areaM2(lengthM: number, widthM: number): number {
   return round2(lengthM * widthM);
 }
 
-export function round2(n: number): number {
-  if (!Number.isFinite(n)) return 0;
-  return Math.round(n * 100) / 100;
-}
-
-/**
- * Math.ceil with a 6-decimal-place precision guard. Same logic as
- * materialCalculator.safeCeil — pulled into this file so calculators
- * in this module can use it without importing the legacy file.
- */
-export function safeCeil(n: number): number {
-  if (!Number.isFinite(n)) return 0;
-  return Math.ceil(Math.round(n * 1e6) / 1e6);
-}
+// Area rounding (exact half-up) and the noise-guarded round-up live in the
+// one shared quantity-maths module; re-exported so the calculators in this
+// folder keep importing them from the normalisation layer.
+export { round2, safeCeil };
 
 /**
  * Convert a board nominal width + gap to its effective COVERAGE width.

@@ -1,3 +1,5 @@
+import { round2, safeCeil } from "./quantity-maths";
+
 export type MaterialTakeoffInput = {
   wallLengthM: number;
   wallHeightM?: number;
@@ -91,23 +93,8 @@ export const DEFAULTS = {
  */
 export const MAX_DWANG_CENTRES_M = 1.35;
 
-function round2(n: number): number {
-  return Math.round((Number.isFinite(n) ? n : 0) * 100) / 100;
-}
-
-/**
- * Math.ceil with a 6-decimal-place precision guard. Plain Math.ceil on a
- * floating-point computation can push a value like 22.0000000004 (which
- * is mathematically 22 but suffers from IEEE-754 noise) over the integer
- * boundary to 23. safeCeil rounds to 6dp first so only meaningful
- * fractions trigger the ceiling. Used by EVERY round-up in this file —
- * e.g. a 3.2 m wall needs 9.6 m of plate = exactly 2 × 4.8 m lengths, and
- * 19 GIB sheets need 19 × 40 × 1.1 = 836 screws, not 3 lengths / 837.
- */
-function safeCeil(n: number): number {
-  if (!Number.isFinite(n)) return 0;
-  return Math.ceil(Math.round(n * 1e6) / 1e6);
-}
+// Area rounding (exact half-up) and the noise-guarded round-up used by EVERY
+// quantity in this file come from the one shared quantity-maths module.
 
 /** Reject invalid dimensions before any count is produced. An invalid divisor
  * must never masquerade as zero material required. */

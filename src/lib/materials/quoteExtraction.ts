@@ -13,6 +13,9 @@
 // same way as the takeoff schemas.
 // ─────────────────────────────────────────────────────────────────────────
 
+// Money rounds through the ONE exact half-up helper (1.005 → 1.01).
+import { round2 } from "../quote-defaults";
+
 export type ExtractedSupplierItem = {
   /** Product description as printed on the quote. */
   name: string;
@@ -171,7 +174,6 @@ function clampConfidence(v: unknown): number {
   return Math.max(0, Math.min(1, n));
 }
 
-const round2 = (n: number): number => Math.round(n * 100) / 100;
 
 /**
  * Clean binary floating-point noise off a unit price WITHOUT rounding it to
@@ -506,7 +508,7 @@ export function toExGst(
   rate = 0.15,
 ): number {
   const ex = inclusive ? price / (1 + rate) : price;
-  return Math.round(ex * 100) / 100;
+  return round2(ex);
 }
 
 /**
