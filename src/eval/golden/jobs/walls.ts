@@ -314,7 +314,7 @@ export const WALL_JOBS: GoldenJob[] = [
       "gib-10mm": {
         qty: count(
           56,
-          "GIB is an INTERIOR lining: exterior walls take it on the inside face only. Exterior 36 × 2.4 = 86.4 − 6 windows × 1.44 (8.64) − 2 exterior doors × 1.6728 (3.3456) = 74.4144 m²; interior 16.8 × 2.4 = 40.32 × 2 faces = 80.64 − 3 doors × 2 faces × 1.6728 (10.0368) = 70.6032 m²; total 145.0176 × 1.1 = 159.519 ÷ 2.88 = 55.39 → 56 sheets",
+          "GIB is an INTERIOR lining: exterior walls take it on the inside face only. Exterior 36 × 2.4 = 86.4 − 6 windows × 1.44 (8.64) − 2 exterior doors × 1.6728 (3.3456) = 74.4144 m²; interior 16.8 × 2.4 = 40.32 × 2 faces = 80.64 − 3 doors × 2 faces × 1.6728 (10.0368) = 70.6032 m²; total 145.0176 × 1.1 = 159.519 ÷ 2.88 = 55.39 → 56 sheets (the code shares the openings by run, as for the batts: 17.004 × 36/52.8 = 11.59 m² on exterior walls → 74.81 + (40.32 − 5.41) × 2 = 69.82 → 144.63 m² × 1.1 ÷ 2.88 = 55.24 → also 56)",
         ),
         price: PRICE.gib10,
         total: money("1764.00", "56 × $31.50"),
@@ -336,13 +336,6 @@ export const WALL_JOBS: GoldenJob[] = [
       subtotal_before_tax: money("6615.17", "5512.64 + 1102.53"),
       tax_amount: money("992.28", "15 % × 6615.17 = 992.2755 → 992.28"),
       total: money("7607.45", "6615.17 + 992.28"),
-    },
-    knownBugs: {
-      "qty:gib-10mm":
-        "KNOWN BUG: 'both sides' is applied to the whole 52.8 m run, so the OUTSIDE face of the 36 m of exterior wall is GIB-lined too (materialCalculator.calculateMaterialTakeoff has one gibSides for the run although it knows exteriorWallLengthM) — expected 56 sheets (exterior walls inside face + interior walls both faces = 145.02 m²), code gives 84 (219.43 m²)",
-      "qty:gib-screws": "KNOWN BUG: cascades from the GIB over-count — expected 2464 (56 sheets), code gives 3696 (84 sheets)",
-      "qty:gib-adhesive": "KNOWN BUG: cascades from the GIB over-count — expected 14 tubes, code gives 21",
-      ...moneyCascade(["gib-10mm", "gib-screws", "gib-adhesive"], "KNOWN BUG: cascades from GIB lined on the outside of exterior walls — 28 sheets ($882 + fixings) too many"),
     },
   }),
 

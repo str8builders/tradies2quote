@@ -197,7 +197,31 @@ export function calculateMaterialTakeoff(
       ? safeCeil((safeWallLength * dwangRows) / timberStockLengthM)
       : 0;
 
-  const gibAreaM2 = Math.max(rawWallAreaM2 - doorAreaM2 - windowAreaM2, 0) * gibSides;
+  // Lined faces. GIB is an interior lining: an EXTERIOR wall is lined on its
+  // inside face only (its outside is the cladding), an interior wall on the
+  // `gibSides` faces asked for. When the exterior run is known the run
+  // splits into the two, and the openings (and the doors on each part)
+  // share the run the way the insulation's do; with no exterior run nothing
+  // says which walls are exterior, so every metre takes `gibSides` as before.
+  // One "both sides" for a whole-house run used to GIB the outside of every
+  // exterior wall too (52.8 m run, 36 m exterior: 84 sheets instead of 56).
+  const rawExteriorRun = input.exteriorWallLengthM;
+  const exteriorRunKnown =
+    typeof rawExteriorRun === "number" && Number.isFinite(rawExteriorRun) && rawExteriorRun >= 0;
+  const exteriorRunM = exteriorRunKnown ? Math.min(rawExteriorRun, safeWallLength) : 0;
+  const interiorRunM = safeWallLength - exteriorRunM;
+  const exteriorShare = safeWallLength > 0 ? exteriorRunM / safeWallLength : 0;
+  const exteriorDoors = numberOfDoors * exteriorShare;
+  const interiorDoors = numberOfDoors - exteriorDoors;
+  const EXTERIOR_FACES = 1;
+  const splitFaces = exteriorRunKnown && gibSides > EXTERIOR_FACES && exteriorRunM > 0;
+
+  const gibAreaM2 = exteriorRunKnown
+    ? Math.max(exteriorRunM * safeWallHeight - (doorAreaM2 + windowAreaM2) * exteriorShare, 0) *
+        EXTERIOR_FACES +
+      Math.max(interiorRunM * safeWallHeight - (doorAreaM2 + windowAreaM2) * (1 - exteriorShare), 0) *
+        gibSides
+    : Math.max(rawWallAreaM2 - doorAreaM2 - windowAreaM2, 0) * gibSides;
   const gibAreaWithWaste = gibAreaM2 * wasteMultiplier;
   const gibSheets =
     sheetAreaM2 > 0 ? safeCeil(gibAreaWithWaste / sheetAreaM2) : 0;
@@ -243,7 +267,15 @@ export function calculateMaterialTakeoff(
       quantity: gibSheets,
       unit: "sheets",
       formula:
-        "ceil((netWallAreaM2 * gibSides * wasteMultiplier) / sheetAreaM2)",
+        "ceil(((exteriorNetAreaM2 * 1) + (interiorNetAreaM2 * gibSides)) * wasteMultiplier / sheetAreaM2)",
+      ...(splitFaces
+        ? {
+            notes:
+              interiorRunM > 0
+                ? "Exterior walls lined on the inside face only; interior walls both sides."
+                : "Exterior walls lined on the inside face only.",
+          }
+        : {}),
       priceMatchKey: "10mm-gib-board",
     },
     {
@@ -327,9 +359,12 @@ export function calculateMaterialTakeoff(
   }
 
   if (includeSkirting) {
-    // Skirting runs along every lined face and stops at each door opening.
-    const skirtingLinearM =
-      Math.max(safeWallLength - numberOfDoors * doorWidthM, 0) * gibSides;
+    // Skirting runs along every lined face and stops at each door opening
+    // (exterior walls: the inside face only — see the lined faces above).
+    const skirtingLinearM = exteriorRunKnown
+      ? Math.max(exteriorRunM - exteriorDoors * doorWidthM, 0) * EXTERIOR_FACES +
+        Math.max(interiorRunM - interiorDoors * doorWidthM, 0) * gibSides
+      : Math.max(safeWallLength - numberOfDoors * doorWidthM, 0) * gibSides;
     const skirtingWithWaste = skirtingLinearM * wasteMultiplier;
     const skirtingLengths =
       timberStockLengthM > 0
@@ -342,16 +377,18 @@ export function calculateMaterialTakeoff(
       quantity: skirtingLengths,
       unit: "lengths",
       formula:
-        "ceil(((wallLengthM − doors × doorWidthM) × gibSides × wasteMultiplier) / timberStockLengthM)",
+        "ceil((((exteriorRunM − exterior doors × doorWidthM) × 1) + ((interiorRunM − interior doors × doorWidthM) × gibSides)) × wasteMultiplier / timberStockLengthM)",
       priceMatchKey: "skirting",
     });
   }
 
   if (includeArchitraves) {
     // Two legs + a head per door, on every lined face (an internal door in a
-    // wall lined both sides is architraved both sides).
-    const architraveLinearM =
-      numberOfDoors * (doorHeightM * 2 + doorWidthM) * gibSides;
+    // wall lined both sides is architraved both sides; an exterior door on
+    // its inside face only).
+    const architraveLinearM = exteriorRunKnown
+      ? (exteriorDoors * EXTERIOR_FACES + interiorDoors * gibSides) * (doorHeightM * 2 + doorWidthM)
+      : numberOfDoors * (doorHeightM * 2 + doorWidthM) * gibSides;
     const architraveWithWaste = architraveLinearM * wasteMultiplier;
     const architraveLengths =
       timberStockLengthM > 0
@@ -364,7 +401,7 @@ export function calculateMaterialTakeoff(
       quantity: architraveLengths,
       unit: "lengths",
       formula:
-        "ceil((doors × ((doorHeightM × 2) + doorWidthM) × gibSides × wasteMultiplier) / timberStockLengthM)",
+        "ceil(((exterior doors × 1) + (interior doors × gibSides)) × ((doorHeightM × 2) + doorWidthM) × wasteMultiplier / timberStockLengthM)",
       priceMatchKey: "architraves",
     });
   }

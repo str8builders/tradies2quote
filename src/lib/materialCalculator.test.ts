@@ -33,12 +33,14 @@ describe("calculateMaterialTakeoff", () => {
     expect(getMaterial(r, "plates-90x45")?.quantity).toBe(3);
     // nogs: ceil(4/4.8) = 1
     expect(getMaterial(r, "nogs-90x45")?.quantity).toBe(1);
-    // gib both sides default: ceil((9.6 * 2 * 1.1) / (1.2*2.4)) = ceil(21.12/2.88) = 8
-    expect(getMaterial(r, "gib-10mm")?.quantity).toBe(8);
-    // gib screws: ceil(8 * 40 * 1.1) = 352
-    expect(getMaterial(r, "gib-screws")?.quantity).toBe(352);
-    // adhesive: ceil(8/4) = 2
-    expect(getMaterial(r, "gib-adhesive")?.quantity).toBe(2);
+    // The wall is all exterior, so GIB lines its inside face only (the default
+    // "both sides" applies to interior walls; an exterior wall's outside is
+    // the cladding): ceil((9.6 * 1 * 1.1) / (1.2*2.4)) = ceil(10.56/2.88) = 4
+    expect(getMaterial(r, "gib-10mm")?.quantity).toBe(4);
+    // gib screws: ceil(4 * 40 * 1.1) = 176
+    expect(getMaterial(r, "gib-screws")?.quantity).toBe(176);
+    // adhesive: ceil(4/4) = 1
+    expect(getMaterial(r, "gib-adhesive")?.quantity).toBe(1);
     // insulation default true: ceil((9.6 * 1.1) / 8.8) = ceil(1.2) = 2
     expect(getMaterial(r, "pink-batts")?.quantity).toBe(2);
     // framing nails fixed
