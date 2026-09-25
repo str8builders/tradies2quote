@@ -15,7 +15,11 @@
 
 import { round2 } from "../quote-defaults";
 import type { QuoteData, QuoteLineItem, SupplierSource } from "../quote-types";
-import { buildMirrorQuoteLines, computeQuoteTotals } from "./estimateToQuote";
+import {
+  buildMirrorQuote,
+  computeQuoteTotals,
+  gstRoundingNotes,
+} from "./estimateToQuote";
 import {
   preciseUnitPrice,
   toExGst,
@@ -152,10 +156,11 @@ export function buildScanQuote(
   };
   const validation = validateSupplierQuote(extraction, { taxRate: taxRateFraction });
 
-  const lineItems = buildMirrorQuoteLines(items, {
+  const mirror = buildMirrorQuote(items, {
     gstInclusive: meta.gstInclusive ?? false,
     taxRate: taxRateFraction,
   });
+  const lineItems = mirror.lines;
   // markup 0 — a faithful mirror; total equals the supplier quote total.
   const totals = computeQuoteTotals(lineItems, {
     default_markup_pct: 0,
@@ -213,7 +218,13 @@ export function buildScanQuote(
     tax_label: profile.taxLabel,
     tax_rate: profile.taxRate,
     terms: "",
-    notes: [],
+    // GST-inclusive: which lines took a rounding cent so the quote adds back
+    // to the printed total exactly (or the unavoidable 1¢ when it can't).
+    notes: gstRoundingNotes(mirror.gst, totals.total, {
+      taxRatePct: profile.taxRate,
+      taxLabel: profile.taxLabel || "GST",
+      currency: profile.currency,
+    }),
     supplier_source,
   };
 
