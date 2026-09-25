@@ -55,3 +55,17 @@ describe("the shared metres plausibility rule", () => {
     expect(bareLengthToMetres(0)).toBeNaN();
   });
 });
+
+describe("the millimetre hint is only offered when the mm reading is a real size", () => {
+  it("4800 → 4.8 m and 2400 → 2.4 m are offered; a 150 m run as 0.15 m is not", async () => {
+    const { millimetreReading } = await import("../plausibility");
+    expect(millimetreReading(4800, "edge")).toBe(4.8);
+    expect(millimetreReading(2400, "wallHeight")).toBe(2.4);
+    expect(millimetreReading(150, "edge")).toBeNull();
+    expect(millimetreReading(62, "edge")).toBeNull(); // in band — nothing to ask
+    expect(checkMetres("Cladding wall length", 150, "edge")).toEqual({
+      ok: false,
+      reason: "Cladding wall length 150 m is more than 100 m — check it.",
+    });
+  });
+});

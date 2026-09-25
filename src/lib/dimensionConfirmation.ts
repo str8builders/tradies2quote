@@ -25,6 +25,7 @@ import { round2 } from "./quote-defaults";
 import {
   METRES_BANDS,
   checkMetres,
+  millimetreReading,
   showMetres,
   type MetresKind,
 } from "./takeoff/plausibility";
@@ -186,8 +187,8 @@ function sizeProblem(type: string, dims: ConfirmableDimension[]): string | null 
     if (checkMetres(d.label, d.value, kind).ok) continue;
     const { min, max } = METRES_BANDS[kind];
     const v = d.value;
-    const asMm = v / 1000;
-    if (v > max && asMm >= min && asMm <= max) {
+    const asMm = millimetreReading(v, kind);
+    if (asMm !== null) {
       return `That size looks wrong — ${d.label} ${showMetres(v)} m? Did you mean ${showMetres(v)} mm (${showMetres(asMm)} m)?`;
     }
     const why = v > max ? `more than ${showMetres(max)} m` : `less than ${showMetres(min)} m`;

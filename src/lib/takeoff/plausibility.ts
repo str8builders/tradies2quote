@@ -61,6 +61,19 @@ export function showMetres(n: number): string {
 }
 const show = showMetres;
 
+/**
+ * When an over-the-band metres value only makes sense as millimetres, the
+ * metres it would be (4800 → 4.8) — offered to the tradie as a question,
+ * never applied. Null when the mm reading isn't a real size either (a
+ * 150 m run as mm is 0.15 m: no hint).
+ */
+export function millimetreReading(value: number, kind: MetresKind): number | null {
+  const { min, max } = METRES_BANDS[kind];
+  if (!Number.isFinite(value) || value <= max) return null;
+  const asMm = micro(value / 1000);
+  return asMm >= Math.max(min, 1) && asMm <= max ? asMm : null;
+}
+
 export type MetresCheck =
   | { ok: true; value: number }
   | { ok: false; reason: string };
@@ -80,11 +93,8 @@ export function checkMetres(label: string, value: unknown, kind: MetresKind): Me
   }
   const { min, max } = METRES_BANDS[kind];
   if (v > max) {
-    const asMm = v / 1000;
-    const hint =
-      asMm >= min && asMm <= max
-        ? ` If you meant ${show(v)} mm, that's ${show(asMm)} m.`
-        : "";
+    const asMm = millimetreReading(v, kind);
+    const hint = asMm !== null ? ` If you meant ${show(v)} mm, that's ${show(asMm)} m.` : "";
     return {
       ok: false,
       reason: `${label} ${show(v)} m is more than ${show(max)} m — check it.${hint}`,
