@@ -318,7 +318,10 @@ export async function runStructuredAgent<T>(
         tool: opts.tool,
         maxTokens,
         cacheSystem,
-        includeTemperature: tier === "fast",
+        // Only Haiku accepts the knob; keyed on the resolved model so an env
+        // override of the fast tier (src/lib/ai/models.ts) can't send it to
+        // a model that 400s on it.
+        includeTemperature: tier === "fast" && /haiku/i.test(model),
       });
 
       // Transport, retries on 429/5xx/529 and refusal typing happen in the

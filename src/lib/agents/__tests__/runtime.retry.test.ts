@@ -116,6 +116,29 @@ describe("runStructuredAgent (Anthropic) HTTP retry", () => {
   });
 });
 
+describe("model config overrides", () => {
+  it("sends temperature to a Haiku fast tier only", async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    const fetchImpl = vi.fn(async (_url: unknown, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return anthropicTool();
+    });
+    const run = () =>
+      runStructuredAgent({ agentName: "T", system: "S", user: "U", tool: TOOL, parse, apiKey: "k", tier: "fast", fetchImpl: fetchImpl as unknown as typeof fetch });
+    await run();
+    expect(bodies[0]).toMatchObject({ model: "claude-haiku-4-5", temperature: 0 });
+
+    vi.stubEnv("AI_MODEL_AGENT_FAST", "claude-sonnet-5");
+    try {
+      await run();
+      expect(bodies[1].model).toBe("claude-sonnet-5");
+      expect(bodies[1]).not.toHaveProperty("temperature");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});
+
 describe("runOpenAIStructuredAgent HTTP retry", () => {
   it("rides out a 503 on cloud OpenAI", async () => {
     const fetchImpl = vi.fn().mockResolvedValueOnce(busy(503)).mockResolvedValueOnce(openaiTool());
