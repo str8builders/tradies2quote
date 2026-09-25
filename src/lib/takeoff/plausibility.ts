@@ -13,9 +13,11 @@
 //   footprint   a deck or floor side (length / width)            1 – 30 m
 //               (the residential footprint envelope every plan reader
 //               already used — a 54 m deck side is a misread)
-//   edge        one straight run — a cladding wall run, a
-//               single wall                                   0.1 – 100 m
-//   wallRun     a whole-plan wall run (every wall summed)     0.1 – 1000 m
+//   edge        one straight run — a single wall               0.1 – 100 m
+//   wallRun     a whole wall run added together: every wall on
+//               a floor plan, or a building's cladding run (its
+//               whole exterior wall run — a 101 m re-clad is an
+//               ordinary house)                               0.1 – 1000 m
 //   wallHeight  a wall / stud height                          1.8 – 6 m
 //
 // A value inside its band is taken EXACTLY as stated. A value outside it is
@@ -23,7 +25,7 @@
 // like millimetres" (that rule — "over 50 m means mm" — turned a real 62 m
 // cladding run into 0.062 m and quoted one weatherboard). The caller refuses
 // to calculate and shows the tradie the plain reason written here, e.g.
-// "Cladding wall length 4800 m is more than 100 m — check it. If you meant
+// "Cladding wall length 4800 m is more than 1000 m — check it. If you meant
 // 4800 mm, that's 4.8 m."
 //
 // Text with NO unit written is read before any of this (bareLengthToMetres):

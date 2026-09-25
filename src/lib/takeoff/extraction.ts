@@ -300,7 +300,11 @@ function extractMarker(
     door_count?: number;
     window_count?: number;
   } = {};
-  for (const part of (match[1] ?? "").split(/\s+/)) {
+  const pairs = (match[1] ?? "").split(/\s+/);
+  // A cladding marker's length is the building's whole exterior wall run
+  // added together — the whole-run band, like the legacy marker reader.
+  const isCladding = pairs.some((p) => /^type=cladding$/i.test(p));
+  for (const part of pairs) {
     const eq = part.indexOf("=");
     if (eq <= 0) continue;
     const key = part.slice(0, eq).toLowerCase();
@@ -310,7 +314,7 @@ function extractMarker(
     if (n <= 0 && key !== "door_count" && key !== "window_count") continue;
     // Plan edges: the ONE shared plausibility band (the legacy marker reader
     // uses the same). Out of band → dropped, never rescaled.
-    if (key === "length_m" && isPlausibleMetres(n, "edge")) out.length_m = n;
+    if (key === "length_m" && isPlausibleMetres(n, isCladding ? "wallRun" : "edge")) out.length_m = n;
     if (key === "width_m" && isPlausibleMetres(n, "edge")) out.width_m = n;
     if (key === "height_m" && n >= 0.5 && n <= 20) out.height_m = n;
     if ((key === "joist_spacing_mm" || key === "stud_spacing_mm") && n >= 100 && n <= 1200) {

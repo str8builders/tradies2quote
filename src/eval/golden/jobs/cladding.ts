@@ -165,15 +165,6 @@ export const CLADDING_JOBS: GoldenJob[] = [
       flashings: { qty: decimal("0", "no openings stated") },
       "cladding-nails": { qty: count(3200, "242.4 × 12 × 1.1 = 3199.68 → 3200") },
     },
-    knownBugs: {
-      lines:
-        "KNOWN BUG: runs over 50 m are refused (aiTakeoffParser CLADDING_MAX_RUN_M guards materialCalculator.sanitiseMeters, which would read 101 as 101 mm) — safe, but a 101 m re-clad gets no cladding lines at all — expected the 5 cladding lines, code emits none",
-      "qty:cladding-boards": "KNOWN BUG: refused (> 50 m) — expected 371 lengths, code gives nothing",
-      "qty:cavity-battens": "KNOWN BUG: refused (> 50 m) — expected 140 lengths, code gives nothing",
-      "qty:building-wrap": "KNOWN BUG: refused (> 50 m) — expected 10 rolls, code gives nothing",
-      "qty:flashings": "KNOWN BUG: refused (> 50 m) — expected 0 m (a line), code gives no line",
-      "qty:cladding-nails": "KNOWN BUG: refused (> 50 m) — expected 3200 nails, code gives nothing",
-    },
   }),
 
   // ───────────────────────────────────────────────────────────────────────
@@ -241,13 +232,6 @@ export const CLADDING_JOBS: GoldenJob[] = [
       "building-wrap": { qty: count(10, "242.4 × 1.1 ÷ 27.5 = 9.70 → 10") },
       flashings: { qty: decimal("0", "no openings") },
       "cladding-nails": { qty: count(3200, "242.4 × 12 × 1.1 = 3199.68 → 3200") },
-    },
-    knownBugs: {
-      "qty:cladding-boards":
-        "KNOWN BUG: materialCalculator.sanitiseMeters divides any wallLengthM over 50 by 1000 — the function's input is metres, so 101 m becomes 0.101 m — expected 371 lengths, code gives 1",
-      "qty:cavity-battens": "KNOWN BUG: same sanitiseMeters conversion — expected 140, code gives 2",
-      "qty:building-wrap": "KNOWN BUG: same sanitiseMeters conversion — expected 10 rolls, code gives 1",
-      "qty:cladding-nails": "KNOWN BUG: same sanitiseMeters conversion — expected 3200, code gives 4",
     },
   }),
 ];

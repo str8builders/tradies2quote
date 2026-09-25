@@ -16,14 +16,16 @@ describe("voiceTakeoffSizesNeeded", () => {
   });
 
   it("repeats a size that can't be right, with the shared plausibility reason", () => {
-    expect(needed("Reclad the house in weatherboards, 150m of wall, 2.4m high")).toEqual([
-      "Cladding wall length 150 m is more than 100 m — check it. Say the right size or type it.",
+    // A cladding run is the whole exterior wall run: the whole-run band (≤ 1000 m).
+    expect(needed("Reclad the house in weatherboards, 1200m of wall, 2.4m high")).toEqual([
+      "Cladding wall length 1200 m is more than 1000 m — check it. If you meant 1200 mm, that's 1.2 m. Say the right size or type it.",
     ]);
   });
 
   it("is null when the calculator can run", () => {
     expect(needed("GIB both sides on a 4m wall, 2.4m high")).toBeNull();
     expect(needed("Reclad the house in weatherboards, 62m of wall, 2.4m high")).toBeNull();
+    expect(needed("Reclad the house in weatherboards, 101m of wall, 2.4m high")).toBeNull();
   });
 
   it("is null for upkeep of something already built, and for jobs with no calculator", () => {

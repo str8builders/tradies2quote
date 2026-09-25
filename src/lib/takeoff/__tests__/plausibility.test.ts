@@ -9,7 +9,7 @@ import {
 
 describe("the shared metres plausibility rule", () => {
   it("takes an in-band value exactly as stated", () => {
-    expect(checkMetres("Cladding wall length", 62, "edge")).toEqual({ ok: true, value: 62 });
+    expect(checkMetres("Wall length", 62, "edge")).toEqual({ ok: true, value: 62 });
     expect(checkMetres("Total wall run", 480, "wallRun")).toEqual({ ok: true, value: 480 });
     expect(checkMetres("Wall height", 2.7, "wallHeight")).toEqual({ ok: true, value: 2.7 });
   });
@@ -63,9 +63,9 @@ describe("the millimetre hint is only offered when the mm reading is a real size
     expect(millimetreReading(2400, "wallHeight")).toBe(2.4);
     expect(millimetreReading(150, "edge")).toBeNull();
     expect(millimetreReading(62, "edge")).toBeNull(); // in band — nothing to ask
-    expect(checkMetres("Cladding wall length", 150, "edge")).toEqual({
+    expect(checkMetres("Wall length", 150, "edge")).toEqual({
       ok: false,
-      reason: "Cladding wall length 150 m is more than 100 m — check it.",
+      reason: "Wall length 150 m is more than 100 m — check it.",
     });
   });
 });
@@ -81,6 +81,18 @@ describe("the footprint band (deck / floor sides)", () => {
     expect(checkMetres("Deck width", 5400, "footprint")).toEqual({
       ok: false,
       reason: "Deck width 5400 m is more than 30 m — check it. If you meant 5400 mm, that's 5.4 m.",
+    });
+  });
+});
+
+describe("a cladding run is the whole exterior run added together (the wallRun band)", () => {
+  it("takes 101 m and anything up to 1000 m as stated; refuses more with a plain reason", () => {
+    expect(METRES_BANDS.wallRun).toEqual({ min: 0.1, max: 1000 });
+    expect(checkMetres("Cladding wall length", 101, "wallRun")).toEqual({ ok: true, value: 101 });
+    expect(checkMetres("Cladding wall length", 1000, "wallRun")).toEqual({ ok: true, value: 1000 });
+    expect(checkMetres("Cladding wall length", 1200, "wallRun")).toEqual({
+      ok: false,
+      reason: "Cladding wall length 1200 m is more than 1000 m — check it. If you meant 1200 mm, that's 1.2 m.",
     });
   });
 });

@@ -217,6 +217,34 @@ describe("scan review edits flow into the deck / subfloor takeoff", () => {
   });
 });
 
+describe("scan review edits flow into the cladding takeoff", () => {
+  const CLADDING_PLAN = sanitisePlan({ shape: "line", length_m: 62, height_m: 2.4 });
+  const CLADDING = scan(
+    "Framing",
+    "Weatherboard cladding",
+    CLADDING_PLAN,
+    "Wall length 62.0m\nWall height 2.4m",
+  );
+
+  it("a cladding run corrected 62 m → 101 m reaches the marker (a run is the whole exterior run, not a 30 m footprint side)", () => {
+    const edited = "Wall length 101.0m\nWall height 2.4m";
+    const transcript = finalFor(CLADDING, edited);
+    const marker = extractStructuredPlanMarker(transcript);
+    expect(marker?.type).toBe("cladding");
+    expect(marker?.lengthM).toBe(101);
+    expect(marker?.edited).toContain("length_m");
+    const r = parseTakeoffDescription(transcript);
+    expect(r.type).toBe("cladding");
+    // 101 × 2.4 = 242.4 m² ÷ 0.150 = 1616 lm × 1.1 ÷ 6 m stock (this scan's timber) = 296.3 → 297
+    expect(runTakeoff(r)?.materials.find((m) => m.id === "cladding-boards")?.quantity).toBe(297);
+  });
+
+  it("a deck side over 30 m is still cleared (the footprint band is unchanged)", () => {
+    const edited = DECK_DIMS.replace("Deck width 4800mm = 4.8m", "Deck width 54m");
+    expect(extractStructuredPlanMarker(finalFor(DECK, edited))?.widthM).toBeUndefined();
+  });
+});
+
 describe("applyDimensionEdits", () => {
   it("returns the plan untouched when nothing was edited", () => {
     const out = applyDimensionEdits(DECK_PLAN, DECK_DIMS, DECK_DIMS);

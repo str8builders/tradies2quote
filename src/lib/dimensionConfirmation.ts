@@ -169,9 +169,11 @@ export type DimensionEdit = { key: string; value: number };
 /** Which shared plausibility band a key dimension belongs to. */
 function metresKindFor(type: string, key: string): MetresKind {
   if (key === "wallHeightM") return "wallHeight";
-  // A wall takeoff's length is the whole-plan wall run.
-  if (type === "wall" && key === "wallLengthM") return "wallRun";
-  // Deck / floor sides are a footprint; a cladding run is a single edge.
+  // A wall takeoff's length is the whole-plan wall run; a cladding run is the
+  // building's whole exterior wall run added together — both the whole-run
+  // band.
+  if ((type === "wall" || type === "cladding") && key === "wallLengthM") return "wallRun";
+  // Deck / floor sides are a footprint.
   if (type === "deck" || type === "subfloor") return "footprint";
   return "edge";
 }

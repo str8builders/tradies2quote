@@ -479,4 +479,19 @@ describe("confirmAndRecalc — a size the calculator can't use (item 4)", () => 
     expect(r.line_items.find((i) => i.price_match_key === "weatherboard-cladding")?.quantity).toBe(228);
     expect(r.dimension_confirmation.dimensions.every((d) => d.confirmed)).toBe(true);
   });
+
+  it("a cladding run corrected to 101 m (a whole-house re-clad) recomputes: 371 boards (was refused as over 100 m)", () => {
+    const qd = claddingQuoteFixture();
+    const r = confirmAndRecalc(qd, [{ key: "wallLengthM", value: 101 }, { key: "wallHeightM", value: 2.4 }], META)!;
+    expect(r.problem).toBeUndefined();
+    expect(r.changed).toBe(true);
+    expect(r.line_items.find((i) => i.price_match_key === "weatherboard-cladding")?.quantity).toBe(371);
+  });
+
+  it("a cladding run over the 1000 m whole-run band is refused with the plain reason", () => {
+    const qd = claddingQuoteFixture();
+    const r = confirmAndRecalc(qd, [{ key: "wallLengthM", value: 1500 }], META)!;
+    expect(r.problem).toBe("That size looks wrong — Wall length 1500 m? Did you mean 1500 mm (1.5 m)?");
+    expect(r.changed).toBe(false);
+  });
 });

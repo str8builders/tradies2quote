@@ -800,8 +800,10 @@ export function calculateCladdingTakeoff(
 ): MaterialTakeoffResult {
   const invalid = invalidTakeoff(input, ["wallLengthM"], ["wallLengthM", "wallHeightM", "claddingCoverageMm", "battenSpacingMm", "timberStockLengthM"]);
   if (invalid) return invalid;
+  // A cladding run is the building's whole exterior wall run added together,
+  // so it takes the whole-run band (a 101 m re-clad is an ordinary house).
   const refused = metresProblems([
-    ["Cladding wall length", input.wallLengthM, "edge"],
+    ["Cladding wall length", input.wallLengthM, "wallRun"],
     ["Wall height", input.wallHeightM ?? CLADDING_DEFAULTS.wallHeightM, "wallHeight"],
   ]);
   if (refused.length > 0) return refusedTakeoff(refused);

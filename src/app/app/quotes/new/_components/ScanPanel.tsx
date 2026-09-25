@@ -27,7 +27,7 @@ import {
   readNumberTokens,
   readWallRunLine,
 } from "@/lib/aiTakeoffParser";
-import { METRES_BANDS } from "@/lib/takeoff/plausibility";
+import { METRES_BANDS, type MetresKind } from "@/lib/takeoff/plausibility";
 
 type ScanState =
   | "idle"
@@ -76,10 +76,12 @@ export interface ScanResult {
  * Concrete, Roofing, Other) gets undefined and we skip the marker —
  * the AI fallback handles those.
  */
+type PlanType = "deck" | "subfloor" | "cladding" | "wall";
+
 function planTypeForJob(
   jobType: JobType,
   buildType: string,
-): "deck" | "subfloor" | "cladding" | "wall" | undefined {
+): PlanType | undefined {
   if (jobType === "Deck") return "deck";
   if (jobType === "Framing") {
     const bt = buildType.toLowerCase();
@@ -91,7 +93,7 @@ function planTypeForJob(
 }
 
 function buildPlanMarker(
-  planType: "deck" | "subfloor" | "cladding" | "wall",
+  planType: PlanType,
   plan: ScannedPlan,
   editedFields: readonly PlanField[] = [],
 ): string {
@@ -215,9 +217,15 @@ type LineRole =
   | { role: "unlabelled" }
   | { role: "other" };
 
-/** Plan footprint envelope — the shared footprint band the takeoff marker accepts. */
-const PLAN_EDGE_MIN_M = METRES_BANDS.footprint.min;
-const PLAN_EDGE_MAX_M = METRES_BANDS.footprint.max;
+/**
+ * The shared band a corrected plan side must sit in — the same one the
+ * takeoff marker reader applies: a deck / floor / wall plan side is a
+ * footprint edge; a cladding plan's length is the building's whole exterior
+ * wall run added together (a 101 m re-clad is an ordinary house).
+ */
+function planSideBand(planType: PlanType | undefined): MetresKind {
+  return planType === "cladding" ? "wallRun" : "footprint";
+}
 
 const SPACING_WORDS_RE =
   /(?:\b(?:centres?|centers?|crs|ctrs|cc|spacing|spaced|apart|at)\b|c\/c|@)/;
@@ -316,10 +324,9 @@ function sideByValue(
   return hits.find((f) => !claimed.has(f)) ?? hits[0];
 }
 
-function edgeOrNull(metres: number | undefined): number | null {
-  return metres !== undefined && metres >= PLAN_EDGE_MIN_M && metres <= PLAN_EDGE_MAX_M
-    ? metres
-    : null;
+function edgeOrNull(metres: number | undefined, band: MetresKind): number | null {
+  const { min, max } = METRES_BANDS[band];
+  return metres !== undefined && metres >= min && metres <= max ? metres : null;
 }
 
 /** The plan edits one changed (or added) line implies. */
@@ -328,6 +335,7 @@ function editsForLine(
   orig: string | null,
   edit: string,
   claimed: Set<PlanField>,
+  sideBand: MetresKind,
 ): DimensionEdit[] {
   const role = classifyDimensionLine(edit);
   const before = (field: PlanField): number | null =>
@@ -392,8 +400,8 @@ function editsForLine(
         (nearly(oldPair[0]!, plan.width_m) && nearly(oldPair[1]!, plan.length_m)));
     if (!role.labelled && !matchesPlan) return [];
     if (pair.length < 2 || pair.some((v) => v === undefined)) return [];
-    const a = edgeOrNull(pair[0]);
-    const b = edgeOrNull(pair[1]);
+    const a = edgeOrNull(pair[0], sideBand);
+    const b = edgeOrNull(pair[1], sideBand);
     if (a === null || b === null) return [...one("length_m", null), ...one("width_m", null)];
     return [
       ...one("length_m", Math.max(a, b)),
@@ -410,7 +418,7 @@ function editsForLine(
     sideByValue(plan, oldMetres, claimed) ??
     (role.role === "side" ? role.field : undefined);
   if (!field) return [];
-  return one(field, edgeOrNull(tokenMetres(t)));
+  return one(field, edgeOrNull(tokenMetres(t), sideBand));
 }
 
 function blankPlan(): ScannedPlan {
@@ -500,6 +508,7 @@ export function applyDimensionEdits(
   plan: ScannedPlan | null,
   original: string,
   edited: string,
+  planType?: PlanType,
 ): { plan: ScannedPlan | null; edits: DimensionEdit[] } {
   const lines = (t: string) =>
     t
@@ -515,7 +524,7 @@ export function applyDimensionEdits(
   const edits: DimensionEdit[] = [];
   for (const [orig, edit] of alignLines(a, b)) {
     if (orig === edit) continue;
-    edits.push(...editsForLine(plan, orig, edit, claimed));
+    edits.push(...editsForLine(plan, orig, edit, claimed, planSideBand(planType)));
   }
   if (edits.length === 0) return { plan, edits };
 
@@ -569,6 +578,7 @@ export function buildFinalTranscript(
     result.plan,
     result.dimensions,
     editedDimensions,
+    planType,
   );
   const editedFields = [
     ...new Set(reviewed.edits.filter((e) => e.to !== null).map((e) => e.field)),

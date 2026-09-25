@@ -86,13 +86,15 @@ export function validateExtractionForScope(
   /**
    * A metres value that drives a calculator: the ONE shared plausibility
    * band. Outside it is a hard block with the plain reason (never a
-   * rescale); a plan edge under 1 m is plausible but soft-flagged.
+   * rescale); a plan edge (or a cladding run) under 1 m is plausible but
+   * soft-flagged.
    */
   const requireMetres = (
     field: string,
     label: string,
     v: number | null | undefined,
     kind: MetresKind,
+    opts: { flagUnderTypicalMin?: boolean } = {},
   ): "missing" | "out-of-range" | "ok" => {
     if (v === null || v === undefined) {
       reasons.push(`${field} is missing`);
@@ -108,7 +110,7 @@ export function validateExtractionForScope(
       problems.push({ field, reason: check.reason });
       return "out-of-range";
     }
-    if (kind === "edge" && v < TYPICAL_MIN_EDGE_M) {
+    if ((kind === "edge" || opts.flagUnderTypicalMin) && v < TYPICAL_MIN_EDGE_M) {
       flags.push(`${label} ${v} m is unusually small — check it`);
     }
     return "ok";
@@ -137,7 +139,11 @@ export function validateExtractionForScope(
       break;
     }
     case "cladding": {
-      requireMetres("length_m", "Cladding wall length", dimensions.length_m, "edge");
+      // A cladding run is the building's whole exterior wall run added
+      // together — the whole-run band (a 101 m re-clad is an ordinary house).
+      requireMetres("length_m", "Cladding wall length", dimensions.length_m, "wallRun", {
+        flagUnderTypicalMin: true,
+      });
       requireMetres("height_m", "Wall height", dimensions.height_m, "wallHeight");
       if (!Number.isFinite(dimensions.length_m ?? NaN) || reasons.length > 0) {
         return blocked();

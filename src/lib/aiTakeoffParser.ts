@@ -155,9 +155,9 @@ export interface StructuredPlanMarker {
  * Pull `[T2Q_PLAN] key=value key=value …` off the transcript. Returns
  * undefined if no marker, or if the marker's length/width values are
  * outside the shared plausibility band (takeoff/plausibility.ts): a deck /
- * floor footprint side 1–30 m, a cladding / wall run 0.1–100 m — a
- * corrupted marker (a 4800 "m" side) can't bypass the safety floor, and is
- * never rescaled.
+ * floor footprint side 1–30 m, a single wall 0.1–100 m, a cladding run (the
+ * whole exterior wall run) 0.1–1000 m — a corrupted marker (a 4800 "m" side)
+ * can't bypass the safety floor, and is never rescaled.
  */
 export function extractStructuredPlanMarker(
   text: string,
@@ -173,14 +173,16 @@ export function extractStructuredPlanMarker(
   };
   const rawLength = optNum("length_m");
   const rawWidth = optNum("width_m");
-  // Envelope check — the ONE shared plausibility rule. A cladding / wall
-  // marker's length is a wall run (the old 1–30 m footprint envelope dropped
-  // a real 62 m cladding run, so the calculator asked for a length the
-  // drawing already gave); a deck / floor marker (or an untyped one) carries
-  // a footprint. Out-of-band markers are dropped so a corrupted marker can't
-  // bypass the safety floor.
+  // Envelope check — the ONE shared plausibility rule. A cladding marker's
+  // length is the building's whole exterior wall run (the old 1–30 m
+  // footprint envelope dropped a real 62 m cladding run, so the calculator
+  // asked for a length the drawing already gave); a wall marker's length is
+  // one wall edge (its total run is wall_run_m, below); a deck / floor marker
+  // (or an untyped one) carries a footprint. Out-of-band markers are dropped
+  // so a corrupted marker can't bypass the safety floor.
   const markerType = pairs["type"]?.toLowerCase();
-  const sideKind = markerType === "cladding" || markerType === "wall" ? "edge" : "footprint";
+  const sideKind =
+    markerType === "cladding" ? "wallRun" : markerType === "wall" ? "edge" : "footprint";
   if (rawLength !== undefined && !isPlausibleMetres(rawLength, sideKind)) {
     return undefined;
   }
@@ -1340,16 +1342,16 @@ function parseCladdingDescription(
       ? readDimension(marker.lengthM, "m", "length")
       : undefined);
   let lengthFlagged = false;
-  // The shared plausibility rule — the same edge band the cladding
-  // calculator and the orchestrator use. A run outside it is refused with
-  // its plain reason, never rescaled (a 62 m run is simply 62 m).
-  const lengthCheck = lengthReading?.plausible
-    ? checkMetres("Cladding wall length", lengthReading.value, "edge")
+  // The shared plausibility rule — the whole-run band the cladding
+  // calculator and the orchestrator use. A cladding run is the building's
+  // whole exterior wall run added together, so it is checked against that
+  // band ONLY (not the 200 m single-length reading band): a 101 m or 250 m
+  // re-clad is taken as stated; a run outside the band is refused with its
+  // plain reason, never rescaled.
+  const lengthCheck = lengthReading
+    ? checkMetres("Cladding wall length", lengthReading.value, "wallRun")
     : undefined;
-  if (lengthReading && !lengthReading.plausible) {
-    flag(implausibleMessage("Wall length", lengthReading));
-    lengthFlagged = true;
-  } else if (lengthCheck && !lengthCheck.ok) {
+  if (lengthCheck && !lengthCheck.ok) {
     flag(lengthCheck.reason);
     lengthFlagged = true;
   } else if (lengthReading) {
@@ -1855,8 +1857,9 @@ export function canRunCalculator(parsed: ParsedTakeoffResult): boolean {
     return plausible(i.deckLengthM, "footprint") && plausible(i.deckWidthM, "footprint");
   }
   if (parsed.type === "cladding") {
+    // A cladding run is the whole exterior wall run: the whole-run band.
     const i = parsed.input as Partial<CladdingTakeoffInput>;
-    return plausible(i.wallLengthM, "edge") && plausible(i.wallHeightM, "wallHeight");
+    return plausible(i.wallLengthM, "wallRun") && plausible(i.wallHeightM, "wallHeight");
   }
   if (parsed.type === "subfloor") {
     const i = parsed.input as Partial<SubfloorTakeoffInput>;
