@@ -69,13 +69,19 @@ export const WALL_JOBS: GoldenJob[] = [
       "gib-10mm": { qty: count(19, "10 × 2.4 = 24 m² a side × 2 = 48 m² × 1.1 = 52.8 ÷ 2.88 = 18.33 → 19 sheets"), unit: "sheets", price: PRICE.gib10, total: money("598.50", "19 × $31.50") },
       "gib-screws": { qty: count(836, "19 × 40 = 760 × 1.1 = 836"), price: PRICE.gibScrew, total: money("29.26", "836 × $0.035 = 29.26") },
       "gib-adhesive": { qty: count(5, "19 ÷ 4 = 4.75 → 5 tubes"), price: PRICE.gibAdhesive, total: money("64.50", "5 × $12.90") },
-      "pink-batts": { qty: count(0, "insulation isn't excluded so the parser assumes it, but no exterior run was given → exterior-only rule: a BLOCKED 0-pack line, never sized off this (interior) wall"), price: PRICE.battsR22Pack, total: money("0.00", "0 × $58.00") },
       "framing-nails": { qty: count(1, "1 box allowance"), price: PRICE.framingNailsBox, total: money("69.00", "1 × $69.00") },
+      // No insulation line: the tradie never asked for batts, and a wall
+      // lined BOTH sides is an interior wall — insulation is quoted for
+      // exterior walls only.
     },
     profile: NZ_PROFILE,
     labour: [labourStatedDay(2, 600, "1200.00")],
+    knownBugs: {
+      lines:
+        "KNOWN BUG: a wall lined both sides (so an interior wall) that never mentions insulation still gets a BLOCKED 0-pack 'Pink Batts Insulation' line — aiTakeoffParser.parseWallDescription defaults includeInsulation=true ('Assumed insulation is included unless stated otherwise') and the exterior-only rule then blocks it, and any blocked line hard-blocks sending (quote-validation.assessQuoteTakeoffSafety) — expected no insulation line, code emits one",
+    },
     totals: {
-      materials_subtotal: money("1253.46", "223.20 + 188.30 + 80.70 + 598.50 + 29.26 + 64.50 + 0 + 69.00"),
+      materials_subtotal: money("1253.46", "223.20 + 188.30 + 80.70 + 598.50 + 29.26 + 64.50 + 69.00"),
       labour_subtotal: money("1200.00", "2 days × $600"),
       markup_amount: money("250.69", "20 % × 1253.46 = 250.692 → 250.69"),
       subtotal_before_tax: money("2704.15", "1253.46 + 250.69 + 1200.00"),
