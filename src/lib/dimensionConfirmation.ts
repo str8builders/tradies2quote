@@ -22,6 +22,12 @@
 
 import { runTakeoff, type ParsedTakeoffResult } from "./aiTakeoffParser";
 import { round2 } from "./quote-defaults";
+import {
+  METRES_BANDS,
+  checkMetres,
+  showMetres,
+  type MetresKind,
+} from "./takeoff/plausibility";
 import type {
   ConfirmableDimension,
   DimensionConfirmation,
@@ -159,6 +165,53 @@ export function buildDimensionConfirmation(args: {
 
 export type DimensionEdit = { key: string; value: number };
 
+/** Which shared plausibility band a key dimension belongs to. */
+function metresKindFor(type: string, key: string): MetresKind {
+  if (key === "wallHeightM") return "wallHeight";
+  // A wall takeoff's length is the whole-plan wall run.
+  if (type === "wall" && key === "wallLengthM") return "wallRun";
+  return "edge";
+}
+
+/**
+ * The plain message for a corrected size the calculator can't use, checked
+ * against the ONE shared plausibility rule (takeoff/plausibility.ts). Null
+ * when every size is usable. When the number only makes sense as
+ * millimetres it asks ("…2400 m? Did you mean 2400 mm (2.4 m)?") — it never
+ * converts it behind the tradie's back.
+ */
+function sizeProblem(type: string, dims: ConfirmableDimension[]): string | null {
+  for (const d of dims) {
+    const kind = metresKindFor(type, d.key);
+    if (checkMetres(d.label, d.value, kind).ok) continue;
+    const { min, max } = METRES_BANDS[kind];
+    const v = d.value;
+    const asMm = v / 1000;
+    if (v > max && asMm >= min && asMm <= max) {
+      return `That size looks wrong — ${d.label} ${showMetres(v)} m? Did you mean ${showMetres(v)} mm (${showMetres(asMm)} m)?`;
+    }
+    const why = v > max ? `more than ${showMetres(max)} m` : `less than ${showMetres(min)} m`;
+    return `That size looks wrong — ${d.label} ${showMetres(v)} m is ${why}. Check it and try again.`;
+  }
+  return null;
+}
+
+/** Shown when plausible sizes still can't be recalculated from the stored inputs. */
+const CANT_RECALCULATE =
+  "Couldn't recalculate the materials with those sizes — check them, or type the quantities on the lines yourself.";
+
+export type ConfirmAndRecalcResult = {
+  line_items: QuoteLineItem[];
+  dimension_confirmation: DimensionConfirmation;
+  changed: boolean;
+  /**
+   * Set when the correction can't be used (an implausible size, or inputs
+   * the calculator can't run). NOTHING is confirmed, the stored values and
+   * quantities are kept, and this plain message says why.
+   */
+  problem?: string;
+};
+
 /**
  * Apply the tradie's confirmations/corrections to a quote.
  *
@@ -169,6 +222,11 @@ export type DimensionEdit = { key: string; value: number };
  * the prior calculator lines are preserved (keyed by `price_match_key`);
  * non-calculator lines (labour, tradie additions) are left untouched.
  *
+ * A correction the calculator can't use is refused, never half-applied: the
+ * result carries `problem`, every dimension stays unconfirmed at its stored
+ * value and the line items are unchanged (it used to record the new value as
+ * confirmed while the quote kept the old quantities).
+ *
  * Returns null when there's nothing to act on (no confirmation object or no
  * stored takeoff inputs to recompute from).
  */
@@ -176,11 +234,7 @@ export function confirmAndRecalc(
   quoteData: QuoteData,
   edits: DimensionEdit[],
   meta: { confirmedBy: string; confirmedAt: string },
-): {
-  line_items: QuoteLineItem[];
-  dimension_confirmation: DimensionConfirmation;
-  changed: boolean;
-} | null {
+): ConfirmAndRecalcResult | null {
   const dc = quoteData.dimension_confirmation;
   if (!dc) return null;
   const takeoffInputs = quoteData.takeoff_inputs as
@@ -221,6 +275,16 @@ export function confirmAndRecalc(
     };
   }
 
+  // Refuse a size the calculator can't use — keep everything as it was.
+  const unchanged = (problem: string): ConfirmAndRecalcResult => ({
+    line_items: quoteData.line_items,
+    dimension_confirmation: dc,
+    changed: false,
+    problem,
+  });
+  const problem = sizeProblem(dc.takeoff_type, newDimensions);
+  if (problem) return unchanged(problem);
+
   // Rebuild the calculator input from the frozen takeoff inputs + corrections.
   const input: Record<string, unknown> = { ...takeoffInputs };
   for (const d of newDimensions) input[d.key] = d.value;
@@ -234,15 +298,10 @@ export function confirmAndRecalc(
   } as unknown as ParsedTakeoffResult;
 
   const calc = runTakeoff(parsed);
-  if (!calc) {
-    // Recompute couldn't run (shouldn't happen — dims are present). Keep the
-    // prior numbers but still record the confirmation.
-    return {
-      line_items: quoteData.line_items,
-      dimension_confirmation: newConfirmation,
-      changed: false,
-    };
-  }
+  // The stored inputs can't be calculated even with plausible sizes (e.g. an
+  // old quote missing a required input): don't confirm sizes the quantities
+  // don't reflect.
+  if (!calc) return unchanged(CANT_RECALCULATE);
 
   // Preserve prices / library matches from the prior calculator lines.
   const priorByKey = new Map<

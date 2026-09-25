@@ -1155,6 +1155,12 @@ export function QuoteEditor({
                 </div>
               )}
 
+              {dimPreview?.problem && (
+                <p data-testid="dimension-problem" className="mt-3 text-xs text-red-300">
+                  {dimPreview.problem}
+                </p>
+              )}
+
               {dimError && (
                 <p className="mt-3 text-xs text-red-300">{dimError}</p>
               )}

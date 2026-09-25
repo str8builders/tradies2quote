@@ -293,6 +293,9 @@ export async function confirmDimensions(
   if (!result) {
     return { error: "There are no drawing dimensions to confirm on this quote." };
   }
+  // A size the calculator can't use is refused, not half-applied: nothing is
+  // saved and nothing is marked confirmed.
+  if (result.problem) return { error: result.problem };
 
   const items = result.line_items.map((it) => {
     const qty = Number(it.quantity) || 0;
