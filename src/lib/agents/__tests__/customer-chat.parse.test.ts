@@ -45,3 +45,23 @@ describe("parseCustomerChat (tool-input normalisation)", () => {
     expect(res.value.confidence).toBe(0.6);
   });
 });
+
+describe("parseCustomerChat — dollar figures (money guard)", () => {
+  it("sends back a reply that works out a new total", () => {
+    const res = parseCustomerChat(
+      { intent: "wants_cheaper_alternative", reply: "With pine it'd come to about $10,950.", confidence: 0.7 },
+      [12204.46, 1591.89],
+    );
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.error).toMatch(/\$10,950/);
+  });
+
+  it("figures printed on the quote pass", () => {
+    const res = parseCustomerChat(
+      { intent: "explain_line_item", reply: "The total of $12,204.46 includes $1,591.89 GST.", confidence: 0.8 },
+      [12204.46, 1591.89],
+    );
+    expect(res.ok).toBe(true);
+  });
+});

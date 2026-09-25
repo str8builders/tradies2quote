@@ -48,7 +48,11 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
  * Each suite: its vitest file, the env flag that opens its gate, and the
  * minimum pass rate (passed ÷ run, skipped cases excluded). `optional`
  * suites need fixtures that may not be on the box (drawings) — if every
- * case skips they are reported, not failed.
+ * case skips they are reported, not failed. A suite with a `feature` flag
+ * only gates the release when that feature is on (the flag is "true" in the
+ * environment or the --env-file); while it's off a failure is reported as
+ * INFO — e.g. the plan reader, which stays off until its hand-labelled plan
+ * sheets exist (src/lib/planreader/flag.ts).
  */
 const SUITES = [
   {
@@ -108,6 +112,7 @@ const SUITES = [
     min: 0.75,
     needsModel: true,
     optional: true,
+    feature: "PLAN_READER_ENABLED",
   },
 ];
 
@@ -122,6 +127,9 @@ const MODEL_ENV_ALLOWLIST = [
   "LOCAL_LLM_MODEL",
   "LOCAL_LLM_TIMEOUT_MS",
 ];
+
+/** Feature flags an --env-file may contribute (never secrets): they decide which suites gate. */
+const FEATURE_ENV_ALLOWLIST = ["PLAN_READER_ENABLED"];
 
 // ── Arguments ────────────────────────────────────────────────────────────
 
@@ -176,11 +184,13 @@ function readEnvFile(path) {
 
 function buildChildEnv(opts) {
   const env = { ...process.env };
+  const features = Object.fromEntries(FEATURE_ENV_ALLOWLIST.map((k) => [k, process.env[k] ?? ""]));
   let keySource = env.ANTHROPIC_API_KEY ? "shell environment" : null;
   if (opts.envFile) {
     if (!existsSync(opts.envFile)) usage(`--env-file ${opts.envFile} not found`);
     const fromFile = readEnvFile(opts.envFile);
     for (const k of MODEL_ENV_ALLOWLIST) if (fromFile[k]) env[k] = fromFile[k];
+    for (const k of FEATURE_ENV_ALLOWLIST) if (fromFile[k] !== undefined) features[k] = fromFile[k];
     if (fromFile.ANTHROPIC_API_KEY) keySource = `--env-file (${opts.envFile})`;
   }
   if (!env.ANTHROPIC_API_KEY) {
@@ -193,7 +203,7 @@ function buildChildEnv(opts) {
       }
     }
   }
-  return { env, keySource };
+  return { env, keySource, features };
 }
 
 function makeScrubber(env) {
@@ -296,7 +306,7 @@ function main() {
     process.exit(1);
   }
 
-  const { env, keySource } = buildChildEnv(opts);
+  const { env, keySource, features } = buildChildEnv(opts);
   const scrub = makeScrubber(env);
   const provider = (env.TEXT_AI_PROVIDER ?? "").trim().toLowerCase() === "local" ? "local model (TEXT_AI_PROVIDER=local)" : "Anthropic";
   const haveModel = Boolean(env.ANTHROPIC_API_KEY) || provider.startsWith("local");
@@ -340,6 +350,10 @@ function main() {
       note = `${r.knownOpen} known-bug figures still open` + (r.knownFixed.length ? `; ${r.knownFixed.length} FIXED — flip it.fails → it` : "");
     }
     if (r.soft) note = [note, r.soft].filter(Boolean).join("; ");
+    if (verdict === "FAIL" && r.suite.feature && features[r.suite.feature] !== "true") {
+      verdict = "INFO";
+      note = [note, `${r.suite.feature} is off — reported, not gated`].filter(Boolean).join("; ");
+    }
     return { ...r, min, run, rate, verdict, note };
   });
   const gateFailed = rows.filter((r) => r.verdict === "FAIL");

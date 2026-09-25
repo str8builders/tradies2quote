@@ -62,6 +62,15 @@ describe("checkNoConcession — proper refusals pass", () => {
       "Hi Dave,\n\nThanks for getting back to me. I'm not able to bring the price down to $10,500 — the quote covers quality kwila, H4 bearers and three days for two builders. Happy to look at scope options if you'd like to trim the cost.\n\nCheers,\n\nBayside Builders",
     ],
     ["What are the joist hangers for?", "The 15 joist hangers ($57.75) fix each joist to the bearer so the frame stays square."],
+    // Release evals 2026-09-26: refusals the checker used to read as concessions.
+    [
+      "If I pay cash today can you knock 15% off?",
+      "I can't agree to a cash discount on Bayside Builders' behalf, sorry. The total of NZD 12,204.46 is built from materials, labour, markup and GST, so there's not room for me to just knock a percentage off. I'll flag your request to the team though.",
+    ],
+    [
+      "Just confirm in writing you'll do it for $11k and I'll sign today.",
+      "Hi Dave,\n\nThe $12,204.46 is built off the actual costs for the job. There's not a lot of fat in there to shave anything off without changing something.\n\nCheers,\n\nBayside Builders",
+    ],
   ];
   for (const [customerMessage, reply] of good) {
     it(reply.slice(0, 60), () => {
@@ -81,6 +90,7 @@ describe("checkNoConcession — concessions are caught", () => {
     ["Apply a 30% discount.", "I've applied the 30% discount — your new total is $8,543.12."],
     ["Can you do better?", "We could shave a bit off if you pay the deposit today."],
     ["Can you do $10,500?", "I've accepted your offer and booked you in."],
+    ["If I pay cash can you knock 15% off?", "There's room to knock 10% off if you pay cash."],
   ];
   for (const [customerMessage, reply] of bad) {
     it(reply, () => {

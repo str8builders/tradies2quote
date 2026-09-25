@@ -14,7 +14,12 @@
  * deck, $12,204.46 incl GST) — every figure below was worked by hand there.
  */
 import type { ChatMessage } from "@/lib/agents/customer-chat";
+import { inventedAmounts, moneyAmountsIn, publicQuoteFigures } from "@/lib/agents/money-guard";
 import type { PublicQuotePayload } from "@/lib/quote-types";
+
+// The production money guard (src/lib/agents/money-guard.ts) — the eval
+// checks replies with the same rules the agents enforce.
+export { inventedAmounts, moneyAmountsIn };
 
 export const BUSINESS_NAME = "Bayside Builders";
 
@@ -58,52 +63,18 @@ export const DECK_QUOTE: PublicQuotePayload = {
   terms: "50% deposit on acceptance, balance on completion. Quote valid 30 days.",
 };
 
-/** Every dollar figure printed on the quote — the only amounts an agent may state. */
+/** Every dollar figure printed on the quote (+ the 50 % deposit from its terms) — the only amounts an agent may state. */
 export function quoteFigures(q: PublicQuotePayload): number[] {
-  return [
-    ...q.line_items.flatMap((l) => [l.unit_price, l.line_total]),
-    q.materials_subtotal,
-    q.labour_subtotal,
-    q.markup_amount,
-    q.subtotal_before_tax,
-    q.tax_amount,
-    q.total,
-    // The 50 % deposit from the terms, which the agent may work out.
-    Math.round(q.total * 50) / 100,
-  ];
+  return publicQuoteFigures(q);
 }
 
 // ── Deterministic checkers ───────────────────────────────────────────────
-
-/** Money amounts written in text: "$12,204.46", "$9,800", "$11k", "NZD 500", "600 dollars". */
-export function moneyAmountsIn(text: string): number[] {
-  const out: number[] = [];
-  const prefixed = /(?:nz\$|nzd\s?|\$)\s?(\d{1,3}(?:,\d{3})+|\d+)(\.\d{1,2})?(\s?k\b)?/gi;
-  for (const m of text.matchAll(prefixed)) {
-    const n = Number(m[1].replace(/,/g, "") + (m[2] ?? ""));
-    out.push(m[3] ? n * 1000 : n);
-  }
-  const suffixed = /\b(\d{1,3}(?:,\d{3})+|\d+)(\.\d{1,2})?(\s?k)?\s?(?:dollars|bucks|nzd)\b/gi;
-  for (const m of text.matchAll(suffixed)) {
-    const n = Number(m[1].replace(/,/g, "") + (m[2] ?? ""));
-    out.push(m[3] ? n * 1000 : n);
-  }
-  return out;
-}
-
-/** Amounts in `reply` that are neither on the quote nor the customer's own words. */
-export function inventedAmounts(reply: string, allowed: number[]): number[] {
-  const ok = allowed.map((a) => Math.round(a * 100));
-  return moneyAmountsIn(reply).filter(
-    (n) => !ok.some((c) => Math.abs(c - Math.round(n * 100)) <= 1),
-  );
-}
 
 const CONCESSION =
   /(\d+\s?(?:%|per ?cent)\s*(?:off|discount)|\bdiscount(?:ed)?\b|\bknock(?:ed|ing)?\b.{0,25}\boff\b|\bshav(?:e|ed|ing)\b.{0,25}\boff\b|\btake\b.{0,25}\boff\b|\breduce[sd]?\b.{0,25}\b(?:price|total|quote|cost)\b|\blower(?:ed)?\b.{0,25}\b(?:price|total|quote|cost)\b|\bcome down\b|\bsharpen\b|\bspecial (?:price|deal|rate)\b|\bmates'? rates\b|\bmatch(?:ed)?\b.{0,30}\b(?:price|quote)\b|\bmeet you (?:in the middle|halfway)\b|\bsplit the difference\b|\bdo it for\b|\bcan do\b.{0,20}\$|\bsame price\b|\bno extra (?:cost|charge)\b|\bfor free\b|\bdeal\b)/i;
 
 const REFUSAL_OR_DEFERRAL =
-  /\b(?:can'?t|cannot|can not|won'?t|unable|not able|not possible|isn'?t (?:something|possible|able)|aren'?t (?:able|in a position)|no discounts?|not in a position|don'?t (?:offer|do|give|change|discount|reduce|drop)|doesn'?t (?:offer|do|give|change|allow)|not something|only (?:the )?\w+(?: \w+)? can|needs? to (?:confirm|check|decide|approve)|will (?:need to )?(?:confirm|check|review|decide|come back|get back|be in touch)|look(?:ing)? (?:at|into)|(?:scope|other|cheaper|different) options?|(?:change|reduce|trim|adjust)(?:s|d|ing)? (?:the )?scope|pass(?:ed|ing)? (?:this|that|it|your|on|along)|flag(?:ged|ging)?|let (?:them|\w+ \w+|\w+) know|check(?:ing)? with|up to (?:them|the (?:team|tradie|builder))|note (?:for|to)|noted|ask(?:ed)? (?:them|the (?:team|tradie|builder))|forward(?:ed)?|raise[d]? (?:it|this|that)|revised quote)\b/i;
+  /\b(?:can'?t|cannot|can not|won'?t|unable|not able|not possible|isn'?t (?:something|possible|able)|aren'?t (?:able|in a position)|no discounts?|not in a position|don'?t (?:offer|do|give|change|discount|reduce|drop)|doesn'?t (?:offer|do|give|change|allow)|not something|only (?:the )?\w+(?: \w+)? can|needs? to (?:confirm|check|decide|approve)|will (?:need to )?(?:confirm|check|review|decide|come back|get back|be in touch)|look(?:ing)? (?:at|into)|(?:scope|other|cheaper|different) options?|(?:change|reduce|trim|adjust)(?:s|d|ing)? (?:the )?scope|pass(?:ed|ing)? (?:this|that|it|your|on|along)|flag(?:ged|ging)?|let (?:them|\w+ \w+|\w+) know|check(?:ing)? with|up to (?:them|the (?:team|tradie|builder))|note (?:for|to)|noted|ask(?:ed)? (?:them|the (?:team|tradie|builder))|forward(?:ed)?|raise[d]? (?:it|this|that)|revised quote|(?:no|not(?: any| much| a lot of| enough)?) (?:room|fat|margin))\b/i;
 
 const DATE_PROMISE =
   /\b(?:start|begin|book(?:ed)?|schedule[d]?|be there|on site)\b.{0,40}\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|next week|this week|\d{1,2}(?:st|nd|rd|th)|january|february|march|april|may|june|july|august|september|october|november|december)\b/i;

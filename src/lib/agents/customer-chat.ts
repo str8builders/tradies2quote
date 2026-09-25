@@ -23,6 +23,7 @@
  */
 import "server-only";
 import type { PublicQuotePayload } from "@/lib/quote-types";
+import { inventedAmounts, inventedFigureError, moneyAmountsIn, publicQuoteFigures } from "./money-guard";
 import { runStructuredAgent, type ParseResult } from "./runtime";
 
 export const CHAT_INTENTS = [
@@ -83,6 +84,7 @@ Your boundaries — these are firm:
 - NEVER agree to a start date or timeline. Tell the customer the tradie will confirm dates after acceptance.
 - NEVER claim consent IS required — only that it MAY be required for certain work types. Defer to council.
 - NEVER invent line items, prices, or warranty terms that aren't in the quote.
+- Only write dollar figures that are printed in the quote context or that the customer wrote. Never work out a difference, discount or new total ("that's $1,200 more than your offer").
 - NEVER share customer details across quotes. You only see this one quote.
 
 How to behave:
@@ -118,9 +120,15 @@ const CHAT_TOOL = {
   },
 };
 
-/** Validate + normalise the model's emit_chat_reply tool input. Pure. */
+/**
+ * Validate + normalise the model's emit_chat_reply tool input. Pure. With
+ * `allowedAmounts`, a reply stating any other dollar figure is sent back once
+ * to be rewritten (src/lib/agents/money-guard.ts); if the rewrite still has
+ * one, the route shows its polite fallback instead.
+ */
 export function parseCustomerChat(
   input: unknown,
+  allowedAmounts?: readonly number[],
 ): ParseResult<CustomerChatResult> {
   const parsed = (input ?? {}) as {
     intent?: unknown;
@@ -142,6 +150,10 @@ export function parseCustomerChat(
   const rawConfidence =
     typeof parsed.confidence === "number" ? parsed.confidence : 0.6;
   const confidence = Math.max(0, Math.min(1, rawConfidence));
+  if (allowedAmounts) {
+    const invented = inventedAmounts(reply, allowedAmounts);
+    if (invented.length > 0) return { ok: false, error: inventedFigureError(invented, "reply") };
+  }
   return { ok: true, value: { intent, reply, noteToTradie, confidence } };
 }
 
@@ -210,7 +222,13 @@ export async function runCustomerChat(
     system: SYSTEM_PROMPT,
     user: buildUserTurn(input),
     tool: CHAT_TOOL,
-    parse: parseCustomerChat,
+    // Dollar figures: the quote's own and the customer's, nothing worked out.
+    parse: (raw) =>
+      parseCustomerChat(raw, [
+        ...publicQuoteFigures(input.quote),
+        ...moneyAmountsIn(input.customerMessage),
+        ...input.history.filter((m) => m.role === "customer").flatMap((m) => moneyAmountsIn(m.content)),
+      ]),
     maxTokens: MAX_TOKENS,
   });
   return result.value;

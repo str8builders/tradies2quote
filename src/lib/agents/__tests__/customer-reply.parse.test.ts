@@ -35,3 +35,29 @@ describe("parseCustomerReply (tool-input normalisation)", () => {
     expect(res.value.replyDraft).toMatch(/empty/i);
   });
 });
+
+describe("parseCustomerReply — dollar figures (money guard)", () => {
+  const allowed = [12204.46, 11000]; // the quote total + the customer's "$11k"
+
+  it("sends back a draft that works out a new figure, naming it", () => {
+    const res = parseCustomerReply(
+      { intent: "wants_cheaper_price", replyDraft: "There's not a lot of fat in there to shave $1,200 off." },
+      allowed,
+    );
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.error).toMatch(/\$1,200, which is not on the quote/);
+  });
+
+  it("the total and the customer's own amount are fine", () => {
+    const res = parseCustomerReply(
+      { intent: "wants_cheaper_price", replyDraft: "The $12,204.46 is built off real costs, so I can't do $11,000." },
+      allowed,
+    );
+    expect(res.ok).toBe(true);
+  });
+
+  it("without allowed amounts nothing is checked", () => {
+    expect(parseCustomerReply({ replyDraft: "About $1,200 less." }).ok).toBe(true);
+  });
+});

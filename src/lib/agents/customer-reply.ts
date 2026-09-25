@@ -14,6 +14,7 @@
  */
 import "server-only";
 import type { QuoteData } from "@/lib/quote-types";
+import { inventedAmounts, inventedFigureError, moneyAmountsIn } from "./money-guard";
 import { runStructuredAgent, type ParseResult, type AgentRunOptions } from "./runtime";
 
 export const CUSTOMER_INTENTS = [
@@ -67,6 +68,7 @@ Your job:
 2. Draft a professional reply the tradie can copy and send.
    - Use direct tradie voice (NZ English, no corporate fluff).
    - Be honest. Don't over-promise. Don't quote a new price unless the customer named one.
+   - The only dollar figures you may write are the quote total and amounts the customer wrote. Never work out a difference, discount, deposit or new total.
    - If they want a discount, do NOT agree to one — instead acknowledge, explain how the price was built, and offer to look at scope.
    - If they accept the quote, confirm next steps (deposit, scheduling) — never invent dates.
    - If they ask for timing, say "I'll get back to you with concrete dates" unless the quote already has scheduling.
@@ -88,9 +90,14 @@ const REPLY_TOOL = {
   },
 };
 
-/** Validate + normalise the model's emit_reply tool input. Pure. */
+/**
+ * Validate + normalise the model's emit_reply tool input. Pure. With
+ * `allowedAmounts`, a draft stating any other dollar figure is sent back once
+ * to be rewritten (src/lib/agents/money-guard.ts).
+ */
 export function parseCustomerReply(
   input: unknown,
+  allowedAmounts?: readonly number[],
 ): ParseResult<CustomerReplyResult> {
   const obj = (input ?? {}) as Partial<CustomerReplyResult>;
   const intent: CustomerIntent = (CUSTOMER_INTENTS as readonly string[]).includes(
@@ -102,6 +109,10 @@ export function parseCustomerReply(
     typeof obj.confidence === "number" && obj.confidence >= 0 && obj.confidence <= 1
       ? obj.confidence
       : 0.5;
+  if (allowedAmounts && typeof obj.replyDraft === "string") {
+    const invented = inventedAmounts(obj.replyDraft, allowedAmounts);
+    if (invented.length > 0) return { ok: false, error: inventedFigureError(invented, "replyDraft") };
+  }
   return {
     ok: true,
     value: {
@@ -142,7 +153,12 @@ export async function runCustomerReplyAgent(
     system: SYSTEM_PROMPT,
     user: userPrompt,
     tool: REPLY_TOOL,
-    parse: parseCustomerReply,
+    // Dollar figures: the quote total and the customer's own amounts only.
+    parse: (raw) =>
+      parseCustomerReply(raw, [
+        ...(typeof input.quote?.total === "number" ? [input.quote.total] : []),
+        ...moneyAmountsIn(customerMessage),
+      ]),
     maxTokens: MAX_TOKENS,
     // Caller-supplied so the route and the runtime share one run row.
     runId: opts.runId,
