@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { startMicrophoneMeter } from "@/lib/microphone-level";
+import { cx } from "@/components/ui/cx";
 import { useReducedMotion } from "@/components/ui/lib/use-reduced-motion";
-import { RESTING_BARS, SILENT_BARS, barMode, barScales, pushLevel } from "./lib/mic-levels";
+import { BAR_COUNT, RESTING_BARS, SILENT_BARS, barMode, barScales, pushLevel, waveTiming } from "./lib/mic-levels";
 
 function subscribeVisibility(onChange: () => void): () => void {
   document.addEventListener("visibilitychange", onChange);
@@ -19,21 +20,44 @@ function usePageVisible(): boolean {
 }
 
 const scaleY = (scale: number) => `scaleY(${scale})`;
+const BAR = "w-1.5 origin-center rounded-full bg-linear-to-t from-ui-brand to-ui-hivis";
+const WAVE_BARS = Array.from({ length: BAR_COUNT }, (_, i) => waveTiming(i));
 
 /**
- * Bars that move with the real microphone while recording. The level comes
- * from the shared meter (a Web Audio AnalyserNode on the recording's own
- * stream, RMS of each ~32 ms frame) and is written straight onto each bar's
- * transform, so the screen doesn't re-render thirty times a second. The
- * meter runs only while listening, on a visible page, without reduced
- * motion: it stops on pause, stop, unmount or when the page is hidden. With
- * reduced motion (or a meter that can't start) the bars hold a still shape;
- * when not listening they lie flat.
+ * Bars for the talk screen (see barMode in ./lib/mic-levels):
+ *
+ * - Before recording, a gentle wave says the mic is ready.
+ * - While recording they follow the real voice. The level comes from the
+ *   shared meter (a Web Audio AnalyserNode on the recording's own stream,
+ *   RMS of each ~32 ms frame, its audio context primed in the mic tap for
+ *   iPhones) and is written straight onto each bar's transform, so the
+ *   screen doesn't re-render thirty times a second.
+ * - If the phone gives no sound level (the meter can't start, or never
+ *   does), the wave carries on instead, so it never looks frozen.
+ * - Reduced motion or a hidden page: a still shape. Paused or done: flat.
  */
-export function MicLevelBars({ stream, listening }: { stream: MediaStream | null; listening: boolean }) {
+export function MicLevelBars({
+  stream,
+  listening,
+  inviting = false,
+}: {
+  stream: MediaStream | null;
+  listening: boolean;
+  /** Not recording yet (idle, or getting the mic ready). */
+  inviting?: boolean;
+}) {
   const reducedMotion = useReducedMotion();
   const pageVisible = usePageVisible();
-  const mode = barMode({ listening, reducedMotion, pageVisible, hasStream: stream !== null });
+  // The stream whose meter gave no level; a new recording starts afresh.
+  const [failedStream, setFailedStream] = useState<MediaStream | null>(null);
+  const mode = barMode({
+    listening,
+    inviting,
+    meterFailed: stream !== null && failedStream === stream,
+    reducedMotion,
+    pageVisible,
+    hasStream: stream !== null,
+  });
   const bars = useRef<Array<HTMLSpanElement | null>>([]);
 
   useEffect(() => {
@@ -47,13 +71,32 @@ export function MicLevelBars({ stream, listening }: { stream: MediaStream | null
     };
     return startMicrophoneMeter(stream, (level) => {
       if (level === null) {
-        paint(RESTING_BARS);
+        setFailedStream(stream);
         return;
       }
       history = pushLevel(history, level);
       paint(barScales(history));
     });
   }, [mode, stream]);
+
+  if (mode === "wave") {
+    return (
+      <div
+        key={mode}
+        aria-hidden="true"
+        data-bars={mode}
+        className="flex h-16 w-full max-w-xs items-center justify-center gap-1"
+      >
+        {WAVE_BARS.map((timing, i) => (
+          <span
+            key={i}
+            style={{ animationDuration: `${timing.duration}s`, animationDelay: `${timing.delay}s` }}
+            className={cx(BAR, listening ? "h-full" : "h-2/3", "animate-ui-level motion-reduce:animate-none")}
+          />
+        ))}
+      </div>
+    );
+  }
 
   const scales = mode === "resting" ? RESTING_BARS : SILENT_BARS;
   return (
@@ -70,7 +113,7 @@ export function MicLevelBars({ stream, listening }: { stream: MediaStream | null
             bars.current[i] = bar;
           }}
           style={{ transform: scaleY(scale) }}
-          className="h-full w-1.5 origin-center rounded-full bg-ui-brand-text transition-transform duration-ui-fast ease-ui-out motion-reduce:transition-none"
+          className={cx(BAR, "h-full transition-transform duration-ui-fast ease-ui-out motion-reduce:transition-none")}
         />
       ))}
     </div>

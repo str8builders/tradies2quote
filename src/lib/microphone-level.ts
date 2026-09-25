@@ -10,25 +10,64 @@ export function microphoneLevel(samples: ArrayLike<number>): number {
   return Math.min(1, Math.sqrt(Math.max(0, rms - 0.006) * 6));
 }
 
+type AudioContextCtor = typeof AudioContext;
+
+function audioContextClass(): AudioContextCtor | undefined {
+  if (typeof window === "undefined") return undefined;
+  return window.AudioContext ??
+    (window as typeof window & { webkitAudioContext?: AudioContextCtor }).webkitAudioContext;
+}
+
+/**
+ * One audio context for the meter, made and resumed inside a tap. iPhones
+ * (Safari and the app's web view) only let audio start from a user gesture:
+ * a context made later, from an effect, can stay "suspended" for good and
+ * the bars never move. Call this first thing in the mic button's click
+ * handler. Safe to call again; never throws.
+ */
+let shared: AudioContext | null = null;
+
+export function primeMicrophoneMeter(): void {
+  try {
+    const AudioContextClass = audioContextClass();
+    if (!AudioContextClass) return;
+    if (!shared || shared.state === "closed") shared = new AudioContextClass();
+    if (shared.state === "suspended") void shared.resume().catch(() => {});
+  } catch {
+    shared = null;
+  }
+}
+
+/** If the audio hasn't started by then, say so (null) rather than sit silent. */
+export const METER_START_TIMEOUT_MS = 1500;
+
 export function startMicrophoneMeter(stream: MediaStream, onLevel: (level: number | null) => void): () => void {
   let context: AudioContext | undefined;
+  let owned = false;
   let source: MediaStreamAudioSourceNode | undefined;
   let analyser: AnalyserNode | undefined;
   let frame = 0;
+  let startTimer: ReturnType<typeof setTimeout> | undefined;
   let stopped = false;
   const stop = () => {
     if (stopped) return;
     stopped = true;
+    if (startTimer !== undefined) clearTimeout(startTimer);
     cancelAnimationFrame(frame);
     source?.disconnect();
     analyser?.disconnect();
-    void context?.close().catch(() => {});
+    // The primed context is kept for the next recording; only our own closes.
+    if (owned) void context?.close().catch(() => {});
   };
   try {
-    const AudioContextClass = window.AudioContext ??
-      (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const AudioContextClass = audioContextClass();
     if (!AudioContextClass) return stop;
-    context = new AudioContextClass();
+    if (shared && shared.state !== "closed") {
+      context = shared;
+    } else {
+      context = new AudioContextClass();
+      owned = true;
+    }
     analyser = context.createAnalyser();
     analyser.fftSize = 512;
     source = context.createMediaStreamSource(stream);
@@ -47,7 +86,13 @@ export function startMicrophoneMeter(stream: MediaStream, onLevel: (level: numbe
       }
       frame = requestAnimationFrame(tick);
     };
+    startTimer = setTimeout(() => {
+      startTimer = undefined;
+      if (!stopped) onLevel(null);
+    }, METER_START_TIMEOUT_MS);
     void context.resume().then(() => {
+      if (startTimer !== undefined) clearTimeout(startTimer);
+      startTimer = undefined;
       if (!stopped) frame = requestAnimationFrame(tick);
     }).catch(() => {
       if (!stopped) { onLevel(null); stop(); }

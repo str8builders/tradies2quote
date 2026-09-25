@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { microphoneLevel, startMicrophoneMeter } from "./microphone-level";
+import { METER_START_TIMEOUT_MS, microphoneLevel, primeMicrophoneMeter, startMicrophoneMeter } from "./microphone-level";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 describe("microphone volume feedback", () => {
   it("keeps silence still, grows with speech and bounds loud or malformed samples", () => {
@@ -77,5 +80,43 @@ describe("microphone volume feedback", () => {
     expect(updates).toHaveBeenCalledWith(null);
     expect(b.close).toHaveBeenCalledOnce();
     expect(b.stream.getTracks).not.toHaveBeenCalled();
+  });
+
+  it("says so (null) when the audio never starts, instead of sitting silent", async () => {
+    vi.useFakeTimers();
+    const b = browser(new Promise<void>(() => {}));
+    const updates = vi.fn();
+    const stop = startMicrophoneMeter(b.stream, updates);
+    await vi.advanceTimersByTimeAsync(METER_START_TIMEOUT_MS - 1);
+    expect(updates).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(updates).toHaveBeenCalledWith(null);
+    stop();
+  });
+
+  it("uses the context primed in the tap, and keeps it for the next recording", async () => {
+    let made = 0;
+    const close = vi.fn().mockResolvedValue(undefined);
+    const resume = vi.fn(() => Promise.resolve());
+    const analyser = { fftSize: 512, getFloatTimeDomainData: vi.fn(), disconnect: vi.fn() };
+    vi.stubGlobal("window", { AudioContext: class {
+      state = "suspended";
+      constructor() { made++; }
+      createAnalyser = () => analyser;
+      createMediaStreamSource = () => ({ connect: vi.fn(), disconnect: vi.fn() });
+      resume = resume;
+      close = close;
+    } });
+    vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1));
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    primeMicrophoneMeter();
+    expect(made).toBe(1);
+    expect(resume).toHaveBeenCalledTimes(1);
+    const stream = {} as MediaStream;
+    const stop = startMicrophoneMeter(stream, vi.fn());
+    stop();
+    startMicrophoneMeter(stream, vi.fn())();
+    expect(made).toBe(1);
+    expect(close).not.toHaveBeenCalled();
   });
 });

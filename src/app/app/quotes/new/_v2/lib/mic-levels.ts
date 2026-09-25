@@ -63,20 +63,46 @@ export const RESTING_BARS: readonly number[] = Array.from({ length: BAR_COUNT },
   round3(0.3 + 0.45 * Math.abs(Math.sin((i - (BAR_COUNT - 1) / 2) * 0.55))),
 );
 
-export type BarMode = "live" | "resting" | "silent";
+export type BarMode = "live" | "wave" | "resting" | "silent";
 
-/** Which bars to draw: moving with the voice, a still shape, or flat. */
+/**
+ * Which bars to draw:
+ *   - live: recording, moving with the real voice.
+ *   - wave: a gentle looping wave. Before recording (the mic is ready and
+ *     inviting), and while recording when the phone gives no sound level
+ *     (the meter failed or never started), so it never looks frozen.
+ *   - resting: a still shape while recording for reduced motion or a
+ *     hidden page.
+ *   - silent: flat, for paused, writing it down, done or an error.
+ */
 export function barMode({
   listening,
+  inviting = false,
+  meterFailed = false,
   reducedMotion,
   pageVisible,
   hasStream,
 }: {
   listening: boolean;
+  /** Not recording yet: idle or getting the mic ready. */
+  inviting?: boolean;
+  /** Recording, but no sound level came through. */
+  meterFailed?: boolean;
   reducedMotion: boolean;
   pageVisible: boolean;
   hasStream: boolean;
 }): BarMode {
-  if (!listening) return "silent";
-  return !reducedMotion && pageVisible && hasStream ? "live" : "resting";
+  if (listening) {
+    if (reducedMotion || !pageVisible) return "resting";
+    return hasStream && !meterFailed ? "live" : "wave";
+  }
+  return inviting && !reducedMotion && pageVisible ? "wave" : "silent";
+}
+
+/** Wave timing per bar (s): a steady spread so it ripples instead of pulsing together. */
+export function waveTiming(i: number): { duration: number; delay: number } {
+  return {
+    duration: round3(0.7 + ((i * 37) % 60) / 100),
+    delay: -round3(((i * 53) % 90) / 100),
+  };
 }

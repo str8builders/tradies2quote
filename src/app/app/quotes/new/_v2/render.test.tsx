@@ -134,13 +134,15 @@ describe("TalkView", () => {
     );
   const fakeStream = {} as MediaStream;
 
-  it("ready: a big mic, flat bars and one big Start talking", () => {
+  it("ready: a big mic sending out rings, a gentle wave and one big Start talking", () => {
     const out = view({});
     const mic = tag(out, 'data-testid="talk-mic"');
     expect(mic).toContain('aria-label="Start recording"');
     expect(mic).toContain("h-30 w-30");
     expect(mic).not.toContain("disabled");
-    expect(out).toContain('data-bars="silent"');
+    expect(out).toContain('data-bars="wave"');
+    expect(out).toContain('data-alive="true"');
+    expect(out.match(/animate-ui-ring motion-reduce:animate-none/g)).toHaveLength(3);
     expect(out).toContain("Tap the mic to start.");
     expect(out).toContain("Up to 3 minutes.");
     expect(tag(out, 'data-testid="talk-start"')).toContain("min-h-14");
@@ -172,8 +174,8 @@ describe("TalkView", () => {
     expect(view({ phase: "recording", seconds: 150, stream: fakeStream })).toContain("30 seconds left");
   });
 
-  it("without a stream to measure, the bars hold a still shape", () => {
-    expect(view({ phase: "recording", seconds: 3, stream: null })).toContain('data-bars="resting"');
+  it("without a stream to measure, the bars keep waving (never frozen)", () => {
+    expect(view({ phase: "recording", seconds: 3, stream: null })).toContain('data-bars="wave"');
   });
 
   it("paused: flat bars, the clock held, and the mic carries on", () => {
@@ -204,7 +206,7 @@ describe("TalkView", () => {
       <TalkScreen back={step} focusOnArrival={false} onTranscript={noop} onTypeInstead={noop} />,
     );
     expect(out).toContain('data-phase="idle"');
-    expect(out).toContain('data-bars="silent"');
+    expect(out).toContain('data-bars="wave"');
   });
 });
 

@@ -8,6 +8,7 @@ import {
   SILENT_BARS,
   barMode,
   barScales,
+  waveTiming,
   clampLevel,
   pushLevel,
 } from "./mic-levels";
@@ -101,10 +102,32 @@ describe("which bars to draw", () => {
     expect(barMode(base)).toBe("live");
   });
 
-  it("holds a still shape for reduced motion, a hidden page or no stream", () => {
+  it("waves while recording when no sound level comes through (never frozen)", () => {
+    expect(barMode({ ...base, hasStream: false })).toBe("wave");
+    expect(barMode({ ...base, meterFailed: true })).toBe("wave");
+  });
+
+  it("waves before recording to show the mic is ready, unless motion is reduced", () => {
+    expect(barMode({ ...base, listening: false, inviting: true })).toBe("wave");
+    expect(barMode({ ...base, listening: false, inviting: true, reducedMotion: true })).toBe("silent");
+    expect(barMode({ ...base, listening: false, inviting: true, pageVisible: false })).toBe("silent");
+  });
+
+  it("wave timings spread out and stay in range", () => {
+    const timings = Array.from({ length: BAR_COUNT }, (_, i) => waveTiming(i));
+    for (const t of timings) {
+      expect(t.duration).toBeGreaterThanOrEqual(0.7);
+      expect(t.duration).toBeLessThan(1.3);
+      expect(t.delay).toBeLessThanOrEqual(0);
+      expect(t.delay).toBeGreaterThan(-0.9);
+    }
+    expect(new Set(timings.map((t) => t.duration)).size).toBeGreaterThan(5);
+  });
+
+  it("holds a still shape for reduced motion or a hidden page", () => {
     expect(barMode({ ...base, reducedMotion: true })).toBe("resting");
     expect(barMode({ ...base, pageVisible: false })).toBe("resting");
-    expect(barMode({ ...base, hasStream: false })).toBe("resting");
+    expect(barMode({ ...base, reducedMotion: true, meterFailed: true })).toBe("resting");
     expect(RESTING_BARS).toHaveLength(BAR_COUNT);
     expect(new Set(RESTING_BARS).size).toBeGreaterThan(3);
     for (let i = 0; i < BAR_COUNT / 2; i++) expect(RESTING_BARS[i]).toBe(RESTING_BARS[BAR_COUNT - 1 - i]);
