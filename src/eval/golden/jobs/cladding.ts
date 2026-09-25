@@ -19,7 +19,7 @@
 // ─────────────────────────────────────────────────────────────────────────
 
 import { calculateCladdingTakeoff } from "@/lib/materialCalculator";
-import { moneyCascade, takeoffJob } from "../build";
+import { takeoffJob } from "../build";
 import { NZ_PROFILE, PRICE } from "../library";
 import { count, decimal, money, text, type GoldenJob } from "../types";
 
@@ -145,16 +145,7 @@ export const CLADDING_JOBS: GoldenJob[] = [
     },
     knownBugs: {
       lines:
-        "KNOWN BUG: the scan also emits wall-framing lines (studs/plates/nogs/nails — the 'stud' in the scan boilerplate and 'Job type: Framing' route a framing scope that legacyCoverage.ts doesn't suppress for cladding, unlike deck) and a 'cladding takeoff — needs dimensions' blocked line (aiTakeoffParser drops a [T2Q_PLAN] marker over 30 m) — expected only the 5 cladding lines, code emits 10",
-      "qty:cladding-boards":
-        "KNOWN BUG: materialCalculator.sanitiseMeters treats any run over 50 as millimetres, so the orchestrator's cladding scope (takeoff/calculators/cladding.ts) prices 62 m of wall as 0.062 m — expected 228 lengths, code gives 1",
-      "qty:cavity-battens": "KNOWN BUG: same 62 m → 0.062 m conversion (sanitiseMeters) — expected 87 lengths, code gives 2",
-      "qty:building-wrap": "KNOWN BUG: same 62 m → 0.062 m conversion (sanitiseMeters) — expected 6 rolls, code gives 1",
-      "qty:cladding-nails": "KNOWN BUG: same 62 m → 0.062 m conversion (sanitiseMeters) — expected 1965 nails, code gives 2",
-      ...moneyCascade(
-        ["cladding-boards", "cavity-battens", "building-wrap", "cladding-nails"],
-        "KNOWN BUG: cascades from 62 m read as 62 mm — an $18,195.71 re-clad prices at $355.10 (1 weatherboard, 2 battens, 1 roll of wrap, 2 nails)",
-      ),
+        "KNOWN BUG: the scan also emits wall-framing lines (studs/plates/nogs/nails — the 'stud' in the scan boilerplate and 'Job type: Framing' route a framing scope that legacyCoverage.ts doesn't suppress for cladding, unlike deck) — expected only the 5 cladding lines, code emits 9",
     },
   }),
 

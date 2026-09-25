@@ -320,13 +320,6 @@ export const MONEY_JOBS: GoldenJob[] = [
       total: money("100.00", "the supplier's GST-inclusive total"),
       reconciliation: text("ok", "the supplier's printed figures reconcile"),
     },
-    knownBugs: {
-      materials_subtotal:
-        "KNOWN BUG: materials/estimateToQuote.buildMirrorQuoteLines converts each $10.00 incl line to $8.70 ex (8.6957 rounded up) and the ten roundings add up — expected 86.96, code gives 87.00",
-      subtotal_before_tax: "KNOWN BUG: same per-line rounding drift — expected 86.96, code gives 87.00",
-      tax_amount: "KNOWN BUG: GST is re-added as 15 % of 87.00 — expected 13.04, code gives 13.05",
-      total: "KNOWN BUG: the mirror should equal the supplier's total (scanToQuote.ts says so) — expected 100.00, code gives 100.05 (5 c over on 10 lines; reconciliation still reports ok)",
-    },
   }),
 
   supplierScanJob({
@@ -342,12 +335,6 @@ export const MONEY_JOBS: GoldenJob[] = [
       tax_amount: money("1061.03", "GST inside $8,134.58 = × 3/23 = 1061.032 → 1061.03"),
       total: money("8134.58", "Σ of the 25 printed incl line totals (690.00 + 279.20 + … + 65.00) — the supplier's total"),
       reconciliation: text("ok", "the supplier's printed figures reconcile"),
-    },
-    knownBugs: {
-      materials_subtotal:
-        "KNOWN BUG: per-line incl→ex rounding (buildMirrorQuoteLines) sums to 7073.54 — expected 7073.55 (8134.58 − 1061.03), code gives 7073.54",
-      subtotal_before_tax: "KNOWN BUG: same per-line drift — expected 7073.55, code gives 7073.54",
-      total: "KNOWN BUG: 7073.54 + 15 % (1061.03) — expected the supplier's 8134.58, code gives 8134.57 (1 c under)",
     },
   }),
 
