@@ -23,7 +23,7 @@
 //   generic   area × (1 + waste), needs review
 // ─────────────────────────────────────────────────────────────────────────
 
-import { moneyCascade, takeoffJob } from "../build";
+import { takeoffJob } from "../build";
 import { NZ_PROFILE, PRICE } from "../library";
 import { count, decimal, money, type GoldenJob } from "../types";
 
@@ -288,11 +288,6 @@ export const OUTDOOR_JOBS: GoldenJob[] = [
       tax_amount: money("169.56", "15 % × 1130.40"),
       total: money("1299.96", "1130.40 + 169.56"),
     },
-    knownBugs: {
-      "qty:concrete-volume":
-        "KNOWN BUG: takeoff/calculators/concrete.ts rounds up twice — normalise.concreteVolumeM3 pads 2.01 → 2.1 m³, then waste is added and rounded again (2.1 × 1.05 = 2.205 → 2.3) — expected 2.2 m³ (2.01 × 1.05 = 2.1105 → 2.2), code gives 2.3",
-      ...moneyCascade(["concrete-volume"], "KNOWN BUG: cascades from the double round-up — 0.1 m³ ($29.50) over-ordered"),
-    },
   }),
 
   takeoffJob({
@@ -337,11 +332,6 @@ export const OUTDOOR_JOBS: GoldenJob[] = [
       subtotal_before_tax: money("2039.40", "1699.50 + 339.90"),
       tax_amount: money("305.91", "15 % × 2039.40"),
       total: money("2345.31", "2039.40 + 305.91"),
-    },
-    knownBugs: {
-      "qty:concrete-volume":
-        "KNOWN BUG: the stated thickness is never read — takeoff/extraction.ts has no 'thick' pattern, so the concrete calculator assumes 100 mm — expected 4.5 m³ (150 mm), code gives 3.0 m³ (a third of the pour missing)",
-      ...moneyCascade(["concrete-volume"], "KNOWN BUG: cascades from the ignored 150 mm thickness — 1.5 m³ ($442.50) short"),
     },
   }),
 

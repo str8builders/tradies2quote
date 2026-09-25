@@ -165,13 +165,10 @@ export function slopeLengthFromPitch(planLengthM: number, pitchDeg: number): num
 }
 
 /**
- * Concrete volume from L × W × thickness (mm).
- *
- *   thicknessMm is the FINISHED slab thickness. We pad to a standard
- *   delivery unit (0.1 m³) because most NZ ready-mix suppliers will
- *   not pour fractional cubes.
+ * Exact slab volume (m³) from L × W × thickness (mm) — the FINISHED slab.
+ * Not rounded: an order adds its waste to THIS and rounds up once.
  */
-export function concreteVolumeM3(
+export function slabVolumeM3(
   lengthM: number,
   widthM: number,
   thicknessMm: number,
@@ -179,7 +176,22 @@ export function concreteVolumeM3(
   if (!Number.isFinite(lengthM) || lengthM <= 0) return 0;
   if (!Number.isFinite(widthM) || widthM <= 0) return 0;
   if (!Number.isFinite(thicknessMm) || thicknessMm <= 0) return 0;
-  const raw = lengthM * widthM * (thicknessMm / 1000);
+  return lengthM * widthM * (thicknessMm / 1000);
+}
+
+/**
+ * Concrete volume from L × W × thickness (mm), padded to the standard
+ * delivery unit (0.1 m³) because most NZ ready-mix suppliers will not pour
+ * fractional cubes. For a volume that still gets waste added, use
+ * slabVolumeM3 and round up once at the end — padding here first rounds
+ * up twice (2.01 → 2.1 → × 1.05 = 2.205 → 2.3 instead of 2.1105 → 2.2).
+ */
+export function concreteVolumeM3(
+  lengthM: number,
+  widthM: number,
+  thicknessMm: number,
+): number {
+  const raw = slabVolumeM3(lengthM, widthM, thicknessMm);
   // Round up to nearest 0.1 m³ — through safeCeil, so float noise
   // (2 × 1.5 × 0.1 = 0.30000000000000004) can't add a tenth.
   return safeCeil(raw * 10) / 10;

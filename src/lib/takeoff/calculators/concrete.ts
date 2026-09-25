@@ -13,7 +13,7 @@ import type {
   TakeoffLine,
 } from "../schemas";
 import { worstStatus } from "../schemas";
-import { concreteVolumeM3, round2, safeCeil } from "../normalise";
+import { round2, safeCeil, slabVolumeM3 } from "../normalise";
 
 const DEFAULT_SLAB_THICKNESS_MM = 100;
 const DEFAULT_MESH_COVERAGE_M2 = 12.5; // SE62 mesh sheet
@@ -43,10 +43,13 @@ export function runConcreteCalculator(ext: ExtractedExtraction): ScopeResult {
   }
 
   const planArea = round2(length_m * width_m);
+  // The exact volume: the order below rounds up ONCE, after the waste. (The
+  // slab volume used to be padded to 0.1 m³ first and the order rounded up
+  // again — 2.01 → 2.1 → 2.205 → 2.3 m³ instead of 2.1105 → 2.2.)
   const volume =
     explicitVolume !== null && explicitVolume > 0
       ? explicitVolume
-      : concreteVolumeM3(length_m, width_m, thicknessMm);
+      : slabVolumeM3(length_m, width_m, thicknessMm);
   // Round up to the 0.1 m³ delivery unit without float noise adding a tenth
   // (6 m³ × 1.05 = 6.300000000000001 → 6.3, not 6.4).
   const orderVolume = safeCeil(volume * (1 + wastePct / 100) * 10) / 10;
@@ -70,7 +73,7 @@ export function runConcreteCalculator(ext: ExtractedExtraction): ScopeResult {
         thickness_mm: thicknessMm,
         plan_area_m2: planArea,
         waste_percent: wastePct,
-        base_volume_m3: volume,
+        base_volume_m3: Math.round(volume * 1000) / 1000,
       },
       assumed: assumptions,
     },

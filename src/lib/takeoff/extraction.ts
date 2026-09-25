@@ -200,6 +200,40 @@ function extractEaveM(text: string): number | null {
   return null;
 }
 
+/**
+ * A slab / pad thickness in mm: "150 thick", "150mm thick", "15cm thick",
+ * "0.15m thick", "thickness 125mm". A bare figure is mm (under 1, metres).
+ * Anything outside 25–1000 mm isn't a slab thickness and isn't read (the
+ * concrete calculator then uses its default and says so).
+ */
+function extractSlabThicknessMm(text: string): number | null {
+  const NUM_UNIT = String.raw`(\d+(?:\.\d+)?)\s*(millimet(?:re|er)s?|mm|cm|metres?|meters?|m)?`;
+  const patterns = [
+    new RegExp(String.raw`(?:^|[^\w.])${NUM_UNIT}\s*thick\b`, "i"),
+    new RegExp(String.raw`\bthickness\s*(?:of\s+|is\s+|=\s*|:\s*)?${NUM_UNIT}`, "i"),
+  ];
+  for (const re of patterns) {
+    const m = text.match(re);
+    if (!m) continue;
+    const n = Number(m[1]);
+    if (!Number.isFinite(n) || n <= 0) continue;
+    const u = (m[2] ?? "").toLowerCase();
+    const mm =
+      u === "mm" || u.startsWith("millimet")
+        ? n
+        : u === "cm"
+          ? n * 10
+          : u
+            ? n * 1000
+            : n < 1
+              ? n * 1000
+              : n;
+    const rounded = Math.round(mm * 1000) / 1000;
+    if (rounded >= 25 && rounded <= 1000) return rounded;
+  }
+  return null;
+}
+
 function extractPitch(text: string): number | null {
   const re = /(\d+(?:\.\d+)?)\s*(?:deg(?:rees)?|°)\s*(?:pitch|roof)?/i;
   const m = text.match(re);
@@ -456,6 +490,13 @@ export function extractFromText(
     ];
     const h = extractSinglePattern(text, heightPatterns);
     if (h !== null && h > 0 && h < 20) dimensions.height_m = h;
+  }
+  // Concrete: the scope's height_m is its slab thickness in mm (the clarify
+  // question asks for it there, and the calculator reads it so) — a stated
+  // thickness ("150 thick") beats the 100 mm default.
+  if (scope === "concrete") {
+    const thicknessMm = extractSlabThicknessMm(text);
+    if (thicknessMm !== null) dimensions.height_m = thicknessMm;
   }
 
   // Openings — the marker's whole-plan door/window counts (read off the
