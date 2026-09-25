@@ -44,6 +44,13 @@ interface ParsedTakeoffBase {
    * tradie exactly what to check.
    */
   reviewFlags?: string[];
+  /**
+   * What detectTakeoffType read off the description. An "unknown" job still
+   * parses as an (empty) wall so the gate rejects it — this keeps the real
+   * answer, so callers can tell "a wall job missing its size" from "not a
+   * calculator job at all".
+   */
+  detectedType?: TakeoffType;
 }
 
 /**
@@ -1483,15 +1490,80 @@ export function parseTakeoffDescription(
   // identically. Marker lines are left byte-for-byte untouched.
   const text = normalizeSpokenMeasurements(description ?? "").text;
   const type = detectTakeoffType(text);
-  if (type === "deck") return parseDeckDescription(text, options);
-  if (type === "cladding") {
-    return parseCladdingDescription(text, options);
-  }
-  if (type === "subfloor") return parseSubfloorDescription(text, options);
-  // Fall through to the original wall framing parser for type === "wall"
-  // or "unknown" (the unknown branch produces an empty wall result which
-  // canRunCalculator rejects, so the route falls back to the AI generator).
-  return parseWallDescription(text, options);
+  const parsed =
+    type === "deck"
+      ? parseDeckDescription(text, options)
+      : type === "cladding"
+        ? parseCladdingDescription(text, options)
+        : type === "subfloor"
+          ? parseSubfloorDescription(text, options)
+          : // The original wall framing parser for type === "wall" or
+            // "unknown" (the unknown branch produces an empty wall result
+            // which canRunCalculator rejects, so the route falls back to the
+            // AI generator).
+            parseWallDescription(text, options);
+  return { ...parsed, detectedType: type };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Voice / typed jobs whose calculator can't run (audit item 2).
+//
+// A drawing that can't be calculated gets a blocked line and no AI material
+// quantities. A voice / typed job used to fall back to the AI's own counts —
+// the model invented the GIB sheets and studs for a wall whose height it
+// never had. Voice now behaves the same, but only when the words show it
+// really is that calculator's job: "wall" alone (a retaining wall, painting
+// a wall) or "deck" alone (oiling a deck) is not a framing or deck build.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Words that make a job the calculator's own takeoff, per type. */
+const CALCULATOR_JOB_WORDS: Record<Exclude<TakeoffType, "unknown">, RegExp> = {
+  wall: /\b(?:gib|plasterboard|gyprock|framing|framed|studs?|nogs?|noggins?|dwangs?)\b/i,
+  deck: /\b(?:build|building|new|construct(?:ion)?|extend|extension|joists?|bearers?|piles?|decking\s+boards?)\b/i,
+  cladding: /\b(?:re-?clad(?:ding)?|clad(?:ding)?|weatherboards?|siding|cavity\s+battens?|building\s+wrap)\b/i,
+  subfloor: /\b(?:sub[-\s]?floor|floor\s+framing|floor\s+joists?|bearers?|piles?)\b/i,
+};
+/** Upkeep of something already built — not a build the calculator sizes… */
+const UPKEEP_WORDS = /\b(?:paint(?:ing)?|stain(?:ing)?|oil(?:ing)?|wash(?:ing)?|water\s*blast(?:ing)?|clean(?:ing)?|re-?coat(?:ing)?|seal(?:ing)?)\b/i;
+/** …unless the tradie is building / fitting something too. */
+const BUILD_WORDS = /\b(?:build|building|new|construct|install|supply|fit|frame|line|lining|re-?line|re-?clad|clad|hang|replace|extend|erect)\b/i;
+
+/**
+ * The plain reasons for a blocked line on a voice / typed calculator job
+ * whose size is missing or can't be right ("Wall height needed — say it or
+ * type it."), or null when the job isn't one the calculator owns (or the
+ * calculator can run). The pipeline then leaves the AI's material counts for
+ * that scope out and shows this line instead.
+ */
+export function voiceTakeoffSizesNeeded(
+  parsed: ParsedTakeoffResult,
+  description: string,
+): string[] | null {
+  if (canRunCalculator(parsed)) return null;
+  const type = parsed.detectedType ?? parsed.type;
+  if (type === "unknown") return null;
+  const flagged = parsed.reviewFlags ?? [];
+  const text = description ?? "";
+  const isTheJob =
+    flagged.length > 0 ||
+    (CALCULATOR_JOB_WORDS[type].test(text) &&
+      (!UPKEEP_WORDS.test(text) || BUILD_WORDS.test(text)));
+  if (!isTheJob) return null;
+  const reasons = parsed.missingFields.map((field) => {
+    const f = field.trim();
+    // A size that was read but can't be right — its message says which.
+    if (flagged.includes(field)) return `${f} Say the right size or type it.`;
+    // "Wall length." / "Deck length and width."
+    const named = /^([^?]*?)\.$/.exec(f);
+    if (named) {
+      return /\band\b/.test(named[1])
+        ? `${named[1]} needed — say them or type them.`
+        : `${named[1]} needed — say it or type it.`;
+    }
+    // A question ("GIB one side or both sides?").
+    return `${f} Say it or type it.`;
+  });
+  return reasons.length > 0 ? reasons : ["Sizes needed — say them or type them."];
 }
 
 /**
