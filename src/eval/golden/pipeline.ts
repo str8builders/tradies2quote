@@ -13,6 +13,9 @@
 //     → takeoff orchestrator runTakeoff    (roofing, fencing, concrete, …)
 //     → legacyScopeCoverage                (drop orchestrator scopes the
 //                                           legacy calculator already covers)
+//     → voiceTakeoffSizesNeeded            (voice/typed: a calculator job
+//                                           missing a size gets one blocked
+//                                           line naming it)
 //     → guardLinesForScope                 (strip deck-only lines from a
 //                                           non-deck job)
 //
@@ -26,6 +29,7 @@ import {
   canRunCalculator,
   parseTakeoffDescription,
   runTakeoff as runLegacyTakeoff,
+  voiceTakeoffSizesNeeded,
   type ParsedTakeoffResult,
 } from "@/lib/aiTakeoffParser";
 import { runTakeoff as runOrchestratedTakeoff } from "@/lib/takeoff";
@@ -65,6 +69,10 @@ export function runDeterministicPipeline(rawTranscript: string): PipelineResult 
   const parsed = parseTakeoffDescription(transcript);
   const useCalculator = canRunCalculator(parsed);
   const isDrawing = /\[T2Q_(?:PLAN|TIMBER)\]/i.test(transcript);
+  // run.ts audit item 2: a VOICE/typed calculator job whose size is missing
+  // or can't be right gets one blocked line naming the size needed.
+  const voiceSizesNeeded =
+    !isDrawing && !useCalculator ? voiceTakeoffSizesNeeded(parsed, transcript) : null;
 
   const orchestrated = runOrchestratedTakeoff(transcript, {
     licenseContext: { scanType: parsed.type },
@@ -125,6 +133,16 @@ export function runDeterministicPipeline(rawTranscript: string): PipelineResult 
   }
 
   if (isDrawing && !useCalculator && parsed.type !== "unknown") {
+    lines.push({
+      id: `blocked:${parsed.type}`,
+      source: `legacy:${parsed.type}`,
+      description: `${parsed.type} takeoff — needs dimensions before it can be quoted`,
+      quantity: 0,
+      unit: "each",
+      status: "blocked",
+    });
+  }
+  if (voiceSizesNeeded) {
     lines.push({
       id: `blocked:${parsed.type}`,
       source: `legacy:${parsed.type}`,
