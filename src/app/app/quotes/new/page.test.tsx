@@ -68,10 +68,11 @@ beforeEach(() => {
   vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant-test");
 });
 
-async function render(error?: string | string[]): Promise<string> {
-  const element = (await NewQuotePage({
-    searchParams: Promise.resolve(error === undefined ? {} : { error }),
-  })) as ReactElement;
+async function render(error?: string | string[], start?: string): Promise<string> {
+  const params: { error?: string | string[]; start?: string } = {};
+  if (error !== undefined) params.error = error;
+  if (start !== undefined) params.start = start;
+  const element = (await NewQuotePage({ searchParams: Promise.resolve(params) })) as ReactElement;
   return renderToStaticMarkup(element);
 }
 
@@ -118,7 +119,12 @@ describe("switch on: the new look, behind the same gates", () => {
     expect(html).not.toContain('data-testid="old-flow"');
     expect(html).not.toContain("step 1 of 3");
     expect(html).toContain('data-testid="app-header" data-context="New quote"');
-    expect(newFlowProps(html)).toEqual({ needsAiConsent: false, voiceEnabled: true, scanEnabled: true });
+    expect(newFlowProps(html)).toEqual({ needsAiConsent: false, voiceEnabled: true, scanEnabled: true, start: null });
+  });
+
+  it("?start=talk (Home's Talk a quote) opens on the mic; anything else is ignored", async () => {
+    expect(newFlowProps(await render(undefined, "talk")).start).toBe("talk");
+    expect(newFlowProps(await render(undefined, "scan")).start).toBeNull();
   });
 
   it("passes the page's error key on (the first of several)", async () => {

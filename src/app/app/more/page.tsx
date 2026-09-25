@@ -5,6 +5,7 @@ import { isOwnerEmail } from "@/lib/owner";
 import { getCachedAuthUser } from "@/lib/supabase/auth";
 import { getNewLookState } from "@/lib/ui/newLook";
 import { OUTDOOR_COOKIE, isOutdoorCookieValue } from "@/lib/ui/outdoor";
+import { loadTopBarData } from "../_v2/lib/top-bar";
 import { MoreView } from "./_components/MoreView";
 
 export const metadata: Metadata = {
@@ -24,10 +25,11 @@ export default async function MorePage() {
   const look = await getNewLookState();
   if (!look.on) redirect("/app");
 
-  const outdoor = isOutdoorCookieValue((await cookies()).get(OUTDOOR_COOKIE)?.value);
+  const [cookieStore, bar] = await Promise.all([cookies(), loadTopBarData()]);
+  const outdoor = isOutdoorCookieValue(cookieStore.get(OUTDOOR_COOKIE)?.value);
   return (
     <MoreView
-      email={user.email ?? null}
+      bar={bar}
       isOwner={isOwnerEmail(user.email)}
       outdoor={outdoor}
       canChooseLook={look.canChoose}

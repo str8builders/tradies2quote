@@ -67,3 +67,14 @@ export function request(over: Partial<BoardRequest> = {}): BoardRequest {
     ...over,
   };
 }
+
+/** A signed-in top bar for render tests: a first name, no photo. */
+export const TOP_BAR_FIXTURE = {
+  greeting: "Good morning",
+  name: "Sam",
+  letter: "S",
+  avatarUrl: null,
+  email: "sam@example.test",
+  businessName: "Sam's Building",
+  outdoor: false,
+} as const satisfies import("./top-bar").TopBarData;

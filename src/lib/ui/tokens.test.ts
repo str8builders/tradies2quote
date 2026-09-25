@@ -57,9 +57,11 @@ describe.each(MODES)("%s palette contrast (WCAG)", (mode) => {
     expect(ratio(mode, "on-brand", "brand")).toBeGreaterThanOrEqual(4.5);
     expect(ratio(mode, "on-brand", "hivis")).toBeGreaterThanOrEqual(4.5);
     expect(ratio(mode, "on-mark", "mark")).toBeGreaterThanOrEqual(4.5);
+    // The gradient's deep end carries the same dark icons and labels.
+    expect(ratio(mode, "on-brand", "ember")).toBeGreaterThanOrEqual(4.5);
   });
 
-  it.each(["ok", "warn", "bad", "info"] as const)(
+  it.each(["ok", "warn", "bad", "info", "violet"] as const)(
     "%s is readable on every surface, on its soft tint, and as a fill",
     (tone) => {
       for (const s of surfaces) {

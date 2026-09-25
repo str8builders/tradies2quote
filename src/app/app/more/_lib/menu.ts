@@ -1,3 +1,5 @@
+import type { IconTone } from "@/components/ui/styles";
+
 /**
  * The More screen's rows (new look), as data. Pure.
  *
@@ -60,7 +62,7 @@ const BUSINESS: MoreGroup = {
     {
       id: "account",
       label: "Account",
-      caption: "Your login, photo and notifications",
+      caption: "Your name, photo and notifications",
       href: "/app/settings/account",
     },
   ],
@@ -97,4 +99,44 @@ const OWNER: MoreGroup = {
 /** The link groups, and the owner's tools (null for everyone else). */
 export function moreMenu({ isOwner }: { isOwner: boolean }): { groups: MoreGroup[]; owner: MoreGroup | null } {
   return { groups: [BUSINESS, TOOLS], owner: isOwner ? OWNER : null };
+}
+
+/**
+ * Each row's tile colour (IconTone meanings: brand quotes and prices, ok
+ * money in, info jobs, dates and the business, violet people, tools
+ * T2QCAL, neutral help). The owner's tools stay orange.
+ */
+export const MORE_TONE: Readonly<Record<MoreItemId, IconTone>> = {
+  clients: "violet",
+  prices: "brand",
+  calendar: "info",
+  business: "info",
+  rates: "warn",
+  payments: "ok",
+  account: "brand",
+  team: "violet",
+  calculators: "tools",
+  help: "neutral",
+  feedback: "neutral",
+  agents: "brand",
+  debug: "brand",
+  monitor: "brand",
+  ops: "brand",
+};
+
+const SHEET_ORDER: readonly MoreItemId[] = ["account", "business", "rates", "payments", "team", "help", "feedback"];
+
+/**
+ * The account sheet behind your photo in the top bar: your own settings
+ * and the business's, then help. The same rows as More (one list, so the
+ * two can't drift), with "Account" said the way the sheet means it. No
+ * plans or prices, so it's the same in the iOS app.
+ */
+export function accountSheetItems(): MoreItem[] {
+  const all = [...BUSINESS.items, ...TOOLS.items];
+  return SHEET_ORDER.map((id) => {
+    const item = all.find((entry) => entry.id === id);
+    if (!item) throw new Error(`accountSheetItems: no More item "${id}"`);
+    return id === "account" ? { ...item, label: "Your profile" } : item;
+  });
 }

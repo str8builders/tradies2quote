@@ -33,6 +33,8 @@ export interface NewQuoteFlowProps {
   scanEnabled: boolean;
   /** `?error=` from a failed `createDraftQuote`. */
   errorKey?: string;
+  /** `?start=talk`: open straight on the mic (Home's "Talk a quote"). */
+  start?: "talk" | null;
 }
 
 /**
@@ -42,11 +44,11 @@ export interface NewQuoteFlowProps {
  * the plan reader, the clean-up questions, and `createDraftQuote`, which
  * saves the words and opens the quote page where QuoteGenerator writes it.
  */
-export function NewQuoteFlow({ needsAiConsent, voiceEnabled, scanEnabled, errorKey }: NewQuoteFlowProps) {
+export function NewQuoteFlow({ needsAiConsent, voiceEnabled, scanEnabled, errorKey, start }: NewQuoteFlowProps) {
   const [state, dispatch] = useReducer(
     flowReducer,
     { voiceEnabled, scanEnabled } satisfies ChannelFlags,
-    (flags) => initialFlowState(availableChannels(flags)),
+    (flags) => initialFlowState(availableChannels(flags), start),
   );
   // Local mirror so accepting hides the modal at once. The AI routes check
   // consent themselves, so this is only the tradie's view of it.

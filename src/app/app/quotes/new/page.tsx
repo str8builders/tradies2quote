@@ -25,9 +25,10 @@ const NEW_QUOTE_ERRORS: Record<string, string> = {
 export default async function NewQuotePage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string | string[] }>;
+  searchParams: Promise<{ error?: string | string[]; start?: string | string[] }>;
 }) {
-  const { error: rawError } = await searchParams;
+  const { error: rawError, start: rawStart } = await searchParams;
+  const start = (Array.isArray(rawStart) ? rawStart[0] : rawStart) === "talk" ? "talk" : null;
   const errorKey = Array.isArray(rawError) ? rawError[0] : rawError;
   const errorMessage = errorKey ? NEW_QUOTE_ERRORS[errorKey] : undefined;
   const { user } = await getCachedAuthUser();
@@ -72,6 +73,7 @@ export default async function NewQuotePage({
         <AppHeader context="New quote" />
         <NewQuoteFlow
           errorKey={errorKey}
+          start={start}
           needsAiConsent={needsAiConsent}
           voiceEnabled={voiceEnabled}
           scanEnabled={scanEnabled}

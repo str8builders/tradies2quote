@@ -35,7 +35,16 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
 }));
 vi.mock("@/lib/supabase/auth", () => ({ getCachedAuthUser: async () => ({ user: sw.user, error: null }) }));
-vi.mock("@/lib/supabase/profile", () => ({ getCachedAvatarUrl: async () => null }));
+vi.mock("@/lib/supabase/profile", () => ({
+  getCachedAvatarUrl: async () => null,
+  getCachedTopBarProfile: async () => ({
+    firstName: "Sam",
+    businessName: null,
+    avatarUrl: null,
+    country: "NZ",
+    currency: "NZD",
+  }),
+}));
 vi.mock("@/lib/weather-impact/outlook", () => ({ getWeekOutlook: vi.fn(async () => null) }));
 vi.mock("@/lib/observability", () => ({ captureError: vi.fn() }));
 vi.mock("@/lib/supabase/server", async () => {
@@ -176,7 +185,11 @@ describe("/app (Home)", () => {
     sw.user = { id: "owner-1", email: OWNER_EMAIL };
     const tree = await DashboardPage();
     expect(isValidElement(tree) && tree.type).toBe(NewHome);
-    expect(elements(tree)[0].props).toEqual({ userId: "owner-1", isOwner: true });
+    expect(elements(tree)[0].props).toEqual({
+      userId: "owner-1",
+      isOwner: true,
+      bar: expect.objectContaining({ name: "Sam", greeting: expect.stringMatching(/^Good (morning|afternoon|evening)$/) }),
+    });
   });
 
   it("signed out still goes to login first", async () => {
@@ -213,7 +226,12 @@ describe("/app/more", () => {
     sw.on = true;
     sw.cookies = { "t2q-outdoor": "1" };
     let view = elements(await MorePage()).find((e) => e.type === MoreView);
-    expect(view?.props).toEqual({ email: "tradie@example.test", isOwner: false, outdoor: true, canChooseLook: false });
+    expect(view?.props).toEqual({
+      bar: expect.objectContaining({ name: "Sam", letter: "S", email: "tradie@example.test", outdoor: true }),
+      isOwner: false,
+      outdoor: true,
+      canChooseLook: false,
+    });
     sw.user = { id: "owner-1", email: OWNER_EMAIL };
     sw.canChoose = true;
     view = elements(await MorePage()).find((e) => e.type === MoreView);

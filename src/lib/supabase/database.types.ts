@@ -1035,6 +1035,7 @@ export type Database = {
           default_labour_rate: number | null
           default_markup_pct: number | null
           email: string | null
+          first_name: string | null
           gst_number: string | null
           id: string
           logo_url: string | null
@@ -1059,6 +1060,7 @@ export type Database = {
           default_labour_rate?: number | null
           default_markup_pct?: number | null
           email?: string | null
+          first_name?: string | null
           gst_number?: string | null
           id: string
           logo_url?: string | null
@@ -1083,6 +1085,7 @@ export type Database = {
           default_labour_rate?: number | null
           default_markup_pct?: number | null
           email?: string | null
+          first_name?: string | null
           gst_number?: string | null
           id?: string
           logo_url?: string | null

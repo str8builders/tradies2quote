@@ -39,7 +39,6 @@ function todo(n: number, over: Partial<Todo> = {}): Todo {
 const zero: MoneyTotal = { amount: 0, count: 0, currency: "NZD", otherCurrencies: 0 };
 
 const base: HomeViewProps = {
-  greeting: "Good morning",
   summary: "3 things need you today",
   setup: null,
   todos: [],
@@ -91,12 +90,38 @@ describe("to-do cards", () => {
 });
 
 describe("Home states", () => {
-  it("greets and says how much needs doing", () => {
+  it("the photo hero says how much needs doing, then the quick actions", () => {
     const out = html(<HomeView {...base} todos={[todo(1)]} />);
-    expect(out).toMatch(/<h1 [^>]*ui-heading[^>]*>Good morning<\/h1>/);
-    expect(out).toContain("3 things need you today");
-    // New quote: the raised (+) at the thumb on phones, a button from sm up.
-    expect(out).toMatch(/<div class="hidden sm:block"><a [^>]*href="\/app\/quotes\/new"/);
+    const hero = out.slice(out.indexOf('data-testid="home-hero"'), out.indexOf('data-testid="home-quick"'));
+    expect(hero).toMatch(/<h2 id="home-summary"[^>]*>3 things need you today<\/h2>/);
+    expect(hero).toContain("worksite.webp");
+    expect(hero).toContain('alt=""');
+    // The h1 is the top bar's (greeting); Home's own headings are h2s.
+    expect(out).not.toContain("<h1");
+    expect(links(out.slice(out.indexOf('data-testid="home-quick"'))).slice(0, 4).map((a) => /href="([^"]+)"/.exec(a)?.[1])).toEqual([
+      "/app/quotes/new?start=talk",
+      "/t2qcal/calculators",
+      "/t2qcal/measure",
+      "/app/materials/import-quote",
+    ]);
+    expect(out.indexOf('data-testid="home-quick"')).toBeLessThan(out.indexOf('data-testid="home-todos"'));
+  });
+
+  it("the hero shows what's owed only when something is", () => {
+    const owed: MoneyTotal = { amount: 4820, count: 3, currency: "NZD", otherCurrencies: 0 };
+    const withOwed = html(<HomeView {...base} tiles={{ owed, paidThisMonth: zero }} />);
+    const hero = withOwed.slice(withOwed.indexOf('data-testid="home-hero"'), withOwed.indexOf('data-testid="home-quick"'));
+    expect(hero).toContain("owed to you");
+    const none = html(<HomeView {...base} tiles={{ owed: zero, paidThisMonth: zero }} />);
+    expect(none.slice(none.indexOf('data-testid="home-hero"'), none.indexOf('data-testid="home-quick"'))).not.toContain(
+      "owed to you",
+    );
+  });
+
+  it("to-do cards carry a coloured stripe and a two-tone icon tile", () => {
+    const out = html(<ul><TodoCard todo={todo(1, { tone: "bad" })} primary={false} /></ul>);
+    expect(out).toMatch(/class="[^"]*\bbg-ui-bad"/);
+    expect(out).toContain('data-tone="bad"');
   });
 
   it("a brand-new account: the setup card, no empty state, no money tiles", () => {
@@ -227,7 +252,6 @@ describe("loadHomeData: the day, from real rows", () => {
       now: NOW,
       setupDismissed: false,
     });
-    expect(data.greeting).toBe("Good morning");
     expect(data.todos.map((t) => [t.kind, t.action.href])).toEqual([
       ["overdue", "/app/quotes/preview/late"],
       ["draft", "/app/quotes/preview/draft"],

@@ -26,9 +26,46 @@ const CONDITION_ICON: Readonly<Record<DayOutlook["condition"], Icon>> = {
   changing: CloudSun,
 };
 
-/** The line itself: condition icon (tinted by the work call), words, and a way in. */
-export function WeatherLineView({ line, href }: { line: WeatherLineModel; href: string | null }) {
+/**
+ * The line itself: condition icon (tinted by the work call), words, and a
+ * way in. "chip" is the small pill in the corner of Home's photo hero.
+ */
+export function WeatherLineView({
+  line,
+  href,
+  variant = "row",
+}: {
+  line: WeatherLineModel;
+  href: string | null;
+  variant?: "row" | "chip";
+}) {
   const ConditionIcon = CONDITION_ICON[line.condition] ?? CloudSun;
+  if (variant === "chip") {
+    const chip = cx(
+      "inline-flex min-h-9 max-w-full items-center gap-2 rounded-full bg-ui-bg/80 py-1 pr-3 pl-1 text-ui-sm font-semibold text-ui-text no-underline backdrop-blur-sm",
+      UI_TEXT,
+    );
+    const inner = (
+      <>
+        <span
+          aria-hidden="true"
+          className={cx("inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[1.125rem]", ICON_CHIP[line.tone])}
+        >
+          <ConditionIcon weight="fill" />
+        </span>
+        <span className="min-w-0">{line.text}</span>
+      </>
+    );
+    return href ? (
+      <Link href={href} data-testid="home-weather" className={cx(chip, "ui-focus-ring", TAP)}>
+        {inner}
+      </Link>
+    ) : (
+      <div data-testid="home-weather" className={chip}>
+        {inner}
+      </div>
+    );
+  }
   const content = (
     <>
       <span
@@ -38,7 +75,7 @@ export function WeatherLineView({ line, href }: { line: WeatherLineModel; href: 
           ICON_CHIP[line.tone],
         )}
       >
-        <ConditionIcon weight="bold" />
+        <ConditionIcon weight="duotone" />
       </span>
       <span className="min-w-0 flex-1">{line.text}</span>
       {href ? <CaretRight aria-hidden="true" weight="bold" className="shrink-0 text-[1.25rem] text-ui-faint" /> : null}
@@ -68,10 +105,12 @@ export async function WeatherLine({
   address,
   todayKey,
   href,
+  variant = "row",
 }: {
   address: string;
   todayKey: string | null;
   href: string | null;
+  variant?: "row" | "chip";
 }) {
   let day: DayOutlook | null = null;
   let locality = "";
@@ -83,5 +122,5 @@ export async function WeatherLine({
     return null;
   }
   if (!day) return null;
-  return <WeatherLineView line={weatherLine(day, locality)} href={href} />;
+  return <WeatherLineView line={weatherLine(day, locality)} href={href} variant={variant} />;
 }

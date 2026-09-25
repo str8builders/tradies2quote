@@ -72,7 +72,8 @@ const TONE: Readonly<Record<TodoKind, IconTone>> = {
   overdue: "bad",
   request: "brand",
   invoice: "ok",
-  book: "ok",
+  // Dates are blue (IconTone): booking a job in.
+  book: "info",
   follow_up: "warn",
   draft: "brand",
 };

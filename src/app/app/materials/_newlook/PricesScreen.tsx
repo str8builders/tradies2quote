@@ -22,6 +22,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { kitsEnabled } from "@/lib/kits";
 import { NZ_DEFAULTS } from "@/lib/quote-defaults";
 import { createClient } from "@/lib/supabase/server";
+import type { TopBarData } from "../../_v2/lib/top-bar";
+import { TabTopBar } from "../../_v2/shell/TabTopBar";
 import { ScanBarcodeButton } from "../_components/ScanBarcodeButton";
 import { PricesList } from "./PricesList";
 import { cameFromCapture, toLibraryMaterial, toPriceRow, type MaterialRecord } from "./prices-model";
@@ -36,13 +38,11 @@ const MATERIAL_COLUMNS =
  * /app/materials in the new look: "Your prices". The heading paints at
  * once; the list streams in behind a skeleton, as the old page's does.
  */
-export function PricesScreen({ userId }: { userId: string }) {
+export function PricesScreen({ userId, bar }: { userId: string; bar: TopBarData }) {
   return (
     <Screen data-testid="prices-screen">
       <div className="mx-auto w-full max-w-xl flex-1 space-y-6 px-4 pt-6 pb-10">
-        <SectionTitle size="page" description={PRICES_EXPLAINER}>
-          Your prices
-        </SectionTitle>
+        <TabTopBar data={bar} title="Your prices" description={PRICES_EXPLAINER} />
         <Suspense fallback={<PricesSkeleton />}>
           <PricesBody userId={userId} />
         </Suspense>

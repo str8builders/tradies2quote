@@ -33,6 +33,10 @@ describe("moving between screens", () => {
     expect(ALL.screen).toBe("choose");
     expect(initialFlowState(["type"]).screen).toBe("type");
     expect(initialFlowState(["type", "scan"]).screen).toBe("choose");
+    // Home's "Talk a quote" opens on Talk, but only when Talk is on offer.
+    expect(initialFlowState(["talk", "type", "scan"], "talk").screen).toBe("talk");
+    expect(initialFlowState(["type", "scan"], "talk").screen).toBe("choose");
+    expect(initialFlowState(["talk", "type"], null).screen).toBe("choose");
   });
 
   it("goes to the chosen screen and back to the choice", () => {

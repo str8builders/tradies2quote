@@ -5,7 +5,8 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../settings/new-look-actions", () => ({ setNewLookAction: vi.fn() }));
 
-import { moreMenu } from "../_lib/menu";
+import { TOP_BAR_FIXTURE } from "../../_v2/lib/fixtures";
+import { accountSheetItems, moreMenu } from "../_lib/menu";
 import { MoreView } from "./MoreView";
 
 const hrefs = (markup: string) => [...markup.matchAll(/<a [^>]*href="([^"]+)"/g)].map((m) => m[1]);
@@ -39,22 +40,41 @@ describe("More menu (data)", () => {
   });
 
   it("no plan or price talk anywhere (same list inside the iOS app)", () => {
-    const text = JSON.stringify(moreMenu({ isOwner: true }));
+    const text = JSON.stringify([moreMenu({ isOwner: true }), accountSheetItems()]);
     expect(text).not.toMatch(/plan|subscri|upgrade|\$/i);
+  });
+
+  it("the account sheet: your settings, then help, from the same rows", () => {
+    expect(accountSheetItems().map((i) => [i.label, i.href])).toEqual([
+      ["Your profile", "/app/settings/account"],
+      ["Business details", "/app/settings/business"],
+      ["Rates and quotes", "/app/settings/rates"],
+      ["Payments", "/app/settings/payments"],
+      ["Team", "/app/team"],
+      ["Help", "/help"],
+      ["Send feedback", "/app/beta"],
+    ]);
   });
 });
 
 describe("MoreView", () => {
   const view = (over: Partial<Parameters<typeof MoreView>[0]> = {}) =>
     renderToStaticMarkup(
-      <MoreView email="sam@example.test" isOwner={false} outdoor={false} canChooseLook={false} {...over} />,
+      <MoreView bar={TOP_BAR_FIXTURE} isOwner={false} outdoor={false} canChooseLook={false} {...over} />,
     );
 
-  it("big rows to every place, and who is signed in", () => {
+  it("the top bar, T2QCAL first, then big rows to every place", () => {
     const out = view();
     expect(out).toMatch(/<h1 [^>]*>More<\/h1>/);
-    expect(out).toContain("Signed in as sam@example.test");
-    expect(hrefs(out)).toEqual([
+    expect(out).toContain('aria-label="Your account and settings"');
+    expect(hrefs(out).slice(0, 4)).toEqual([
+      "/t2qcal/calculators",
+      "/t2qcal/calculators",
+      "/t2qcal/measure",
+      "/t2qcal/takeoff",
+    ]);
+    expect(out.indexOf('data-testid="more-t2qcal"')).toBeLessThan(out.indexOf("Your business"));
+    expect(hrefs(out).slice(4)).toEqual([
       "/app/clients",
       "/app/materials",
       "/app/calendar",

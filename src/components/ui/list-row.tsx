@@ -2,12 +2,13 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { CaretRight } from "@phosphor-icons/react/dist/ssr";
 import { cx } from "./cx";
-import { ICON_CHIP, TAP, UI_TEXT, type IconTone } from "./styles";
+import { IconTile } from "./icon-tile";
+import { TAP, UI_TEXT, type IconTone } from "./styles";
 
 export interface ListRowProps {
   title: ReactNode;
   subtitle?: ReactNode;
-  /** A Phosphor icon element, shown in a soft 40 px chip. */
+  /** A Phosphor icon element (duotone), shown in a 40 px <IconTile>. */
   icon?: ReactNode;
   iconTone?: IconTone;
   /** Right-hand value: <Money/>, a <StatusPill/>, or short text. */
@@ -47,17 +48,7 @@ export function ListRow({
   );
   const content = (
     <>
-      {icon ? (
-        <span
-          aria-hidden="true"
-          className={cx(
-            "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-ui-md text-[1.375rem]",
-            ICON_CHIP[iconTone],
-          )}
-        >
-          {icon}
-        </span>
-      ) : null}
+      {icon ? <IconTile icon={icon} tone={iconTone} /> : null}
       <span className="min-w-0 flex-1">
         <span className="block font-semibold break-words text-ui-text">{title}</span>
         {subtitle ? <span className="block text-ui-sm text-ui-muted">{subtitle}</span> : null}

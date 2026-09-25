@@ -22,6 +22,10 @@ vi.mock("next/navigation", () => ({
 // Only found in the tree, never rendered.
 vi.mock("@/app/app/_components/AppHeader", () => ({ AppHeader: () => null }));
 vi.mock("../_components/ScanBarcodeButton", () => ({ ScanBarcodeButton: () => null }));
+vi.mock("@/app/app/_v2/lib/top-bar", async () => {
+  const { TOP_BAR_FIXTURE } = await import("@/app/app/_v2/lib/fixtures");
+  return { loadTopBarData: async () => TOP_BAR_FIXTURE };
+});
 
 import MaterialsPage from "../page";
 import { AppHeader } from "@/app/app/_components/AppHeader";
@@ -60,6 +64,7 @@ describe("/app/materials", () => {
     const tree = (await MaterialsPage()) as ReactElement<{ userId: string }>;
     expect(tree.type).toBe(PricesScreen);
     expect(tree.props.userId).toBe("user-1");
+    expect(tree.props).toHaveProperty("bar.name", "Sam");
   });
 
   it("signed out goes to the login page either way", async () => {

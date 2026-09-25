@@ -109,6 +109,46 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.55; }
   }
+
+  /* Round two loops and the welcome. Transform/opacity only; every use
+     pairs with motion-reduce:animate-none. */
+  --animate-ui-level: ui-level 1s ease-in-out infinite;
+  --animate-ui-ring: ui-ring 2.4s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+  --animate-ui-breathe: ui-breathe 1.6s ease-in-out infinite;
+  --animate-ui-rise: ui-rise 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-ui-land: ui-land 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-ui-unroll: ui-unroll 700ms cubic-bezier(0.25, 0.9, 0.25, 1) both;
+  --animate-ui-fade-out: ui-fade-out 250ms ease-in both;
+
+  @keyframes ui-level {
+    0%, 100% { transform: scaleY(0.18); }
+    50% { transform: scaleY(1); }
+  }
+  @keyframes ui-ring {
+    0% { transform: scale(0.8); opacity: 0.7; }
+    100% { transform: scale(1.55); opacity: 0; }
+  }
+  @keyframes ui-breathe {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.04); }
+  }
+  @keyframes ui-rise {
+    from { opacity: 0; transform: translateY(110%); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes ui-land {
+    0% { opacity: 0; transform: scale(0.6); }
+    70% { opacity: 1; transform: scale(1.06); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  @keyframes ui-unroll {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+  }
+  @keyframes ui-fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
 }
 
 @theme inline {
@@ -135,6 +175,9 @@
   --color-ui-bad-soft: var(--ui-bad-soft);
   --color-ui-info: var(--ui-info);
   --color-ui-info-soft: var(--ui-info-soft);
+  --color-ui-violet: var(--ui-violet);
+  --color-ui-violet-soft: var(--ui-violet-soft);
+  --color-ui-ember: var(--ui-ember);
   --color-ui-focus: var(--ui-focus);
   --color-ui-scrim: var(--ui-scrim);
   --color-ui-chrome: var(--ui-chrome);
@@ -171,6 +214,9 @@
   --ui-bad-soft: #3A1916;
   --ui-info: #58A6FF;
   --ui-info-soft: #132A45;
+  --ui-violet: #B99BFF;
+  --ui-violet-soft: #2A2145;
+  --ui-ember: #E0480D;
   --ui-focus: #FFEA00;
   --ui-scrim: rgba(0, 0, 0, 0.6);
   --ui-chrome: #111110;
@@ -209,6 +255,9 @@
   --ui-bad-soft: #FCE4E2;
   --ui-info: #0B57D0;
   --ui-info-soft: #DDE8FB;
+  --ui-violet: #5B2FC2;
+  --ui-violet-soft: #ECE4FF;
+  --ui-ember: #E0480D;
   --ui-focus: #000000;
   --ui-scrim: rgba(0, 0, 0, 0.5);
   --ui-chrome: #111110;
@@ -226,6 +275,45 @@
    layered utilities whatever their specificity. These few utilities carry
    !important on exactly those properties, so a kit part looks the same inside
    the /app shell as it does on /ui-kit. For src/components/ui only. */
+/* Round two fills. Colours come only from --ui-* variables, so outdoor
+   mode follows; components use these instead of raw colours. */
+@utility ui-brand-gradient {
+  background-color: var(--ui-brand);
+  background-image: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--ui-brand) 72%, white) 0%,
+    var(--ui-brand) 45%,
+    var(--ui-ember) 100%
+  );
+}
+/* Over a photo: clear at the top, the page colour at the bottom where the
+   words sit, with an orange glow from the bottom left. */
+@utility ui-hero-scrim {
+  background-image:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ui-bg) 12%, transparent) 0%,
+      color-mix(in srgb, var(--ui-bg) 42%, transparent) 42%,
+      color-mix(in srgb, var(--ui-bg) 94%, transparent) 100%
+    ),
+    radial-gradient(120% 90% at 0% 100%, color-mix(in srgb, var(--ui-brand) 45%, transparent), transparent 60%);
+}
+/* A tape-measure blade: hi-vis with millimetre and 50 mm ticks. */
+@utility ui-tape {
+  background-color: var(--ui-hivis);
+  background-image:
+    repeating-linear-gradient(90deg, var(--ui-on-brand) 0 1.5px, transparent 1.5px 7px),
+    repeating-linear-gradient(90deg, var(--ui-on-brand) 0 2px, transparent 2px 35px);
+  background-size: 100% 30%, 100% 55%;
+  background-repeat: no-repeat;
+}
+/* A soft orange glow rising from the bottom of a full screen. */
+@utility ui-glow {
+  background-image:
+    radial-gradient(90% 55% at 50% 108%, color-mix(in srgb, var(--ui-brand) 42%, transparent), transparent 70%),
+    radial-gradient(60% 40% at 50% 38%, color-mix(in srgb, var(--ui-brand) 10%, transparent), transparent 70%);
+}
+
 @utility ui-focus-ring {
   &:focus-visible {
     outline: var(--ui-focus-width) solid var(--ui-focus) !important;

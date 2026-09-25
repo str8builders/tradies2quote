@@ -35,7 +35,16 @@ vi.mock("@/lib/supabase/server", () => ({
     return { auth: { getUser: async () => ({ data: { user: env.user } }) }, from: db.from };
   },
 }));
-vi.mock("@/lib/supabase/profile", () => ({ getCachedAvatarUrl: async () => null }));
+vi.mock("@/lib/supabase/profile", () => ({
+  getCachedAvatarUrl: async () => null,
+  getCachedTopBarProfile: async () => ({
+    firstName: "Mike",
+    businessName: null,
+    avatarUrl: null,
+    country: "NZ",
+    currency: "NZD",
+  }),
+}));
 vi.mock("@/lib/team", () => ({ getTeamContext: async (id: string) => ({ clientOwnerId: id }) }));
 vi.mock("@/lib/native-shell", () => ({ isNativeShellRequest: async () => env.native }));
 vi.mock("@/lib/subscription", () => ({
@@ -74,6 +83,7 @@ vi.mock("@/app/app/_components/AppHeader", () => ({ AppHeader: () => null }));
 
 import SettingsPage from "../page";
 import AccountSettingsPage from "../account/page";
+import { FirstNameField } from "./FirstNameField";
 import BusinessSettingsPage from "../business/page";
 import PaymentsSettingsPage from "../payments/page";
 import RatesSettingsPage from "../rates/page";
@@ -255,6 +265,7 @@ describe("/app/settings with the new look on", () => {
     expect(findAll(web, AiConsentCard)).toHaveLength(0);
     expect(findAll(web, NewLookSetting)).toHaveLength(0);
     expect(findAll(web, DeleteAccountCard)).toHaveLength(1);
+    expect(findAll(web, FirstNameField)[0].props.initial).toBe("Mike");
 
     env.native = true;
     env.canChoose = true;

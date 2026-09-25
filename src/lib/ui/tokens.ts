@@ -43,6 +43,9 @@ export const UI_COLOR_NAMES = [
   "bad-soft",
   "info",
   "info-soft",
+  "violet",
+  "violet-soft",
+  "ember",
   "focus",
   "scrim",
   "chrome",
@@ -91,6 +94,12 @@ export const UI_THEMES: Readonly<Record<UiMode, UiTheme>> = {
       "bad-soft": "#3A1916",
       info: "#58A6FF",
       "info-soft": "#132A45",
+      // People (clients, team): the fifth category colour for icon tiles.
+      violet: "#B99BFF",
+      "violet-soft": "#2A2145",
+      // The deep end of the orange gradient (New button, Talk tile, mic).
+      // A fill only: icons on it use on-brand.
+      ember: "#E0480D",
       focus: "#FFEA00",
       scrim: "rgba(0, 0, 0, 0.6)",
       // Backdrop behind the phone's status bar. The installed iPhone app uses
@@ -132,6 +141,9 @@ export const UI_THEMES: Readonly<Record<UiMode, UiTheme>> = {
       "bad-soft": "#FCE4E2",
       info: "#0B57D0",
       "info-soft": "#DDE8FB",
+      violet: "#5B2FC2",
+      "violet-soft": "#ECE4FF",
+      ember: "#E0480D",
       focus: "#000000",
       scrim: "rgba(0, 0, 0, 0.5)",
       chrome: "#111110",

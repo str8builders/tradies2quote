@@ -40,6 +40,7 @@ vi.mock("../_components/ScanBarcodeButton", () => ({
 }));
 
 import { PricesList } from "./PricesList";
+import { TOP_BAR_FIXTURE } from "../../_v2/lib/fixtures";
 import { PRICES_EXPLAINER, PricesBody, PricesScreen } from "./PricesScreen";
 import { toPriceRow } from "./prices-model";
 
@@ -79,7 +80,7 @@ afterEach(() => {
 
 describe("Your prices", () => {
   it("has the title and the one-line explainer", () => {
-    const html = renderToStaticMarkup(<PricesScreen userId="user-1" />);
+    const html = renderToStaticMarkup(<PricesScreen userId="user-1" bar={TOP_BAR_FIXTURE} />);
     expect(html).toContain("Your prices");
     expect(html).toContain(PRICES_EXPLAINER.replace("'", "&#x27;"));
     expect(html).toContain('data-testid="prices-screen"');

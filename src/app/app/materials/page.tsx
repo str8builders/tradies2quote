@@ -14,6 +14,7 @@ import { MaterialsList } from "./_components/MaterialsList";
 import { MaterialsListSkeleton } from "./_components/MaterialsListSkeleton";
 import { ScanBarcodeButton } from "./_components/ScanBarcodeButton";
 import { isNewLookOn } from "@/lib/ui/newLook";
+import { loadTopBarData } from "../_v2/lib/top-bar";
 import { PricesScreen } from "./_newlook/PricesScreen";
 
 export const metadata: Metadata = {
@@ -34,7 +35,7 @@ export default async function MaterialsPage() {
   if (!user) redirect("/login");
 
   // Redesign phase 5: the new look is "Your prices". Off: unchanged below.
-  if (await isNewLookOn()) return <PricesScreen userId={user.id} />;
+  if (await isNewLookOn()) return <PricesScreen userId={user.id} bar={await loadTopBarData()} />;
 
   return (
     <div className="min-h-screen text-white">

@@ -5,10 +5,12 @@ import { Screen } from "@/components/ui/screen";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/server";
 import { isWeatherImpactEnabled } from "@/lib/weather-impact/feature-flag";
-import { businessTimeZone, dayKeyInZone, greetingFor } from "../lib/dates";
+import { businessTimeZone, dayKeyInZone } from "../lib/dates";
 import { buildTodos, moneyTiles, todoSummary } from "../lib/home-todos";
 import { loadBoard, loadHomeExtras } from "../lib/load-board";
 import { SETUP_DISMISSED_COOKIE, isSetupDismissed, setupSteps, showSetupCard } from "../lib/setup-steps";
+import type { TopBarData } from "../lib/top-bar";
+import { TabTopBar } from "../shell/TabTopBar";
 import { HomeSkeleton, HomeView, type HomeViewProps } from "./HomeParts";
 import { WeatherLine } from "./WeatherLine";
 
@@ -61,7 +63,6 @@ export async function loadHomeData({
   const currency = profile.currency ?? board.quotes[0]?.currency ?? "NZD";
 
   return {
-    greeting: greetingFor(now, timeZone),
     summary: board.failed
       ? "Your jobs didn't load"
       : setup && !hasJobs
@@ -95,8 +96,8 @@ async function HomeBody({ userId, isOwner }: { userId: string; isOwner: boolean 
       {...view}
       weather={
         weather ? (
-          <Suspense fallback={<Skeleton className="h-14 w-full" />}>
-            <WeatherLine address={weather.address} todayKey={weather.todayKey} href={weather.href} />
+          <Suspense fallback={<Skeleton shape="line" className="h-9 w-48 rounded-full" />}>
+            <WeatherLine address={weather.address} todayKey={weather.todayKey} href={weather.href} variant="chip" />
           </Suspense>
         ) : null
       }
@@ -106,16 +107,19 @@ async function HomeBody({ userId, isOwner }: { userId: string; isOwner: boolean 
 
 /**
  * /app in the new look (src/app/app/page.tsx switches here when
- * isNewLookOn()). Opens on what needs doing today; the data streams in
- * behind a skeleton so the screen paints at once.
+ * isNewLookOn()). The top bar (your photo, the greeting, T2QCAL) paints at
+ * once; the day streams in behind a skeleton.
  */
-export function NewHome({ userId, isOwner }: { userId: string; isOwner: boolean }) {
+export function NewHome({ userId, isOwner, bar }: { userId: string; isOwner: boolean; bar: TopBarData }) {
   return (
     <Screen height="fill" data-testid="new-home">
       <main className="mx-auto w-full max-w-2xl px-4 pt-6 pb-10 sm:px-6 sm:pt-10">
-        <Suspense fallback={<HomeSkeleton />}>
-          <HomeBody userId={userId} isOwner={isOwner} />
-        </Suspense>
+        <TabTopBar data={bar} />
+        <div className="mt-5">
+          <Suspense fallback={<HomeSkeleton />}>
+            <HomeBody userId={userId} isOwner={isOwner} />
+          </Suspense>
+        </div>
       </main>
     </Screen>
   );

@@ -17,7 +17,12 @@ export const PRESS =
 export const TAP = "touch-manipulation select-none [-webkit-tap-highlight-color:transparent]";
 
 export type Tone = "ok" | "warn" | "bad" | "info" | "neutral";
-export type IconTone = Tone | "brand";
+/**
+ * Icon tile colours. Each means one thing everywhere: brand = quotes,
+ * ok = money in, info = jobs and dates, violet = people, tools = T2QCAL and
+ * tools, bad = overdue, warn = needs a look, neutral = everything else.
+ */
+export type IconTone = Tone | "brand" | "violet" | "tools";
 
 /** Soft chip behind an icon (list rows, to-do cards, empty states). */
 export const ICON_CHIP: Record<IconTone, string> = {
@@ -26,5 +31,19 @@ export const ICON_CHIP: Record<IconTone, string> = {
   warn: "bg-ui-warn-soft text-ui-warn",
   bad: "bg-ui-bad-soft text-ui-bad",
   info: "bg-ui-info-soft text-ui-info",
+  violet: "bg-ui-violet-soft text-ui-violet",
+  tools: "bg-ui-mark text-ui-on-mark",
   neutral: "bg-ui-surface-2 text-ui-muted",
+};
+
+/** The solid colour of each tone, for a card's side stripe. */
+export const TONE_STRIPE: Record<IconTone, string> = {
+  brand: "bg-ui-brand",
+  ok: "bg-ui-ok",
+  warn: "bg-ui-warn",
+  bad: "bg-ui-bad",
+  info: "bg-ui-info",
+  violet: "bg-ui-violet",
+  tools: "bg-ui-hivis",
+  neutral: "bg-ui-line-strong",
 };

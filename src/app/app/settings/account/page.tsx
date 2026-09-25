@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { SectionTitle } from "@/components/ui/section-title";
 import { isNativeShellRequest } from "@/lib/native-shell";
 import { getCachedAuthUser } from "@/lib/supabase/auth";
-import { getCachedAvatarUrl } from "@/lib/supabase/profile";
+import { getCachedAvatarUrl, getCachedTopBarProfile } from "@/lib/supabase/profile";
 import { createClient } from "@/lib/supabase/server";
 import { getNewLookState } from "@/lib/ui/newLook";
 import { OUTDOOR_COOKIE, isOutdoorCookieValue } from "@/lib/ui/outdoor";
@@ -15,6 +15,7 @@ import { NewLookSetting } from "../_components/NewLookSetting";
 import { AiConsentCard } from "../_newlook/AiConsentCard";
 import { AvatarField } from "../_newlook/AvatarField";
 import { DeleteAccountCard } from "../_newlook/DeleteAccountCard";
+import { FirstNameField } from "../_newlook/FirstNameField";
 import { LEGACY_SETTINGS_HREF } from "../_newlook/hub";
 import { NotificationsSetting } from "../_newlook/NotificationsSetting";
 import { OutdoorSetting } from "../_newlook/OutdoorSetting";
@@ -43,8 +44,8 @@ async function readAiConsent(userId: string): Promise<string | null> {
  * today), sign out and delete account. Everything here acts at once, so the
  * page has no Save button.
  *
- * There is no personal-name field on the profile yet, so "you" is the photo
- * and the email you sign in with.
+ * "You" is your photo, your first name (for Home's greeting) and the email
+ * you sign in with.
  */
 export default async function AccountSettingsPage() {
   const newLook = await getNewLookState();
@@ -52,8 +53,9 @@ export default async function AccountSettingsPage() {
   const { user } = await getCachedAuthUser();
   if (!user) redirect("/login");
 
-  const [avatarUrl, native, cookieStore] = await Promise.all([
+  const [avatarUrl, profile, native, cookieStore] = await Promise.all([
     getCachedAvatarUrl(user.id),
+    getCachedTopBarProfile(user.id),
     isNativeShellRequest(),
     cookies(),
   ]);
@@ -65,6 +67,7 @@ export default async function AccountSettingsPage() {
       <Card as="section" padding="lg" className="space-y-4" aria-labelledby="you-title">
         <SectionTitle id="you-title">You</SectionTitle>
         <AvatarField avatarUrl={avatarUrl} email={user.email ?? null} />
+        <FirstNameField initial={profile.firstName} />
       </Card>
 
       <Card as="section" padding="lg" className="space-y-2" aria-labelledby="notify-title">

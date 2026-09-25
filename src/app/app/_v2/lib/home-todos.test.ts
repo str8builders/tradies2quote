@@ -103,7 +103,7 @@ describe("each card type: what happened, who and how much, one action", () => {
       title: "Quote accepted yesterday",
       detail: "Sam Taylor · $1,000.00",
       action: { label: "Book the job", href: "/app/quotes/preview/tile" },
-      tone: "ok",
+      tone: "info",
     });
     expect(only(todos([quote({ status: "accepted", acceptedAt: daysAgo(0) })])).title).toBe("Quote accepted today");
   });

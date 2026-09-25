@@ -50,10 +50,14 @@ export type FlowEvent =
   | { type: "leaveQuestions" }
   | { type: "restore"; channel: Channel; text: string };
 
-export function initialFlowState(channels: Channel[]): FlowState {
+/**
+ * The opening state. `start` opens straight on one way in (Home's "Talk a
+ * quote" tile) when that way is on offer; otherwise the usual first screen.
+ */
+export function initialFlowState(channels: Channel[], start?: Channel | null): FlowState {
   return {
     channels,
-    screen: firstScreen(channels),
+    screen: start && channels.includes(start) ? start : firstScreen(channels),
     texts: { talk: "", type: "", scan: "" },
     writing: "idle",
     pending: "",
