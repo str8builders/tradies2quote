@@ -76,10 +76,6 @@ export const WALL_JOBS: GoldenJob[] = [
     },
     profile: NZ_PROFILE,
     labour: [labourStatedDay(2, 600, "1200.00")],
-    knownBugs: {
-      lines:
-        "KNOWN BUG: a wall lined both sides (so an interior wall) that never mentions insulation still gets a BLOCKED 0-pack 'Pink Batts Insulation' line — aiTakeoffParser.parseWallDescription defaults includeInsulation=true ('Assumed insulation is included unless stated otherwise') and the exterior-only rule then blocks it, and any blocked line hard-blocks sending (quote-validation.assessQuoteTakeoffSafety) — expected no insulation line, code emits one",
-    },
     totals: {
       materials_subtotal: money("1253.46", "223.20 + 188.30 + 80.70 + 598.50 + 29.26 + 64.50 + 69.00"),
       labour_subtotal: money("1200.00", "2 days × $600"),
@@ -281,13 +277,6 @@ export const WALL_JOBS: GoldenJob[] = [
       subtotal_before_tax: money("2550.72", "1325.60 + 265.12 + 960.00"),
       tax_amount: money("382.61", "15 % × 2550.72 = 382.608 → 382.61"),
       total: money("2933.33", "2550.72 + 382.61"),
-    },
-    knownBugs: {
-      "input:exteriorWallLengthM":
-        "KNOWN BUG: a typed/voice 'Exterior wall run: 12m' line is ignored without a scan [T2Q_PLAN] marker (aiTakeoffParser.parseWallDescription only uses textRuns.exterior to cross-check marker.exteriorWallRunM) — expected 12 m because the tradie stated the exterior run, code gives undefined",
-      "qty:pink-batts":
-        "KNOWN BUG: same root cause — expected 4 packs because the exterior run is stated (25.92 m² × 1.1 ÷ 8.8 = 3.24 → 4), code gives a BLOCKED 0-pack line (safe, but the tradie must re-enter what they already said)",
-      ...moneyCascade(["pink-batts"], "KNOWN BUG: cascades from the blocked 0-pack insulation line (exterior run ignored) — $232.00 of batts missing from the total"),
     },
   }),
 

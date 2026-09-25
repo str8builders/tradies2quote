@@ -10,6 +10,7 @@ import {
   type SubfloorTakeoffInput,
 } from "./materialCalculator";
 import { normalizeSpokenMeasurements } from "./transcript/measureNormalize";
+import { detectWallKind } from "./takeoff/extraction";
 import {
   BARE_MM_FROM,
   METRES_BANDS,
@@ -1687,11 +1688,14 @@ function parseWallDescription(
     );
   }
 
-  // Exterior (perimeter) wall run, when the drawing distinguished it. Insulation
-  // is then sized off EXTERIOR walls only (exact). Absent → exteriorWallLengthM
-  // stays undefined and the calculator keeps insulation review-required (no
-  // exterior/interior split is guessed). Clamp to the total so an inconsistent
-  // marker can't make the exterior run exceed the whole wall run.
+  // Exterior (perimeter) wall run: the drawing's marker (cross-checked against
+  // an "EXTERIOR WALL RUN = …" line in the dimensions text), or — a voice /
+  // typed job with no marker — that line on its own ("Exterior wall run:
+  // 12m"). Insulation is then sized off EXTERIOR walls only (exact), and
+  // exterior walls are GIB-lined on the inside face only. Absent →
+  // exteriorWallLengthM stays undefined (no exterior/interior split is
+  // guessed). Clamp to the total so an inconsistent run can't make the
+  // exterior run exceed the whole wall run.
   let exteriorM = marker?.exteriorWallRunM;
   const textExterior = textRuns.exterior;
   if (
@@ -1708,12 +1712,20 @@ function parseWallDescription(
       flag(implausibleMessage("Exterior wall run", textExterior.reading));
       exteriorM = undefined;
     }
+  } else if (exteriorM === undefined && textExterior) {
+    if (textExterior.plausible) {
+      exteriorM = textExterior.value;
+    } else {
+      flag(implausibleMessage("Exterior wall run", textExterior.reading));
+    }
   }
   if (exteriorM !== undefined) {
     input.exteriorWallLengthM =
       wallLengthM !== undefined ? Math.min(exteriorM, wallLengthM) : exteriorM;
     assumptions.push(
-      `Insulation sized off the exterior wall run (${input.exteriorWallLengthM}m) from the floor plan.`,
+      marker?.exteriorWallRunM !== undefined
+        ? `Insulation sized off the exterior wall run (${input.exteriorWallLengthM}m) from the floor plan.`
+        : `Insulation sized off the exterior wall run you gave (${input.exteriorWallLengthM}m).`,
     );
   }
 
@@ -1771,12 +1783,29 @@ function parseWallDescription(
   const gibSides = extractGibSides(text);
   if (gibSides !== undefined) input.gibSides = gibSides;
 
+  // Insulation is quoted for EXTERIOR walls only, so it is on when the tradie
+  // asks for it, or by default only when the job clearly includes exterior
+  // walls: an exterior run is given, the wall run is a whole plan's (a house
+  // has exterior walls), or the tradie calls the walls exterior. A wall that
+  // is none of those — "GIB both sides for a 10m wall" is an interior wall —
+  // gets no insulation line: defaulting it on gave a BLOCKED 0-pack line
+  // (the exterior-only rule), and any blocked line stops the quote being sent.
   const insulation = extractIncludeInsulation(text);
   if (insulation !== undefined) {
     input.includeInsulation = insulation;
   } else if (applyDefaults) {
-    input.includeInsulation = true;
-    assumptions.push("Assumed insulation is included unless stated otherwise.");
+    const wallKind = detectWallKind(text);
+    const clearlyExterior =
+      input.exteriorWallLengthM !== undefined ||
+      usedWallRun ||
+      wallKind === "exterior" ||
+      wallKind === "mixed";
+    input.includeInsulation = clearlyExterior;
+    assumptions.push(
+      clearlyExterior
+        ? "Assumed the exterior walls are insulated unless stated otherwise."
+        : 'No insulation line — none was asked for and this isn\'t an exterior wall. Say "pink batts" to add it.',
+    );
   }
 
   const skirting = extractIncludeSkirting(text);
