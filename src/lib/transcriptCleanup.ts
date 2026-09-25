@@ -36,8 +36,20 @@
 import { applyGlossaryCorrections } from "./transcript/glossaryCorrect";
 import { normalizeSpokenMeasurements } from "./transcript/measureNormalize";
 import type { VocabSet, VocabTermType } from "./transcript/glossary";
-import { fetchWithTimeout, TIMEOUTS } from "@/lib/fetchTimeout";
+import { TIMEOUTS } from "@/lib/fetchTimeout";
 import { parseModelJsonObject } from "@/lib/modelJson";
+// The shared AI client is browser-safe (no Node / server-only imports), so
+// this module stays bundle-safe while getting the same retry and timeout
+// policy as every other model call.
+import { callAnthropic } from "@/lib/ai/anthropic";
+import { callChatCompletions } from "@/lib/ai/openai";
+import { aiModel } from "@/lib/ai/models";
+
+/**
+ * The summary is optional (the cleaned transcript stands without it) and
+ * sits on the quote-generation path, so a blip gets one retry, not two.
+ */
+const SUMMARY_MAX_ATTEMPTS = 2;
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -548,78 +560,57 @@ async function callLocalSummary({
       confidence: { type: "number", minimum: 0, maximum: 1 },
     },
   };
-  const res = await fetchWithTimeout(
-    `${baseUrl}/chat/completions`,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: Math.min(maxTokens, maxTokensCeiling),
-        temperature: 0,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: "transcript_summary",
-            strict: true,
-            schema: summarySchema,
-          },
+  const reply = await callChatCompletions({
+    provider: "local",
+    url: `${baseUrl}/chat/completions`,
+    apiKey,
+    body: {
+      model,
+      max_tokens: Math.min(maxTokens, maxTokensCeiling),
+      temperature: 0,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "transcript_summary",
+          strict: true,
+          schema: summarySchema,
         },
-      }),
+      },
     },
     timeoutMs,
-  );
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new Error(`Local LLM ${res.status}: ${detail.slice(0, 200)}`);
-  }
-  const payload = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string | null } }>;
-  };
-  return payload.choices?.[0]?.message?.content ?? "";
+    maxAttempts: SUMMARY_MAX_ATTEMPTS,
+  });
+  return reply.content;
 }
 
 // Keep this transport browser-import-safe: this module also supplies the
 // deterministic cleanup used by client code. Never import the server-only
 // quote completion module here.
 const callHostedSummary: AnthropicCallable = async ({ apiKey, system, user, model, maxTokens }) => {
-  const res = await fetchWithTimeout(
-    "https://api.anthropic.com/v1/messages",
-    {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: maxTokens,
-        // Current Claude models think adaptively inside max_tokens. At the
-        // default effort the reasoning alone ate a 768-token cap and every
-        // summary came back truncated; low effort is plenty for a fixed
-        // JSON shape and keeps the answer inside the budget.
-        output_config: { effort: "low" },
-        system,
-        messages: [{ role: "user", content: user }],
-      }),
+  // Timeouts, retries and stop_reason typing (a max_tokens stop throws a
+  // "truncated" AiError) come from the shared client. Its error messages
+  // carry "HTTP <status>", which summaryFailure() reports.
+  const reply = await callAnthropic({
+    apiKey,
+    body: {
+      model,
+      max_tokens: maxTokens,
+      // Current Claude models think adaptively inside max_tokens. At the
+      // default effort the reasoning alone ate a 768-token cap and every
+      // summary came back truncated; low effort is plenty for a fixed
+      // JSON shape and keeps the answer inside the budget.
+      output_config: { effort: "low" },
+      system,
+      messages: [{ role: "user", content: user }],
     },
-    TIMEOUTS.llm,
-  );
-  if (!res.ok) throw new Error(`Summary provider returned HTTP ${res.status}`);
-  const payload = (await res.json()) as {
-    content?: Array<{ type: string; text?: string }>;
-    stop_reason?: string;
-  };
-  if (payload.stop_reason === "max_tokens") throw new Error("Summary response was truncated");
-  return payload.content?.filter((block) => block.type === "text").map((block) => block.text ?? "").join("\n") ?? "";
+    timeoutMs: TIMEOUTS.llm,
+    maxAttempts: SUMMARY_MAX_ATTEMPTS,
+  });
+  return reply.text;
 };
 
 /**
@@ -676,9 +667,9 @@ export async function buildSummary(
   const local = process.env.TEXT_AI_PROVIDER?.trim().toLowerCase() === "local";
   const apiKey = options.apiKey ?? (local ? process.env.LOCAL_LLM_API_KEY : process.env.ANTHROPIC_API_KEY);
   if (!apiKey) return null;
-  const model = options.model ?? (local
-    ? process.env.LOCAL_LLM_MODEL?.trim() || "qwen3.5-9b-uncensored"
-    : process.env.ANTHROPIC_QUOTE_MODEL?.trim() || "claude-sonnet-5");
+  // One model config for the app (src/lib/ai/models.ts): LOCAL_LLM_MODEL
+  // or ANTHROPIC_QUOTE_MODEL still override, as before.
+  const model = options.model ?? aiModel(local ? "localFallback" : "quote");
   const fn = options.callAnthropic ?? (local ? callLocalSummary : callHostedSummary);
 
   let raw: string;

@@ -8,6 +8,10 @@
 //   - Validation + one retry — caller's parse() validates/normalises.
 //   - Observability — logs run.start / run.finish to agent-monitor.
 //   - Vision-ready — user content may include image_url blocks.
+//   - Transport — the shared AI client (src/lib/ai): timeout, bounded
+//     retries on 429/5xx and network errors, typed AiErrors. The local model
+//     rides its node:http transport (no undici header timeout) under the
+//     same policy.
 //
 // (OpenAI caches long prompts automatically, so there's no cache_control to
 // set — the caching win is free.)
@@ -21,16 +25,21 @@ import {
   logAgentRunStart,
   newRunId,
 } from "@/lib/agent-monitor/logger";
-import { fetchWithTimeout, TIMEOUTS } from "@/lib/fetchTimeout";
+import { TIMEOUTS } from "@/lib/fetchTimeout";
 import {
   buildLocalJsonSchemaResponseFormat,
   clampLocalMaxTokens,
+  localHttpTransport,
   resolveLocalLlmConfig,
   toChatCompletionsUrl,
 } from "@/lib/llm/local-chat";
+import { aiModel } from "@/lib/ai/models";
+import { AiError, describeAiError } from "@/lib/ai/errors";
+import {
+  callChatCompletions,
+  OPENAI_CHAT_COMPLETIONS_URL,
+} from "@/lib/ai/openai";
 import type { ParseResult } from "./runtime";
-
-const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 
 export type OpenAIContentBlock =
   | { type: "text"; text: string }
@@ -187,18 +196,22 @@ export async function runOpenAIStructuredAgent<T>(
       : null;
   const apiKey = localConfig?.apiKey ?? opts.apiKey ?? process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    throw new Error(
-      provider === "local"
-        ? "LOCAL_LLM_API_KEY is not configured."
-        : "OPENAI_API_KEY is not configured.",
-    );
+    throw new AiError({
+      kind: "not_configured",
+      provider,
+      message:
+        provider === "local"
+          ? "LOCAL_LLM_API_KEY is not configured."
+          : "OPENAI_API_KEY is not configured.",
+    });
   }
 
-  const doFetch = opts.fetchImpl ?? fetch;
-  const model = localConfig?.model ?? opts.model ?? "gpt-4o-mini";
+  const model = localConfig?.model ?? opts.model ?? aiModel("openaiDefault");
   const url =
     localConfig?.chatCompletionsUrl ??
-    (opts.baseUrl ? toChatCompletionsUrl(opts.baseUrl) : OPENAI_URL);
+    (opts.baseUrl
+      ? toChatCompletionsUrl(opts.baseUrl)
+      : OPENAI_CHAT_COMPLETIONS_URL);
   const outputFormat =
     opts.outputFormat ?? (provider === "local" ? "json_schema" : "tool_call");
   const maxTokens = localConfig
@@ -224,6 +237,9 @@ export async function runOpenAIStructuredAgent<T>(
 
   const MAX_ATTEMPTS = 2;
   let lastError = "";
+  let lastTruncated = false;
+  let inputTokens = 0;
+  let outputTokens = 0;
 
   try {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -236,27 +252,24 @@ export async function runOpenAIStructuredAgent<T>(
         outputFormat,
       });
 
-      const res = await fetchWithTimeout(
+      const reply = await callChatCompletions({
+        provider,
         url,
-        {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${apiKey}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify(body),
-        },
+        apiKey,
+        body,
         timeoutMs,
-        doFetch,
-      );
-
-      if (!res.ok) {
-        const detail = await res.text().catch(() => "");
-        const label = provider === "local" ? "Local LLM" : "OpenAI";
-        throw new Error(`${label} ${res.status}: ${detail.slice(0, 200)}`);
-      }
-
-      const payload = (await res.json()) as OpenAIResponsePayload;
+        fetchImpl: opts.fetchImpl,
+        // Production local calls use node:http so a slow CPU model's silent
+        // prompt phase can't trip undici's 300 s header timeout. Tests (and
+        // any caller that injects fetch) keep their fetch.
+        transport:
+          provider === "local" && !opts.fetchImpl ? localHttpTransport : undefined,
+        onTruncated: "return",
+      });
+      const payload = reply.payload as OpenAIResponsePayload;
+      inputTokens += reply.usage.inputTokens;
+      outputTokens += reply.usage.outputTokens;
+      lastTruncated = reply.truncated;
 
       let input: unknown;
       try {
@@ -276,7 +289,12 @@ export async function runOpenAIStructuredAgent<T>(
           });
           continue;
         }
-        throw e;
+        throw new AiError({
+          kind: lastTruncated ? "truncated" : "invalid_output",
+          provider,
+          attempts: attempt,
+          message: lastError,
+        });
       }
 
       const parsed = opts.parse(input);
@@ -293,10 +311,7 @@ export async function runOpenAIStructuredAgent<T>(
           value: parsed.value,
           model,
           attempts: attempt,
-          usage: {
-            inputTokens: payload.usage?.prompt_tokens ?? 0,
-            outputTokens: payload.usage?.completion_tokens ?? 0,
-          },
+          usage: { inputTokens, outputTokens },
         };
       }
 
@@ -312,15 +327,18 @@ export async function runOpenAIStructuredAgent<T>(
       }
     }
 
-    throw new Error(
-      `Agent "${opts.agentName}" failed validation after ${MAX_ATTEMPTS} attempts: ${lastError}`,
-    );
+    throw new AiError({
+      kind: lastTruncated ? "truncated" : "invalid_output",
+      provider,
+      attempts: MAX_ATTEMPTS,
+      message: `Agent "${opts.agentName}" failed validation after ${MAX_ATTEMPTS} attempts: ${lastError}`,
+    });
   } catch (err) {
     logAgentRunFinish({
       agentName: opts.agentName,
       runId,
       status: "failed",
-      message: `Failed: ${(err as Error).message}`.slice(0, 280),
+      message: `Failed: ${describeAiError(err)}`.slice(0, 280),
       quoteId: opts.quoteId,
       userId: opts.userId,
     });

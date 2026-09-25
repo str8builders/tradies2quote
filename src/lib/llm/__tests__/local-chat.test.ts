@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import type { AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
 import { FetchTimeoutError } from "@/lib/fetchTimeout";
+import { AiError } from "@/lib/ai/errors";
 import {
   buildLocalJsonSchemaResponseFormat,
   clampLocalMaxTokens,
@@ -157,6 +158,83 @@ describe("postJsonWithoutHeaderTimeout", () => {
       expect(res.ok).toBe(false);
       expect(res.status).toBe(503);
       expect(await res.text()).toBe("loading model");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("gives the node:http path the shared retry policy (503 → 200)", async () => {
+    let hits = 0;
+    const server = await listen((req, res) => {
+      req.resume();
+      req.on("end", () => {
+        hits += 1;
+        if (hits === 1) {
+          // llama.cpp answers 503 while the model is still loading.
+          res.writeHead(503, { "content-type": "text/plain", "retry-after": "0" });
+          res.end("loading model");
+          return;
+        }
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ choices: [{ finish_reason: "stop", message: { content: "{}" } }] }));
+      });
+    });
+    try {
+      const result = await runLocalChatCompletion({
+        baseUrl: server.url.replace(/\/chat\/completions$/, ""),
+        apiKey: "k",
+        model: "m",
+        system: "s",
+        user: "u",
+      });
+      expect(hits).toBe(2);
+      expect(result.text).toBe("{}");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("types a local timeout and does not retry it", async () => {
+    let hits = 0;
+    const server = await listen(() => {
+      hits += 1; // never respond
+    });
+    try {
+      const err = await runLocalChatCompletion({
+        baseUrl: server.url.replace(/\/chat\/completions$/, ""),
+        apiKey: "k",
+        model: "m",
+        timeoutMs: 150,
+        system: "s",
+        user: "u",
+      }).catch((e) => e);
+      expect(err).toBeInstanceOf(AiError);
+      expect(err.kind).toBe("timeout");
+      expect(err.provider).toBe("local");
+      expect(hits).toBe(1);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("flags a length stop as truncated for the caller to handle", async () => {
+    const server = await listen((req, res) => {
+      req.resume();
+      req.on("end", () => {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ choices: [{ finish_reason: "length", message: { content: '{"a":' } }] }));
+      });
+    });
+    try {
+      const result = await runLocalChatCompletion({
+        baseUrl: server.url.replace(/\/chat\/completions$/, ""),
+        apiKey: "k",
+        model: "m",
+        system: "s",
+        user: "u",
+      });
+      expect(result.truncated).toBe(true);
+      expect(result.finishReason).toBe("length");
     } finally {
       await server.close();
     }

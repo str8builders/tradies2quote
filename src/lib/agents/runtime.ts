@@ -12,6 +12,9 @@
 //      tool input; on failure we retry once with the error fed back, then throw.
 //   4. Model routing — fast / default / deep tiers.
 //   5. Observability — logs run.start / run.finish to agent-monitor.
+//   6. Transport — every call goes through the shared AI client
+//      (src/lib/ai): per-attempt timeout, bounded retries with backoff on
+//      429/5xx/529 and network errors, typed AiErrors with plain messages.
 //
 // The request builder, model resolver and tool-use extractor are PURE and
 // exported for unit tests; `runStructuredAgent` is the orchestrator (fetch +
@@ -23,28 +26,34 @@ import {
   logAgentRunStart,
   newRunId,
 } from "@/lib/agent-monitor/logger";
-import { fetchWithTimeout, TIMEOUTS } from "@/lib/fetchTimeout";
+import { TIMEOUTS } from "@/lib/fetchTimeout";
 import { isLocalTextAiProvider } from "@/lib/llm/local-chat";
+import { AI_MODEL_DEFAULTS, aiModel } from "@/lib/ai/models";
+import { addUsage, callAnthropic, ZERO_USAGE, type AiUsage } from "@/lib/ai/anthropic";
+import { AiError, describeAiError } from "@/lib/ai/errors";
 import { runOpenAIStructuredAgent } from "./openai-runtime";
 
 export type ModelTier = "fast" | "default" | "deep";
 
+const TIER_ROLES = {
+  fast: "agent.fast",
+  default: "agent.default",
+  deep: "agent.deep",
+} as const;
+
 /**
- * Model IDs per tier. `fast`/`deep` are opt-in; adjust these as Anthropic
- * ships new ids. (claude-sonnet-4-20250514 and claude-3-5-haiku-20241022
- * were retired by Anthropic — the API now 404s on them.)
+ * Default model id per tier. The ids live in src/lib/ai/models.ts (one config
+ * for the whole app, env-overridable there); this map keeps the tier view.
  */
 export const TIER_MODELS: Record<ModelTier, string> = {
-  fast: "claude-haiku-4-5",
-  default: "claude-sonnet-5",
-  deep: "claude-opus-4-8",
+  fast: AI_MODEL_DEFAULTS["agent.fast"],
+  default: AI_MODEL_DEFAULTS["agent.default"],
+  deep: AI_MODEL_DEFAULTS["agent.deep"],
 };
 
 export function resolveModel(tier: ModelTier = "default"): string {
-  return TIER_MODELS[tier] ?? TIER_MODELS.default;
+  return aiModel(TIER_ROLES[tier] ?? TIER_ROLES.default);
 }
-
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 
 /** A subset of Anthropic content blocks we build (text + image). */
 export type AgentContentBlock =
@@ -95,12 +104,7 @@ export interface StructuredAgentOptions<T> {
   fetchImpl?: typeof fetch;
 }
 
-export interface AgentUsage {
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheCreationTokens: number;
-}
+export type AgentUsage = AiUsage;
 
 export interface StructuredAgentResult<T> {
   value: T;
@@ -193,12 +197,6 @@ interface AnthropicResponsePayload {
     input?: unknown;
     text?: string;
   }>;
-  usage?: {
-    input_tokens?: number;
-    output_tokens?: number;
-    cache_read_input_tokens?: number;
-    cache_creation_input_tokens?: number;
-  };
 }
 
 /** Pull the forced tool call's `input` object out of a response. Pure. */
@@ -215,16 +213,6 @@ export function extractToolUse(
     );
   }
   return block.input;
-}
-
-function usageFrom(payload: AnthropicResponsePayload): AgentUsage {
-  const u = payload.usage ?? {};
-  return {
-    inputTokens: u.input_tokens ?? 0,
-    outputTokens: u.output_tokens ?? 0,
-    cacheReadTokens: u.cache_read_input_tokens ?? 0,
-    cacheCreationTokens: u.cache_creation_input_tokens ?? 0,
-  };
 }
 
 /**
@@ -283,7 +271,13 @@ export async function runStructuredAgent<T>(
   }
 
   const apiKey = opts.apiKey ?? process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not configured.");
+  if (!apiKey) {
+    throw new AiError({
+      kind: "not_configured",
+      provider: "anthropic",
+      message: "ANTHROPIC_API_KEY is not configured.",
+    });
+  }
 
   const doFetch = opts.fetchImpl ?? fetch;
   const tier = opts.tier ?? "default";
@@ -310,12 +304,10 @@ export async function runStructuredAgent<T>(
 
   const MAX_ATTEMPTS = 2;
   let lastError = "";
-  let usage: AgentUsage = {
-    inputTokens: 0,
-    outputTokens: 0,
-    cacheReadTokens: 0,
-    cacheCreationTokens: 0,
-  };
+  // True when the latest reply stopped at max_tokens — the final error is
+  // then typed "truncated" rather than "invalid_output".
+  let lastTruncated = false;
+  let usage: AgentUsage = { ...ZERO_USAGE };
 
   try {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -329,28 +321,19 @@ export async function runStructuredAgent<T>(
         includeTemperature: tier === "fast",
       });
 
-      const res = await fetchWithTimeout(
-        ANTHROPIC_URL,
-        {
-          method: "POST",
-          headers: {
-            "x-api-key": apiKey,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-          },
-          body: JSON.stringify(body),
-        },
+      // Transport, retries on 429/5xx/529 and refusal typing happen in the
+      // shared client; a max_tokens stop comes back flagged so the one
+      // corrective retry below still gets its chance.
+      const reply = await callAnthropic({
+        apiKey,
+        body,
         timeoutMs,
-        doFetch,
-      );
-
-      if (!res.ok) {
-        const detail = await res.text().catch(() => "");
-        throw new Error(`Anthropic ${res.status}: ${detail.slice(0, 200)}`);
-      }
-
-      const payload = (await res.json()) as AnthropicResponsePayload;
-      usage = usageFrom(payload);
+        fetchImpl: doFetch,
+        onTruncated: "return",
+      });
+      usage = addUsage(usage, reply.usage);
+      lastTruncated = reply.truncated;
+      const payload: AnthropicResponsePayload = reply.payload;
 
       let input: unknown;
       try {
@@ -371,7 +354,12 @@ export async function runStructuredAgent<T>(
           });
           continue;
         }
-        throw e;
+        throw new AiError({
+          kind: lastTruncated ? "truncated" : "invalid_output",
+          provider: "anthropic",
+          attempts: attempt,
+          message: lastError,
+        });
       }
 
       const parsed = opts.parse(input);
@@ -401,15 +389,19 @@ export async function runStructuredAgent<T>(
       }
     }
 
-    throw new Error(
-      `Agent "${opts.agentName}" failed validation after ${MAX_ATTEMPTS} attempts: ${lastError}`,
-    );
+    throw new AiError({
+      kind: lastTruncated ? "truncated" : "invalid_output",
+      provider: "anthropic",
+      attempts: MAX_ATTEMPTS,
+      message: `Agent "${opts.agentName}" failed validation after ${MAX_ATTEMPTS} attempts: ${lastError}`,
+    });
   } catch (err) {
     logAgentRunFinish({
       agentName: opts.agentName,
       runId,
       status: "failed",
-      message: `Failed: ${(err as Error).message}`.slice(0, 280),
+      // Operator-only monitor: the typed kind, status and provider detail.
+      message: `Failed: ${describeAiError(err)}`.slice(0, 280),
       quoteId: opts.quoteId,
       userId: opts.userId,
     });

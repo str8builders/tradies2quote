@@ -25,9 +25,17 @@ import type {
   OcrBlock,
   SheetType,
 } from "./schema";
+import { TIMEOUTS } from "@/lib/fetchTimeout";
+import { aiModel } from "@/lib/ai/models";
+import {
+  callAnthropic,
+  EPHEMERAL_CACHE,
+  ZERO_USAGE,
+  type AiUsage,
+} from "@/lib/ai/anthropic";
+import { isAiError, type AiErrorKind } from "@/lib/ai/errors";
+import type { RetryOptions } from "@/lib/ai/http";
 
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const EXTRACT_MODEL = "claude-opus-4-8";
 const MAX_TOKENS = 2048;
 
 const EXTRACT_SYSTEM = `You are a construction-drawing OCR + dimension reader. You are shown ONE plan sheet. Read ONLY what is actually printed — never guess, never infer a measurement that is not written.
@@ -63,7 +71,7 @@ function isUnit(v: unknown): v is LengthUnit {
   return v === "mm" || v === "m" || v === "ft" || v === "in";
 }
 
-export type ExtractDeps = {
+export type ExtractDeps = RetryOptions & {
   apiKey: string;
   imageBase64: string;
   mediaType?: string;
@@ -72,12 +80,23 @@ export type ExtractDeps = {
   fetchImpl?: typeof fetch;
 };
 
+/** Why a sheet's model call produced nothing usable. */
+export type ExtractFailure = {
+  kind: AiErrorKind | "unparseable";
+  /** The thrown error, for captureError (server-side only). */
+  error: unknown;
+};
+
 export type ExtractOutcome = {
   extracted: ExtractedSheet;
   enforcement: GateEnforcement;
+  /** Null when the sheet was read; set when the call itself failed. */
+  failure: ExtractFailure | null;
+  usage: AiUsage;
+  attempts: number;
 };
 
-function emptyExtraction(warnings: string[]): ExtractedSheet {
+function emptyExtraction(warnings: string[], failure: string): ExtractedSheet {
   return {
     units: null,
     scale_text: null,
@@ -91,61 +110,135 @@ function emptyExtraction(warnings: string[]): ExtractedSheet {
     takeoff: null,
     warnings,
     review_required: true,
+    extraction_error: failure,
   };
 }
 
 /**
+ * The per-sheet request. The static instructions are their own system block
+ * marked `cache_control` (the stable prefix, shared by every sheet); the
+ * sheet image and the one-line ask follow in the user turn. Pure — exported
+ * for tests.
+ *
+ * Note: at ~330 tokens the instructions sit below Opus 4.8's 1,024-token
+ * cache minimum, so the API skips caching them (silently, at no cost) until
+ * the prompt grows or the model's minimum drops.
+ */
+export function buildExtractRequestBody(deps: {
+  imageBase64: string;
+  mediaType?: string;
+  model?: string;
+}): Record<string, unknown> {
+  return {
+    model: deps.model ?? aiModel("planReader"),
+    max_tokens: MAX_TOKENS,
+    system: [{ type: "text", text: EXTRACT_SYSTEM, cache_control: EPHEMERAL_CACHE }],
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: deps.mediaType ?? "image/png",
+              data: deps.imageBase64,
+            },
+          },
+          { type: "text", text: "Extract this sheet." },
+        ],
+      },
+    ],
+  };
+}
+
+/** The sheets a re-run must NOT extract again (they were read fine). */
+const LEGACY_FAILURE_WARNING =
+  /^extraction (?:http \d+|error:|returned unparseable output)/;
+const EXTRACTED_STATUSES = new Set(["extracted", "needs_review", "blocked", "done"]);
+
+export function isSheetAlreadyExtracted(sheet: {
+  status?: string | null;
+  extraction?: unknown;
+}): boolean {
+  if (!EXTRACTED_STATUSES.has(String(sheet.status ?? ""))) return false;
+  const ex = sheet.extraction;
+  if (!ex || typeof ex !== "object" || Array.isArray(ex)) return false;
+  const { extraction_error, warnings } = ex as {
+    extraction_error?: unknown;
+    warnings?: unknown;
+  };
+  if (typeof extraction_error === "string" && extraction_error) return false;
+  // Rows written before `extraction_error` existed carry the failure only
+  // as a warning string.
+  if (
+    Array.isArray(warnings) &&
+    warnings.some((w) => typeof w === "string" && LEGACY_FAILURE_WARNING.test(w))
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/**
  * Run text extraction for one sheet. On any model/transport error we return a
- * minimal extraction flagged review_required (explicit failure, not a guess).
+ * minimal extraction flagged review_required (explicit failure, not a guess)
+ * and say so in `failure` — the call goes through the shared AI client, so a
+ * blip has already been retried within its budget by then.
  */
 export async function extractSheet(deps: ExtractDeps): Promise<ExtractOutcome> {
-  const doFetch = deps.fetchImpl ?? fetch;
+  const failed = (
+    warning: string,
+    failure: ExtractFailure,
+    usage: AiUsage = { ...ZERO_USAGE },
+    attempts = 1,
+  ): ExtractOutcome => {
+    const ex = emptyExtraction([warning], failure.kind);
+    return {
+      extracted: ex,
+      enforcement: enforceExtractionGates(ex, deps.sheetType),
+      failure,
+      usage,
+      attempts,
+    };
+  };
 
   let raw: Record<string, unknown> | null = null;
+  let usage: AiUsage = { ...ZERO_USAGE };
+  let attempts = 1;
   try {
-    const res = await doFetch(ANTHROPIC_URL, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": deps.apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: EXTRACT_MODEL,
-        max_tokens: MAX_TOKENS,
-        system: EXTRACT_SYSTEM,
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "image",
-                source: {
-                  type: "base64",
-                  media_type: deps.mediaType ?? "image/png",
-                  data: deps.imageBase64,
-                },
-              },
-              { type: "text", text: "Extract this sheet." },
-            ],
-          },
-        ],
-      }),
+    const reply = await callAnthropic({
+      apiKey: deps.apiKey,
+      body: buildExtractRequestBody(deps),
+      timeoutMs: TIMEOUTS.extraction,
+      fetchImpl: deps.fetchImpl,
+      // A cut-off reply is incomplete JSON; it lands as "unparseable" below.
+      onTruncated: "return",
+      maxAttempts: deps.maxAttempts,
+      budgetMs: deps.budgetMs,
+      sleep: deps.sleep,
+      random: deps.random,
+      now: deps.now,
     });
-    if (!res.ok) {
-      const ex = emptyExtraction([`extraction http ${res.status}`]);
-      return { extracted: ex, enforcement: enforceExtractionGates(ex, deps.sheetType) };
-    }
-    const json: unknown = await res.json();
-    raw = safeJsonObject(extractText(json));
+    usage = reply.usage;
+    attempts = reply.attempts;
+    raw = safeJsonObject(reply.text);
   } catch (e) {
-    const ex = emptyExtraction([`extraction error: ${(e as Error).message}`]);
-    return { extracted: ex, enforcement: enforceExtractionGates(ex, deps.sheetType) };
+    const kind: AiErrorKind = isAiError(e) ? e.kind : "unavailable";
+    const warning =
+      isAiError(e) && e.status !== null
+        ? `extraction http ${e.status}`
+        : `extraction error: ${kind.replace(/_/g, " ")}`;
+    return failed(warning, { kind, error: e }, usage, isAiError(e) ? e.attempts : 1);
   }
 
   if (!raw) {
-    const ex = emptyExtraction(["extraction returned unparseable output"]);
-    return { extracted: ex, enforcement: enforceExtractionGates(ex, deps.sheetType) };
+    return failed(
+      "extraction returned unparseable output",
+      { kind: "unparseable", error: new Error("plan extraction reply was not a JSON object") },
+      usage,
+      attempts,
+    );
   }
 
   const warnings: string[] = [];
@@ -221,7 +314,7 @@ export async function extractSheet(deps: ExtractDeps): Promise<ExtractOutcome> {
   const enforcement = enforceExtractionGates(extracted, deps.sheetType);
   extracted.review_required = enforcement.review_required;
 
-  return { extracted, enforcement };
+  return { extracted, enforcement, failure: null, usage, attempts };
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────
@@ -230,19 +323,6 @@ function clampNum(v: unknown): number {
   const n = typeof v === "number" ? v : Number(v);
   if (!Number.isFinite(n)) return 0;
   return Math.max(0, Math.min(1, n));
-}
-
-function extractText(json: unknown): string {
-  if (typeof json !== "object" || json === null) return "";
-  const content = (json as { content?: unknown }).content;
-  if (!Array.isArray(content)) return "";
-  return content
-    .map((b) =>
-      typeof b === "object" && b !== null && (b as { type?: string }).type === "text"
-        ? String((b as { text?: string }).text ?? "")
-        : "",
-    )
-    .join("");
 }
 
 function safeJsonObject(text: string): Record<string, unknown> | null {

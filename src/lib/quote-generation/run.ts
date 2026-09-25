@@ -3,6 +3,7 @@ import type { Database, Json } from "@/lib/supabase/database.types";
 import { captureError } from "@/lib/observability";
 import { parseModelJsonObject } from "@/lib/modelJson";
 import { FetchTimeoutError } from "@/lib/fetchTimeout";
+import { isAiError } from "@/lib/ai/errors";
 import { DEFAULT_NZ_CONTRACT_TERMS } from "@/lib/default-contract";
 import {
   NZ_DEFAULTS,
@@ -494,7 +495,8 @@ async function runQuotePipeline(
   } catch (e) {
     console.error(`Quote model (${textProvider}) unreachable`, e);
     captureError(e, { route: "/api/quotes/generate" });
-    const timedOut = e instanceof FetchTimeoutError;
+    const timedOut =
+      e instanceof FetchTimeoutError || (isAiError(e) && e.kind === "timeout");
     return fail(timedOut ? 504 : 502, {
         error: timedOut
           ? "Quote generation took too long. Please try again."

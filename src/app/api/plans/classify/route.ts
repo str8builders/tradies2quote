@@ -17,6 +17,9 @@ import {
   summarizePlanRun,
   type PlanSheetLog,
 } from "@/lib/planreader/observability";
+import { captureError } from "@/lib/observability";
+import { describeAiError } from "@/lib/ai/errors";
+import { trackAgentRun } from "@/lib/agent-monitor/track";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -126,6 +129,12 @@ export async function POST(request: NextRequest) {
     status: string;
   }> = [];
   const logs: PlanSheetLog[] = [];
+  const run = trackAgentRun("Plan Reader", {
+    runIdPrefix: "plansc",
+    userId: user.id,
+    startMessage: `Classifying ${sheets.length} sheet(s)`,
+  });
+  const visionFailures: string[] = [];
 
   for (const sheet of sheets) {
     // Title-block OCR text is a Phase-2 signal; Phase 1 classifies from the
@@ -145,6 +154,13 @@ export async function POST(request: NextRequest) {
         apiKey,
         imageBase64: buf.toString("base64"),
         mediaType: dl.data.type || "image/png",
+        // The verdict still degrades to unknown (→ review); the failure is
+        // reported instead of vanishing.
+        onError: (error) => {
+          visionFailures.push(`sheet ${sheet.sheet_number}`);
+          console.error(`plans/classify sheet ${sheet.sheet_number} vision failed: ${describeAiError(error)}`);
+          captureError(error, { route: "plans/classify" });
+        },
       });
     }
 
@@ -171,6 +187,7 @@ export async function POST(request: NextRequest) {
       })
       .eq("id", sheet.id);
     if (updErr) {
+      await run.fail(new Error(updErr.message), `Persist sheet ${sheet.sheet_number}`);
       return NextResponse.json(
         { error: `failed to persist sheet ${sheet.sheet_number}: ${updErr.message}` },
         { status: 500 },
@@ -205,6 +222,15 @@ export async function POST(request: NextRequest) {
 
   summarizePlanRun(fileId, "classify", logs);
   await supabase.from("plan_files").update({ status: "classified" }).eq("id", fileId);
+
+  if (visionFailures.length > 0) {
+    await run.fail(
+      new Error(`vision failed for ${visionFailures.join(", ")}`),
+      `${visionFailures.length} of ${sheets.length} sheet(s) unclassified`,
+    );
+  } else {
+    await run.succeed(`${sheets.length} sheet(s) classified`);
+  }
 
   return NextResponse.json({ file_id: fileId, sheets: out }, { status: 200 });
 }

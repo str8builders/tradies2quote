@@ -19,7 +19,11 @@ import {
   sniffPreparedImageMime,
 } from "@/lib/imageUpload";
 import { parseModelJsonObject } from "@/lib/modelJson";
-import { fetchWithTimeout, TIMEOUTS } from "@/lib/fetchTimeout";
+import { TIMEOUTS } from "@/lib/fetchTimeout";
+import { aiModel } from "@/lib/ai/models";
+import { callAnthropic, type AiUsage, addUsage, ZERO_USAGE } from "@/lib/ai/anthropic";
+import { describeAiError, isAiError } from "@/lib/ai/errors";
+import { trackAgentRun, usageSummary } from "@/lib/agent-monitor/track";
 
 /**
  * POST /api/materials/extract-quote
@@ -48,8 +52,8 @@ export const dynamic = "force-dynamic";
 // the deploy caps at 60s the retry is time-budget-skipped (UI "Scan again").
 export const maxDuration = 90;
 
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-sonnet-5";
+/** Monitor name for /app/agents/monitor. */
+const SUPPLIER_QUOTE_AGENT_NAME = "Supplier Quote Reader";
 // A quote can list 30-40 lines; each JSON row is ~40 tokens. 8192 keeps
 // headroom so a long quote doesn't truncate mid-array.
 const MAX_TOKENS = 8192;
@@ -82,11 +86,6 @@ function checkAndCountUsage(
   }
   bucket.count += 1;
   return { ok: true };
-}
-
-interface AnthropicResponse {
-  content?: Array<{ type: string; text?: string }>;
-  stop_reason?: string;
 }
 
 const SYSTEM_PROMPT = `You read a photo of a NEW ZEALAND building-supplier quote, invoice or order (e.g. ITM, PlaceMakers, Mitre 10 Trade, Bunnings, Carters, Bunnings Trade). Extract each product line so the prices can go into a tradie's price library.
@@ -260,7 +259,23 @@ export async function POST(request: NextRequest) {
   };
   type AttemptResult =
     | { kind: "attempt"; attempt: RouteAttempt }
-    | { kind: "error"; status: number; body: Record<string, unknown> };
+    | {
+        kind: "error";
+        status: number;
+        body: Record<string, unknown>;
+        /** Server-side cause, for the monitor row. */
+        cause: unknown;
+        label?: string;
+      };
+
+  // The model id lives in src/lib/ai/models.ts with every other one.
+  const model = aiModel("supplierQuote");
+  const run = trackAgentRun(SUPPLIER_QUOTE_AGENT_NAME, {
+    runIdPrefix: "squote",
+    userId: user.id,
+    startMessage: `Reading a supplier quote (${model})`,
+  });
+  let usage: AiUsage = { ...ZERO_USAGE };
 
   // One AI extraction pass. `priorReasons` (non-empty on a retry) is fed
   // back to the model so it re-reads the rows it got wrong.
@@ -269,18 +284,15 @@ export async function POST(request: NextRequest) {
       priorReasons.length > 0
         ? `\n\nYour previous read had problems: ${priorReasons.join("; ")}. Re-read EVERY row carefully, capture the EXACT printed numbers (never guess or skip a line), and include the printed subtotal, GST and total.`
         : "";
-    let res: Response;
+    let reply: Awaited<ReturnType<typeof callAnthropic>>;
     try {
-      res = await fetchWithTimeout(ANTHROPIC_URL, {
-        method: "POST",
-        headers: {
-          "x-api-key": apiKey!,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-        },
+      // Timeout, retries on 429/5xx/529 and network errors, and error
+      // typing all come from the shared AI client.
+      reply = await callAnthropic({
+        apiKey,
         // Sonnet 5 rejects non-default `temperature` with a 400 — omit it.
-        body: JSON.stringify({
-          model: MODEL,
+        body: {
+          model,
           max_tokens: MAX_TOKENS,
           output_config: { effort: EFFORT },
           system: SYSTEM_PROMPT,
@@ -299,35 +311,38 @@ export async function POST(request: NextRequest) {
               ],
             },
           ],
-        }),
-      }, TIMEOUTS.extraction);
+        },
+        timeoutMs: TIMEOUTS.extraction,
+        onTruncated: "return",
+      });
     } catch (err) {
       captureError(err, { route: "materials/extract-quote" });
-      console.error("extract-quote fetch failed", err);
+      console.error(`extract-quote ${model} failed: ${describeAiError(err)}`);
+      if (isAiError(err) && err.kind === "timeout") {
+        return {
+          kind: "error",
+          status: 504,
+          body: { error: "Reading the quote took too long. Please try again." },
+          cause: err,
+        };
+      }
+      if (isAiError(err) && err.status !== null) {
+        return {
+          kind: "error",
+          status: 502,
+          body: { error: "Quote scan failed. Please try again.", upstream_status: err.status },
+          cause: err,
+        };
+      }
       return {
         kind: "error",
         status: 502,
         body: { error: "Network error contacting the scan model. Please try again." },
+        cause: err,
       };
     }
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      console.error(
-        `ANTHROPIC_${res.status} ${MODEL} ${detail.slice(0, 120).replace(/\s+/g, " ")}`,
-      );
-      return {
-        kind: "error",
-        status: 502,
-        body: { error: "Quote scan failed. Please try again.", upstream_status: res.status },
-      };
-    }
-    let payload: AnthropicResponse;
-    try {
-      payload = (await res.json()) as AnthropicResponse;
-    } catch {
-      return { kind: "error", status: 502, body: { error: "Quote scan failed. Please try again." } };
-    }
-    if (payload.stop_reason === "max_tokens") {
+    usage = addUsage(usage, reply.usage);
+    if (reply.truncated) {
       return {
         kind: "error",
         status: 502,
@@ -335,9 +350,11 @@ export async function POST(request: NextRequest) {
           error:
             "That quote had too many lines to read in one go. Try photographing it in two halves.",
         },
+        cause: new Error("reply hit max_tokens"),
+        label: "Truncated",
       };
     }
-    const text = payload.content?.find((c) => c.type === "text")?.text ?? "";
+    const text = reply.text;
     let raw: unknown;
     try {
       raw = parseModelJsonObject<unknown>(text);
@@ -353,6 +370,8 @@ export async function POST(request: NextRequest) {
         kind: "error",
         status: 502,
         body: { error: "Couldn't read that quote. Try a sharper, flatter photo." },
+        cause: e,
+        label: "Unparseable reply",
       };
     }
     const parsed = parseSupplierQuoteExtraction(raw);
@@ -361,6 +380,8 @@ export async function POST(request: NextRequest) {
         kind: "error",
         status: 502,
         body: { error: "Couldn't read that quote. Try a sharper, flatter photo." },
+        cause: new Error("extraction failed validation"),
+        label: "Invalid reply",
       };
     }
     return {
@@ -386,6 +407,7 @@ export async function POST(request: NextRequest) {
       // Hard failure on the first pass → surface it. On a retry → keep the
       // attempt(s) we already have.
       if (attempts.length === 0) {
+        await run.fail(r.cause, r.label);
         return NextResponse.json(r.body, { status: r.status });
       }
       break;
@@ -403,6 +425,7 @@ export async function POST(request: NextRequest) {
 
   // 422 only for a truly unusable read (no usable items at all).
   if (best.value.items.length === 0) {
+    await run.succeed(`No product lines · ${usageSummary(usage, attempts.length)}`);
     return NextResponse.json(
       {
         error:
@@ -421,6 +444,9 @@ export async function POST(request: NextRequest) {
     attempts: attempts.length,
   });
 
+  await run.succeed(
+    `${best.value.items.length} line(s), ${best.status} · ${usageSummary(usage, attempts.length)}`,
+  );
   // 200 even when needs_review/blocked so the tradie SEES the partial read
   // + exactly why; createQuoteFromScan's reconciliation still gates create.
   return NextResponse.json({

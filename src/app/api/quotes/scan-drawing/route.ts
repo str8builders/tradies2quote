@@ -1,10 +1,12 @@
-import { ANTHROPIC_URL, MAX_TOKENS, JOB_TYPES, MODEL, buildSystemPrompt, sanitisePlan, geometryPreamble, type AnthropicResponse, type ScanPayload } from "@/lib/scan-drawing";
+import { MAX_TOKENS, JOB_TYPES, MODEL, buildSystemPrompt, sanitisePlan, geometryPreamble, type ScanPayload } from "@/lib/scan-drawing";
 import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
 import { aiConsentGate } from "@/lib/ai-consent";
 import { prepareImageForAi, UnreadableImageError } from "@/lib/aiImage";
-import { fetchWithOverloadRetry } from "@/lib/anthropicRetry";
+import { callAnthropic, type AnthropicCallResult } from "@/lib/ai/anthropic";
+import { describeAiError, isAiError } from "@/lib/ai/errors";
+import { trackAgentRun, usageSummary } from "@/lib/agent-monitor/track";
 import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
 import { resolveDocumentType } from "@/lib/scanClassify";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
@@ -20,10 +22,14 @@ import { TIMEOUTS } from "@/lib/fetchTimeout";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 // A 4,096-token Opus read of a dense drawing can run well past 50 s, and a
-// 429/529 gets one retry — so each attempt may use the full generation
-// ceiling (TIMEOUTS.generation). Self-hosted (Sydney VPS), so this is a
-// ceiling for platforms that enforce it, not a kill timer.
+// 429/5xx/529 is retried by the shared AI client inside its time budget — so
+// each attempt may use the full generation ceiling (TIMEOUTS.generation).
+// Self-hosted (Sydney VPS), so this is a ceiling for platforms that enforce
+// it, not a kill timer.
 export const maxDuration = 300;
+
+/** Monitor name for /app/agents/monitor. */
+export const DRAWING_SCAN_AGENT_NAME = "Drawing Scan";
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -164,17 +170,20 @@ export async function POST(request: NextRequest) {
 
   const systemPrompt = buildSystemPrompt(jobTypeHint, timberLength);
 
-  let claudeRes: Response;
+  const run = trackAgentRun(DRAWING_SCAN_AGENT_NAME, {
+    runIdPrefix: "dscan",
+    userId: user.id,
+    startMessage: `Reading a drawing (${MODEL})`,
+  });
+
+  let reply: AnthropicCallResult;
   try {
-    // One retry with backoff on 429 (rate limited) / 529 (overloaded).
-    claudeRes = await fetchWithOverloadRetry(ANTHROPIC_URL, {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
+    // The shared AI client times each attempt out and retries 429/5xx/529
+    // and network errors with backoff inside its budget; failures come back
+    // as typed AiErrors.
+    reply = await callAnthropic({
+      apiKey,
+      body: {
         model: MODEL,
         max_tokens: MAX_TOKENS,
         // `temperature` is deprecated on Opus 4.7 — the model uses
@@ -203,59 +212,47 @@ export async function POST(request: NextRequest) {
           // assistant-turn prefills, so we rely on the system
           // prompt's "Output STRICT JSON only" instruction instead.
         ],
-      }),
-    }, TIMEOUTS.generation);
+      },
+      timeoutMs: TIMEOUTS.generation,
+      onTruncated: "return",
+    });
   } catch (err) {
+    // Status FIRST so even a truncated log line still says what the
+    // provider returned; the detail stays server-side.
+    console.error(`scan-drawing ${MODEL} failed: ${describeAiError(err)}`);
     captureError(err, { route: "quotes/scan-drawing" });
-    console.error("scan-drawing fetch failed", err);
+    await run.fail(err);
+    if (isAiError(err) && err.status !== null) {
+      return NextResponse.json(
+        {
+          error: "Drawing scan failed. Please try again.",
+          // The provider's status only (never its body) so the on-screen
+          // error can say more than "try again" — 429 means rate limited.
+          upstream_status: err.status,
+        },
+        { status: 502 },
+      );
+    }
+    if (isAiError(err) && err.kind === "timeout") {
+      return NextResponse.json(
+        { error: "The drawing scan took too long. Please try again." },
+        { status: 504 },
+      );
+    }
+    if (isAiError(err) && err.kind === "refused") {
+      return NextResponse.json(
+        { error: "That image couldn't be scanned. Try a photo of the drawing only." },
+        { status: 422 },
+      );
+    }
     return NextResponse.json(
       { error: "Network error contacting drawing model. Please try again." },
       { status: 502 },
     );
   }
 
-  if (!claudeRes.ok) {
-    const detail = await claudeRes.text().catch(() => "");
-    // Status FIRST so even a 30-char-truncated log surface still
-    // tells us what Anthropic returned. Format: "ANTHROPIC_<status>
-    // <model> <first-bit-of-error-body>". Full JSON follows on the
-    // next line for log tools that ingest everything.
-    console.error(
-      `ANTHROPIC_${claudeRes.status} ${MODEL} ${detail.slice(0, 120).replace(/\s+/g, " ")}`,
-    );
-    console.error(
-      JSON.stringify({
-        tag: "scan-drawing.anthropic_error",
-        model: MODEL,
-        status: claudeRes.status,
-        statusText: claudeRes.statusText,
-        detail: detail.slice(0, 2000),
-      }),
-    );
-    return NextResponse.json(
-      {
-        error: "Drawing scan failed. Please try again.",
-        // Surface the Anthropic status to the client so the on-screen
-        // error is more useful than "try again" — e.g. a 404 likely
-        // means the model id is wrong, 429 means rate limited.
-        upstream_status: claudeRes.status,
-      },
-      { status: 502 },
-    );
-  }
-
-  let payload: AnthropicResponse;
-  try {
-    payload = (await claudeRes.json()) as AnthropicResponse;
-  } catch {
-    console.error("scan-drawing returned non-JSON 200 body");
-    return NextResponse.json(
-      { error: "Drawing scan failed. Please try again." },
-      { status: 502 },
-    );
-  }
-
-  if (payload.stop_reason === "max_tokens") {
+  if (reply.truncated) {
+    await run.fail(new Error("reply hit max_tokens"), "Truncated");
     return NextResponse.json(
       {
         error:
@@ -265,7 +262,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const text = payload.content?.find((c) => c.type === "text")?.text ?? "";
+  const text = reply.text;
 
   let parsed: ScanPayload;
   try {
@@ -278,6 +275,7 @@ export async function POST(request: NextRequest) {
       "raw (first 400):",
       text.slice(0, 400),
     );
+    await run.fail(e, "Unparseable reply");
     return NextResponse.json(
       { error: "Drawing scan response was malformed. Please try again." },
       { status: 502 },
@@ -290,6 +288,7 @@ export async function POST(request: NextRequest) {
   const legacyTranscript = (parsed.transcript ?? "").trim();
 
   if (!dimensions && !structural && !legacyTranscript) {
+    await run.succeed(`Nothing readable · ${usageSummary(reply.usage, reply.attempts)}`);
     return NextResponse.json(
       { error: "Couldn't read anything off that drawing. Try a clearer photo." },
       { status: 422 },
@@ -313,6 +312,7 @@ export async function POST(request: NextRequest) {
       ? parsed.detectedType
       : (jobTypeHint ?? "Other");
 
+  await run.succeed(`Scanned · ${usageSummary(reply.usage, reply.attempts)}`);
   return NextResponse.json({
     document_type: resolveDocumentType(
       parsed.document_type,

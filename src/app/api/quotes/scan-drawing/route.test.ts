@@ -78,12 +78,24 @@ describe("POST /api/quotes/scan-drawing", () => {
     expect(h.fetch).toHaveBeenCalledTimes(2);
   });
 
-  it("gives up after one retry and reports the upstream status", async () => {
+  it("gives up after three attempts and reports the upstream status only", async () => {
     h.fetch.mockResolvedValue(overloaded(529));
     const res = await post();
     expect(res.status).toBe(502);
-    expect(((await res.json()) as { upstream_status?: number }).upstream_status).toBe(529);
-    expect(h.fetch).toHaveBeenCalledTimes(2);
+    const body = (await res.json()) as { error: string; upstream_status?: number };
+    expect(body.upstream_status).toBe(529);
+    expect(body.error).toBe("Drawing scan failed. Please try again.");
+    expect(JSON.stringify(body)).not.toContain("overloaded_error");
+    expect(h.fetch).toHaveBeenCalledTimes(3);
+  });
+
+  it("answers 502 with the drawing copy when the reply was cut off", async () => {
+    h.fetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ content: [{ type: "text", text: "{" }], stop_reason: "max_tokens" }), { status: 200 }),
+    );
+    const res = await post();
+    expect(res.status).toBe(502);
+    expect(((await res.json()) as { error: string }).error).toMatch(/too detailed/);
   });
 
   it("does not retry a request error (400)", async () => {

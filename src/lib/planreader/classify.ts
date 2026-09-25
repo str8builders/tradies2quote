@@ -20,6 +20,11 @@ import {
   type SheetClassification,
   type SheetType,
 } from "./schema";
+import { TIMEOUTS } from "@/lib/fetchTimeout";
+import { aiModel } from "@/lib/ai/models";
+import { callAnthropic, EPHEMERAL_CACHE } from "@/lib/ai/anthropic";
+import { isAiError } from "@/lib/ai/errors";
+import type { RetryOptions } from "@/lib/ai/http";
 
 // ── Keyword tables ────────────────────────────────────────────────────────
 //
@@ -167,9 +172,6 @@ export function classifyFromText(input: HeuristicInput): SheetClassification {
 
 // ── Vision classifier (Claude) ────────────────────────────────────────────
 
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const VISION_MODEL = "claude-opus-4-8";
-
 const VISION_SYSTEM = `You are a construction-drawing sheet classifier. You are shown ONE page from a set of building plans. Identify which single category best describes the sheet.
 
 Categories (use these exact ids):
@@ -186,7 +188,7 @@ Rules:
 - If two categories are plausible or the image is unclear, return "unknown".
 - Respond with ONLY a JSON object: {"sheet_type": "<id>", "confidence": <0..1>, "reason": "<short>"}.`;
 
-export type VisionClassifyDeps = {
+export type VisionClassifyDeps = RetryOptions & {
   apiKey: string;
   /** base64-encoded page image. */
   imageBase64: string;
@@ -194,29 +196,31 @@ export type VisionClassifyDeps = {
   mediaType?: string;
   /** Optional override for tests/injection. */
   fetchImpl?: typeof fetch;
+  /**
+   * Told about a failed vision call (after the shared client's retries) so
+   * the route can report it; the verdict still degrades to unknown@0.
+   */
+  onError?: (error: unknown) => void;
 };
 
 /**
  * Ask the vision model to classify a single page image. Returns a validated
  * SheetClassification, or unknown@0 on any error (never throws into the
  * caller — an unreadable sheet must degrade to review, not crash ingest).
+ * Timeout and retries come from the shared AI client.
  */
 export async function classifyFromVision(
   deps: VisionClassifyDeps,
 ): Promise<SheetClassification> {
-  const doFetch = deps.fetchImpl ?? fetch;
   try {
-    const res = await doFetch(ANTHROPIC_URL, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": deps.apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: VISION_MODEL,
+    const reply = await callAnthropic({
+      apiKey: deps.apiKey,
+      body: {
+        model: aiModel("planReader"),
         max_tokens: 256,
-        system: VISION_SYSTEM,
+        // Static instructions as the cacheable prefix (below Opus 4.8's
+        // 1,024-token minimum today, so the API simply doesn't cache it).
+        system: [{ type: "text", text: VISION_SYSTEM, cache_control: EPHEMERAL_CACHE }],
         messages: [
           {
             role: "user",
@@ -233,12 +237,17 @@ export async function classifyFromVision(
             ],
           },
         ],
-      }),
+      },
+      timeoutMs: TIMEOUTS.llm,
+      fetchImpl: deps.fetchImpl,
+      onTruncated: "return",
+      maxAttempts: deps.maxAttempts,
+      budgetMs: deps.budgetMs,
+      sleep: deps.sleep,
+      random: deps.random,
+      now: deps.now,
     });
-    if (!res.ok) return { sheet_type: "unknown", confidence: 0, basis: [`vision:http_${res.status}`] };
-    const json: unknown = await res.json();
-    const text = extractText(json);
-    const obj = safeJson(text);
+    const obj = safeJson(reply.text);
     const parsed = parseSheetClassification(obj);
     if (!parsed.ok) return { sheet_type: "unknown", confidence: 0, basis: ["vision:unparsable"] };
     return {
@@ -247,22 +256,13 @@ export async function classifyFromVision(
         `vision:${parsed.value.sheet_type}@${parsed.value.confidence.toFixed(2)}`,
       ],
     };
-  } catch {
+  } catch (e) {
+    deps.onError?.(e);
+    if (isAiError(e) && e.status !== null) {
+      return { sheet_type: "unknown", confidence: 0, basis: [`vision:http_${e.status}`] };
+    }
     return { sheet_type: "unknown", confidence: 0, basis: ["vision:error"] };
   }
-}
-
-function extractText(json: unknown): string {
-  if (typeof json !== "object" || json === null) return "";
-  const content = (json as { content?: unknown }).content;
-  if (!Array.isArray(content)) return "";
-  return content
-    .map((b) =>
-      typeof b === "object" && b !== null && (b as { type?: string }).type === "text"
-        ? String((b as { text?: string }).text ?? "")
-        : "",
-    )
-    .join("");
 }
 
 function safeJson(text: string): unknown {

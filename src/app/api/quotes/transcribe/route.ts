@@ -9,19 +9,22 @@ import {
 } from "@/lib/transcript/asrHints";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
 import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
-import { fetchWithTimeout, TIMEOUTS } from "@/lib/fetchTimeout";
+import { TIMEOUTS } from "@/lib/fetchTimeout";
+import { aiModel } from "@/lib/ai/models";
+import { sendWithRetry, type AiHttpResponse } from "@/lib/ai/http";
+import { OPENAI_TRANSCRIPTIONS_URL } from "@/lib/ai/openai";
+import { describeAiError, isAiError } from "@/lib/ai/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_BYTES = 25 * 1024 * 1024;
 const ACCEPTED_PREFIX = "audio/";
-const TRANSCRIBE_URL = "https://api.openai.com/v1/audio/transcriptions";
 // gpt-4o-transcribe is OpenAI's current speech model — notably better
 // than the legacy whisper-1 on accents and job-site noise. Same
-// endpoint + params, so it's a drop-in. Kept as a constant so it's one
-// line to A/B or revert once the eval set exists.
-const TRANSCRIBE_MODEL = "gpt-4o-transcribe";
+// endpoint + params, so it's a drop-in. The id lives in
+// src/lib/ai/models.ts (role "transcription", env AI_MODEL_TRANSCRIPTION)
+// so it's one line to A/B or revert once the eval set exists.
 // Vocabulary bias is passed as the model's `prompt` so it leans toward NZ
 // trade terms / brands over their English soundalikes ("jib" -> GIB). It's
 // now built PER USER + job-relevant (their own materials/suppliers first) by
@@ -122,7 +125,7 @@ export async function POST(request: NextRequest) {
 
   const upstream = new FormData();
   upstream.append("file", audio, audio.name || "recording.webm");
-  upstream.append("model", TRANSCRIBE_MODEL);
+  upstream.append("model", aiModel("transcription"));
   upstream.append("response_format", "json");
   // Bias the model toward this tradie's NZ trade vocabulary at transcription time.
   upstream.append("prompt", asrPrompt);
@@ -136,58 +139,48 @@ export async function POST(request: NextRequest) {
       : "en";
   upstream.append("language", language);
 
-  // One retry on a transient upstream error (5xx / 429) — re-recording
-  // on a job site is painful, and these blips usually clear instantly.
-  // A 4xx won't fix itself, so it's returned straight away.
-  let transcribeRes: Response | null = null;
+  // Transient upstream errors (429 / 5xx / network) are retried by the
+  // shared AI client with backoff inside its budget — re-recording on a job
+  // site is painful, and these blips usually clear quickly. A 4xx won't fix
+  // itself, so it comes straight back.
+  let transcribeRes: AiHttpResponse;
   try {
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      transcribeRes = await fetchWithTimeout(TRANSCRIBE_URL, {
+    ({ response: transcribeRes } = await sendWithRetry({
+      provider: "openai",
+      url: OPENAI_TRANSCRIPTIONS_URL,
+      init: {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}` },
         body: upstream,
-      }, TIMEOUTS.transcribe);
-      if (transcribeRes.ok) break;
-      if (
-        attempt === 1 &&
-        (transcribeRes.status >= 500 || transcribeRes.status === 429)
-      ) {
-        await new Promise((r) => setTimeout(r, 600));
-        continue;
-      }
-      break;
-    }
+      },
+      timeoutMs: TIMEOUTS.transcribe,
+    }));
   } catch (e) {
+    if (isAiError(e) && e.status !== null) {
+      console.error("Transcription error", e.status, describeAiError(e));
+      // Report to the internal monitor with the upstream STATUS only — the
+      // provider's error body is not forwarded.
+      captureError(
+        new Error(`Transcription upstream returned HTTP ${e.status}`),
+        { route: "/api/quotes/transcribe", httpStatus: e.status },
+      );
+      return NextResponse.json(
+        { error: "Transcription failed. Please try again." },
+        { status: 502 },
+      );
+    }
     // Timeout or network failure — the recording is still on the client,
     // so a clean retryable error beats an opaque platform 500.
-    console.error("Transcription upstream failure", e);
+    console.error("Transcription upstream failure", describeAiError(e));
     captureError(e, { route: "/api/quotes/transcribe" });
+    const timedOut = isAiError(e) && e.kind === "timeout";
     return NextResponse.json(
-      { error: "Transcription took too long. Please try again." },
-      { status: 504 },
-    );
-  }
-
-  if (!transcribeRes || !transcribeRes.ok) {
-    const detail = transcribeRes
-      ? await transcribeRes.text().catch(() => "")
-      : "no response";
-    console.error("Transcription error", transcribeRes?.status, detail);
-    // Report to the internal monitor with the upstream STATUS only — the
-    // provider's error body is not forwarded.
-    const upstreamStatus = transcribeRes?.status;
-    captureError(
-      new Error(
-        `Transcription upstream returned HTTP ${upstreamStatus ?? "no response"}`,
-      ),
       {
-        route: "/api/quotes/transcribe",
-        ...(upstreamStatus ? { httpStatus: upstreamStatus } : {}),
+        error: timedOut
+          ? "Transcription took too long. Please try again."
+          : "Couldn't reach the transcription service. Please try again.",
       },
-    );
-    return NextResponse.json(
-      { error: "Transcription failed. Please try again." },
-      { status: 502 },
+      { status: timedOut ? 504 : 502 },
     );
   }
 

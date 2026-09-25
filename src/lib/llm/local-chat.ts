@@ -2,7 +2,10 @@ import "server-only";
 
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
-import { fetchWithTimeout, FetchTimeoutError } from "@/lib/fetchTimeout";
+import { FetchTimeoutError } from "@/lib/fetchTimeout";
+import { AiError } from "@/lib/ai/errors";
+import type { AiTransport } from "@/lib/ai/http";
+import { callChatCompletions } from "@/lib/ai/openai";
 
 export type LocalJsonSchema = {
   name: string;
@@ -39,6 +42,8 @@ export type LocalChatCompletionResult = {
   text: string;
   model: string;
   finishReason: string | null;
+  /** True when the model stopped at its token cap (finish_reason "length"). */
+  truncated: boolean;
   usage: {
     inputTokens: number;
     outputTokens: number;
@@ -50,6 +55,11 @@ type Env = Record<string, string | undefined>;
 export const DEFAULT_LOCAL_LLM_TIMEOUT_MS = 30 * 60 * 1000;
 export const DEFAULT_LOCAL_LLM_MAX_TOKENS = 2048;
 
+/** Configuration problems are typed so routes answer 503 "not set up". */
+function configError(message: string): AiError {
+  return new AiError({ kind: "not_configured", provider: "local", message });
+}
+
 function positiveInteger(
   value: number | string | undefined,
   fallback: number,
@@ -58,7 +68,7 @@ function positiveInteger(
   if (value === undefined || value === "") return fallback;
   const parsed = typeof value === "number" ? value : Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error(`${envName} must be a positive integer.`);
+    throw configError(`${envName} must be a positive integer.`);
   }
   return parsed;
 }
@@ -84,17 +94,17 @@ export function isLocalTextAiProvider(
 export function toChatCompletionsUrl(baseUrl: string): string {
   const trimmed = baseUrl.trim().replace(/\/+$/, "");
   if (!trimmed) {
-    throw new Error("LOCAL_LLM_BASE_URL is not configured.");
+    throw configError("LOCAL_LLM_BASE_URL is not configured.");
   }
 
   let parsed: URL;
   try {
     parsed = new URL(trimmed);
   } catch {
-    throw new Error("LOCAL_LLM_BASE_URL must be a valid HTTP(S) URL.");
+    throw configError("LOCAL_LLM_BASE_URL must be a valid HTTP(S) URL.");
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error("LOCAL_LLM_BASE_URL must use HTTP or HTTPS.");
+    throw configError("LOCAL_LLM_BASE_URL must use HTTP or HTTPS.");
   }
 
   return trimmed.endsWith("/chat/completions")
@@ -109,17 +119,17 @@ export function resolveLocalLlmConfig(
 ): LocalLlmConfig {
   const baseUrl = overrides.baseUrl?.trim() || env.LOCAL_LLM_BASE_URL?.trim();
   if (!baseUrl) {
-    throw new Error("LOCAL_LLM_BASE_URL is not configured.");
+    throw configError("LOCAL_LLM_BASE_URL is not configured.");
   }
 
   const apiKey = overrides.apiKey?.trim() || env.LOCAL_LLM_API_KEY?.trim();
   if (!apiKey) {
-    throw new Error("LOCAL_LLM_API_KEY is not configured.");
+    throw configError("LOCAL_LLM_API_KEY is not configured.");
   }
 
   const model = overrides.model?.trim() || env.LOCAL_LLM_MODEL?.trim();
   if (!model) {
-    throw new Error("LOCAL_LLM_MODEL is not configured.");
+    throw configError("LOCAL_LLM_MODEL is not configured.");
   }
 
   const timeoutMs = positiveInteger(
@@ -172,6 +182,8 @@ export function buildLocalJsonSchemaResponseFormat(schema: LocalJsonSchema) {
 type JsonHttpResponse = {
   ok: boolean;
   status: number;
+  /** Response headers (read for `retry-after`). */
+  headers: { get(name: string): string | null };
   text: () => Promise<string>;
   json: () => Promise<unknown>;
 };
@@ -215,10 +227,18 @@ export function postJsonWithoutHeaderTimeout(
         res.on("end", () => {
           const text = Buffer.concat(chunks).toString("utf8");
           const status = res.statusCode ?? 0;
+          const rawHeaders = res.headers;
           finish(() =>
             resolve({
               ok: status >= 200 && status < 300,
               status,
+              headers: {
+                get: (name: string) => {
+                  const value = rawHeaders[name.toLowerCase()];
+                  if (value === undefined) return null;
+                  return Array.isArray(value) ? value.join(", ") : String(value);
+                },
+              },
               text: async () => text,
               json: async () => JSON.parse(text) as unknown,
             }),
@@ -235,6 +255,26 @@ export function postJsonWithoutHeaderTimeout(
     req.end(body);
   });
 }
+
+function headersRecord(headers: HeadersInit | undefined): Record<string, string> {
+  if (!headers) return {};
+  if (headers instanceof Headers) return Object.fromEntries(headers.entries());
+  if (Array.isArray(headers)) return Object.fromEntries(headers);
+  return { ...(headers as Record<string, string>) };
+}
+
+/**
+ * The node:http transport as a shared-client `AiTransport`: the self-hosted
+ * model keeps its header-timeout-free socket but gets the same retry,
+ * backoff, budget and error typing as every hosted call.
+ */
+export const localHttpTransport: AiTransport = (url, init, timeoutMs) =>
+  postJsonWithoutHeaderTimeout(
+    url,
+    headersRecord(init.headers),
+    typeof init.body === "string" ? init.body : "",
+    timeoutMs,
+  );
 
 /**
  * Small OpenAI-compatible text helper for direct route integrations.
@@ -259,53 +299,36 @@ export async function runLocalChatCompletion(
     );
   }
 
-  const headers = {
-    authorization: `Bearer ${config.apiKey}`,
-    "content-type": "application/json",
-  };
-  const payloadText = JSON.stringify(body);
   // Tests inject fetchImpl; production goes through node:http so a slow
   // model's silent prompt-processing phase cannot trip undici's fixed
-  // 300 s response-header timeout.
-  const res: JsonHttpResponse = opts.fetchImpl
-    ? await fetchWithTimeout(
-        config.chatCompletionsUrl,
-        { method: "POST", headers, body: payloadText },
-        config.timeoutMs,
-        opts.fetchImpl,
-      )
-    : await postJsonWithoutHeaderTimeout(
-        config.chatCompletionsUrl,
-        headers,
-        payloadText,
-        config.timeoutMs,
-      );
+  // 300 s response-header timeout. Either way the shared policy applies:
+  // bounded retries on 429/5xx/network errors, typed AiErrors.
+  const reply = await callChatCompletions({
+    provider: "local",
+    url: config.chatCompletionsUrl,
+    apiKey: config.apiKey,
+    body,
+    timeoutMs: config.timeoutMs,
+    fetchImpl: opts.fetchImpl,
+    transport: opts.fetchImpl ? undefined : localHttpTransport,
+    onTruncated: "return",
+  });
 
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new Error(`Local LLM ${res.status}: ${detail.slice(0, 200)}`);
-  }
-
-  const payload = (await res.json()) as {
-    choices?: Array<{
-      finish_reason?: string | null;
-      message?: { content?: string | null };
-    }>;
-    usage?: { prompt_tokens?: number; completion_tokens?: number };
-  };
-  const choice = payload.choices?.[0];
-  const text = choice?.message?.content;
-  if (typeof text !== "string" || !text.trim()) {
-    throw new Error("Local LLM returned an empty response.");
+  const text = reply.content;
+  if (!text.trim()) {
+    throw new AiError({
+      kind: reply.truncated ? "truncated" : "invalid_output",
+      provider: "local",
+      attempts: reply.attempts,
+      message: "Local LLM returned an empty response.",
+    });
   }
 
   return {
     text,
     model: config.model,
-    finishReason: choice?.finish_reason ?? null,
-    usage: {
-      inputTokens: payload.usage?.prompt_tokens ?? 0,
-      outputTokens: payload.usage?.completion_tokens ?? 0,
-    },
+    finishReason: reply.finishReason,
+    truncated: reply.truncated,
+    usage: reply.usage,
   };
 }

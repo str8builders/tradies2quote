@@ -21,6 +21,7 @@ import {
   type OpenAIContentBlock,
 } from "./openai-runtime";
 import type { ParseResult } from "./runtime";
+import { aiModel } from "@/lib/ai/models";
 
 export interface PhotoPlanItem {
   /** Short label, e.g. "GIB plasterboard sheet (used)". */
@@ -53,7 +54,8 @@ export interface PhotoPlanInput {
   hint?: string | null;
 }
 
-const MODEL = "gpt-4o-mini";
+// The id lives in src/lib/ai/models.ts (role "photoPlan").
+const MODEL = aiModel("photoPlan");
 const MAX_TOKENS = 1500;
 
 const SYSTEM_PROMPT = `You are an NZ-builder vision assistant. The user uploaded a photo or a sketched plan from a trade job.

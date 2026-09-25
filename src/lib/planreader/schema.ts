@@ -182,6 +182,12 @@ export type ExtractedSheet = {
   takeoff: TakeoffResult | null;
   warnings: string[];
   review_required: boolean;
+  /**
+   * Set when the model call failed (timeout, provider error, refusal,
+   * unreadable reply) instead of the sheet being read. A re-run of
+   * /api/plans/extract retries these sheets and skips the ones read fine.
+   */
+  extraction_error?: string | null;
 };
 
 // ── zod-shaped validators ─────────────────────────────────────────────────

@@ -2,7 +2,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
-import { extractSheet } from "@/lib/planreader/extract";
+import { extractSheet, isSheetAlreadyExtracted } from "@/lib/planreader/extract";
+import { captureError } from "@/lib/observability";
+import { addUsage, ZERO_USAGE, type AiUsage } from "@/lib/ai/anthropic";
+import { trackAgentRun, usageSummary } from "@/lib/agent-monitor/track";
 import { isSheetType, isSupportedSheetType } from "@/lib/planreader/schema";
 import { PLAN_BUCKET } from "@/lib/planreader/storage";
 import { planReaderAllowed } from "@/lib/planreader/flag";
@@ -16,6 +19,9 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+/** Monitor name for /app/agents/monitor. */
+const PLAN_READER_AGENT_NAME = "Plan Reader";
 
 /**
  * POST /api/plans/extract   body: { file_id }
@@ -32,6 +38,10 @@ export const maxDuration = 60;
  *   - blocked       → a HARD gate failed (e.g. no dimensions at all).
  *   - needs_review  → a soft gate failed (scale/ocr/etc.).
  *   - extracted     → all active gates passed.
+ *
+ * Re-running is safe and cheap: a sheet already read (its extraction is
+ * stored and not a failed-call placeholder) is skipped, so a retry after a
+ * timeout or provider outage only pays for the sheets that failed.
  */
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -94,7 +104,7 @@ export async function POST(request: NextRequest) {
 
   const { data: sheets, error: sheetsErr } = await supabase
     .from("plan_sheets")
-    .select("id, sheet_number, image_path, sheet_type, review_required")
+    .select("id, sheet_number, image_path, sheet_type, review_required, status, extraction")
     .eq("file_id", fileId)
     .order("sheet_number", { ascending: true });
   if (sheetsErr) return NextResponse.json({ error: sheetsErr.message }, { status: 500 });
@@ -113,6 +123,15 @@ export async function POST(request: NextRequest) {
     skip_reason?: string;
   }> = [];
   const logs: PlanSheetLog[] = [];
+  const run = trackAgentRun(PLAN_READER_AGENT_NAME, {
+    runIdPrefix: "plans",
+    userId: user.id,
+    startMessage: `Extracting ${sheets.length} sheet(s)`,
+  });
+  let usage: AiUsage = { ...ZERO_USAGE };
+  let extractedCount = 0;
+  let alreadyDone = 0;
+  const failures: string[] = [];
 
   for (const sheet of sheets) {
     const sheetType = isSheetType(sheet.sheet_type) ? sheet.sheet_type : "unknown";
@@ -164,6 +183,19 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
+    // A re-run only redoes sheets whose read failed or never ran.
+    if (isSheetAlreadyExtracted(sheet)) {
+      alreadyDone += 1;
+      out.push({
+        sheet_id: sheet.id,
+        sheet_number: sheet.sheet_number,
+        action: "skipped",
+        status: sheet.status,
+        skip_reason: "already extracted",
+      });
+      continue;
+    }
+
     const dl = await storage.download(sheet.image_path);
     if (dl.error || !dl.data) {
       await supabase
@@ -192,13 +224,21 @@ export async function POST(request: NextRequest) {
     }
 
     const buf = Buffer.from(await dl.data.arrayBuffer());
-    const { extracted, enforcement } = await extractSheet({
+    const { extracted, enforcement, failure, usage: sheetUsage } = await extractSheet({
       apiKey,
       imageBase64: buf.toString("base64"),
       mediaType: dl.data.type || "image/png",
       sheetType,
       filename: file.original_filename,
     });
+    usage = addUsage(usage, sheetUsage);
+    if (failure) {
+      failures.push(`sheet ${sheet.sheet_number}: ${failure.kind}`);
+      console.error(`plans/extract sheet ${sheet.sheet_number} failed (${failure.kind})`);
+      captureError(failure.error, { route: "plans/extract" });
+    } else {
+      extractedCount += 1;
+    }
 
     const status = enforcement.blocked
       ? "blocked"
@@ -216,6 +256,7 @@ export async function POST(request: NextRequest) {
       })
       .eq("id", sheet.id);
     if (updErr) {
+      await run.fail(new Error(updErr.message), `Persist sheet ${sheet.sheet_number}`);
       return NextResponse.json(
         { error: `failed to persist sheet ${sheet.sheet_number}: ${updErr.message}` },
         { status: 500 },
@@ -248,6 +289,13 @@ export async function POST(request: NextRequest) {
 
   summarizePlanRun(fileId, "extract", logs);
   await supabase.from("plan_files").update({ status: "extracted" }).eq("id", fileId);
+
+  const summary = `${extractedCount} read, ${alreadyDone} already done · ${usageSummary(usage)}`;
+  if (failures.length > 0) {
+    await run.fail(new Error(failures.join("; ")), `${failures.length} sheet(s) failed (${summary})`);
+  } else {
+    await run.succeed(summary);
+  }
 
   return NextResponse.json({ file_id: fileId, sheets: out }, { status: 200 });
 }

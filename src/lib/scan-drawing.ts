@@ -1,13 +1,10 @@
 import { computePlanGeometry, type Region } from "@/lib/takeoff/geometry";
+import { aiModel } from "@/lib/ai/models";
 
 export const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-// Wave 42 (retry) — back on Opus 4.7 now that the workspace audit
-// (via Claude in Chrome) confirmed Opus is enabled with $11+ credit
-// and Tier 1 rate limits. The exact public API ID per
-// docs.anthropic.com is `claude-opus-4-7`. If we 502 again, the
-// improved error logging below will surface the actual Anthropic
-// response status + body so we can diagnose properly.
-export const MODEL = "claude-opus-4-8";
+// The drawing-scan model id lives in src/lib/ai/models.ts (role
+// "drawingScan", env AI_MODEL_DRAWING_SCAN) with every other model id.
+export const MODEL = aiModel("drawingScan");
 // Bumped from 2048 → 4096. A detailed hand-drawn plan (multiple
 // dimension labels, step heights, post depths, fastener notes) can
 // easily generate a long structured response: 6 sections of prose
