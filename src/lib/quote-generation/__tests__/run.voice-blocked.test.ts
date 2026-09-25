@@ -226,3 +226,16 @@ describe("voice: no false alarms for jobs that aren't calculator takeoffs", () =
     expect(qd.line_items.some((l) => l.is_calculated_takeoff && /GIB/.test(l.description))).toBe(true);
   });
 });
+
+describe("labour that can't be right is flagged at generation (audit item 3)", () => {
+  it("40 hours on a '2 day job' puts a check-this note on the quote (was silent)", async () => {
+    const qd = await generate("Replace the hot water cylinder, it's a 2 day job.", {
+      line_items: [{ type: "labour", description: "Install cylinder", quantity: 40, unit: "hour", unit_price: 75 }],
+    });
+    // The quantity is left exactly as it was — only flagged.
+    expect(described(qd, /Install cylinder/)[0]).toMatchObject({ quantity: 40 });
+    expect(qd.notes[0]).toBe(
+      "Labour adds up to 40 hours, but the job was described as 2 days — that's more than 12 hours a day. Check the labour hours.",
+    );
+  });
+});

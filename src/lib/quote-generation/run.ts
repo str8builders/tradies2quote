@@ -44,6 +44,7 @@ import { loadUserVocab } from "@/lib/transcript/vocab";
 import { reportSummaryFailureToMonitor } from "@/lib/transcript/summaryMonitoring";
 import { aiTermsToNotes, sanitiseModelQuote } from "./model-output";
 import { applyPricingPolicy, extractStatedAmounts } from "./pricing";
+import { labourPlausibilityWarnings } from "@/lib/labour-plausibility";
 import { verifyGeneratedQuote } from "./verification";
 import type {
   LibraryMaterial,
@@ -1104,6 +1105,15 @@ async function runQuotePipeline(
       hourlyRate: Number(profile.default_labour_rate) || 0,
       statedAmounts: asAdmin ? [] : extractStatedAmounts(transcript),
     });
+  }
+
+  // Audit item 3 — labour that can't be right (more than 12 hours a day
+  // against the duration in the transcript, or an absurd line) is flagged at
+  // the top of the review notes now; the send gate then makes the tradie
+  // acknowledge it. The quantity itself is never changed.
+  const labourChecks = labourPlausibilityWarnings(parsed.line_items, transcript);
+  if (labourChecks.length > 0) {
+    parsed.notes = [...labourChecks, ...(parsed.notes ?? [])];
   }
 
   const totals = computeQuoteTotals(
