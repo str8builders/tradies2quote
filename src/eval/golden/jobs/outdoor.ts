@@ -76,11 +76,6 @@ export const OUTDOOR_JOBS: GoldenJob[] = [
       tax_amount: money("689.23", "15 % × 4594.88 = 689.232 → 689.23"),
       total: money("5284.11", "4594.88 + 689.23"),
     },
-    knownBugs: {
-      "qty:roof-sheets":
-        "KNOWN BUG: takeoff/calculators/roofing.ts counts sheets across width_m — the SHORTER plan side after extraction's max/min — and adds 10 % to the sheet count: ceil(8 × 1.1 ÷ 0.762) — expected 16 sheets along the 12 m gutter the tradie named, code gives 12 (a quarter of the roof missing)",
-      ...moneyCascade(["roof-sheets"], "KNOWN BUG: cascades from 12 roof sheets instead of 16 — $591.80 of iron short"),
-    },
   }),
 
   takeoffJob({
@@ -133,10 +128,6 @@ export const OUTDOOR_JOBS: GoldenJob[] = [
     lines: {
       "roof-sheets": { qty: count(6, "4 m gutter ÷ 0.762 = 5.25 → 6 sheets") },
       "roof-fixings": { qty: count(160, "24 ÷ cos 5° = 24.0917 m² × 6 × 1.1 = 159.005 screws → round up → 160") },
-    },
-    knownBugs: {
-      "qty:roof-fixings":
-        "KNOWN BUG: normalise.roofAreaFromPitch rounds the roof area to 0.01 m² (24.09) BEFORE roofing.ts multiplies and rounds up (24.09 × 6.6 = 158.994 → 159) — expected 160 (24.0917 × 6.6 = 159.005 → 160), code gives 159 (1 screw; the round-then-ceil pattern)",
     },
   }),
 

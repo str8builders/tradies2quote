@@ -131,23 +131,37 @@ export function memberCountAlong(runM: number, spacingMm: number): number {
   return safeCeil((runM * 1000) / spacingMm) + 1;
 }
 
+/** 1 / cos(pitch), with the pitch clamped to 0..70° (anything outside is
+ * almost certainly an extraction error — a vertical "roof" is cladding). */
+function pitchFactor(pitchDeg: number): number {
+  const clamped = Math.min(70, Math.max(0, pitchDeg));
+  return 1 / Math.cos((clamped * Math.PI) / 180);
+}
+
 /**
  * Roof plan-area → actual roof area for a given pitch.
  *
  *   plan = area_m2; pitch_deg = roof pitch in degrees
  *
- * actualArea = planArea / cos(pitchRad). Used for sheet/tile counts on
- * pitched roofs.
+ * actualArea = planArea / cos(pitchRad). Used for sheet/tile/screw counts
+ * on pitched roofs, so it is EXACT: rounding it to 0.01 m² before a count
+ * rounds up turned 24.0917 m² × 6.6 = 159.005 screws into 24.09 × 6.6 =
+ * 158.994 → 159 instead of 160. Round it only to show it.
  */
 export function roofAreaFromPitch(planAreaM2: number, pitchDeg: number): number {
   if (!Number.isFinite(planAreaM2) || planAreaM2 <= 0) return 0;
   if (!Number.isFinite(pitchDeg)) return planAreaM2;
-  // Clamp pitch to 0..70°; anything outside is almost certainly an
-  // extraction error (vertical "roof" → cladding).
-  const clamped = Math.min(70, Math.max(0, pitchDeg));
-  const rad = (clamped * Math.PI) / 180;
-  const factor = 1 / Math.cos(rad);
-  return round2(planAreaM2 * factor);
+  return planAreaM2 * pitchFactor(pitchDeg);
+}
+
+/**
+ * A plan length measured down the slope — a rafter / long-run sheet length:
+ * planLength / cos(pitch). Exact; round it only to show it.
+ */
+export function slopeLengthFromPitch(planLengthM: number, pitchDeg: number): number {
+  if (!Number.isFinite(planLengthM) || planLengthM <= 0) return 0;
+  if (!Number.isFinite(pitchDeg)) return planLengthM;
+  return planLengthM * pitchFactor(pitchDeg);
 }
 
 /**

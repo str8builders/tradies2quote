@@ -247,6 +247,12 @@ export type ExtractedDimensions = {
   perimeter_m?: number | null;
   pitch_deg?: number | null;
   volume_m3?: number | null;
+  /**
+   * Roofing: the gutter (eave) length — the edge long-run sheets are laid
+   * side by side along — when the tradie names it ("gutter runs the 12m
+   * side"). Null → the roofing calculator assumes the longer plan side.
+   */
+  eave_m?: number | null;
 };
 
 export type ExtractedOpening = {
@@ -352,6 +358,7 @@ export function parseExtractedExtraction(
     perimeter_m: optNumber(rawDims.perimeter_m),
     pitch_deg: optNumber(rawDims.pitch_deg),
     volume_m3: optNumber(rawDims.volume_m3),
+    eave_m: optNumber(rawDims.eave_m),
   };
 
   const openings: ExtractedOpening[] = Array.isArray(obj.openings)

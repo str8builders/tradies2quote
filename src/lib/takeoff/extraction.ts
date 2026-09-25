@@ -136,6 +136,35 @@ function extractPerimeterM(text: string): number | null {
   return null;
 }
 
+/**
+ * The gutter (eave) length of a roof — long-run sheets are laid side by side
+ * along it: "gutter runs the 12m side", "gutter along the 4m side", "spouting
+ * on the 6 m side", "gutter length 12m", "14.4m of spouting". A bare "eaves"
+ * figure is NOT read as a length ("600mm eaves" is the overhang), and a value
+ * under 1 m or outside the shared edge band is ignored.
+ */
+function extractEaveM(text: string): number | null {
+  const UNIT = String.raw`(mm|cm|m|metres?|meters?)`;
+  const patterns = [
+    new RegExp(
+      String.raw`\b(?:gutters?|guttering|spouting|eaves?)\s+(?:(?:runs?|goes|is|sits)\s+)?(?:(?:along|on|down|across|at)\s+)?(?:the\s+)?(\d+(?:\.\d+)?)\s*${UNIT}?\s+(?:long\s+)?(?:side|edge|end|length|wall)\b`,
+      "i",
+    ),
+    new RegExp(
+      String.raw`\b(?:gutters?|guttering|spouting)\s+(?:length\s+|run\s+)?(?:is\s+|of\s+|=\s*|:\s*)?(\d+(?:\.\d+)?)\s*${UNIT}(?![a-z0-9²³])`,
+      "i",
+    ),
+    new RegExp(String.raw`(\d+(?:\.\d+)?)\s*${UNIT}\s+(?:of\s+)?(?:gutters?|guttering|spouting)\b`, "i"),
+  ];
+  for (const re of patterns) {
+    const m = text.match(re);
+    if (!m) continue;
+    const v = toMetres(Number(m[1]), m[2]);
+    if (Number.isFinite(v) && v >= 1 && isPlausibleMetres(v, "edge")) return v;
+  }
+  return null;
+}
+
 function extractPitch(text: string): number | null {
   const re = /(\d+(?:\.\d+)?)\s*(?:deg(?:rees)?|°)\s*(?:pitch|roof)?/i;
   const m = text.match(re);
@@ -380,6 +409,7 @@ export function extractFromText(
     perimeter_m: extractPerimeterM(text),
     pitch_deg: extractPitch(text),
     volume_m3: extractVolumeM3(text),
+    eave_m: extractEaveM(text),
   };
 
   // Height-specific regex (separate from any rectangle).
