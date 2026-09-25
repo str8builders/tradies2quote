@@ -79,6 +79,7 @@ import AppTemplate from "../template";
 import { NewHome } from "./home/NewHome";
 import { LegacyTopBar } from "./shell/LegacyTopBar";
 import { NewLookShell } from "./shell/NewLookShell";
+import { NewLookWelcome } from "./shell/NewLookWelcome";
 
 /** Every element in a JSX tree (not rendering components, just walking props.children). */
 function elements(node: ReactNode): Array<{ type: unknown; props: Record<string, unknown> }> {
@@ -143,6 +144,20 @@ describe("/app layout", () => {
     expect(types(tree)).not.toContain(MobileAppMenu);
     expect(types(tree)).not.toContain(AppSplash);
     expect(types(tree)).not.toContain(OnboardingTourGate);
+  });
+
+  it("switch on: the short new welcome instead of the old video, until it's been seen", async () => {
+    sw.on = true;
+    const fresh = await AppLayout({ children: "page" });
+    const welcome = elements((fresh as { props: { welcome: ReactNode } }).props.welcome).find(
+      (e) => e.type === NewLookWelcome,
+    );
+    expect(welcome?.props).toMatchObject({ serverOpen: true, data: expect.objectContaining({ name: "Sam" }) });
+    expect(types(fresh)).not.toContain(AppSplash);
+
+    sw.cookies = { "t2q-welcome-seen": "1" };
+    const seen = await AppLayout({ children: "page" });
+    expect((seen as { props: { welcome: ReactNode } }).props.welcome).toBeNull();
   });
 });
 

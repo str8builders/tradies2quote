@@ -11,6 +11,8 @@ import { businessTimeZone, greetingFor, type Greeting } from "./dates";
 export interface TopBarData {
   /** "Good morning" in the business's time zone. */
   greeting: Greeting;
+  /** "Saturday 26 September", in the business's time zone (the welcome). */
+  today: string;
   /** Your first name, else the business name, else null. */
   name: string | null;
   /** The avatar's letter when there's no photo. */
@@ -20,6 +22,15 @@ export interface TopBarData {
   businessName: string | null;
   /** The t2q-outdoor cookie, so the sheet's switch paints right first time. */
   outdoor: boolean;
+}
+
+/** "Saturday 26 September" in a time zone; plain English whatever the device. */
+export function longDay(now: Date, timeZone: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-NZ", { weekday: "long", day: "numeric", month: "long", timeZone }).format(now);
+  } catch {
+    return new Intl.DateTimeFormat("en-NZ", { weekday: "long", day: "numeric", month: "long" }).format(now);
+  }
 }
 
 /** The request's clock, outside any component body (react-hooks/purity). */
@@ -39,8 +50,11 @@ export const loadTopBarData = cache(async (): Promise<TopBarData> => {
     : { firstName: null, businessName: null, avatarUrl: null, country: null, currency: null };
   const name = greetingName(profile);
   const email = user?.email ?? null;
+  const now = requestTime();
+  const timeZone = businessTimeZone(profile.country, profile.currency);
   return {
-    greeting: greetingFor(requestTime(), businessTimeZone(profile.country, profile.currency)),
+    greeting: greetingFor(now, timeZone),
+    today: longDay(now, timeZone),
     name,
     letter: avatarLetter(profile.firstName ?? profile.businessName, email),
     avatarUrl: profile.avatarUrl,

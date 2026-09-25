@@ -14,6 +14,8 @@ import { TrialBanner } from "./_components/TrialBanner";
 import { BetaNoticeBanner } from "./_components/BetaNoticeBanner";
 import { isNewLookOn } from "@/lib/ui/newLook";
 import { NewLookShell } from "./_v2/shell/NewLookShell";
+import { NewLookWelcome } from "./_v2/shell/NewLookWelcome";
+import { loadTopBarData } from "./_v2/lib/top-bar";
 
 /**
  * Visual layout for /app/* routes.
@@ -76,7 +78,16 @@ export default async function AppLayout({
   // first paint is already right. Only ui- tokens react to it, so existing
   // screens look the same either way (see src/lib/ui/outdoor.ts).
   const outdoor = isOutdoorCookieValue(cookieStore.get(OUTDOOR_COOKIE)?.value);
-  if (await isNewLookOn()) return <NewLookShell outdoor={outdoor}>{children}</NewLookShell>;
+  if (await isNewLookOn()) {
+    // The short new-look welcome, only when this device hasn't seen it lately
+    // (the client then applies the same route rules as the old one).
+    const welcome = welcomeSeen ? null : <NewLookWelcome serverOpen data={await loadTopBarData()} />;
+    return (
+      <NewLookShell outdoor={outdoor} welcome={welcome}>
+        {children}
+      </NewLookShell>
+    );
+  }
   return (
     // Dark shell — the app now runs the website's native ink + brand
     // palette (the `[data-theme="light"]` override sheet in globals.css

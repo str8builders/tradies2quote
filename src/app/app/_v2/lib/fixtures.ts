@@ -71,6 +71,7 @@ export function request(over: Partial<BoardRequest> = {}): BoardRequest {
 /** A signed-in top bar for render tests: a first name, no photo. */
 export const TOP_BAR_FIXTURE = {
   greeting: "Good morning",
+  today: "Friday 25 September",
   name: "Sam",
   letter: "S",
   avatarUrl: null,

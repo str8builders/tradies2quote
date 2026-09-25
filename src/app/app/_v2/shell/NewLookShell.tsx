@@ -30,11 +30,21 @@ const SETTLE_KIT_MOTION = "[[data-motion=paused]_&_[class*='animate-ui-']]:anima
  *   - bottom safe area: the docked tab bar (<AppNav>) on phones, or the
  *     screen's own bottom action bar on focused routes.
  *
- * Left out on purpose: the welcome video (AppSplash), the coachmark tour,
- * the side tape and the old mobile menu. Home's setup card replaces the
- * first two; the tab bar and rail replace the menus.
+ * Left out on purpose: the old welcome video (AppSplash), the coachmark
+ * tour, the side tape and the old mobile menu. <NewLookWelcome> (a short
+ * greeting, passed in as `welcome`) and Home's setup card replace the first
+ * two; the tab bar and rail replace the menus.
  */
-export function NewLookShell({ outdoor, children }: { outdoor: boolean; children: ReactNode }) {
+export function NewLookShell({
+  outdoor,
+  welcome,
+  children,
+}: {
+  outdoor: boolean;
+  /** The welcome after signing in (<NewLookWelcome>), when it may play. */
+  welcome?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <div
       data-shell="app"
@@ -61,6 +71,7 @@ export function NewLookShell({ outdoor, children }: { outdoor: boolean; children
       </AppContent>
       <AppNav />
       <TopProgressBar />
+      {welcome}
     </div>
   );
 }
