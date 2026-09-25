@@ -7,6 +7,12 @@ type Props = {
   form: ReactNode;
   backHref?: string;
   reverse?: boolean;
+  /**
+   * Inside the iOS app (isNativeShellRequest): no way out to the website,
+   * whose homepage shows plans and prices (App Store 3.1.3(f)), so no
+   * "Back to website" and the logos aren't links.
+   */
+  native?: boolean;
 };
 /** Shared presentation only: server actions and form state stay with each page. */
 export function AuthSplitShell({
@@ -14,6 +20,7 @@ export function AuthSplitShell({
   form,
   backHref = "/",
   reverse = false,
+  native = false,
 }: Props) {
   return (
     <div
@@ -21,23 +28,38 @@ export function AuthSplitShell({
       className={`studio-auth-shell ${reverse ? "studio-auth-reverse" : ""}`}
     >
       <aside aria-label="What Tradies2Quote does" className="studio-auth-aside">
-        <Link href="/" aria-label="Tradies2Quote home">
+        {native ? (
           <Logo size={34} />
-        </Link>
+        ) : (
+          <Link href="/" aria-label="Tradies2Quote home">
+            <Logo size={34} />
+          </Link>
+        )}
         {visual}
       </aside>
       <div className="studio-auth-form-side">
         <div className="studio-auth-top">
-          <Link href={backHref} data-testid="auth-back">
-            <ArrowLeft size={17} /> Back to website
-          </Link>
-          <Link
-            href="/"
-            aria-label="Tradies2Quote home"
-            className="studio-auth-mobile-logo"
-          >
-            <Logo size={28} withWordmark={false} />
-          </Link>
+          {native ? (
+            <>
+              <span />
+              <span className="studio-auth-mobile-logo">
+                <Logo size={28} withWordmark={false} />
+              </span>
+            </>
+          ) : (
+            <>
+              <Link href={backHref} data-testid="auth-back">
+                <ArrowLeft size={17} /> Back to website
+              </Link>
+              <Link
+                href="/"
+                aria-label="Tradies2Quote home"
+                className="studio-auth-mobile-logo"
+              >
+                <Logo size={28} withWordmark={false} />
+              </Link>
+            </>
+          )}
         </div>
         <div className="studio-auth-form">{form}</div>
         <p className="studio-auth-foot">

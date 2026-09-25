@@ -1,5 +1,5 @@
 "use client";
-import {useEffect,useRef,useState} from "react";
+import {useEffect,useRef,useState,useSyncExternalStore} from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {usePathname} from "next/navigation";
@@ -8,6 +8,10 @@ import catalog from "@/t2qcal/lib/native-catalog.json";
 import {WebAppControls} from "./WebAppControls";
 
 type Account={email:string|null;name:string|null;avatar?:string|null;initial?:string};
+
+const noSubscribe=()=>()=>{};
+/** Inside the Tradies2Quote iOS app (its web view adds this marker): no "install" row there. */
+function useInIosApp(){return useSyncExternalStore(noSubscribe,()=>navigator.userAgent.includes("T2QNativeShell"),()=>false);}
 
 /** The tradie's own uploaded portrait (public storage URL) — no optimiser needed. */
 function Photo({src,className}:{src:string;className:string}){
@@ -73,6 +77,7 @@ export function NativeShell(){
   const dialog=useRef<HTMLDialogElement>(null);
   const account=useCalculatorAccount();
   const ownApp=useCalculatorApp();
+  const iosApp=useInIosApp();
   const directory=path==="/t2qcal"||path==="/t2qcal/calculators";
   const signInHref=`/t2qcal/signin?next=${encodeURIComponent(path.startsWith("/t2qcal")?path:"/t2qcal/calculators")}`;
   return <>
@@ -91,7 +96,7 @@ export function NativeShell(){
         {ownApp?<a className="native-row" href="/app" target="_blank" rel="noopener" data-testid="t2qcal-back-to-app"><ArrowSquareOut size={26}/><span><strong>Open Tradies2Quote</strong><small>Quotes, invoices, clients and materials — opens in your browser or the Tradies2Quote app.</small></span></a>
         :<a className="native-row" href="/app" data-testid="t2qcal-back-to-app"><ArrowLeft size={26}/><span><strong>Back to Tradies2Quote</strong><small>Quotes, invoices, clients and materials.</small></span></a>}
         <a className="native-row" href="/t2qcal/device"><span><strong>Saved on this device</strong><small>Open, export or restore your calculations.</small></span></a>
-        <a className="native-row" href="/t2qcal/install"><span><strong>Install T2QCAL</strong><small>Add this app to your Home Screen.</small></span></a>
+        {!iosApp&&<a className="native-row" href="/t2qcal/install"><span><strong>Install T2QCAL</strong><small>Add this app to your Home Screen.</small></span></a>}
       </div>
       <WebAppControls/><p className="native-footnote">T2QCAL · Construction calculators</p></dialog></>;
 }

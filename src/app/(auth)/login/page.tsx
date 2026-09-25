@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { AuthSplitShell } from "../../_components/auth/AuthSplitShell";
 import { AuthMarketingPanel } from "../../_components/auth/AuthMarketingPanel";
 import { LoginForm } from "./_components/LoginForm";
+import { isNativeShellRequest } from "@/lib/native-shell";
 
 export const metadata: Metadata = {
   title: "Log in",
@@ -27,9 +28,11 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string; message?: string; next?: string }>;
 }) {
   const { error, message, next } = await searchParams;
+  const native = await isNativeShellRequest();
 
   return (
     <AuthSplitShell
+      native={native}
       backHref="/"
       reverse
       visual={<AuthMarketingPanel kind="signin" />}
