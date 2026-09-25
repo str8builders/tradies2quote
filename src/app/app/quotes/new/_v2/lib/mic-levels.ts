@@ -67,12 +67,14 @@ export type BarMode = "live" | "wave" | "resting" | "silent";
 
 /**
  * Which bars to draw:
- *   - live: recording, moving with the real voice.
- *   - wave: a gentle looping wave. Before recording (the mic is ready and
- *     inviting), and while recording when the phone gives no sound level
- *     (the meter failed or never started), so it never looks frozen.
- *   - resting: a still shape while recording for reduced motion or a
- *     hidden page.
+ *   - live: recording, moving with the real voice. Also with Reduce Motion:
+ *     the bars are how you know you're being heard (feedback, not
+ *     decoration). Only their idle wobble stops for Reduce Motion.
+ *   - wave: a steady wave. Before recording (the mic is ready), unless
+ *     Reduce Motion is on; and while recording whenever the phone gives no
+ *     sound level (the meter can't start, or only hears silence), whatever
+ *     the setting, so recording never looks frozen.
+ *   - resting: a still shape while recording on a hidden page.
  *   - silent: flat, for paused, writing it down, done or an error.
  */
 export function barMode({
@@ -93,7 +95,7 @@ export function barMode({
   hasStream: boolean;
 }): BarMode {
   if (listening) {
-    if (reducedMotion || !pageVisible) return "resting";
+    if (!pageVisible) return "resting";
     return hasStream && !meterFailed ? "live" : "wave";
   }
   return inviting && !reducedMotion && pageVisible ? "wave" : "silent";
@@ -105,4 +107,28 @@ export function waveTiming(i: number): { duration: number; delay: number } {
     duration: round3(0.7 + ((i * 37) % 60) / 100),
     delay: -round3(((i * 53) % 90) / 100),
   };
+}
+
+/** The wave at a moment (ms): each bar swings between 0.18 and 1 on its own timing. */
+export function waveScales(timeMs: number, count: number = BAR_COUNT, low = 0.18): number[] {
+  return Array.from({ length: Math.max(0, count) }, (_, i) => {
+    const { duration, delay } = waveTiming(i);
+    const phase = ((timeMs / 1000 - delay) / duration) * Math.PI;
+    return round3(low + (1 - low) * Math.abs(Math.sin(phase)));
+  });
+}
+
+/**
+ * A small, slow ripple under the live bars so they read as "listening" in a
+ * quiet room; the voice lifts them well above it. Off for Reduce Motion.
+ */
+export function idleRipple(timeMs: number, count: number = BAR_COUNT): number[] {
+  return Array.from({ length: Math.max(0, count) }, (_, i) =>
+    round3(MIN_BAR + 0.1 * (0.5 + 0.5 * Math.sin(timeMs / 420 + i * 0.7))),
+  );
+}
+
+/** Each bar the taller of the voice and the ripple. */
+export function withRipple(voice: readonly number[], ripple: readonly number[]): number[] {
+  return voice.map((v, i) => Math.max(v, ripple[i] ?? MIN_BAR));
 }

@@ -8,7 +8,10 @@ import {
   SILENT_BARS,
   barMode,
   barScales,
+  idleRipple,
+  waveScales,
   waveTiming,
+  withRipple,
   clampLevel,
   pushLevel,
 } from "./mic-levels";
@@ -102,9 +105,14 @@ describe("which bars to draw", () => {
     expect(barMode(base)).toBe("live");
   });
 
-  it("waves while recording when no sound level comes through (never frozen)", () => {
+  it("waves while recording when no sound level comes through (never frozen, even with Reduce Motion)", () => {
     expect(barMode({ ...base, hasStream: false })).toBe("wave");
     expect(barMode({ ...base, meterFailed: true })).toBe("wave");
+    expect(barMode({ ...base, meterFailed: true, reducedMotion: true })).toBe("wave");
+  });
+
+  it("follows the voice with Reduce Motion on (it's how you know you're heard)", () => {
+    expect(barMode({ ...base, reducedMotion: true })).toBe("live");
   });
 
   it("waves before recording to show the mic is ready, unless motion is reduced", () => {
@@ -124,10 +132,27 @@ describe("which bars to draw", () => {
     expect(new Set(timings.map((t) => t.duration)).size).toBeGreaterThan(5);
   });
 
-  it("holds a still shape for reduced motion or a hidden page", () => {
-    expect(barMode({ ...base, reducedMotion: true })).toBe("resting");
+  it("the wave moves over time and stays between 0.18 and 1", () => {
+    const a = waveScales(0);
+    const b = waveScales(250);
+    expect(a).toHaveLength(BAR_COUNT);
+    expect(a).not.toEqual(b);
+    for (const v of [...a, ...b]) {
+      expect(v).toBeGreaterThanOrEqual(0.18);
+      expect(v).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("the live ripple is small, moves, and the voice rises above it", () => {
+    const r0 = idleRipple(0);
+    const r1 = idleRipple(300);
+    expect(r0).not.toEqual(r1);
+    for (const v of r0) expect(v).toBeLessThanOrEqual(MIN_BAR + 0.1);
+    expect(withRipple([0.9, 0.12], [0.2, 0.2])).toEqual([0.9, 0.2]);
+  });
+
+  it("holds a still shape on a hidden page while recording", () => {
     expect(barMode({ ...base, pageVisible: false })).toBe("resting");
-    expect(barMode({ ...base, reducedMotion: true, meterFailed: true })).toBe("resting");
     expect(RESTING_BARS).toHaveLength(BAR_COUNT);
     expect(new Set(RESTING_BARS).size).toBeGreaterThan(3);
     for (let i = 0; i < BAR_COUNT / 2; i++) expect(RESTING_BARS[i]).toBe(RESTING_BARS[BAR_COUNT - 1 - i]);

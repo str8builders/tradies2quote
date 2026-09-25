@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import {
   ArrowCounterClockwise,
   Check,
@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
 import { cx } from "@/components/ui/cx";
 import { PRESS, TAP } from "@/components/ui/styles";
-import { primeMicrophoneMeter } from "@/lib/microphone-level";
+import { primeMicrophoneMeter, releasePrimedMeter } from "@/lib/microphone-level";
 import { MicLevelBars } from "./MicLevelBars";
 import { formatClock, micButtonLabel, talkStatus } from "./lib/copy";
 import type { RecorderSnapshot } from "./lib/recorder";
@@ -175,6 +175,8 @@ export interface TalkScreenProps {
 /** Talk: the real microphone, the shared recording rules and the transcription route. */
 export function TalkScreen({ back, notice, focusOnArrival, onTranscript, onTypeInstead }: TalkScreenProps) {
   const { recorder, state } = useVoiceRecorder(onTranscript);
+  // The audio context primed in a mic tap goes when the screen does.
+  useEffect(() => releasePrimedMeter, []);
   const onMic = () => {
     // Inside the tap: iPhones only let the level meter's audio start here.
     primeMicrophoneMeter();
