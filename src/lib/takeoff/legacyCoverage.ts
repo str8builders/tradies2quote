@@ -17,9 +17,16 @@ import type { ScopeType } from "./schemas";
 // hard-blocked sending on every deck drawing. A deck-typed scan never
 // carries a genuinely-separate wall-framing or interior-fixing scope, so
 // suppressing them here is safe.
+//
+// `cladding` covers `framing` for the same reason: every cladding scan has
+// the same boilerplate plus "Job type: Framing.", and there the framing
+// scope DID find dimensions — it sized studs, plates and nogs off the
+// cladding run (a 12 m re-clad got 21 studs, 8 plates, 3 nogs and nails): a
+// new wall frame nobody asked for. Cladding goes over existing framing (the
+// cladding calculator emits the battens, wrap and fixings it needs).
 export const LEGACY_SCOPE_COVERAGE: Record<string, ScopeType[]> = {
   deck: ["deck", "framing", "fixing"],
-  cladding: ["cladding"],
+  cladding: ["cladding", "framing"],
   wall: ["framing", "lining", "insulation", "fixing"],
   subfloor: ["framing", "lining"],
 };

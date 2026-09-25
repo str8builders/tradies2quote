@@ -143,10 +143,6 @@ export const CLADDING_JOBS: GoldenJob[] = [
       tax_amount: money("2373.35", "15 % × 15822.36 = 2373.354 → 2373.35"),
       total: money("18195.71", "15822.36 + 2373.35"),
     },
-    knownBugs: {
-      lines:
-        "KNOWN BUG: the scan also emits wall-framing lines (studs/plates/nogs/nails — the 'stud' in the scan boilerplate and 'Job type: Framing' route a framing scope that legacyCoverage.ts doesn't suppress for cladding, unlike deck) — expected only the 5 cladding lines, code emits 9",
-    },
   }),
 
   // ───────────────────────────────────────────────────────────────────────
@@ -201,10 +197,6 @@ export const CLADDING_JOBS: GoldenJob[] = [
       subtotal_before_tax: money("3258.79", "2715.66 + 543.13"),
       tax_amount: money("488.82", "15 % × 3258.79 = 488.8185 → 488.82"),
       total: money("3747.61", "3258.79 + 488.82"),
-    },
-    knownBugs: {
-      lines:
-        "KNOWN BUG: every cladding scan also gets wall-framing lines (studs 21, plates 8, nogs 3, nails 1) because the scan boilerplate says 'stud' and the job type is 'Framing', and legacyCoverage.ts LEGACY_SCOPE_COVERAGE.cladding doesn't cover framing (deck does, for exactly this reason) — expected only the 5 cladding lines",
     },
   }),
 

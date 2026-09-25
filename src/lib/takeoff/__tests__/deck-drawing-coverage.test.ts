@@ -75,16 +75,17 @@ describe("legacyScopeCoverage", () => {
     expect(legacyScopeCoverage("deck", false).size).toBe(0);
   });
 
-  it("leaves wall/cladding/subfloor coverage unchanged (deck-only fix)", () => {
-    // The fix ONLY widened deck coverage. Every other legacy type keeps
-    // exactly the scopes it covered before, so no framing regression.
+  it("leaves wall/subfloor coverage unchanged (cladding covers framing too — cladding-drawing-coverage.test.ts)", () => {
+    // The deck fix ONLY widened deck coverage; cladding later got the same
+    // framing coverage for the same boilerplate reason. Wall and subfloor
+    // keep exactly the scopes they covered before, so no framing regression.
     expect([...legacyScopeCoverage("wall", true)].sort()).toEqual([
       "fixing",
       "framing",
       "insulation",
       "lining",
     ]);
-    expect([...legacyScopeCoverage("cladding", true)]).toEqual(["cladding"]);
+    expect([...legacyScopeCoverage("cladding", true)].sort()).toEqual(["cladding", "framing"]);
     expect([...legacyScopeCoverage("subfloor", true)].sort()).toEqual([
       "framing",
       "lining",
