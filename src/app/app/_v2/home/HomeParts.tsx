@@ -232,7 +232,10 @@ function MoneyTile({
       <Money
         amount={total.amount}
         currency={total.currency}
-        className={cx("ui-heading mt-2 block text-ui-xl", total.amount > 0 ? look.amount : "text-ui-text")}
+        className={cx(
+          "ui-heading mt-2 block text-ui-lg break-words tabular-nums sm:text-ui-xl",
+          total.amount > 0 ? look.amount : "text-ui-text",
+        )}
       />
       <span className="mt-1 block text-ui-xs text-ui-faint">
         {detail}
