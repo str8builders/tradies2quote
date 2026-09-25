@@ -77,6 +77,7 @@ export function NewLookShell({
         </AppContent>
         <AppNav />
         <TopProgressBar />
+        <LocationBridge />
       </div>
       {/* Outside the canvas, which is its own stacking context; the welcome
         lifts itself into the browser's top layer once it runs. */}

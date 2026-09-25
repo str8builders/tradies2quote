@@ -13,6 +13,7 @@ import { contrastAttributeValue } from "@/lib/ui/outdoor";
 import { TimesheetView } from "@/app/app/timesheet/_components/TimesheetView";
 import type { TimesheetData } from "@/app/app/timesheet/_lib/types";
 import { ForgetWelcome } from "./ForgetWelcome";
+import { NativeTest } from "./NativeTest";
 import { TalkLive } from "./TalkLive";
 import { TalkPreview } from "./TalkPreview";
 
@@ -278,6 +279,8 @@ export default async function DevNewLookPage({
         <TimesheetView data={timesheet} />
       </main>
     );
+  } else if (screen === "native") {
+    content = <NativeTest />;
   } else if (screen === "talk-live") {
     content = <TalkLive />;
   } else if (screen === "talk" || screen === "recording") {

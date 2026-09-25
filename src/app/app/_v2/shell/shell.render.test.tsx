@@ -193,3 +193,11 @@ describe("NewLookShell", () => {
     expect(canvas).toContain("[[data-motion=paused]_&amp;_[class*=&#x27;animate-ui-&#x27;]]:animate-none!");
   });
 });
+
+describe("NewLookShell keeps location in step on every page", () => {
+  it("mounts the LocationBridge (it renders nothing, so check the source)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync(`${process.cwd()}/src/app/app/_v2/shell/NewLookShell.tsx`, "utf8");
+    expect(source).toMatch(/^\s*<LocationBridge \/>/m);
+  });
+});

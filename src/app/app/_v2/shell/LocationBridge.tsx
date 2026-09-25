@@ -103,8 +103,10 @@ export function LocationBridge() {
               days: next.consent.workDays,
               timeZone: next.timeZone,
             },
+            openSite: next.open?.clientId ? { clientId: next.open.clientId, auto: next.open.source === "auto" } : null,
           })
           .catch(() => {});
+        void drain();
       } else if (next.consent.granted && next.open && document.visibilityState === "visible") {
         startWeb();
       } else {
@@ -130,9 +132,16 @@ export function LocationBridge() {
       });
     };
 
+    // Collect what the phone saw (even with the app closed) and act on it.
+    const drain = async () => {
+      if (!native) return;
+      const { events } = await nativeLocation.drainEvents().catch(() => ({ events: [] as SiteEvent[] }));
+      for (const event of events ?? []) onSiteEvent(event);
+    };
+
     let removeListener: (() => void) | null = null;
     if (native) {
-      void nativeLocation.addListener("siteEvent", onSiteEvent).then((handle) => {
+      void nativeLocation.addListener("siteEvent", () => void drain()).then((handle) => {
         if (cancelled) void handle.remove();
         else removeListener = () => void handle.remove();
       });

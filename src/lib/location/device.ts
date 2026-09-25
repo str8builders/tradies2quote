@@ -35,6 +35,8 @@ export interface NativeConfig {
   sites: Array<{ id: string; name: string; lat: number; lng: number; radius: number }>;
   /** Automatic clock-in only inside these hours, in the business's time zone. */
   window: { start: string; end: string; days: number[]; timeZone: string };
+  /** Clocked in at a site (and whether automatically): leaving it can clock out. */
+  openSite: { clientId: string; auto: boolean } | null;
 }
 
 interface T2QLocationPlugin {
@@ -43,9 +45,12 @@ interface T2QLocationPlugin {
   requestAlways(): Promise<{ status: LocationPermission }>;
   status(): Promise<{ hasToken: boolean; tracking: boolean; watching: number }>;
   configure(options: NativeConfig): Promise<void>;
+  /** Arrivals and departures saved since last asked (oldest first). */
+  drainEvents(): Promise<{ events: SiteEvent[] }>;
   stopAll(): Promise<void>;
   openSettings(): Promise<void>;
-  addListener(event: "siteEvent", listener: (event: SiteEvent) => void): Promise<PluginListenerHandle>;
+  /** A nudge that events are waiting (collect them with drainEvents). */
+  addListener(event: "siteEvent", listener: () => void): Promise<PluginListenerHandle>;
 }
 
 const T2QLocation = registerPlugin<T2QLocationPlugin>("T2QLocation");
