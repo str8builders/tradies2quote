@@ -1584,6 +1584,58 @@ export type Database = {
         }
         Relationships: []
       }
+      time_entries: {
+        Row: {
+          break_minutes: number
+          client_id: string | null
+          created_at: string
+          end_time: string
+          id: string
+          invoice_id: string | null
+          note: string | null
+          owner_id: string
+          start_time: string
+          updated_at: string
+          user_id: string
+          work_date: string
+        }
+        Insert: {
+          break_minutes?: number
+          client_id?: string | null
+          end_time: string
+          id?: string
+          note?: string | null
+          owner_id: string
+          start_time: string
+          user_id: string
+          work_date: string
+        }
+        Update: {
+          break_minutes?: number
+          client_id?: string | null
+          end_time?: string
+          note?: string | null
+          start_time?: string
+          updated_at?: string
+          work_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_entries_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       weather_alerts_cache: {
         Row: {
           alerts: Json
@@ -1690,6 +1742,10 @@ export type Database = {
       create_invoice_from_quote: {
         Args: { p_quote_id: string }
         Returns: string
+      }
+      create_timesheet_invoice: {
+        Args: { p_entry_ids: string[]; p_client_id: string; p_quote_data: Json }
+        Returns: Json
       }
       get_quote_by_token: { Args: { p_token: string }; Returns: Json }
       mark_quote_viewed: { Args: { p_token: string }; Returns: undefined }

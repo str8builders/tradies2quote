@@ -39,13 +39,13 @@ describe("AppNav: bottom bar on phones, side rail from sm", () => {
       "/app/jobs",
       "/app/quotes/new",
       "/app/materials",
-      "/app/more",
+      "/app/timesheet",
     ]);
     expect(out).toMatch(/<nav [^>]*aria-label="Main"/);
     expect(linkTo(out, "/app/quotes/new")).toContain('aria-label="New quote"');
     // The New tile: the orange gradient (its base colour is the brand fill).
     expect(out).toContain("ui-brand-gradient");
-    for (const label of ["Home", "Jobs", "Prices", "More"]) expect(out).toContain(`>${label}</span>`);
+    for (const label of ["Home", "Jobs", "Prices", "Timesheet"]) expect(out).toContain(`>${label}</span>`);
   });
 
   it("docked to the bottom edge, painting the home-indicator zone; a rail from sm", () => {
@@ -63,8 +63,7 @@ describe("AppNav: bottom bar on phones, side rail from sm", () => {
     ["/app/quotes/preview/abc", "/app/jobs"],
     ["/app/invoices", "/app/jobs"],
     ["/app/materials/kits", "/app/materials"],
-    ["/app/settings/business", "/app/more"],
-    ["/app/clients", "/app/more"],
+    ["/app/timesheet", "/app/timesheet"],
   ])("on %s the current tab is %s (aria-current and a filled icon)", (path, href) => {
     nav.pathname = path;
     const out = html(<AppNav />);
