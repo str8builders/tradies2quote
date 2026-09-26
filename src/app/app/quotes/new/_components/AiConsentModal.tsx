@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldCheck } from "@phosphor-icons/react";
 import { recordAiConsentAction } from "../ai-consent-actions";
+import { AiConsentSheet } from "../_v2/AiConsentSheet";
 
 /**
  * AI-processing consent (App Store Guideline 5.1.2(i)).
@@ -19,13 +20,20 @@ import { recordAiConsentAction } from "../ai-consent-actions";
  * Robustness: this is an overlay, not a page replacement, and the server AI
  * routes independently enforce consent — so a client bug here can never send
  * data without consent, nor permanently lock the tradie out of the page.
+ *
+ * `look="new"` (the new-look screens pass it) shows the same disclosure and
+ * the same two choices as a kit bottom sheet (<AiConsentSheet>), readable in
+ * dark and outdoor mode; recording consent works exactly the same. Old-look
+ * screens keep this overlay as it is.
  */
 export function AiConsentModal({
   open,
   onGranted,
+  look = "old",
 }: {
   open: boolean;
   onGranted: () => void;
+  look?: "new" | "old";
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -44,6 +52,17 @@ export function AiConsentModal({
         setError(res.error);
       }
     });
+  }
+
+  if (look === "new") {
+    return (
+      <AiConsentSheet
+        pending={pending}
+        error={error}
+        onAccept={accept}
+        onDecline={() => router.push("/app")}
+      />
+    );
   }
 
   return (

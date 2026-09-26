@@ -82,8 +82,8 @@ export function NewLookShell({
         <AppContent
           banners={
             <>
-              <TrialBanner />
-              <BetaNoticeBanner />
+              <TrialBanner look="new" />
+              <BetaNoticeBanner look="new" />
             </>
           }
         >

@@ -7,6 +7,7 @@ import {
   getCachedSubscriptionStatus,
   shouldShowTrialBanner,
 } from "@/lib/subscription";
+import { NoticeLink } from "../_v2/ui/NoticeStrip";
 
 /**
  * Sticky-ish top banner that appears in two cases:
@@ -20,10 +21,20 @@ import {
  * Rendered as a server component inside the /app layout so it shows on
  * every authenticated page. Reads supabase once per render (cheap
  * because the layout is already paying for an auth cookie read).
+ *
+ * `look="new"` (passed by the new-look shell) draws the same banners as a
+ * slim ui-token strip (<NoticeLink>) that reads right in dark and outdoor
+ * mode. Who sees which banner, and the iPhone app rules below, are the same
+ * for both looks.
  */
-export async function TrialBanner() {
+export async function TrialBanner({ look = "old" }: { look?: "new" | "old" } = {}) {
   const { user } = await getCachedAuthUser();
   if (!user) return null;
+  // 3.1.3(f) — every banner here is about paying: "Free access until…" as
+  // much as the "$49/mo" ones (it implies paid access after). The iOS App
+  // Store shell gets none of their HTML; the <HideInNativeApp> wrappers
+  // below stay as defence-in-depth for pre-marker shells.
+  if (await isNativeShellRequest()) return null;
 
   const sub = await getCachedSubscriptionStatus(
     user.id,
@@ -39,6 +50,19 @@ export async function TrialBanner() {
       day: "numeric",
       month: "short",
     });
+    if (look === "new") {
+      return (
+        <NoticeLink
+          href="/app/beta"
+          data-testid="beta-banner"
+          tone="info"
+          icon={<ShieldCheck weight="bold" />}
+          action="Pre-send checklist"
+        >
+          Free access until {endsLabel}.
+        </NoticeLink>
+      );
+    }
     return (
       <Link
         href="/app/beta"
@@ -61,16 +85,25 @@ export async function TrialBanner() {
 
   if (sub.state === "paid") return null;
 
-  // 3.1.3(f) — the two banners below carry "$49/mo" + an upgrade link, so
-  // the iOS App Store shell must never receive their HTML at all. The
-  // server-side UA gate is authoritative; the <HideInNativeApp> wrappers
-  // below stay as defence-in-depth for pre-marker shells.
-  if (await isNativeShellRequest()) return null;
-
   // Show big red banner for expired users (they're locked out of
   // creating new quotes) and a softer hivis banner during the last
   // 2 days of trial.
   if (sub.state === "expired") {
+    if (look === "new") {
+      return (
+        <HideInNativeApp>
+          <NoticeLink
+            href="/app/upgrade"
+            data-testid="trial-banner-expired"
+            tone="bad"
+            icon={<Lightning weight="bold" />}
+            action="Subscribe for $49 a month"
+          >
+            Your trial has ended, so new quotes are paused.
+          </NoticeLink>
+        </HideInNativeApp>
+      );
+    }
     return (
       <HideInNativeApp>
       <Link
@@ -103,6 +136,22 @@ export async function TrialBanner() {
         ? "Trial ends tomorrow"
         : `Trial ends in ${daysLeft} days`;
 
+  if (look === "new") {
+    return (
+      <HideInNativeApp>
+        <NoticeLink
+          href="/app/upgrade"
+          data-testid="trial-banner-warning"
+          tone="warn"
+          icon={<Lightning weight="bold" />}
+          action="Subscribe for $49 a month"
+        >
+          {trialEndsSentence(daysLeft)}
+        </NoticeLink>
+      </HideInNativeApp>
+    );
+  }
+
   return (
     <HideInNativeApp>
     <Link
@@ -123,4 +172,10 @@ export async function TrialBanner() {
     </Link>
     </HideInNativeApp>
   );
+}
+
+/** The new look's words for the last days: "Your trial ends tomorrow." */
+function trialEndsSentence(daysLeft: number): string {
+  const when = daysLeft <= 0 ? "today" : daysLeft === 1 ? "tomorrow" : `in ${daysLeft} days`;
+  return `Your trial ends ${when}.`;
 }

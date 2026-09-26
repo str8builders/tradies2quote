@@ -141,7 +141,7 @@ export function PriceListImport({
 
       {state.phase === "done" && state.summary ? <Done state={state} /> : null}
 
-      <AiConsentModal open={state.consent.open} onGranted={state.consent.onGranted} />
+      <AiConsentModal look="new" open={state.consent.open} onGranted={state.consent.onGranted} />
     </div>
   );
 }
