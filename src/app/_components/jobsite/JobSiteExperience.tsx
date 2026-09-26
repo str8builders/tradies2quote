@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { readMotionPaused, subscribeMotionPaused } from "../wallpaper/motion";
 import { chooseLevel, readLevelInput, type Level } from "./level";
 import { JobSiteNav } from "./JobSiteNav";
+import { siteLevel } from "./site-level";
 
 // The 3D code (three.js + React Three Fiber) is its own chunk, fetched only
 // on devices that get 3D, and only once the page itself is usable.
@@ -50,6 +51,7 @@ export function JobSiteExperience() {
     const root = document.querySelector<HTMLElement>("[data-jobsite-root]");
     if (!root) return;
     root.dataset.level = live ? level : "still";
+    siteLevel.set(live ? level : "still");
     root.toggleAttribute("data-ready", live && ready);
     if (!live && flash.current) flash.current.style.opacity = "0";
   }, [live, level, ready]);

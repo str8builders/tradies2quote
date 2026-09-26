@@ -30,7 +30,7 @@ const nextConfig: NextConfig = {
   //   - HSTS: the site is self-hosted behind Caddy (no Vercel to inject it),
   //     so it is set here. No includeSubDomains/preload: conservative, and
   //     every current host is HTTPS-only anyway.
-  //   - Public media (/videos, /images, /wallpaper, logos) had max-age=0, so
+  //   - Public media (/videos, /images, /wallpaper, /jobsite, logos) had max-age=0, so
   //     every visit re-downloaded the demo videos. Names are not hashed, so
   //     cache for a day and serve stale for a week while revalidating.
   async headers() {
@@ -43,6 +43,7 @@ const nextConfig: NextConfig = {
       { source: "/images/:path*", headers: [mediaCache] },
       { source: "/wallpaper/:path*", headers: [mediaCache] },
       { source: "/screens/:path*", headers: [mediaCache] },
+      { source: "/jobsite/:path*", headers: [mediaCache] },
       { source: "/logo-horizontal.webp", headers: [mediaCache] },
       // Barcode scanner's ZXing reader. The path carries the library version
       // (scripts/copy-zxing-wasm.mjs), so a file never changes in place.
