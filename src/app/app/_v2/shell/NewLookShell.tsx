@@ -6,6 +6,7 @@ import { TopProgressBar } from "../../_components/TopProgressBar";
 import { TrialBanner } from "../../_components/TrialBanner";
 import { AppContent } from "./AppContent";
 import { AppNav } from "./AppNav";
+import { LocationBridge } from "./LocationBridge";
 
 /**
  * The site-wide "pause motion" choice (landing footer toggle →
@@ -76,6 +77,7 @@ export function NewLookShell({
         </AppContent>
         <AppNav />
         <TopProgressBar />
+        <LocationBridge />
       </div>
       {/* Outside the canvas, which is its own stacking context; the welcome
         lifts itself into the browser's top layer once it runs. */}

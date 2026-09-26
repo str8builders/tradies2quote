@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { computeQuoteTotals } from "@/lib/quote-defaults";
 import { formatHours, formatTime, parseTime, sumHours, timeValue, workedTime } from "./hours";
-import { buildTimesheetInvoice, hoursByDay, parseRate, type BillableEntry } from "./invoice";
+import { buildTimesheetInvoice, hoursByDay, kmByDay, parseKmRate, parseRate, type BillableEntry } from "./invoice";
 import { addDays, dayLabel, parseDayKey, resolveWeek, weekDays, weekLabel, weekStart } from "./week";
 
 describe("hours", () => {
@@ -120,5 +120,36 @@ describe("hours to an invoice", () => {
     expect(parseRate("abc")).toBeNull();
     expect(parseRate(20000)).toBeNull();
     expect(hoursByDay([])).toEqual([]);
+  });
+
+  it("adds travel: one line per day with kilometres, at the rate per km", () => {
+    const result = buildTimesheetInvoice({
+      ...base,
+      travelRate: 1.04,
+      entries: [
+        { ...entry("a", "2026-09-21", 8), km: 22.4 },
+        { ...entry("b", "2026-09-21", 5, "Sione"), km: 10.1 },
+        { ...entry("c", "2026-09-22", 7.5), km: null },
+      ],
+    });
+    if (!result.ok) throw new Error(result.error);
+    const travel = result.quoteData.line_items.filter((l) => l.type === "other");
+    expect(travel.map((l) => [l.description, l.quantity, l.unit, l.unit_price, l.line_total])).toEqual([
+      ["Travel, Mon 21 Sept", 32.5, "km", 1.04, 33.8],
+    ]);
+    expect(result.km).toBe(32.5);
+    const expected = computeQuoteTotals(result.quoteData.line_items, 0, 15);
+    expect(result.quoteData.total).toBe(expected.total);
+    // Hours are unchanged by travel.
+    expect(result.hours).toBe(20.5);
+  });
+
+  it("travel needs a sensible rate; no travel asked for, no travel lines", () => {
+    expect(buildTimesheetInvoice({ ...base, travelRate: 0, entries: [{ ...entry("a", "2026-09-21", 8), km: 5 }] }).ok).toBe(false);
+    const none = buildTimesheetInvoice({ ...base, entries: [{ ...entry("a", "2026-09-21", 8), km: 5 }] });
+    expect(none.ok && none.quoteData.line_items.every((l) => l.type === "labour")).toBe(true);
+    expect(parseKmRate("0.95")).toBe(0.95);
+    expect(parseKmRate("25")).toBeNull();
+    expect(kmByDay([{ ...entry("a", "2026-09-22", 1), km: 0.04 }])).toEqual([]);
   });
 });

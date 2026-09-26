@@ -9,6 +9,7 @@ import { businessTimeZone, dayKeyInZone } from "../_v2/lib/dates";
 import { loadTopBarData } from "../_v2/lib/top-bar";
 import { TabTopBar } from "../_v2/shell/TabTopBar";
 import { loadTimesheet } from "./_lib/load";
+import { getLocationState } from "./location-actions";
 import { TimesheetView } from "./_components/TimesheetView";
 
 export const metadata: Metadata = { title: "Timesheet" };
@@ -46,7 +47,10 @@ export default async function TimesheetPage({
   const zone = businessTimeZone(place?.country ?? null, place?.currency ?? null);
   const now = requestTime();
   const today = dayKeyInZone(now, zone) ?? now.toISOString().slice(0, 10);
-  const data = await loadTimesheet({ userId: user.id, weekStart: resolveWeek(first(params.week), today), today });
+  const [data, location] = await Promise.all([
+    loadTimesheet({ userId: user.id, weekStart: resolveWeek(first(params.week), today), today }),
+    getLocationState({ lookUp: true }).catch(() => null),
+  ]);
 
   return (
     <Screen height="fill" data-testid="timesheet-screen">
@@ -56,7 +60,7 @@ export default async function TimesheetPage({
           title="Timesheet"
           description={data.canInvoice ? "Everyone's hours, and invoice a client for the week." : "Your hours, day by day."}
         />
-        <TimesheetView data={data} openAdd={first(params.add) === "today"} />
+        <TimesheetView data={data} location={location} openAdd={first(params.add) === "today"} />
       </main>
     </Screen>
   );

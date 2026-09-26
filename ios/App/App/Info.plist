@@ -33,7 +33,13 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Attach existing plan photos and site pictures to your quotes.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Check wind and rain risk at your job site using your current location, only when you tap the location button.</string>
+	<string>When you start or finish work, Tradies2Quote pins where you are (for example "At the Hemi Walker job") on your timesheet, and checks the weather at your site.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Only if you turn it on in the Timesheet: while you're clocked in, Tradies2Quote keeps your route to work out travel kilometres and show your boss where the team is; and with automatic clock-in, it starts and stops your hours when you arrive at and leave a job, in your work hours only.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

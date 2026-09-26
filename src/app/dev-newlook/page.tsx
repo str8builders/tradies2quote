@@ -13,6 +13,7 @@ import { contrastAttributeValue } from "@/lib/ui/outdoor";
 import { TimesheetView } from "@/app/app/timesheet/_components/TimesheetView";
 import type { TimesheetData } from "@/app/app/timesheet/_lib/types";
 import { ForgetWelcome } from "./ForgetWelcome";
+import { NativeTest } from "./NativeTest";
 import { TalkLive } from "./TalkLive";
 import { TalkPreview } from "./TalkPreview";
 
@@ -160,7 +161,7 @@ const timesheet: TimesheetData = {
       userId: "me",
       person: "You",
       mine: true,
-      invoice: null,
+      invoice: null, pins: null, km: null
     },
     {
       id: "e2",
@@ -175,7 +176,7 @@ const timesheet: TimesheetData = {
       userId: "s",
       person: "Sione",
       mine: false,
-      invoice: null,
+      invoice: null, pins: null, km: null
     },
     {
       id: "e3",
@@ -190,7 +191,7 @@ const timesheet: TimesheetData = {
       userId: "me",
       person: "You",
       mine: true,
-      invoice: null,
+      invoice: null, pins: null, km: null
     },
     {
       id: "e4",
@@ -205,7 +206,7 @@ const timesheet: TimesheetData = {
       userId: "me",
       person: "You",
       mine: true,
-      invoice: { id: "i1", number: "INV-3F9A21C0" },
+      invoice: { id: "i1", number: "INV-3F9A21C0" }, pins: null, km: null
     },
   ],
   clients: [
@@ -228,6 +229,7 @@ const timesheet: TimesheetData = {
   taxLabel: "GST",
   taxRate: 15,
   failed: false,
+  travelRate: null,
 };
 
 /**
@@ -277,6 +279,8 @@ export default async function DevNewLookPage({
         <TimesheetView data={timesheet} />
       </main>
     );
+  } else if (screen === "native") {
+    content = <NativeTest />;
   } else if (screen === "talk-live") {
     content = <TalkLive />;
   } else if (screen === "talk" || screen === "recording") {
