@@ -28,6 +28,9 @@
 
 /* ── Layers behind the story ───────────────────────────────────────── */
 .jobsite-layer { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+/* Inside the house the canvas holds only the floating phone, over the rooms
+   and under the header, step links and Start button. */
+.jobsite-layer[data-space="house"] { z-index: 20; }
 .jobsite-flash {
   position: fixed; inset: 0; z-index: 5; pointer-events: none; opacity: 0;
   background: radial-gradient(120% 90% at 50% 55%, #fff7ec 0%, #ffe0c2 45%, #ff9d62 100%);
@@ -145,28 +148,45 @@
 @media (prefers-reduced-motion: reduce) { .house-photo { animation: none; } }
 .house-scrim {
   position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  background: linear-gradient(180deg, rgba(10, 10, 10, 0.8) 0%, rgba(10, 10, 10, 0.4) 36%, rgba(10, 10, 10, 0) 56%, rgba(10, 10, 10, 0.45) 100%);
+  background: linear-gradient(180deg, rgba(10, 10, 10, 0.82) 0%, rgba(10, 10, 10, 0.5) 38%, rgba(10, 10, 10, 0.34) 58%, rgba(10, 10, 10, 0.62) 100%);
 }
-.house-side { position: absolute; inset: 0; }
-/* Clear of the header and the step links above it. */
-.house-copy { position: relative; max-width: 560px; padding: calc(env(safe-area-inset-top, 0px) + 124px) 16px 0; }
-.house-count { margin: 0; font: 500 12px/1.5 var(--font-mono); letter-spacing: 0.16em; text-transform: uppercase; color: rgba(242, 239, 234, 0.82); }
+/* Phones: the word and the bold line across the top; the body beside the
+   phone slot, which takes whatever height is left. Clear of the header and
+   step links above and the Start button below. */
+.house-side {
+  position: absolute; inset: 0;
+  display: grid; grid-template-columns: minmax(0, 1fr) 40vw;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-areas: "count count" "word word" "bold bold" "body phone";
+  column-gap: 14px;
+  padding: calc(env(safe-area-inset-top, 0px) + 124px) 16px calc(env(safe-area-inset-bottom, 0px) + 80px);
+}
+.house-count { grid-area: count; margin: 0; font: 500 12px/1.5 var(--font-mono); letter-spacing: 0.16em; text-transform: uppercase; color: rgba(242, 239, 234, 0.82); }
 .house-filmed { letter-spacing: 0.06em; }
 .house-word {
-  margin: 6px 0 10px; font-family: var(--font-display); font-weight: 400; text-transform: uppercase;
+  grid-area: word; margin: 6px 0 10px; font-family: var(--font-display); font-weight: 400; text-transform: uppercase;
   font-size: clamp(64px, 17vw, 168px); line-height: 0.86; letter-spacing: -0.02em; color: #f7f4ef;
   text-shadow: 0 4px 40px rgba(0, 0, 0, 0.45);
 }
-.house-bold { margin: 0 0 10px; max-width: 22ch; font: 700 clamp(20px, 5.4vw, 32px)/1.15 var(--font-sans); color: #fff; text-shadow: 0 2px 20px rgba(0, 0, 0, 0.6); }
-.house-body { margin: 0; max-width: 42ch; font-size: 15px; line-height: 1.55; color: #e8e2d8; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.75); }
-.house-phone { position: absolute; right: 16px; bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); width: 44vw; max-width: 230px; margin: 0; }
-.house-phone-frame {
-  padding: 6px; border-radius: 18px; background: #111; border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+.house-bold { grid-area: bold; margin: 0 0 12px; max-width: 22ch; font: 700 clamp(20px, 5.4vw, 32px)/1.15 var(--font-sans); color: #fff; text-shadow: 0 2px 20px rgba(0, 0, 0, 0.6); }
+.house-body { grid-area: body; align-self: start; margin: 0; max-width: 42ch; font-size: 14px; line-height: 1.5; color: #e8e2d8; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.8); }
+.house-phone { grid-area: phone; min-height: 0; margin: 0; display: flex; flex-direction: column; }
+/* The slot is phone-shaped space. With 3D the floating phone fills it
+   (canvas/HousePhone.tsx, contained to BODY_ASPECT = 0.4848); without, the
+   drawn phone below shows the step's finished screen. */
+/* At the bottom of the slot, on its caption: it stays put however long each room's words are. */
+.house-phone-slot { flex: 1 1 0; min-height: 0; container-type: size; display: grid; place-items: end center; }
+.house-phone-device {
+  --dw: min(100cqw, 100cqh * 0.4848);
+  width: var(--dw); aspect-ratio: 0.4848; padding: calc(var(--dw) * 0.0435); border-radius: calc(var(--dw) * 0.155);
+  background: #030304; box-shadow: inset 0 0 0 calc(var(--dw) * 0.014) #48484b, 0 24px 60px rgba(0, 0, 0, 0.55);
+  transition: opacity 0.3s ease;
 }
-.house-phone-frame img { display: block; width: 100%; height: auto; border-radius: 12px; }
+.house-phone-device img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: calc(var(--dw) * 0.13); }
+/* The picture stays in the page (and for screen readers) under the 3D phone. */
+.jobsite[data-ready] .house-phone-device { opacity: 0; }
 .house-phone figcaption {
-  margin-top: 6px; text-align: center; font: 500 10px/1.3 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase;
+  flex: none; margin-top: 8px; text-align: center; font: 500 10px/1.3 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase;
   color: rgba(242, 239, 234, 0.7);
 }
 /* Computers: the footage stands as a tall panel (never stretched), a soft
@@ -179,11 +199,17 @@
     margin-left: 6vw; border-radius: 8px; overflow: hidden; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
   }
   .house-scrim { display: none; }
-  .house-side { position: relative; inset: auto; flex: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 28px 48px; padding: 0 6vw 0 5vw; }
-  .house-copy { flex: 1 1 340px; max-width: 600px; padding: 0; }
+  /* The words, and the phone standing tall beside them. */
+  .house-side {
+    position: relative; inset: auto; flex: 1; align-self: stretch;
+    grid-template-columns: minmax(0, 1fr) clamp(210px, 20vw, 290px);
+    grid-template-rows: 1fr auto auto auto auto 1fr;
+    grid-template-areas: ". phone" "count phone" "word phone" "bold phone" "body phone" ". phone";
+    column-gap: clamp(32px, 4vw, 72px); padding: 0 6vw 0 5vw;
+  }
   .house-word { font-size: clamp(56px, 6vw, 120px); }
-  .house-body { font-size: 16px; }
-  .house-phone { position: relative; right: auto; bottom: auto; flex: 0 0 220px; width: 220px; max-width: none; }
+  .house-body { font-size: 16px; line-height: 1.55; }
+  .house-phone { align-self: center; height: min(78svh, 640px); }
 }
 
 /* ── Scene 4: the finished home, then the details ───────────────────── */
@@ -287,6 +313,8 @@
   .jobsite-steps { left: auto; right: 20px; top: 50%; transform: translateY(-50%); }
   .jobsite-steps ol { flex-direction: column; align-items: flex-end; }
   .jobsite-steps a { font-size: 12px; padding: 0 12px; }
+  /* The step links have the right edge to themselves: the phone stays clear of them. */
+  .house-side { padding-right: 150px; }
 }
 .jobsite-sticky-start {
   position: fixed; z-index: 35; left: 16px; right: 16px; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);

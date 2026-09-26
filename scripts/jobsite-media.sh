@@ -19,7 +19,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BIN="$ROOT/node_modules/@remotion/compositor-darwin-arm64"
 OUT="$ROOT/public/jobsite"
 ff() { DYLD_LIBRARY_PATH="$BIN" "$BIN/ffmpeg" -v error -y "$@"; }
-mkdir -p "$OUT/rooms" "$OUT/screens"
+mkdir -p "$OUT/rooms"
 
 A="$SRC/segment_video_2.MP4"
 B="$SRC/segment_video_2 2.MP4"
@@ -50,14 +50,7 @@ ff -i "$TMP/front.jpg" -map_metadata -1 -q:v 3 "$OUT/finished-front.jpg"
 ff -i "$TMP/deck.jpg" -map_metadata -1 -q:v 3 "$OUT/finished-deck.jpg"
 rm -rf "$TMP"
 
-# The phone screens: the 30-second demo's own screens (example job, example
-# figures) at the moment each is complete, cropped to the app area.
-DEMO="$ROOT/public/videos/demo-tall.mp4"
-screen() { ff -ss "$2" -i "$DEMO" -frames:v 1 -map_metadata -1 -vf "crop=iw:ih*0.67:0:ih*0.13" -q:v 3 "$OUT/screens/$1.jpg"; }
-screen talk 4.8      # "Confirm before I quote": the site note read back
-screen draft 10.8    # the quote total and price breakdown
-screen check 16.8    # the labour line after the tradie's edit (24 hr × $65 = $1,560)
-screen send 22.8     # the client signing with a finger
-screen invoice 28.8  # INV-0042, paid
+# The floating phone's screens are not made here: Remotion renders them
+# (node scripts/render-marketing.mjs --only=steps → public/jobsite/screens).
 
 echo "done: $(du -sh "$OUT" | cut -f1) in $OUT"
