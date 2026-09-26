@@ -250,7 +250,6 @@ export function HousePhone({
     r.model.body.rotation.set(-0.05 + Math.sin(t * 0.77 + 1.2) * 0.03, yaw, 0.03 + Math.sin(t * 0.61 + 0.4) * 0.018);
     r.model.body.position.y = Math.sin(t * 1.1) * 0.014;
     r.model.shade.scale.x = 0.55 + 0.45 * Math.abs(Math.cos(yaw));
-    r.model.glare.offset.x = 0.25 - Math.sin(yaw) * 0.22;
     invalidate();
   });
 
