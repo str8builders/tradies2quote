@@ -143,7 +143,7 @@ export default async function DebugPage({
     <div className="min-h-screen text-white">
       <AppHeader context="Debug" />
 
-      <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
+      <main data-legacy-body="" className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
         <div className="mb-8">
           <div className="t2q-section-label-pro mb-3">{"// owner"}</div>
           <h1 className="font-display text-3xl uppercase tracking-tight sm:text-4xl">

@@ -43,7 +43,9 @@ export default async function SuppliersPage({
   return (
     <div className="min-h-screen text-white">
       <AppHeader context="Suppliers" />
-      <SupplierBrowser initialUrl={initialUrl} />
+      <div data-legacy-body="">
+        <SupplierBrowser initialUrl={initialUrl} />
+      </div>
     </div>
   );
 }

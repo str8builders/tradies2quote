@@ -237,7 +237,7 @@ function MoneyTile({
           total.amount > 0 ? look.amount : "text-ui-text",
         )}
       />
-      <span className="mt-1 block text-ui-xs text-ui-faint">
+      <span className="mt-1 block text-ui-xs text-ui-muted">
         {detail}
         {otherCurrencies(total.otherCurrencies)}
       </span>
@@ -417,9 +417,9 @@ export interface HomeViewProps {
 
 /**
  * The new-look Home under the top bar: the photo hero, four quick actions,
- * then what needs doing today, most urgent first, and the money. The New
- * quote action is the raised (+) at the thumb; "Talk a quote" opens the
- * mic directly.
+ * the money (owed to you, paid this month), then getting set up and what
+ * needs doing today, most urgent first. The New quote action is the raised
+ * (+) at the thumb; "Talk a quote" opens the mic directly.
  */
 export function HomeView({ summary, weather, setup, todos, hasJobs, tiles, failed, t2qcal = false }: HomeViewProps) {
   return (
@@ -439,13 +439,13 @@ export function HomeView({ summary, weather, setup, todos, hasJobs, tiles, faile
           Check your signal, then try again.
         </Callout>
       ) : null}
+      {tiles ? <MoneyTiles owed={tiles.owed} paidThisMonth={tiles.paidThisMonth} /> : null}
       {setup ? <SetupCard steps={setup} /> : null}
       {failed ? null : todos.length > 0 ? (
         <TodoList todos={todos} />
       ) : setup ? null : (
         <HomeEmpty hasJobs={hasJobs} />
       )}
-      {tiles ? <MoneyTiles owed={tiles.owed} paidThisMonth={tiles.paidThisMonth} /> : null}
     </div>
   );
 }
@@ -462,11 +462,11 @@ export function HomeSkeleton() {
         <Skeleton className="aspect-square" />
         <Skeleton className="aspect-square" />
       </div>
-      <Skeleton className="h-36 w-full" />
       <div className="grid grid-cols-2 gap-3">
         <Skeleton className="h-28" />
         <Skeleton className="h-28" />
       </div>
+      <Skeleton className="h-36 w-full" />
     </div>
   );
 }

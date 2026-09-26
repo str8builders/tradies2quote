@@ -9,6 +9,8 @@ import { Card } from "@/components/ui/card";
 import { IconTile } from "@/components/ui/icon-tile";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusPill } from "@/components/ui/status-pill";
+import { cx } from "@/components/ui/cx";
+import { TAP } from "@/components/ui/styles";
 import { WEATHER_IMPACT_ADVISORY } from "@/lib/weather-impact/config";
 import type { WeatherImpactTrade } from "@/lib/weather-impact/types";
 import { WeatherIcon } from "./weather-icons";
@@ -27,9 +29,6 @@ import {
   type NoWeatherReason,
   type WeatherState,
 } from "./weather-now";
-
-const SELECT =
-  "ui-focus-ring min-h-12 w-full rounded-ui-md border-2 border-ui-line-strong bg-ui-surface px-4 text-ui-base text-ui-text";
 
 type ReadyState = Extract<WeatherState, { kind: "ready" }>;
 
@@ -110,23 +109,36 @@ function Ready({
 
       {call ? (
         <section aria-labelledby={`${id}-trade`} className="space-y-2" data-testid="weather-your-trade" data-call={call.status}>
-          <label id={`${id}-trade`} htmlFor={`${id}-trade-pick`} className="block px-1 text-ui-sm font-semibold text-ui-muted">
-            Your trade
-          </label>
-          <select
-            id={`${id}-trade-pick`}
-            value={call.id}
-            onChange={(e) => {
-              if (isTrade(e.target.value)) onTrade(e.target.value);
-            }}
-            className={SELECT}
-          >
-            {weather.trades.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.label}
-              </option>
-            ))}
-          </select>
+          <div className="px-1">
+            <h3 id={`${id}-trade`} className="text-ui-base font-semibold text-ui-text">
+              Your trade
+            </h3>
+            <p className="text-ui-sm text-ui-muted">Tap yours to see what the weather means for your work.</p>
+          </div>
+          <div role="radiogroup" aria-labelledby={`${id}-trade`} data-testid="weather-trade-picker" className="flex flex-wrap gap-2">
+            {weather.trades.map((t) => {
+              const on = t.id === call.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  data-trade={t.id}
+                  onClick={() => {
+                    if (isTrade(t.id)) onTrade(t.id);
+                  }}
+                  className={cx(
+                    "ui-focus-ring min-h-11 rounded-full px-4 text-ui-sm font-semibold",
+                    TAP,
+                    on ? "bg-ui-brand text-ui-on-brand" : "border-2 border-ui-line-strong bg-ui-surface text-ui-text",
+                  )}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
           <Card className="space-y-3">
             <div className="flex items-start gap-3">
               <StatusPill tone={CALL_TONE[call.status]}>{CALL_WORDS[call.status]}</StatusPill>

@@ -3,6 +3,7 @@ import { cx } from "@/components/ui/cx";
 import { UI_TEXT } from "@/components/ui/styles";
 import type { TopBarData } from "../lib/top-bar";
 import { AccountButton } from "./AccountButton";
+import { SettingsTip } from "./SettingsTip";
 import { WeatherButton } from "./WeatherButton";
 import type { WeatherState } from "./weather-now";
 
@@ -43,6 +44,8 @@ export function TabTopBar({ data, title, description, weatherPreview }: TabTopBa
         {data.weather ? <WeatherButton preview={weatherPreview} /> : null}
       </div>
       {description ? <p className="text-ui-base text-ui-muted">{description}</p> : null}
+      {/* Home only: a one-time pointer to the settings behind the photo. */}
+      {greeting ? <SettingsTip /> : null}
     </header>
   );
 }

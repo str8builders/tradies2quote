@@ -78,7 +78,7 @@ export const UI_THEMES: Readonly<Record<UiMode, UiTheme>> = {
       "line-strong": "#75736C",
       text: "#F5F4F0",
       muted: "#BDBBB3",
-      faint: "#8E8C85",
+      faint: "#9A9891",
       brand: "#FF5F15",
       "brand-text": "#FF8A4C",
       "on-brand": "#121211",

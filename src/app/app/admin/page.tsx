@@ -33,7 +33,7 @@ export default async function AdminPage() {
   return (
     <div className="min-h-screen text-white">
       <AppHeader context="Ops" />
-      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
+      <main data-legacy-body="" className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12">
         <AdminDashboard initial={initial} />
       </main>
     </div>

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { SignOut } from "@phosphor-icons/react/dist/ssr";
+import { GearSix, SignOut } from "@phosphor-icons/react/dist/ssr";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import { NewLookRow } from "../../more/_components/NewLookRow";
 import { MORE_TONE, accountMenuSections, ownerMenu, type MoreItem } from "../../more/_lib/menu";
 import type { TopBarData } from "../lib/top-bar";
 import { Avatar } from "./Avatar";
+import { OPEN_ACCOUNT_EVENT, markSettingsTipSeen } from "./SettingsTip";
 import { T2QCALRow } from "./T2QCALLauncher";
 
 type AccountData = Pick<
@@ -84,18 +85,41 @@ export function AccountButton({ data }: { data: AccountData }) {
   const sections = accountMenuSections();
   const owner = ownerMenu(data.isOwner);
   const close = () => setOpen(false);
+  const show = () => {
+    setOpen(true);
+    markSettingsTipSeen();
+  };
+
+  // The Home tip's "Show me" opens this menu.
+  useEffect(() => {
+    const onOpen = () => {
+      setOpen(true);
+      markSettingsTipSeen();
+    };
+    window.addEventListener(OPEN_ACCOUNT_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_ACCOUNT_EVENT, onOpen);
+  }, []);
+
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={show}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label="Your account and settings"
         data-testid="top-bar-account"
-        className={cx("ui-focus-ring inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full", TAP, PRESS)}
+        className={cx("ui-focus-ring relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full", TAP, PRESS)}
       >
         <Avatar avatarUrl={data.avatarUrl} letter={data.letter} />
+        {/* Says "settings are in here" without words. */}
+        <span
+          aria-hidden="true"
+          data-testid="account-settings-badge"
+          className="absolute -right-0.5 -bottom-0.5 grid h-5 w-5 place-items-center rounded-full bg-ui-surface text-ui-text ring-2 ring-ui-bg"
+        >
+          <GearSix weight="fill" className="text-[0.75rem]" />
+        </span>
       </button>
       <BottomSheet open={open} onClose={close} title="Your account">
         <SheetHeader data={data} />

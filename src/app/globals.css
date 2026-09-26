@@ -198,7 +198,7 @@
   --ui-line-strong: #75736C;
   --ui-text: #F5F4F0;
   --ui-muted: #BDBBB3;
-  --ui-faint: #8E8C85;
+  --ui-faint: #9A9891;
   --ui-brand: #FF5F15;
   --ui-brand-text: #FF8A4C;
   --ui-on-brand: #121211;
@@ -2294,6 +2294,17 @@ body:has([data-shell="app"]) {
   --t2q-app-text: #17212B;
   --t2q-app-muted: #607383;
   --t2q-app-orange-soft: #FFF1EA;
+}
+
+/* OUTDOOR SAFETY NET — screens not yet moved to the new look.
+   They were built for the dark look (white text, ink greys) and don't react
+   to outdoor mode, so on its white page they'd be white-on-white. Until each
+   one is converted, its body (marked data-legacy-body) keeps the dark panel
+   it was designed on. Remove a screen's marker when it moves to ui- tokens. */
+[data-look="new"][data-contrast="outdoor"] [data-legacy-body] {
+  background-color: #111110;
+  color: #f5f4f0;
+  border-radius: 1rem;
 }
 
 /* MOBILE SHELL CONTRACT — owner: APP PAGE PAINT.

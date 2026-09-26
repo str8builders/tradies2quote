@@ -73,7 +73,7 @@ describe("the weather button", () => {
     const tag = openTag(out, 'data-testid="top-bar-weather"');
     expect(tag).toContain('data-state="ready"');
     expect(tag).toContain(
-      'aria-label="Weather: 14 degrees, light rain. Caution for general outdoor labour. Tap for the impact on today&#x27;s work."',
+      'aria-label="Weather: 14 degrees, light rain, in Tauranga. Caution for general outdoor labour. Tap for the impact on today&#x27;s work."',
     );
     expect(tag).toContain('aria-haspopup="dialog"');
     expect(tag).toContain('aria-expanded="false"');
@@ -130,7 +130,10 @@ describe("the Weather impact sheet", () => {
     // Your trade, picked, with its call and reason first
     const yours = out.slice(out.indexOf('data-testid="weather-your-trade"'), out.indexOf('data-testid="weather-other-trades"'));
     expect(yours).toContain('data-call="caution"');
-    expect(yours).toMatch(/<option value="general_outdoor" selected="">General outdoor labour<\/option>/);
+    // The trade picker: big tap buttons, yours filled in.
+    expect(yours).toContain('data-testid="weather-trade-picker"');
+    expect(yours).toMatch(/role="radio" aria-checked="true" data-trade="general_outdoor"[^>]*>General outdoor labour</);
+    expect(yours).toMatch(/role="radio" aria-checked="false" data-trade="roofing"/);
     expect(yours).toContain("Caution");
     expect(yours).toContain("enough to affect handling and balance");
     expect(out.indexOf("weather-your-trade")).toBeLessThan(out.indexOf("weather-other-trades"));
@@ -157,7 +160,7 @@ describe("the Weather impact sheet", () => {
 
   it("your trade's better window, when it has one", () => {
     const out = sheet(readyState(), { trade: "roofing" });
-    expect(out).toMatch(/<option value="roofing" selected="">Roofing<\/option>/);
+    expect(out).toMatch(/role="radio" aria-checked="true" data-trade="roofing"[^>]*>Roofing</);
     expect(out).toContain('data-testid="weather-better-window"');
     expect(out).toContain("Sat 2:00 pm-Sat 4:00 pm looks better");
     expect(sheet(readyState())).not.toContain("weather-better-window");
@@ -216,5 +219,20 @@ describe("TabTopBar: the weather, top right", () => {
   it("left out when it's parked (or not given)", () => {
     expect(html(<TabTopBar data={{ ...TOP_BAR_FIXTURE, weather: false }} title="Jobs" />)).not.toContain("top-bar-weather");
     expect(html(<TabTopBar data={TOP_BAR_FIXTURE} />)).not.toContain("top-bar-weather");
+  });
+});
+
+describe("the town next to the weather", () => {
+  it("shows where the forecast is for, beside the icon and in the words read out", () => {
+    const state = readyState({ locality: "Tauranga" });
+    const out = html(<WeatherButtonView state={state} trade="general_outdoor" open={false} onOpen={noop} />);
+    expect(out).toContain('data-testid="weather-town"');
+    expect(out).toContain(">Tauranga<");
+    expect(out).toMatch(/aria-label="Weather: 14 degrees, [^"]*in Tauranga\./);
+  });
+
+  it("no town, no gap", () => {
+    const out = html(<WeatherButtonView state={readyState({ locality: null })} trade="general_outdoor" open={false} onOpen={noop} />);
+    expect(out).not.toContain('data-testid="weather-town"');
   });
 });
