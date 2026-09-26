@@ -111,7 +111,9 @@ export type Feature = {
  * look, which everyone on the web has had since 27 Sep 2026
  * (T2Q_NEW_LOOK_DEFAULT=on): Start work / Finish work, pinned to the job
  * when location's on, and "Invoice this week" at the labour rate. Travel km
- * need the route only the iPhone app records, so they're in COMING_SOON.
+ * are recorded only while location is on and the route is being sent (on
+ * the web, while the Timesheet page is open; the iPhone app, roughly, even
+ * when closed), so the web feature doesn't promise them.
  */
 export const FEATURES: readonly Feature[] = [
   {
@@ -151,7 +153,7 @@ export const FEATURES: readonly Feature[] = [
   },
 ];
 
-/** Only the iPhone app does this (it needs location in the background), and that app isn't public yet. */
+/** Only the iPhone app does this (region monitoring runs in the app), and that app isn't public yet. */
 export const COMING_SOON = {
   tag: "Coming to the iPhone app",
   // A non-breaking hyphen, so a narrow screen never splits "clock-in".

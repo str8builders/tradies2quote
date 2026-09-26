@@ -2,8 +2,9 @@
  * The timesheet (new look: app/timesheet/_components/ClockCard.tsx,
  * TimesheetView.tsx, InvoiceWeekSheet.tsx) for a solo tradie on the web:
  * clocked in on the Sam Taylor job, "Finish work" with the 30-minute break,
- * the day's hours on the week, then "Invoice this week". Travel km come
- * from the route only the iPhone app records, so they're left out. The
+ * the day's hours on the week, then "Invoice this week". Travel km need
+ * the route recorded while clocked in (on the web only while the Timesheet
+ * page is open), so the web feature leaves them out. The
  * wording and colours are the app's (globals.css --ui-* tokens); the
  * figures are the example job's ($65 an hour).
  */
