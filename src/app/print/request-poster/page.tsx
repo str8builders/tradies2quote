@@ -50,7 +50,7 @@ export default async function RequestPosterPage() {
       .t2q-poster-inapp{margin:0;max-width:560px;text-align:center;font-size:14px;line-height:1.4;color:#f4f3ef;}
       @media(max-width:520px){.t2q-poster-band{padding:20px 18px;}.t2q-poster-body{padding:24px 16px 22px;}.t2q-poster-steps{grid-template-columns:1fr;gap:10px;}.t2q-poster-logo{height:52px;}}
       @media print{
-        html,body{background:#fff!important;}
+        html,body{background:#fff!important;color-scheme:light!important;}
         .t2q-poster-page{background:#fff;padding:0;min-height:0;}
         .t2q-poster-top,.t2q-poster-actions,.t2q-poster-hint,.studio-wallpaper,.studio-motion-toggle,[data-testid="cookie-consent"],[data-testid="site-live-wallpaper"]{display:none!important;}
         .t2q-poster{box-shadow:none;border-radius:0;max-width:none;page-break-inside:avoid;}

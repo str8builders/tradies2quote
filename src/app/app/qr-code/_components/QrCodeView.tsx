@@ -29,6 +29,25 @@ import { requestLinkUrl } from "../../settings/_newlook/RequestLinkCard";
 import { POSTER_PATH, QR_GUIDE, STICKER_HREF } from "../_lib/guide";
 import { ShareQrButton } from "./ShareQrButton";
 
+/** The link in words, allowed to wrap after each slash rather than mid-name. */
+function LinkWords({ link }: { link: string }) {
+  const parts = link.replace(/^https?:\/\//, "").split("/");
+  return (
+    <>
+      {parts.map((part, i) => (
+        <span key={i}>
+          {part}
+          {i < parts.length - 1 ? (
+            <>
+              /<wbr />
+            </>
+          ) : null}
+        </span>
+      ))}
+    </>
+  );
+}
+
 export const QR_INTRO =
   "Put it on your van, your site sign or your counter. Anyone who scans it can tell you about their job, and it lands in the app as a draft quote.";
 
@@ -169,9 +188,9 @@ export function QrCodeView({
             </p>
             <p
               data-testid="qr-code-link"
-              className="rounded-ui-md border border-ui-line bg-ui-surface-2 px-4 py-3 text-center font-semibold break-all text-ui-text"
+              className="rounded-ui-md border border-ui-line bg-ui-surface-2 px-4 py-3 text-center font-semibold break-words text-ui-text"
             >
-              {link.replace(/^https?:\/\//, "")}
+              <LinkWords link={link} />
             </p>
             <div className="grid grid-cols-2 gap-2">
               <Button variant="secondary" icon={<Copy weight="bold" />} onClick={copy}>

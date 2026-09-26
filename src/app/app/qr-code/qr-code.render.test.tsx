@@ -46,7 +46,10 @@ describe("Your QR code", () => {
     const out = view();
     expect(tagWith(out, 'data-testid="qr-code-image"')).toContain('src="/api/account/request-qr?v=bayside-builders"');
     expect(out).toContain("scan it straight off your phone");
-    expect(out).toContain(">tradies2quote.com/r/bayside-builders</p>");
+    const words = tagWith(out, 'data-testid="qr-code-link"');
+    expect(words).toContain("break-words");
+    // Wraps after a slash, never mid-name.
+    expect(out).toContain("<span>tradies2quote.com/<wbr/></span><span>r/<wbr/></span><span>bayside-builders</span>");
     expect(out).toContain("Copy link");
     expect(out).toContain('href="https://tradies2quote.com/r/bayside-builders"');
   });

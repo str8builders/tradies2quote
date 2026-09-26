@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 export const SETTINGS_TIP_KEY = "t2q-settings-tip-seen";
 /** Opens the photo menu from anywhere on the page. */
 export const OPEN_ACCOUNT_EVENT = "t2q:open-account";
-const SEEN_EVENT = "t2q:settings-tip-seen";
+/** Hides the tip on this page; the first-run tour sends it while it runs (the tip comes back next visit unless seen). */
+export const SETTINGS_TIP_SEEN_EVENT = "t2q:settings-tip-seen";
 
 /** The tip has done its job: never show it again on this phone. */
 export function markSettingsTipSeen(): void {
@@ -17,7 +18,7 @@ export function markSettingsTipSeen(): void {
   } catch {
     // Blocked storage: it just shows again next visit.
   }
-  window.dispatchEvent(new Event(SEEN_EVENT));
+  window.dispatchEvent(new Event(SETTINGS_TIP_SEEN_EVENT));
 }
 
 /** The tip itself (no storage), pointing up at the photo on the left. */
@@ -61,10 +62,10 @@ export function SettingsTip() {
       if (!seen) setShow(true);
     }, 0);
     const hide = () => setShow(false);
-    window.addEventListener(SEEN_EVENT, hide);
+    window.addEventListener(SETTINGS_TIP_SEEN_EVENT, hide);
     return () => {
       window.clearTimeout(t);
-      window.removeEventListener(SEEN_EVENT, hide);
+      window.removeEventListener(SETTINGS_TIP_SEEN_EVENT, hide);
     };
   }, []);
 

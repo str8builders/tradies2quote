@@ -1,10 +1,18 @@
 import { notFound } from "next/navigation";
+import QRCode from "qrcode";
+import { StickerSheet } from "@/app/print/_components/StickerSheet";
+import { stickerSize } from "@/app/print/_lib/sticker";
 import { AppNav } from "@/app/app/_v2/shell/AppNav";
+import { LegacyTopBar } from "@/app/app/_v2/shell/LegacyTopBar";
 import { NewLookWelcome } from "@/app/app/_v2/shell/NewLookWelcome";
 import { TabTopBar } from "@/app/app/_v2/shell/TabTopBar";
 import { HomeView } from "@/app/app/_v2/home/HomeParts";
 import { WeatherLineView } from "@/app/app/_v2/home/WeatherLine";
 import { TOP_BAR_FIXTURE } from "@/app/app/_v2/lib/fixtures";
+import { setupSteps } from "@/app/app/_v2/lib/setup-steps";
+import { HomeTour } from "@/app/app/_v2/tour/HomeTour";
+import { QrCodeView } from "@/app/app/qr-code/_components/QrCodeView";
+import { ToastProvider } from "@/components/ui/toast";
 import type { MoneyTotal, Todo } from "@/app/app/_v2/lib/home-todos";
 import type { JobRow } from "@/app/app/_v2/lib/job-board";
 import { JobsBrowser } from "@/app/app/jobs/_components/JobsBrowser";
@@ -268,18 +276,30 @@ const timesheet: TimesheetData = {
 
 /**
  * Local-only look at the round-two new-look screens with made-up data
- * (?screen=home|jobs|more|timesheet|talk|recording|talk-live|welcome,
+ * (?screen=home|jobs|more|timesheet|talk|recording|talk-live|welcome|qr,
  * &outdoor=1). talk-live is the real recorder and meter (for trying the mic
- * in the iOS Simulator). Never served
- * in production.
+ * in the iOS Simulator). Home (and welcome) take &tour=1 for the first-run
+ * tour and &setup=1 for the setup card; qr takes &link=off and &inapp=1;
+ * sticker (the print sheet, alone) takes &size=small.
+ * Never served in production.
  */
 export default async function DevNewLookPage({
   searchParams,
 }: {
-  searchParams: Promise<{ screen?: string; outdoor?: string; t2qcal?: string }>;
+  searchParams: Promise<{ screen?: string; outdoor?: string; t2qcal?: string; setup?: string; link?: string; inapp?: string; size?: string }>;
 }) {
   if (process.env.NODE_ENV === "production") notFound();
-  const { screen = "home", outdoor, t2qcal } = await searchParams;
+  const { screen = "home", outdoor, t2qcal, setup, link, inapp, size } = await searchParams;
+  if (screen === "sticker") {
+    const url = "https://tradies2quote.com/r/str8-builders";
+    const svg = await QRCode.toString(url, { type: "svg", errorCorrectionLevel: "H", margin: 1, width: 640, color: { dark: "#0A0A0A", light: "#FFFFFF" } });
+    return (
+      <StickerSheet
+        size={stickerSize(size)}
+        data={{ business: "STR8 Builders", phone: "021 000 0000", logo: null, link: url, shortLink: url.replace("https://", ""), svg, inApp: inapp === "1" }}
+      />
+    );
+  }
   const main = "mx-auto w-full max-w-2xl px-4 pt-6 pb-10 sm:px-6 sm:pt-10";
   let content;
   if (screen === "jobs") {
@@ -315,6 +335,19 @@ export default async function DevNewLookPage({
         <TimesheetView data={timesheet} />
       </main>
     );
+  } else if (screen === "qr") {
+    content = (
+      <ToastProvider>
+        <LegacyTopBar context="Your QR code" />
+        <QrCodeView
+          initialSlug={link === "off" ? null : "str8-builders"}
+          appUrl="https://tradies2quote.com"
+          hasBusinessName
+          hasLogo={false}
+          inApp={inapp === "1"}
+        />
+      </ToastProvider>
+    );
   } else if (screen === "native") {
     content = <NativeTest />;
   } else if (screen === "talk-live") {
@@ -341,7 +374,11 @@ export default async function DevNewLookPage({
                 variant="chip"
               />
             }
-            setup={null}
+            setup={
+              setup === "1"
+                ? setupSteps({ businessName: "STR8 Builders", logoUrl: null, labourRate: 85, pricedMaterials: 3, quoteCount: 0 })
+                : null
+            }
             todos={todos}
             hasJobs
             tiles={{ owed, paidThisMonth: paid }}
@@ -349,6 +386,8 @@ export default async function DevNewLookPage({
             t2qcal={t2qcal !== "0"}
           />
         </div>
+        {/* ?tour=1 starts it (after the welcome, on ?screen=welcome). */}
+        <HomeTour firstRun={false} />
       </main>
     );
   }

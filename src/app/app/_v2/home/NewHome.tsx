@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Screen } from "@/components/ui/screen";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getCachedAuthUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { isWeatherImpactEnabled } from "@/lib/weather-impact/feature-flag";
 import { businessTimeZone, dayKeyInZone } from "../lib/dates";
@@ -11,6 +12,8 @@ import { loadBoard, loadHomeExtras } from "../lib/load-board";
 import { SETUP_DISMISSED_COOKIE, isSetupDismissed, setupSteps, showSetupCard } from "../lib/setup-steps";
 import type { TopBarData } from "../lib/top-bar";
 import { TabTopBar } from "../shell/TabTopBar";
+import { HomeTour } from "../tour/HomeTour";
+import { isFirstRun } from "../tour/tour-steps";
 import { HomeSkeleton, HomeView, type HomeViewProps } from "./HomeParts";
 import { WeatherLine } from "./WeatherLine";
 
@@ -84,32 +87,41 @@ export async function loadHomeData({
 }
 
 async function HomeBody({ userId, isOwner, t2qcal }: { userId: string; isOwner: boolean; t2qcal: boolean }) {
-  const { weather, ...view } = await loadHomeData({
-    db: await createClient(),
-    userId,
-    isOwner,
-    now: requestTime(),
-    setupDismissed: isSetupDismissed((await cookies()).get(SETUP_DISMISSED_COOKIE)?.value),
-  });
+  const now = requestTime();
+  const [{ weather, ...view }, { user }] = await Promise.all([
+    loadHomeData({
+      db: await createClient(),
+      userId,
+      isOwner,
+      now,
+      setupDismissed: isSetupDismissed((await cookies()).get(SETUP_DISMISSED_COOKIE)?.value),
+    }),
+    getCachedAuthUser(),
+  ]);
+  const firstRun = isFirstRun({ hasJobs: view.hasJobs, failed: view.failed, createdAt: user?.created_at, now });
   return (
-    <HomeView
-      {...view}
-      t2qcal={t2qcal}
-      weather={
-        weather ? (
-          <Suspense fallback={<Skeleton shape="line" className="h-9 w-48 rounded-full" />}>
-            <WeatherLine address={weather.address} todayKey={weather.todayKey} href={weather.href} variant="chip" />
-          </Suspense>
-        ) : null
-      }
-    />
+    <>
+      <HomeView
+        {...view}
+        t2qcal={t2qcal}
+        weather={
+          weather ? (
+            <Suspense fallback={<Skeleton shape="line" className="h-9 w-48 rounded-full" />}>
+              <WeatherLine address={weather.address} todayKey={weather.todayKey} href={weather.href} variant="chip" />
+            </Suspense>
+          ) : null
+        }
+      />
+      {/* Client only: nothing in the server HTML, and it waits for the welcome. */}
+      <HomeTour firstRun={firstRun} />
+    </>
   );
 }
 
 /**
  * /app in the new look (src/app/app/page.tsx switches here when
  * isNewLookOn()). The top bar (your photo, the greeting, T2QCAL) paints at
- * once; the day streams in behind a skeleton.
+ * once; the day streams in behind a skeleton, with the first-run tour.
  */
 export function NewHome({ userId, isOwner, bar }: { userId: string; isOwner: boolean; bar: TopBarData }) {
   return (
