@@ -14,15 +14,18 @@ import type { ReactNode } from "react";
 import { AbsoluteFill, useCurrentFrame, type CalculateMetadataFunction } from "remotion";
 import { EXAMPLE } from "../demo-script";
 import { ADD_BUTTON_FROM_TOP, BARCODE_SHEET_TOP as TOP, BarcodeSheet, type BarcodeStage } from "../screens/BarcodeScreens";
-import { QuoteReviewScreen } from "../screens/QuoteReviewScreen";
 import { ClientVideoScreen } from "../screens/QuoteVideoScreen";
 import { SupplierCaptureScreen, SupplierScanScreen } from "../screens/SupplierScanScreen";
 import { FinishSheet, InvoiceWeekSheet, TimesheetPage } from "../screens/TimesheetScreens";
 import { Tap as TapMark } from "../screens/ui";
+import { PushBanner } from "../screens/SystemUI";
+import { JobScreen } from "../screens/newlook/JobScreens";
+import { ClientRequestsScreen, PricesScreen } from "../screens/newlook/OtherScreens";
 import { eseg, seg } from "./anim";
 import { SCREEN_H, SCREEN_W, Screen } from "./Phone";
 import { Push } from "./Push";
-import { SECTIONS_SCROLL, deckingLine, finalLabour, storyShot } from "./story";
+import { REQUEST_BEATS } from "./beats";
+import { storyShot } from "./story";
 
 export const FEATURE_IDS = ["barcode", "supplier", "request", "video", "timesheet"] as const;
 export type FeatureId = (typeof FEATURE_IDS)[number];
@@ -68,11 +71,14 @@ function barcode(frame: number): ReactNode {
       : p < 0.74
         ? lerp(TOP.checking, TOP.found, eseg(p, 0.58, 0.61))
         : lerp(TOP.found, TOP.added, eseg(p, 0.74, 0.77));
+  // The job page scrolled to "Scan barcode", under "What's in the job".
+  const scanTap = tapAt(p, 0.01, 0.07, 195, 645);
   return (
     <>
-      <QuoteReviewScreen scroll={SECTIONS_SCROLL} total={EXAMPLE.total} decking={deckingLine()} labour={finalLabour()} />
+      <JobScreen stage="draft" scroll={120} scanPress={pressAt(p, 0.01, 0.07)} />
+      {scanTap ? <TapMark {...scanTap} /> : null}
       <BarcodeSheet
-        enter={eseg(p, 0, 0.08)}
+        enter={eseg(p, 0.07, 0.15)}
         stage={stage}
         top={top}
         t={t}
@@ -88,21 +94,28 @@ function barcode(frame: number): ReactNode {
 function supplier(frame: number): ReactNode {
   const p = frame / (FEATURE_FRAMES.supplier - 1);
   const t = frame / FPS;
-  const captureTap = tapAt(p, 0.1, 0.2, 195, 526) ?? tapAt(p, 0.26, 0.34, 195, 636);
-  const checkTap = tapAt(p, 0.84, 0.92, 113, 711);
+  const pricesTap = tapAt(p, 0.02, 0.08, 195, 324);
+  const captureTap = tapAt(p, 0.16, 0.22, 195, 511) ?? tapAt(p, 0.28, 0.34, 195, 618);
+  const checkTap = tapAt(p, 0.86, 0.93, 113, 711);
+  const prices = (
+    <Screen scale={SCALE}>
+      <PricesScreen press={pressAt(p, 0.02, 0.08)} />
+      {pricesTap ? <TapMark {...pricesTap} /> : null}
+    </Screen>
+  );
   const capture = (
     <Screen scale={SCALE}>
-      <SupplierCaptureScreen t={t} photo={seg(p, 0.16, 0.22)} reading={p >= 0.32} press={pressAt(p, 0.26, 0.34)} />
+      <SupplierCaptureScreen shell="new" t={t} photo={seg(p, 0.22, 0.26)} reading={p >= 0.34} press={pressAt(p, 0.28, 0.34)} />
       {captureTap ? <TapMark {...captureTap} /> : null}
     </Screen>
   );
   const check = (
     <Screen scale={SCALE}>
-      <SupplierScanScreen shown={seg(p, 0.56, 0.74) * 3} press={pressAt(p, 0.84, 0.92)} />
+      <SupplierScanScreen shell="new" shown={seg(p, 0.6, 0.76) * 3} press={pressAt(p, 0.86, 0.93)} />
       {checkTap ? <TapMark {...checkTap} /> : null}
     </Screen>
   );
-  return <Push p={eseg(p, 0.48, 0.56)} from={capture} to={check} />;
+  return p < 0.5 ? <Push p={eseg(p, 0.08, 0.14)} from={prices} to={capture} /> : <Push p={eseg(p, 0.5, 0.57)} from={capture} to={check} />;
 }
 
 function video(frame: number): ReactNode {
@@ -144,12 +157,29 @@ export function FeatureScreen({ feature }: FeatureScreenProps) {
   const frame = useCurrentFrame();
   let screen: ReactNode;
   if (feature === "request") {
-    // The request chapter from the full tour: the client's form, then the tradie's phone.
+    // The client's request form (the public page, unchanged), then the
+    // tradie's "Client requests" in the new look, then the draft it made.
     const p = Math.min(1, frame / 179);
+    const T = REQUEST_BEATS;
     const shot = storyShot("request", { p, frame, pace: "full" });
     if (!shot) return null;
-    const a = <Screen scale={SCALE}>{shot.a.screen}</Screen>;
-    screen = shot.b ? <Push p={shot.mix} from={a} to={<Screen scale={SCALE}>{shot.b.screen}</Screen>} /> : a;
+    const form = <Screen scale={SCALE}>{shot.a.screen}</Screen>;
+    const banner = Math.min(eseg(p, T.banner[0], T.banner[1]), 1 - eseg(p, T.banner[2], T.banner[3]));
+    const openTap = tapAt(p, T.open[0], T.open[1], 195, 462);
+    const requests = (
+      <Screen scale={SCALE}>
+        <ClientRequestsScreen arrive={eseg(p, T.arrive[0], T.arrive[1])} press={pressAt(p, T.open[0], T.open[1])}>
+          <PushBanner title="New quote request" body={`${EXAMPLE.client}: new timber deck, about 24 m²`} enter={banner} />
+        </ClientRequestsScreen>
+        {openTap ? <TapMark {...openTap} /> : null}
+      </Screen>
+    );
+    const draft = (
+      <Screen scale={SCALE}>
+        <JobScreen stage="draft" />
+      </Screen>
+    );
+    screen = p < T.open[1] ? <Push p={eseg(p, T.swap[0], T.swap[1])} from={form} to={requests} /> : <Push p={eseg(p, T.open[1], 1)} from={requests} to={draft} />;
   } else if (feature === "supplier") {
     screen = supplier(frame);
   } else {

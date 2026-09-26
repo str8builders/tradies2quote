@@ -8,6 +8,29 @@ import { Camera, CaretLeft, Check, CircleNotch, Receipt, UploadSimple } from "@p
 import { EXAMPLE, formatMoney } from "../demo-script";
 import { C, FONT, TONE, rgba } from "../marketing/theme";
 import { Accent, AppCanvas, Avatar, BottomNav, Card, GhostButton, H1, Input, MonoLabel, Page, PrimaryButton, SectionLabel, TopScrim } from "./ui";
+import { TabBar as NewTabBar, TopBar as NewTopBar } from "./newlook/ui";
+
+/**
+ * "old": the page as it looked in the old app. "new": the same page inside
+ * the new look, which only gave it a new top bar ("‹ Prices · Prices from a
+ * quote") and the new tab bar; the page itself is unchanged.
+ */
+export type Shell = "old" | "new";
+
+function Chrome({ shell }: { shell: Shell }) {
+  return shell === "new" ? (
+    <>
+      <NewTopBar back="Prices" title="Prices from a quote" />
+      <NewTabBar active="prices" />
+    </>
+  ) : (
+    <>
+      <TopScrim />
+      <Avatar />
+      <BottomNav active="materials" />
+    </>
+  );
+}
 
 function ScanLine({
   description,
@@ -54,15 +77,17 @@ function ScanLine({
  * Step 2, "check the lines". `shown` reveals the read lines one by one (the
  * still shows them all); `press` pushes "Create quote".
  */
-export function SupplierScanScreen({ shown = 99, press = 0 }: { shown?: number; press?: number } = {}) {
+export function SupplierScanScreen({ shown = 99, press = 0, shell = "old" }: { shown?: number; press?: number; shell?: Shell } = {}) {
   return (
     <>
       <AppCanvas tone="materials" />
-      <Page top={112}>
-        <div style={{ display: "flex", alignItems: "center", gap: 4, fontFamily: FONT.mono, fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", color: C.ink300 }}>
-          <CaretLeft size={11} weight="bold" /> Back to materials
-        </div>
-        <SectionLabel tone="materials" style={{ marginTop: 14 }}>
+      <Page top={shell === "new" ? 128 : 112}>
+        {shell === "old" ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 4, fontFamily: FONT.mono, fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", color: C.ink300 }}>
+            <CaretLeft size={11} weight="bold" /> Back to materials
+          </div>
+        ) : null}
+        <SectionLabel tone="materials" style={{ marginTop: shell === "old" ? 14 : 0 }}>
           {"// supplier quote"}
         </SectionLabel>
         <H1 style={{ marginTop: 10 }}>
@@ -110,9 +135,7 @@ export function SupplierScanScreen({ shown = 99, press = 0 }: { shown?: number; 
           <Check size={16} weight="bold" /> Add 3 to library
         </GhostButton>
       </div>
-      <TopScrim />
-      <Avatar />
-      <BottomNav active="materials" />
+      <Chrome shell={shell} />
     </>
   );
 }
@@ -127,11 +150,13 @@ export function SupplierCaptureScreen({
   photo = 0,
   reading = false,
   press = 0,
+  shell = "old",
 }: {
   t: number;
   photo?: number;
   reading?: boolean;
   press?: number;
+  shell?: Shell;
 }) {
   const taken = photo >= 1;
   const sway = taken ? 0 : Math.sin(t * 2.2) * 3;
@@ -139,11 +164,13 @@ export function SupplierCaptureScreen({
   return (
     <>
       <AppCanvas tone="materials" />
-      <Page top={112}>
-        <div style={{ display: "flex", alignItems: "center", gap: 4, fontFamily: FONT.mono, fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", color: C.ink300 }}>
-          <CaretLeft size={11} weight="bold" /> Back to materials
-        </div>
-        <SectionLabel tone="materials" style={{ marginTop: 14 }}>
+      <Page top={shell === "new" ? 128 : 112}>
+        {shell === "old" ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 4, fontFamily: FONT.mono, fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", color: C.ink300 }}>
+            <CaretLeft size={11} weight="bold" /> Back to materials
+          </div>
+        ) : null}
+        <SectionLabel tone="materials" style={{ marginTop: shell === "old" ? 14 : 0 }}>
           {"// supplier quote"}
         </SectionLabel>
         <H1 style={{ marginTop: 10 }}>
@@ -194,9 +221,7 @@ export function SupplierCaptureScreen({
           </PrimaryButton>
         </Card>
       </Page>
-      <TopScrim />
-      <Avatar />
-      <BottomNav active="materials" />
+      <Chrome shell={shell} />
     </>
   );
 }

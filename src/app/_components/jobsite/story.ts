@@ -23,7 +23,7 @@ export const HERO = {
 /** The owner confirmed the footage and photos are one of his builds (26 Sep 2026). */
 export const FILMED_ON = "Filmed on one of our builds in Tauranga.";
 
-/** The phone screens are the 30-second demo's, with its example job. */
+/** The phone screens are the app's new look, with the demo's example job (src/remotion/marketing/newlook-story.tsx). */
 export const EXAMPLE_LABEL = "Example job · example figures";
 
 export type RoomId = "talk" | "draft" | "check" | "send" | "invoice";
@@ -57,7 +57,7 @@ export const ROOMS: readonly Room[] = [
     bold: "The quote writes itself.",
     body: "What you said becomes line items: materials, labour and GST, line by line. Photograph your supplier’s quote and its lines drop straight into your materials.",
     media: { kind: "clip" },
-    screenAlt: "The draft quote: the total and the price breakdown",
+    screenAlt: "The draft quote: the total and what’s in the job",
   },
   {
     id: "check",
