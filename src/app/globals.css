@@ -2298,10 +2298,13 @@ body:has([data-shell="app"]) {
 
 /* OUTDOOR SAFETY NET — screens not yet moved to the new look.
    They were built for the dark look (white text, ink greys) and don't react
-   to outdoor mode, so on its white page they'd be white-on-white. Until each
-   one is converted, its body (marked data-legacy-body) keeps the dark panel
-   it was designed on. Remove a screen's marker when it moves to ui- tokens. */
-[data-look="new"][data-contrast="outdoor"] [data-legacy-body] {
+   to outdoor mode, so on the new-look shell's white outdoor page they'd be
+   white-on-white. Until each one is converted, its body (marked
+   data-legacy-body) keeps the dark panel it was designed on. The shell adds
+   .t2q-outdoor while outdoor mode is on (outdoor itself only swaps --ui-*
+   variables; see tokens.test.ts). Remove a screen's marker when it moves to
+   ui- tokens. */
+.t2q-outdoor [data-legacy-body] {
   background-color: #111110;
   color: #f5f4f0;
   border-radius: 1rem;

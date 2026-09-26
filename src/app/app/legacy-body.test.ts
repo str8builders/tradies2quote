@@ -23,9 +23,10 @@ const OLD_LOOK_SCREENS = [
 ];
 
 describe("outdoor safety net for old-look screens", () => {
-  it("globals.css paints marked bodies dark in outdoor mode only", () => {
+  it("globals.css paints marked bodies dark while the new-look shell is in outdoor mode", () => {
     const css = read("../globals.css");
-    expect(css).toMatch(/\[data-look="new"\]\[data-contrast="outdoor"\] \[data-legacy-body\] \{[^}]*background-color: #111110;/);
+    expect(css).toMatch(/\.t2q-outdoor \[data-legacy-body\] \{[^}]*background-color: #111110;/);
+    expect(read("_v2/shell/NewLookShell.tsx")).toContain("outdoor && OUTDOOR_SHELL_CLASS");
   });
 
   it.each(OLD_LOOK_SCREENS)("%s marks its old-look body", (file) => {

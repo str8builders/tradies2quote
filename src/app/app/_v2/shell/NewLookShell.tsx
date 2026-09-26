@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { cx } from "@/components/ui/cx";
-import { contrastAttributeValue } from "@/lib/ui/outdoor";
+import { OUTDOOR_SHELL_CLASS, contrastAttributeValue } from "@/lib/ui/outdoor";
 import { BetaNoticeBanner } from "../../_components/BetaNoticeBanner";
 import { TopProgressBar } from "../../_components/TopProgressBar";
 import { TrialBanner } from "../../_components/TrialBanner";
@@ -69,6 +69,8 @@ export function NewLookShell({
         className={cx(
           "studio-app t2q-app-canvas min-h-dvh w-full max-w-full overflow-x-clip bg-ui-bg!",
           SETTLE_KIT_MOTION,
+          // Old-look screens keep a dark panel on outdoor's white (globals.css).
+          outdoor && OUTDOOR_SHELL_CLASS,
         )}
       >
         <div

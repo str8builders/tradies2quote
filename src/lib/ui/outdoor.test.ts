@@ -4,6 +4,7 @@ import {
   OUTDOOR_COOKIE,
   OUTDOOR_MAX_AGE_S,
   applyOutdoorAttribute,
+  OUTDOOR_SHELL_CLASS,
   contrastAttributeValue,
   isOutdoorCookieValue,
   outdoorCookieString,
@@ -91,5 +92,30 @@ describe("readOutdoorMode", () => {
   it("falls back to the cookie on a page without a root", () => {
     expect(readOutdoorMode({ querySelector: () => null, cookie: "t2q-outdoor=1" })).toBe(true);
     expect(readOutdoorMode({ querySelector: () => null, cookie: "" })).toBe(false);
+  });
+});
+
+describe("the new-look shell's outdoor class", () => {
+  it("follows the switch at once on the new-look shell, and only there", () => {
+    const make = (look: string | null) => {
+      const attrs = new Map<string, string>(look ? [["data-look", look]] : []);
+      const classes = new Set<string>();
+      return {
+        attrs,
+        classes,
+        setAttribute: (n: string, v: string) => void attrs.set(n, v),
+        removeAttribute: (n: string) => void attrs.delete(n),
+        getAttribute: (n: string) => attrs.get(n) ?? null,
+        classList: { toggle: (t: string, force?: boolean) => (force ? (classes.add(t), true) : (classes.delete(t), false)) },
+      };
+    };
+    const shell = make("new");
+    const old = make(null);
+    const doc = { querySelectorAll: () => [shell, old] };
+    applyOutdoorAttribute(doc, true);
+    expect(shell.classes.has(OUTDOOR_SHELL_CLASS)).toBe(true);
+    expect(old.classes.has(OUTDOOR_SHELL_CLASS)).toBe(false);
+    applyOutdoorAttribute(doc, false);
+    expect(shell.classes.has(OUTDOOR_SHELL_CLASS)).toBe(false);
   });
 });
