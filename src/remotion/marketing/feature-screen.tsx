@@ -8,6 +8,7 @@
  *   supplier  photograph a supplier's quote, read it, check the lines
  *   request   the client's QR request form, then the tradie's requests
  *   video     the client's quote link playing the real quote video
+ *   timesheet finish work on site, the day's hours, invoice the week
  */
 import type { ReactNode } from "react";
 import { AbsoluteFill, useCurrentFrame, type CalculateMetadataFunction } from "remotion";
@@ -16,13 +17,14 @@ import { ADD_BUTTON_FROM_TOP, BARCODE_SHEET_TOP as TOP, BarcodeSheet, type Barco
 import { QuoteReviewScreen } from "../screens/QuoteReviewScreen";
 import { ClientVideoScreen } from "../screens/QuoteVideoScreen";
 import { SupplierCaptureScreen, SupplierScanScreen } from "../screens/SupplierScanScreen";
+import { FinishSheet, InvoiceWeekSheet, TimesheetPage } from "../screens/TimesheetScreens";
 import { Tap as TapMark } from "../screens/ui";
 import { eseg, seg } from "./anim";
 import { SCREEN_H, SCREEN_W, Screen } from "./Phone";
 import { Push } from "./Push";
 import { SECTIONS_SCROLL, deckingLine, finalLabour, storyShot } from "./story";
 
-export const FEATURE_IDS = ["barcode", "supplier", "request", "video"] as const;
+export const FEATURE_IDS = ["barcode", "supplier", "request", "video", "timesheet"] as const;
 export type FeatureId = (typeof FEATURE_IDS)[number];
 export type FeatureScreenProps = { feature: FeatureId };
 
@@ -38,6 +40,7 @@ export const FEATURE_FRAMES: Record<FeatureId, number> = {
   supplier: 204,
   request: 204,
   video: VIDEO_TAP + 450 + 18,
+  timesheet: 255,
 };
 export const featureMetadata: CalculateMetadataFunction<FeatureScreenProps> = ({ props }) => ({
   durationInFrames: FEATURE_FRAMES[props.feature],
@@ -107,6 +110,36 @@ function video(frame: number): ReactNode {
   return <ClientVideoScreen startAt={VIDEO_TAP} tap={p > 0 && p < 1 ? { x: 195, y: 458, p } : null} />;
 }
 
+function timesheet(frame: number): ReactNode {
+  const p = frame / (FEATURE_FRAMES.timesheet - 1);
+  const open = p < 0.56;
+  // The shift ticks over its last few minutes while you watch.
+  const minutes = 8 * 60 + 8 + Math.min(7, Math.floor(seg(p, 0, 0.14) * 7));
+  const elapsed = `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
+  const pageScroll = eseg(p, 0.58, 0.66) * 260;
+  const finishSheet = Math.min(eseg(p, 0.22, 0.3), 1 - eseg(p, 0.54, 0.6));
+  const tap =
+    tapAt(p, 0.14, 0.22, 195, 285) ??
+    tapAt(p, 0.42, 0.5, 195, 730) ??
+    tapAt(p, 0.72, 0.78, 195, 336) ??
+    tapAt(p, 0.93, 0.99, 195, 620);
+  return (
+    <>
+      <TimesheetPage
+        open={open}
+        elapsed={elapsed}
+        finishPress={pressAt(p, 0.14, 0.22)}
+        invoicePress={pressAt(p, 0.72, 0.78)}
+        scroll={pageScroll}
+        flash={p > 0.6 && p < 0.72 ? Math.sin(seg(p, 0.6, 0.72) * Math.PI) : 0}
+      />
+      {finishSheet > 0 ? <FinishSheet enter={finishSheet} breakOn press={pressAt(p, 0.42, 0.5)} finishing={p >= 0.47} /> : null}
+      {p >= 0.78 ? <InvoiceWeekSheet enter={eseg(p, 0.78, 0.84)} scroll={0} press={pressAt(p, 0.93, 0.99)} /> : null}
+      {tap ? <TapMark {...tap} /> : null}
+    </>
+  );
+}
+
 export function FeatureScreen({ feature }: FeatureScreenProps) {
   const frame = useCurrentFrame();
   let screen: ReactNode;
@@ -120,7 +153,7 @@ export function FeatureScreen({ feature }: FeatureScreenProps) {
   } else if (feature === "supplier") {
     screen = supplier(frame);
   } else {
-    screen = <Screen scale={SCALE}>{feature === "barcode" ? barcode(frame) : video(frame)}</Screen>;
+    screen = <Screen scale={SCALE}>{feature === "barcode" ? barcode(frame) : feature === "timesheet" ? timesheet(frame) : video(frame)}</Screen>;
   }
   return (
     <AbsoluteFill style={{ background: "#0c0f0f" }}>

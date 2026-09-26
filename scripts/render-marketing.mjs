@@ -103,7 +103,7 @@ const TARGETS = {
   // The "More in the app" tour on the phone (same sizes and folder as the steps).
   features: {
     composition: "FeatureScreen",
-    screens: { prop: "feature", ids: ["barcode", "supplier", "request", "video"] },
+    screens: { prop: "feature", ids: ["barcode", "supplier", "request", "video", "timesheet"] },
     dir: "public/jobsite/screens",
     web: { widths: [600, 420], mp4Crf: 26, gop: 60, stillWidth: 600 },
   },
@@ -117,12 +117,14 @@ const TARGETS = {
 };
 
 function parseArgs(argv) {
-  const out = { only: null, props: {}, concurrency: null, browser: null, keepTemp: false, list: false };
+  const out = { only: null, ids: null, props: {}, concurrency: null, browser: null, keepTemp: false, list: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const [key, inline] = arg.includes("=") ? [arg.slice(0, arg.indexOf("=")), arg.slice(arg.indexOf("=") + 1)] : [arg, null];
     const value = () => inline ?? argv[++i];
     if (key === "--only") out.only = value().split(",").map((s) => s.trim()).filter(Boolean);
+    // Phone screens: just these (e.g. --only=features --ids=timesheet).
+    else if (key === "--ids") out.ids = value().split(",").map((s) => s.trim()).filter(Boolean);
     else if (key === "--props") out.props = JSON.parse(value());
     else if (key === "--concurrency") out.concurrency = Number(value());
     else if (key === "--browser") out.browser = value();
@@ -264,7 +266,7 @@ async function main() {
       if (target.screens) {
         const dir = path.join(ROOT, target.dir);
         fs.mkdirSync(dir, { recursive: true });
-        for (const step of target.screens.ids) {
+        for (const step of target.screens.ids.filter((id) => !args.ids || args.ids.includes(id))) {
           const props = { [target.screens.prop]: step };
           const composition = await selectComposition({ serveUrl, id: target.composition, inputProps: props, ...common });
           const master = path.join(tmp, `step-${step}-master.mp4`);

@@ -73,9 +73,12 @@ describe("the job-site story is complete as plain HTML (search, screen readers, 
     expect(text).toContain("finds it in your own prices");
     // The T2QCAL hand-off makes a draft (the tradie reviews it), with the working attached.
     expect(text).toContain("turns the result into a draft quote, with your working attached");
-    // Features that are off, or only in the unreleased iPhone app, aren't offered as live.
+    // Features that are off, or only in the unreleased iPhone app (automatic
+    // clock-in, travel km from the background route), aren't offered as live.
     const live = [...FEATURES.map((f) => `${f.bold} ${f.body}`), T2QCAL_STOP.body, ...T2QCAL_STOP.inside].join(" ");
-    expect(live).not.toMatch(/timesheet|clock in|deposit|pay online|plan reader|automatic follow|team|crew/i);
+    expect(live).not.toMatch(/automatic|kilomet|\bkm\b|deposit|pay online|plan reader|follow-up|team|crew/i);
+    // Timesheets are in the new look, which everyone on the web has.
+    expect(FEATURES.map((f) => f.id)).toContain("timesheet");
     expect(text).toContain(`${COMING_SOON.tag} ${COMING_SOON.title}`);
   });
 

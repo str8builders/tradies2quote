@@ -89,7 +89,7 @@ export const ROOMS: readonly Room[] = [
   },
 ];
 
-export type FeatureId = "barcode" | "supplier" | "request" | "video";
+export type FeatureId = "barcode" | "supplier" | "request" | "video" | "timesheet";
 
 export type Feature = {
   id: FeatureId;
@@ -107,7 +107,11 @@ export type Feature = {
  * supplier quotes take photos (several pages) or a PDF and nothing is saved
  * until the tradie checks the lines; a QR request makes the client and a
  * filled-in draft and notifies the tradie; the quote video is the 15-second
- * video at the top of the client's quote link.
+ * video at the top of the client's quote link. The timesheet is in the new
+ * look, which everyone on the web has had since 27 Sep 2026
+ * (T2Q_NEW_LOOK_DEFAULT=on): Start work / Finish work, pinned to the job
+ * when location's on, and "Invoice this week" at the labour rate. Travel km
+ * need the route only the iPhone app records, so they're in COMING_SOON.
  */
 export const FEATURES: readonly Feature[] = [
   {
@@ -138,13 +142,21 @@ export const FEATURES: readonly Feature[] = [
     body: "Turn a quote into a 15-second video: your logo, the job, the main items and the total, ending on tap to accept. It plays at the top of your client’s quote link.",
     screenAlt: "The client’s quote link playing the 15-second quote video, ending on the $4,830.00 total and tap the link to accept",
   },
+  {
+    id: "timesheet",
+    word: "Hours",
+    bold: "Clock in on site. Invoice the week.",
+    body: "Tap Start work when you get there and Finish work when you’re done. Your hours land on the timesheet, pinned to the job when location’s on. At the end of the week, pick the client and the week’s hours become an invoice at your labour rate, a line a day.",
+    screenAlt: "The timesheet: finishing work at the Sam Taylor job with a 30-minute break, 7.75 hours logged, then invoicing the week for $579.31",
+  },
 ];
 
-/** Not in the web app yet: only the iPhone app has it, and that isn't public. */
+/** Only the iPhone app does this (it needs location in the background), and that app isn't public yet. */
 export const COMING_SOON = {
   tag: "Coming to the iPhone app",
-  title: "Timesheets",
-  body: "Clock in and out on site with a tap, or automatically when you arrive. Log travel km, and invoice the week’s hours.",
+  // A non-breaking hyphen, so a narrow screen never splits "clock-in".
+  title: "Automatic clock\u2011in",
+  body: "Your hours start when you arrive at a job and stop when you leave, in your work hours only, with the kilometres you drive ready to go on the invoice.",
 } as const;
 
 /**
