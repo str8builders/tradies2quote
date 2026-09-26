@@ -9,6 +9,7 @@ import { TextField } from "@/components/ui/text-field";
 import { Toggle } from "@/components/ui/toggle";
 import { TAP } from "@/components/ui/styles";
 import { hasNativeLocation, nativeLocation, type LocationPermission } from "@/lib/location/device";
+import { isStaleDeployError, reloadForUpdate } from "@/lib/stale-deploy";
 import { announceLocationChanged } from "../../_v2/shell/LocationBridge";
 import { saveLocationConsent } from "../location-actions";
 import type { LocationState } from "../_lib/location-types";
@@ -101,7 +102,8 @@ export function LocationForm({
           }
         }
         onDone();
-      } catch {
+      } catch (e) {
+        if (isStaleDeployError(e)) return reloadForUpdate(setError);
         setError("Couldn't save that. Check your signal and try again.");
       }
     });

@@ -7,6 +7,7 @@ import { TrialBanner } from "../../_components/TrialBanner";
 import { AppContent } from "./AppContent";
 import { AppNav } from "./AppNav";
 import { LocationBridge } from "./LocationBridge";
+import { StaleVersionReload } from "./StaleVersionReload";
 import { StatusBarTint } from "./StatusBarTint";
 
 /**
@@ -44,12 +45,15 @@ const SETTLE_KIT_MOTION =
 export function NewLookShell({
   outdoor,
   inApp = false,
+  build = null,
   welcome,
   children,
 }: {
   outdoor: boolean;
   /** This request comes from the iPhone app (isNativeShellRequest). */
   inApp?: boolean;
+  /** The live commit this page came from (as /api/health reports it). */
+  build?: string | null;
   /** The welcome after signing in (<NewLookWelcome>), when it may play. */
   welcome?: ReactNode;
   children: ReactNode;
@@ -89,6 +93,7 @@ export function NewLookShell({
         <TopProgressBar />
         <LocationBridge />
         {inApp ? <StatusBarTint outdoor={outdoor} /> : null}
+        <StaleVersionReload build={build} />
       </div>
       {/* Outside the canvas, which is its own stacking context; the welcome
         lifts itself into the browser's top layer once it runs. */}

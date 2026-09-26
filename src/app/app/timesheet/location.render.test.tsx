@@ -46,7 +46,8 @@ describe("ClockCard", () => {
         open: { id: "s1", startedAt: "2026-09-20T19:02:00.000Z", place: "At the Hemi Walker job", clientId: "c1", clientName: "Hemi Walker", source: "auto" },
       }),
     );
-    expect(out).toContain("Working since 7:02am");
+    // A fixed date from an earlier week: the card also names the day it started.
+    expect(out).toMatch(/Working since (?:\w{3} \d{1,2} \w+, )?7:02am/);
     expect(out).toContain("At the Hemi Walker job");
     expect(out).toContain("Started automatically");
     expect(out).toContain('data-testid="clock-finish"');

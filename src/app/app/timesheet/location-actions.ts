@@ -209,7 +209,8 @@ export async function clockOut(input: {
   });
   if (error) {
     if (/Not clocked in/.test(error.message)) return { ok: false, error: "You're not clocked in." };
-    if (/midnight/.test(error.message)) return { ok: false, error: "You clocked in yesterday: add those hours by hand, then start again." };
+    if (/midnight/.test(error.message)) return { ok: false, error: "You started on an earlier day: pick the time you finished that day." };
+    if (/out of range/.test(error.message)) return { ok: false, error: "That finish time is in the future." };
     if (/break is longer/.test(error.message)) return { ok: false, error: "The break is longer than the time worked." };
     if (/after start/.test(error.message)) return { ok: false, error: "That's less than a minute of work." };
     captureError(error, { route: "timesheet/clock-out" });
