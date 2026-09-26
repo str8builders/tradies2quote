@@ -373,7 +373,9 @@ export default async function DevNewLookPage({
         data-contrast={contrastAttributeValue(outdoor === "1")}
         className="studio-app t2q-app-canvas min-h-dvh w-full max-w-full overflow-x-clip bg-ui-bg!"
       >
-        <div className="t2q-app-scroll min-w-0 sm:pl-[calc(6rem+env(safe-area-inset-left))]">
+        {/* The top as in the real shell: padded under the clock, painted the page's colour. */}
+        <div aria-hidden="true" className="pointer-events-none fixed inset-x-0 top-0 z-50 h-[env(safe-area-inset-top)] bg-ui-bg" />
+        <div className="t2q-app-scroll min-w-0 pt-[env(safe-area-inset-top)] sm:pl-[calc(6rem+env(safe-area-inset-left))]">
           {content}
         </div>
         {screen.startsWith("talk") || screen === "recording" ? null : (
