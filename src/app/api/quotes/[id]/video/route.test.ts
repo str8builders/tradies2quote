@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeSupabase, type FakeOp } from "@/test/fake-supabase";
 
 const state = vi.hoisted(() => ({ client: null as unknown, admin: null as unknown }));
@@ -15,6 +15,7 @@ let videoRow: Record<string, unknown> | null;
 let download: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
+  vi.stubEnv("QUOTE_VIDEO_ENABLED", "true");
   user = { id: OWNER };
   videoRow = { quote_version: 2, status: "ready", storage_path: `${OWNER}/${QUOTE_ID}/v2.mp4`, poster_path: `${OWNER}/${QUOTE_ID}/v2.jpg` };
   const db = fakeSupabase((op: FakeOp) => {
@@ -29,7 +30,17 @@ beforeEach(() => {
 
 const call = (id: string) => GET({} as never, { params: Promise.resolve({ id }) });
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe("GET /api/quotes/[id]/video", () => {
+  it("is not found while quote videos are switched off", async () => {
+    vi.stubEnv("QUOTE_VIDEO_ENABLED", "");
+    expect((await call(QUOTE_ID)).status).toBe(404);
+    expect(download).not.toHaveBeenCalled();
+  });
+
   it("serves the owner's current video as an MP4 download", async () => {
     const res = await call(QUOTE_ID);
     expect(res.status).toBe(200);

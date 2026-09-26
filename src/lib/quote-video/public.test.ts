@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeSupabase, type FakeOp } from "@/test/fake-supabase";
 import { loadPublicQuoteVideo } from "./public";
 
@@ -10,6 +10,7 @@ let db: ReturnType<typeof fakeSupabase>;
 let admin: Parameters<typeof loadPublicQuoteVideo>[0];
 
 beforeEach(() => {
+  vi.stubEnv("QUOTE_VIDEO_ENABLED", "true");
   row = { quote_version: 4, status: "ready", storage_path: "u/q/v4.mp4", poster_path: "u/q/v4.jpg" };
   rowError = null;
   db = fakeSupabase((op: FakeOp) => (op.table === "quote_videos" ? { data: row, error: rowError } : {}));
@@ -20,7 +21,18 @@ beforeEach(() => {
   admin = { from: db.from, storage: { from: () => ({ createSignedUrls }) } } as unknown as typeof admin;
 });
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe("loadPublicQuoteVideo", () => {
+  it("shows nothing and reads nothing while quote videos are switched off", async () => {
+    vi.stubEnv("QUOTE_VIDEO_ENABLED", "");
+    expect(await loadPublicQuoteVideo(admin, { id: QUOTE_ID, version: 4 })).toBeNull();
+    expect(db.ops).toEqual([]);
+    expect(createSignedUrls).not.toHaveBeenCalled();
+  });
+
   it("signs the ready video and poster of the quote's current version for an hour", async () => {
     expect(await loadPublicQuoteVideo(admin, { id: QUOTE_ID, version: 4 })).toEqual({
       videoUrl: "https://api.example.test/storage/v1/object/sign/quote-videos/u/q/v4.mp4?token=t",

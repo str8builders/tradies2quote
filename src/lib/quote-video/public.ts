@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { QUOTE_VIDEO_BUCKET, QUOTE_VIDEO_SIGNED_URL_SECONDS } from "./constants";
+import { quoteVideoEnabled } from "./flag";
 import { publicQuoteVideoFiles, type QuoteVideoRow } from "./status";
 
 export type PublicQuoteVideo = { videoUrl: string; posterUrl: string };
@@ -12,13 +13,14 @@ export type PublicQuoteVideo = { videoUrl: string; posterUrl: string };
  * with the service-role client after get_quote_by_token resolved the token,
  * and only for a live (sent/viewed) quote. Returns null — never throws — for
  * no video, an older version, or any read/sign failure: the quote page must
- * render without it.
+ * render without it. Null without reading anything while the switch is off
+ * (./flag).
  */
 export async function loadPublicQuoteVideo(
   admin: SupabaseClient<Database>,
   quote: { id: string; version: number },
 ): Promise<PublicQuoteVideo | null> {
-  if (!Number.isInteger(quote.version)) return null;
+  if (!quoteVideoEnabled() || !Number.isInteger(quote.version)) return null;
   try {
     const { data, error } = await admin
       .from("quote_videos")

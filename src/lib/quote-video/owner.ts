@@ -4,6 +4,7 @@ import type { Database } from "@/lib/supabase/database.types";
 import { captureError } from "@/lib/observability";
 import { quoteNumber } from "@/lib/quote-defaults";
 import { QUOTE_VIDEO_BUCKET, QUOTE_VIDEO_SIGNED_URL_SECONDS } from "./constants";
+import { quoteVideoEnabled } from "./flag";
 import { describeQuoteVideo, quoteVideoFileName, type QuoteVideoRow, type QuoteVideoStatus } from "./status";
 
 /**
@@ -14,6 +15,9 @@ import { describeQuoteVideo, quoteVideoFileName, type QuoteVideoRow, type QuoteV
  * by the owner's id from auth.getUser(), never an id from the browser).
  * `admin` is the service-role client, used only to sign URLs for, or read,
  * files in the private quote-videos bucket after the ownership check passed.
+ *
+ * With the switch off (./flag) all three stop before the database: the card
+ * hides (its status isn't ok), nothing can be queued, and the file is 404.
  */
 
 type Db = SupabaseClient<Database>;
@@ -28,6 +32,7 @@ export const QUOTE_VIDEO_MESSAGES = {
   tooMany: "You've made a lot of videos in the last hour. Try again a bit later.",
   unavailable: "We couldn't check the video just now. Try again in a minute.",
   requestFailed: "We couldn't start the video. Try again in a minute.",
+  off: "Quote videos aren't available any more.",
 } as const;
 
 /** request_quote_video's SQLSTATEs (migration 20260925_quote_videos.sql) in plain words. */
@@ -69,6 +74,7 @@ async function readOwnerVideo(db: Db, userId: string, quoteId: string): Promise<
 
 /** The owner's card status, with 1-hour signed URLs for a ready video of the current version. */
 export async function loadQuoteVideoStatus(db: Db, admin: Db, userId: string, quoteId: string): Promise<QuoteVideoResult> {
+  if (!quoteVideoEnabled()) return { ok: false, error: QUOTE_VIDEO_MESSAGES.off };
   const read = await readOwnerVideo(db, userId, quoteId);
   if (!read.ok) {
     return { ok: false, error: read.error === "not_found" ? QUOTE_VIDEO_MESSAGES.notFound : QUOTE_VIDEO_MESSAGES.unavailable };
@@ -98,6 +104,7 @@ export async function loadQuoteVideoStatus(db: Db, admin: Db, userId: string, qu
 
 /** Queue a render of the quote's current version (request_quote_video checks ownership, lock, lines and the hourly limit). */
 export async function requestQuoteVideo(db: Db, quoteId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!quoteVideoEnabled()) return { ok: false, error: QUOTE_VIDEO_MESSAGES.off };
   const { error } = await db.rpc("request_quote_video", { p_quote_id: quoteId });
   if (!error) return { ok: true };
   const message = REQUEST_ERRORS[error.code ?? ""];
@@ -132,6 +139,7 @@ export type QuoteVideoFile =
 
 /** The ready MP4 of the quote's current version, for the owner's Share / Download buttons. */
 export async function loadQuoteVideoFile(db: Db, admin: Db, userId: string, quoteId: string): Promise<QuoteVideoFile> {
+  if (!quoteVideoEnabled()) return { ok: false, status: 404 };
   const read = await readOwnerVideo(db, userId, quoteId);
   if (!read.ok) return { ok: false, status: read.error === "not_found" ? 404 : 503 };
   const state = describeQuoteVideo(read.row, read.quote.version);

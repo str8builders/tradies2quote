@@ -1,6 +1,6 @@
 import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeSupabase, type FakeOp } from "@/test/fake-supabase";
 
 /**
@@ -34,6 +34,7 @@ let db: ReturnType<typeof fakeSupabase>;
 let createSignedUrls: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
+  vi.stubEnv("QUOTE_VIDEO_ENABLED", "true");
   payload = {
     id: QUOTE_ID,
     status: "sent",
@@ -76,7 +77,19 @@ async function render(): Promise<string> {
   return renderToStaticMarkup(element);
 }
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe("public quote page — quote video", () => {
+  it("shows no video, and the quote as usual, while quote videos are switched off", async () => {
+    vi.stubEnv("QUOTE_VIDEO_ENABLED", "");
+    const html = await render();
+    expect(html).not.toContain("public-quote-video");
+    expect(html).toContain('data-testid="summary"');
+    expect(db.ops.some((op) => op.table === "quote_videos")).toBe(false);
+  });
+
   it.each(["sent", "viewed"])("plays a video of the current version on a %s quote", async (status) => {
     payload.status = status;
     const html = await render();

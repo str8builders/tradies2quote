@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeSupabase, type FakeOp } from "@/test/fake-supabase";
 
 const state = vi.hoisted(() => ({
@@ -29,6 +29,7 @@ let createSignedUrls: ReturnType<typeof vi.fn>;
 let user: { id: string } | null;
 
 beforeEach(() => {
+  vi.stubEnv("QUOTE_VIDEO_ENABLED", "true");
   quoteRow = { id: QUOTE_ID, version: 3, created_at: "2026-09-20T00:00:00Z" };
   videoRow = null;
   quoteError = null;
@@ -52,6 +53,21 @@ beforeEach(() => {
 
 const quoteReads = () => db.ops.filter((op) => op.table === "quotes");
 const videoReads = () => db.ops.filter((op) => op.table === "quote_videos");
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+describe("quote videos switched off", () => {
+  it("queues nothing and reports no status, so the card stays hidden", async () => {
+    vi.stubEnv("QUOTE_VIDEO_ENABLED", "");
+    expect(await requestQuoteVideoAction(QUOTE_ID)).toEqual({ ok: false, error: QUOTE_VIDEO_MESSAGES.off });
+    expect(await getQuoteVideoStatusAction(QUOTE_ID)).toEqual({ ok: false, error: QUOTE_VIDEO_MESSAGES.off });
+    expect(rpc).not.toHaveBeenCalled();
+    expect(quoteReads()).toEqual([]);
+    expect(videoReads()).toEqual([]);
+  });
+});
 
 describe("requestQuoteVideoAction", () => {
   it("queues a render through the RPC and reports it as being made", async () => {
