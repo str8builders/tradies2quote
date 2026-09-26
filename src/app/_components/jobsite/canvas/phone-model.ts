@@ -1,9 +1,7 @@
 import {
-  AdditiveBlending,
   BufferGeometry,
   CanvasTexture,
   CapsuleGeometry,
-  ClampToEdgeWrapping,
   CylinderGeometry,
   ExtrudeGeometry,
   Float32BufferAttribute,
@@ -185,34 +183,6 @@ function canvasTexture(width: number, height: number, draw: (g: CanvasRenderingC
   return tex;
 }
 
-/**
- * A diagonal streak of light for the glass. The screen shows half of it
- * (repeat 0.5); sliding the offset from 0 to 0.5 sweeps the streak across
- * the screen as the phone turns.
- */
-function glareTexture(): CanvasTexture {
-  const tex = canvasTexture(512, 256, (g) => {
-    const band = g.createLinearGradient(150, 256, 362, 0);
-    band.addColorStop(0, "rgba(255,255,255,0)");
-    band.addColorStop(0.4, "rgba(255,255,255,0)");
-    band.addColorStop(0.5, "rgba(255,255,255,0.5)");
-    band.addColorStop(0.6, "rgba(255,255,255,0)");
-    band.addColorStop(1, "rgba(255,255,255,0)");
-    g.fillStyle = band;
-    g.fillRect(0, 0, 512, 256);
-    const top = g.createLinearGradient(0, 0, 0, 256);
-    top.addColorStop(0, "rgba(255,255,255,0.09)");
-    top.addColorStop(0.45, "rgba(255,255,255,0)");
-    g.fillStyle = top;
-    g.fillRect(0, 0, 512, 256);
-  });
-  tex.wrapS = ClampToEdgeWrapping;
-  tex.wrapT = ClampToEdgeWrapping;
-  tex.repeat.set(0.5, 1);
-  tex.offset.set(0.25, 0);
-  return tex;
-}
-
 /** A soft oval of shade behind the phone, so it lifts off busy footage. */
 function shadeTexture(): CanvasTexture {
   return canvasTexture(128, 256, (g) => {
@@ -233,8 +203,6 @@ export type PhoneModel = {
   body: Group;
   /** The screen's material: its map is the step's clip. */
   screen: MeshBasicMaterial;
-  /** The glass streak; its offset follows the phone's turn. */
-  glare: Texture;
   /** The shade behind the phone; it narrows as the phone turns edge-on. */
   shade: Mesh;
   dispose(): void;
@@ -244,7 +212,6 @@ export function buildPhone(env: Texture, blank: Texture): PhoneModel {
   const { front, back, edge } = bodyGeometries();
   const { plate, trim, glass, flash } = backDetails();
   const screenShape = screenGeometry();
-  const glare = glareTexture();
   const shadeMap = shadeTexture();
   const shadeGeometry = new PlaneGeometry(BODY.width * 1.9, BODY.height * 1.3);
 
@@ -255,16 +222,9 @@ export function buildPhone(env: Texture, blank: Texture): PhoneModel {
   const bumpGlass = new MeshStandardMaterial({ ...std, color: "#27292c", metalness: 0.1, roughness: 0.18, envMapIntensity: 1 });
   const lensGlass = new MeshStandardMaterial({ ...std, color: "#050608", metalness: 0.3, roughness: 0.04, envMapIntensity: 1.4 });
   const flashLens = new MeshStandardMaterial({ ...std, color: "#e9e3cf", metalness: 0, roughness: 0.35, emissive: "#2e281a" });
+  // The screen shows the clip's own colours, unlit, with nothing over it: the
+  // owner had the glass streak taken off so every step reads clearly.
   const screen = new MeshBasicMaterial({ map: blank, toneMapped: false, fog: false });
-  const sheen = new MeshBasicMaterial({
-    map: glare,
-    transparent: true,
-    blending: AdditiveBlending,
-    depthWrite: false,
-    toneMapped: false,
-    fog: false,
-    opacity: 0.32,
-  });
   const shadeMat = new MeshBasicMaterial({
     color: "#000000",
     map: shadeMap,
@@ -280,9 +240,6 @@ export function buildPhone(env: Texture, blank: Texture): PhoneModel {
   const face = BODY.depth / 2;
   const screenMesh = new Mesh(screenShape, screen);
   screenMesh.position.z = face + 0.0008;
-  const glareMesh = new Mesh(screenShape, sheen);
-  glareMesh.position.z = face + 0.0016;
-  glareMesh.renderOrder = 2;
   body.add(
     new Mesh(front, blackGlass),
     new Mesh(back, frosted),
@@ -292,7 +249,6 @@ export function buildPhone(env: Texture, blank: Texture): PhoneModel {
     new Mesh(glass, lensGlass),
     new Mesh(flash, flashLens),
     screenMesh,
-    glareMesh,
   );
 
   const shade = new Mesh(shadeGeometry, shadeMat);
@@ -303,17 +259,15 @@ export function buildPhone(env: Texture, blank: Texture): PhoneModel {
   anchor.add(shade, body);
 
   const geometries = [front, back, edge, plate, trim, glass, flash, screenShape, shadeGeometry];
-  const materials = [titanium, blackGlass, frosted, bumpGlass, lensGlass, flashLens, screen, sheen, shadeMat];
+  const materials = [titanium, blackGlass, frosted, bumpGlass, lensGlass, flashLens, screen, shadeMat];
   return {
     anchor,
     body,
     screen,
-    glare,
     shade,
     dispose() {
       geometries.forEach((g) => g.dispose());
       materials.forEach((m) => m.dispose());
-      glare.dispose();
       shadeMap.dispose();
     },
   };
