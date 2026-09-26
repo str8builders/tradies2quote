@@ -4,7 +4,14 @@ import { captureError } from "@/lib/observability";
 import type { QuoteStatus } from "@/lib/quote-types";
 import type { InvoiceStatus } from "@/lib/types/invoice";
 import { OPEN_REQUEST_STATUSES, type BoardRequest } from "./home-todos";
-import type { BoardInvoice, BoardQuote } from "./job-board";
+import {
+  CO_DELETED_WITHIN_MS,
+  DELETED_JOBS_DAYS,
+  type BoardInvoice,
+  type BoardQuote,
+  type DeletedInvoice,
+  type DeletedQuote,
+} from "./job-board";
 
 /**
  * Reads for the new-look Home and Jobs. The same queries the dashboard, the
@@ -107,6 +114,66 @@ export async function loadBoard(db: Db, userId: string, route = "app/jobs"): Pro
   return {
     quotes: ((quotesRes.data ?? []) as Row[]).map(toBoardQuote),
     invoices: ((invoicesRes.data ?? []) as Row[]).map(toBoardInvoice),
+    failed: false,
+  };
+}
+
+/** Most jobs Recently deleted lists (the newest deletions). */
+export const DELETED_QUOTE_LIMIT = 200;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export interface DeletedBoard {
+  quotes: DeletedQuote[];
+  /** Invoices deleted over the same stretch, to pair with their jobs. */
+  invoices: DeletedInvoice[];
+  failed: boolean;
+}
+
+/**
+ * Recently deleted: the user's jobs deleted in the last DELETED_JOBS_DAYS
+ * days, newest deletion first, and the invoices deleted over the same
+ * stretch (a few seconds more, so one deleted with the oldest job still
+ * pairs up). Scoped to the user's id on top of RLS, like loadBoard. A
+ * failure is reported; the Jobs list itself does not depend on it.
+ */
+export async function loadDeletedJobs(
+  db: Db,
+  userId: string,
+  now: Date,
+  route = "app/jobs:deleted",
+): Promise<DeletedBoard> {
+  const since = now.getTime() - DELETED_JOBS_DAYS * DAY_MS;
+  const [quotesRes, invoicesRes] = await Promise.all([
+    db
+      .from("quotes")
+      .select(`${QUOTE_COLUMNS}, deleted_at`)
+      .eq("user_id", userId)
+      .gt("deleted_at", new Date(since).toISOString())
+      .order("deleted_at", { ascending: false })
+      .limit(DELETED_QUOTE_LIMIT),
+    db
+      .from("invoices")
+      .select(`${INVOICE_COLUMNS}, deleted_at`)
+      .eq("user_id", userId)
+      .gt("deleted_at", new Date(since - CO_DELETED_WITHIN_MS).toISOString())
+      .order("deleted_at", { ascending: false })
+      .limit(BOARD_INVOICE_LIMIT),
+  ]);
+  if (quotesRes.error || invoicesRes.error) {
+    report(quotesRes.error ?? invoicesRes.error, route);
+    return { quotes: [], invoices: [], failed: true };
+  }
+  const quotes: DeletedQuote[] = [];
+  for (const row of (quotesRes.data ?? []) as Row[]) {
+    const deletedAt = text(row.deleted_at);
+    if (deletedAt) quotes.push({ ...toBoardQuote(row), deletedAt });
+  }
+  return {
+    quotes,
+    invoices: ((invoicesRes.data ?? []) as Row[]).map((row) => ({
+      ...toBoardInvoice(row),
+      deletedAt: text(row.deleted_at),
+    })),
     failed: false,
   };
 }
