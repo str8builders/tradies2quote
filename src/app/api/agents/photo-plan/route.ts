@@ -16,6 +16,7 @@ import {
 import { newRunId } from "@/lib/agent-monitor/logger";
 import { agentFailureResponse } from "@/lib/agents/routeErrors";
 import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
+import { trialEndedResponse } from "@/lib/trial-ended-response";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -61,14 +62,8 @@ export async function POST(req: NextRequest) {
     email: user.email,
   });
   if (!canWrite(sub)) {
-    return NextResponse.json(
-      {
-        error: "trial_expired",
-        message: "Your free trial has ended. Subscribe to keep using photo analysis.",
-        upgrade_url: "/app/upgrade",
-      },
-      { status: 402 },
-    );
+    // In the iPhone app: "New quotes are paused", no subscribe wording (3.1.3(f)).
+    return trialEndedResponse("Your free trial has ended. Subscribe to keep using photo analysis.");
   }
 
   const contentType = req.headers.get("content-type") ?? "";

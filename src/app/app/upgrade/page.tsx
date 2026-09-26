@@ -7,15 +7,17 @@ import { isStripeConfigured, getPlanPriceId } from "@/lib/stripe-client";
 import { PLANS, type PlanId } from "@/lib/plans";
 import { HideInNativeApp } from "@/app/_components/HideInNativeApp";
 import { isNativeShellRequest } from "@/lib/native-shell";
+import { NEW_QUOTES_PAUSED } from "@/lib/trial-ended";
 import { AppHeader } from "../_components/AppHeader";
 import { CheckoutButton } from "./_components/CheckoutButton";
 import { ManageBillingButton } from "../settings/_components/ManageBillingButton";
-export const metadata={title:"Choose your plan"};
+// The tab title is in the HTML too: the iPhone app never says "plan" (3.1.3(f)).
+export async function generateMetadata(){return {title:(await isNativeShellRequest())?"Account":"Choose your plan"};}
 export const dynamic="force-dynamic";
 export default async function UpgradePage({searchParams}:{searchParams:Promise<{stripe?:string;plan?:string;from?:string}>}){
  const query=await searchParams;const db=await createClient();const{data:{user}}=await db.auth.getUser();if(!user)redirect('/login');
  const sub=await getSubscriptionStatus({userId:user.id,signedUpAt:new Date(user.created_at!),email:user.email});
- const nativeFallback=<main className="mx-auto max-w-3xl px-4 py-14"><h1 className="text-3xl font-semibold">{sub.state==='expired'?'New quotes are paused on your account.':'Account information'}</h1><p className="mt-4 text-sm text-ink-300">You can still view, send and download your existing quotes and invoices.</p></main>;
+ const nativeFallback=<main className="mx-auto max-w-3xl px-4 py-14"><h1 className="text-3xl font-semibold">{sub.state==='expired'?NEW_QUOTES_PAUSED:'Account information'}</h1><p className="mt-4 text-sm text-ink-300">You can still view, send and download your existing quotes and invoices.</p></main>;
  if(await isNativeShellRequest())return <div className="text-white"><AppHeader context="Account"/>{nativeFallback}</div>;
  const team=await getTeamContext(user.id);
  const managed=team.team&&!team.isOwner;

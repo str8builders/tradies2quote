@@ -1,7 +1,8 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- Private authenticated and bearer routes must not use the shared image optimiser. */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { Camera, Trash } from "@phosphor-icons/react";
+import { inIPhoneApp } from "@/lib/trial-ended";
 type Photo = { id: string; name: string };
 /**
  * Where the photo list is read, and where (if anywhere) it can be changed.
@@ -13,7 +14,19 @@ export function quotePhotoEndpoints({ quoteId, token }: { quoteId?: string; toke
   const owner = `/api/quotes/${encodeURIComponent(quoteId ?? "")}/photos`;
   return { list: owner, manage: owner };
 }
+const noSubscribe = () => () => {};
+/**
+ * The line under "Job photos". In the iPhone app plan names are never shown
+ * (App Store 3.1.3(f)). The new-look job page opens this in the More tools
+ * sheet, drawn on the phone, so the app's words are there from the start.
+ */
+export function photosNote({ enabled, fromClient, inApp }: { enabled: boolean; fromClient: boolean; inApp: boolean }): string {
+  if (enabled) return "Attach up to 8 photos before sending. Clients can view them on the quote link. Photos are locked once sent.";
+  if (inApp) return fromClient ? "Photos the client sent with their request." : "Adding photos to quotes isn’t switched on for this account.";
+  return fromClient ? "Photos the client sent with their request. Adding your own photos is included with Crew and Builder." : "Photo attachments are included with Crew and Builder.";
+}
 export function QuotePhotos({ quoteId, token }: { quoteId?: string; token?: string }) {
+  const inApp = useSyncExternalStore(noSubscribe, inIPhoneApp, () => false);
   const { list: endpoint, manage } = quotePhotoEndpoints({ quoteId, token });
   const [photos, setPhotos] = useState<Photo[]>([]); const [canEdit, setCanEdit] = useState(false);
   const [enabled, setEnabled] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
@@ -44,7 +57,7 @@ export function QuotePhotos({ quoteId, token }: { quoteId?: string; token?: stri
   if (token && !photos.length && !error) return null;
   return <section className="t2q-card-pro p-5 sm:p-6" aria-label="Quote photos">
     <div className="flex items-center gap-2"><Camera size={20} className="text-brand" /><h2 className="text-lg font-semibold">Job photos</h2></div>
-    {!token && <p className="mt-2 text-sm text-ink-300">{enabled ? "Attach up to 8 photos before sending. Clients can view them on the quote link. Photos are locked once sent." : photos.length > 0 ? "Photos the client sent with their request. Adding your own photos is included with Crew and Builder." : "Photo attachments are included with Crew and Builder."}</p>}
+    {!token && <p className="mt-2 text-sm text-ink-300">{photosNote({ enabled, fromClient: photos.length > 0, inApp })}</p>}
     {error && <p role="alert" className="mt-3 text-sm text-red-300">{error}</p>}
     <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">{photos.map((photo) => <figure key={photo.id} className="min-w-0 overflow-hidden rounded-xl border border-ink-700">
       <a href={`${endpoint}?photo=${photo.id}`} target="_blank" rel="noreferrer"><img src={`${endpoint}?photo=${photo.id}`} alt={photo.name} loading="lazy" className="aspect-[4/3] w-full object-cover" /></a>

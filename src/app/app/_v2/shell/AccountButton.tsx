@@ -76,8 +76,8 @@ function Section({ id, title, children }: { id: string; title: string; children:
  * Your photo, top left on every tab. A tap slides up everything that isn't
  * a tab (the More tab's replacement): your profile and the business's
  * settings, clients, calendar and team, T2QCAL (opens its own app), help,
- * outdoor mode, the owner's tools and sign out. No plans or prices, so it's
- * the same in the iOS app.
+ * the privacy policy and terms, outdoor mode, the owner's tools and sign
+ * out. No plans or prices, so it's the same in the iOS app.
  */
 export function AccountButton({ data }: { data: AccountData }) {
   const [open, setOpen] = useState(false);

@@ -4,9 +4,10 @@ import { AuthMarketingPanel } from "../../_components/auth/AuthMarketingPanel";
 import { SignupForm } from "./_components/SignupForm";
 import { isNativeShellRequest } from "@/lib/native-shell";
 
-export const metadata: Metadata = {
-  title: "Start your free trial",
-};
+/** The tab title is in the HTML too: inside the iOS app no "free trial" (App Store 3.1.3(f)). */
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await isNativeShellRequest()) ? "Create account" : "Start your free trial" };
+}
 
 /**
  * /signup — split-screen sign-up.
@@ -47,7 +48,7 @@ export default async function SignupPage({
           </p>
 
           <div className="mt-8">
-            <SignupForm error={error} next={next} />
+            <SignupForm error={error} next={next} native={native} />
           </div>
         </>
       }

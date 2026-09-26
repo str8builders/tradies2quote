@@ -9,6 +9,7 @@ import {
 } from "@/lib/transcript/asrHints";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
 import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
+import { trialEndedResponse } from "@/lib/trial-ended-response";
 import { TIMEOUTS } from "@/lib/fetchTimeout";
 import { aiModel } from "@/lib/ai/models";
 import { sendWithRetry, type AiHttpResponse } from "@/lib/ai/http";
@@ -58,14 +59,8 @@ export async function POST(request: NextRequest) {
     email: user.email,
   });
   if (!canWrite(sub)) {
-    return NextResponse.json(
-      {
-        error: "trial_expired",
-        message: "Your free trial has ended. Subscribe to keep creating quotes.",
-        upgrade_url: "/app/upgrade",
-      },
-      { status: 402 },
-    );
+    // In the iPhone app: "New quotes are paused", no subscribe wording (3.1.3(f)).
+    return trialEndedResponse("Your free trial has ended. Subscribe to keep creating quotes.");
   }
 
   const apiKey = process.env.OPENAI_API_KEY;

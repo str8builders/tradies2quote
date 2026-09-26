@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { purgeAccount } from "@/lib/account-deletion";
 import { isCompedEmail } from "@/lib/reviewer";
+import { isNativeShellRequest } from "@/lib/native-shell";
 
 /**
  * Account deletion — Apple App Store Guideline 5.1.1(v) requires that any
@@ -27,6 +28,21 @@ import { isCompedEmail } from "@/lib/reviewer";
  */
 
 export type DeleteAccountResult = { ok: false; error: string };
+
+/** The line the sign-in screen shows after a deletion in the iPhone app. */
+const ACCOUNT_DELETED_MESSAGE = "Your account has been deleted.";
+
+/**
+ * Where a finished deletion lands. The website: its homepage, as before. The
+ * iPhone app: the sign-in screen, never the homepage, whose HTML carries the
+ * website's trial offers (App Store 3.1.3(f)); the app would only bounce on
+ * from there after they had been sent.
+ */
+async function afterDeletion(): Promise<string> {
+  return (await isNativeShellRequest())
+    ? `/login?message=${encodeURIComponent(ACCOUNT_DELETED_MESSAGE)}`
+    : "/?account-deleted=1";
+}
 
 export async function deleteAccountAction(
   formData: FormData,
@@ -54,7 +70,7 @@ export async function deleteAccountAction(
   // review email(s) in src/lib/reviewer.ts.
   if (isCompedEmail(user.email)) {
     await supabase.auth.signOut();
-    redirect("/?account-deleted=1");
+    redirect(await afterDeletion());
   }
 
   // The purge itself lives in `@/lib/account-deletion` so the iOS calculator
@@ -66,5 +82,5 @@ export async function deleteAccountAction(
   if (!result.ok) return result;
 
   await supabase.auth.signOut();
-  redirect("/?account-deleted=1");
+  redirect(await afterDeletion());
 }

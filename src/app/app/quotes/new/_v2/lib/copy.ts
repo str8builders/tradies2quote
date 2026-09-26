@@ -3,6 +3,7 @@
  * flow, and the recorder's status lines. Pure, so every message is tested.
  */
 
+import { inIPhoneApp, trialEndedMessage } from "@/lib/trial-ended";
 import { MAX_RECORDING_SECONDS } from "../../_lib/quote-input";
 
 // ── Errors the page is sent back with (?error=) ─────────────────────────────
@@ -84,11 +85,18 @@ function sentenceOf(body: unknown): string {
   return /\s/.test(code) && !/[_{}<>]/.test(code) ? code : "";
 }
 
-/** Plain words for a failed transcription reply, and whether re-sending could work. */
-export function transcribeFailure(status: number, body: unknown): TranscribeFailure {
+/**
+ * Plain words for a failed transcription reply, and whether re-sending could
+ * work. `inApp`: inside the iPhone app a finished trial is only "paused",
+ * never "subscribe" (App Store 3.1.3(f)).
+ */
+export function transcribeFailure(status: number, body: unknown, inApp: boolean = inIPhoneApp()): TranscribeFailure {
   const code = codeOf(body);
   if (status === 402 || code === "trial_expired") {
-    return { error: "Your free trial has ended. Subscribe to keep making quotes.", retryable: false };
+    return {
+      error: trialEndedMessage("Your free trial has ended. Subscribe to keep making quotes.", inApp),
+      retryable: false,
+    };
   }
   if (code === "ai_consent_required") {
     return {

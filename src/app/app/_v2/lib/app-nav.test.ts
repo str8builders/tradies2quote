@@ -86,7 +86,7 @@ describe("the top bar old pages get in the new look", () => {
     ["/app/team", "Your team", { href: "/app/more", label: "More" }],
     ["/app/templates", "Terms templates", { href: "/app/more", label: "More" }],
     ["/app/beta", "Send feedback", { href: "/app/more", label: "More" }],
-    ["/app/upgrade", "Plans", { href: "/app/more", label: "More" }],
+    ["/app/upgrade", "Some old label", { href: "/app/more", label: "More" }],
     ["/app/agents", "Agents", { href: "/app/more", label: "More" }],
     ["/app/agents/monitor", "Agent monitor", { href: "/app/more", label: "More" }],
     ["/app/admin", "Ops", { href: "/app/more", label: "More" }],

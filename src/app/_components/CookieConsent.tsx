@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import Script from "next/script";
 import { Cookie } from "@phosphor-icons/react";
+import { isNativeIOSApp } from "@/lib/native-app";
 
 /**
  * Cookie consent banner + analytics gate.
@@ -37,6 +38,16 @@ const ANALYTICS_SRC = "https://uptimewatch-vert.vercel.app/track.js";
 
 type Consent = "accepted" | "declined" | null;
 
+/**
+ * The iPhone app (Capacitor, whose user agent carries "T2QNativeShell")
+ * uses essential cookies only: no banner, and the analytics script never
+ * loads there, whatever was chosen before. Decided in the browser, where
+ * the banner lives anyway, so the root layout stays static-friendly.
+ */
+export function analyticsAllowedHere(userAgent: string, nativePlatform: boolean): boolean {
+  return !nativePlatform && !userAgent.includes("T2QNativeShell");
+}
+
 export function CookieConsent() {
   // `undefined` = not yet read (avoid a flash of the banner before we
   // know the stored choice); null = read, no choice yet → show banner.
@@ -45,7 +56,7 @@ export function CookieConsent() {
   // authenticated app shell (it overlapped the app's own bottom controls). The
   // analytics-injection logic below still runs everywhere for opted-in users.
   const pathname = usePathname() ?? "";
-  const inApp = pathname.startsWith("/app");
+  const onAppPages = pathname.startsWith("/app");
   const onT2qcal = pathname.startsWith("/t2qcal");
   // On the home page the bar waits until the visitor scrolls. It used to sit
   // over the headline and the "Start your free trial" button on every first
@@ -58,6 +69,8 @@ export function CookieConsent() {
     // Defer the read to a 0-ms timer so it doesn't run synchronously in
     // the effect body (React 19's react-hooks/set-state-in-effect).
     const t = setTimeout(() => {
+      // In the iPhone app the choice is never read: no banner, no script.
+      if (!analyticsAllowedHere(navigator.userAgent, isNativeIOSApp())) return;
       try {
         const stored = window.localStorage.getItem(CONSENT_KEY);
         setConsent(stored === "accepted" || stored === "declined" ? stored : null);
@@ -100,7 +113,7 @@ export function CookieConsent() {
         <Script src={ANALYTICS_SRC} strategy="afterInteractive" />
       ) : null}
 
-      {consent === null && !inApp && (!onHome || engaged) ? (
+      {consent === null && !onAppPages && (!onHome || engaged) ? (
         <div
           data-testid="cookie-consent"
           role="dialog"

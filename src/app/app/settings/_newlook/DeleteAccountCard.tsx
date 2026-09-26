@@ -13,11 +13,22 @@ import { deleteAccountAction } from "../delete-account-actions";
 export const DELETE_CONFIRM_WORD = "DELETE";
 
 /**
+ * What goes. In the iPhone app it doesn't mention a subscription (App Store
+ * 3.1.3(f)); any subscription is still cancelled, as on the website.
+ */
+export function deleteAccountWarning(inApp: boolean): string {
+  return inApp
+    ? "Everything goes: your business profile, all quotes and their PDFs, invoices, clients, material library, timesheet hours and calendar notes."
+    : "Everything goes: your business profile, all quotes and their PDFs, invoices, clients, material library, calendar notes, and any active subscription is cancelled.";
+}
+
+/**
  * Delete your account (Apple 5.1.1(v)) with the old page's two steps: open
  * it, then type DELETE before the existing action runs. On success the
  * action signs out and leaves the app; we only land back here on a failure.
+ * `inApp` (from the server) picks the warning's words (deleteAccountWarning).
  */
-export function DeleteAccountCard() {
+export function DeleteAccountCard({ inApp = false }: { inApp?: boolean } = {}) {
   const [open, setOpen] = useState(false);
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
@@ -68,10 +79,9 @@ export function DeleteAccountCard() {
       ) : (
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
           <Callout tone="bad" title="This can't be undone">
-            Everything goes: your business profile, all quotes and their PDFs, invoices, clients,
-            material library, calendar notes, and any active subscription is cancelled. Records we
-            are legally required to keep (for example tax records for payments already made) are
-            kept only as long as the law requires.
+            {deleteAccountWarning(inApp)}{" "}
+            Records we are legally required to keep (for example tax records for payments already
+            made) are kept only as long as the law requires.
           </Callout>
           <TextField
             label={`Type ${DELETE_CONFIRM_WORD} to confirm`}

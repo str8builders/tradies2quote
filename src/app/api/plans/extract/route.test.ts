@@ -26,6 +26,7 @@ const h = vi.hoisted(() => ({
 
 vi.mock("@/lib/observability", () => ({ captureError: h.capture }));
 vi.mock("@/lib/planreader/flag", () => ({ planReaderAllowed: () => true }));
+vi.mock("@/lib/ai-consent", () => ({ aiConsentGate: async () => null }));
 vi.mock("@/lib/subscription", () => ({ getSubscriptionStatus: async () => ({ state: "trialing" }), canWrite: () => true }));
 vi.mock("@/lib/rate-limit", () => ({ consumeDailyQuota: () => ({ ok: true }), tooManyRequestsResponse: () => new Response(null, { status: 429 }) }));
 vi.mock("@/lib/supabase/server", () => ({

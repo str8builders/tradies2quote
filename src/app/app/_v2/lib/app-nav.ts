@@ -104,7 +104,11 @@ const TO_JOBS = { href: JOBS_PATH, label: "Jobs" };
 const TO_PRICES = { href: PRICES_PATH, label: "Prices" };
 const TO_MORE = { href: MORE_PATH, label: "More" };
 
-/** Titles in plain words, by path; the page's own label fills the gaps. */
+/**
+ * Titles in plain words, by path; the page's own label fills the gaps.
+ * /app/upgrade is left to its label on purpose: "Plans" on the website,
+ * "Account" in the iPhone app, where plans are never named (3.1.3(f)).
+ */
 const TITLES: ReadonlyArray<[base: string, title: string]> = [
   ["/app/requests", "Client requests"],
   ["/app/materials/quick-start", "Quick start"],
@@ -119,7 +123,6 @@ const TITLES: ReadonlyArray<[base: string, title: string]> = [
   ["/app/team", "Your team"],
   ["/app/templates", "Terms templates"],
   ["/app/beta", "Send feedback"],
-  ["/app/upgrade", "Plans"],
   ["/app/weather", "Weather"],
   ["/app/agents/monitor", "Agent monitor"],
   ["/app/agents", "Agents"],

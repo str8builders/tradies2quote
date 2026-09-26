@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
+import { trialEndedResponse } from "@/lib/trial-ended-response";
 import { captureError } from "@/lib/observability";
 import { regenerateRefusalMessage } from "@/lib/lifecycle/lock";
 
@@ -64,14 +65,9 @@ export async function POST(
     email: user.email,
   });
   if (!canWrite(sub)) {
-    return NextResponse.json(
-      {
-        error: "trial_expired",
-        message:
-          "Your free trial has ended. Subscribe to keep regenerating quotes.",
-        upgrade_url: "/app/upgrade",
-      },
-      { status: 402 },
+    // In the iPhone app: "New quotes are paused", no subscribe wording (3.1.3(f)).
+    return trialEndedResponse(
+      "Your free trial has ended. Subscribe to keep regenerating quotes.",
     );
   }
 

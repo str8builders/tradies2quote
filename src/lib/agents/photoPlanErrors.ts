@@ -3,6 +3,8 @@
 // "ai_consent_required", "rate_limited") and technical sentences; the
 // tradie must never see those raw.
 
+import { inIPhoneApp, trialEndedMessage } from "@/lib/trial-ended";
+
 const FALLBACK = "Something went wrong reading that photo. Please try again.";
 
 const BY_CODE: Record<string, string> = {
@@ -24,12 +26,18 @@ const BY_STATUS: Record<number, string> = {
   504: "Reading the photo took too long. Please try again.",
 };
 
-export function photoPlanErrorMessage(status: number, body: unknown): string {
+/**
+ * `inApp`: inside the iPhone app a finished trial is only "paused", never
+ * "subscribe" (App Store 3.1.3(f)); the route already words its own reply so.
+ */
+export function photoPlanErrorMessage(status: number, body: unknown, inApp: boolean = inIPhoneApp()): string {
   const b = (body && typeof body === "object" ? body : {}) as { error?: unknown; message?: unknown };
   const code = typeof b.error === "string" ? b.error : "";
   const message = typeof b.message === "string" && b.message.trim() ? b.message.trim() : "";
   // Known codes: the route's own plain sentence when it sent one.
-  if (code in BY_CODE) return message || BY_CODE[code];
+  if (code in BY_CODE) {
+    return message || (code === "trial_expired" ? trialEndedMessage(BY_CODE[code], inApp) : BY_CODE[code]);
+  }
   if (BY_STATUS[status]) return BY_STATUS[status];
   if (status >= 500) return "Photo reading failed. Please try again.";
   return FALLBACK;

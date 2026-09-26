@@ -8,6 +8,7 @@ import { callAnthropic, type AnthropicCallResult } from "@/lib/ai/anthropic";
 import { describeAiError, isAiError } from "@/lib/ai/errors";
 import { trackAgentRun, usageSummary } from "@/lib/agent-monitor/track";
 import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
+import { trialEndedResponse } from "@/lib/trial-ended-response";
 import { resolveDocumentType } from "@/lib/scanClassify";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
 import {
@@ -55,14 +56,9 @@ export async function POST(request: NextRequest) {
     email: user.email,
   });
   if (!canWrite(sub)) {
-    return NextResponse.json(
-      {
-        error: "trial_expired",
-        message:
-          "Your free trial has ended. Subscribe to keep scanning drawings.",
-        upgrade_url: "/app/upgrade",
-      },
-      { status: 402 },
+    // In the iPhone app: "New quotes are paused", no subscribe wording (3.1.3(f)).
+    return trialEndedResponse(
+      "Your free trial has ended. Subscribe to keep scanning drawings.",
     );
   }
 

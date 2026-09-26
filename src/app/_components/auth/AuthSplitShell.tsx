@@ -10,7 +10,8 @@ type Props = {
   /**
    * Inside the iOS app (isNativeShellRequest): no way out to the website,
    * whose homepage shows plans and prices (App Store 3.1.3(f)), so no
-   * "Back to website" and the logos aren't links.
+   * "Back to website" and the logos aren't links. Small Privacy policy and
+   * Terms links sit at the foot instead (5.1.1(i)).
    */
   native?: boolean;
 };
@@ -62,9 +63,33 @@ export function AuthSplitShell({
           )}
         </div>
         <div className="studio-auth-form">{form}</div>
-        <p className="studio-auth-foot">
-          Built by a builder in New Zealand. Made for the trades.
-        </p>
+        {native ? (
+          // In the app the privacy policy and terms are one tap away before
+          // signing in or signing up (App Store 5.1.1(i)).
+          <div className="studio-auth-foot">
+            <p>Built by a builder in New Zealand. Made for the trades.</p>
+            <nav aria-label="Privacy and terms" className="flex justify-center gap-5">
+              <Link
+                href="/privacy"
+                data-testid="auth-privacy"
+                className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-white"
+              >
+                Privacy policy
+              </Link>
+              <Link
+                href="/terms"
+                data-testid="auth-terms"
+                className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-white"
+              >
+                Terms
+              </Link>
+            </nav>
+          </div>
+        ) : (
+          <p className="studio-auth-foot">
+            Built by a builder in New Zealand. Made for the trades.
+          </p>
+        )}
       </div>
     </div>
   );

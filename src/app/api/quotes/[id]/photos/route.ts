@@ -5,6 +5,7 @@ import { adminClient } from "@/lib/supabase/admin";
 import { getTeamContext } from "@/lib/team";
 import { captureError } from "@/lib/observability";
 import { consumeFixedWindow } from "@/lib/rate-limit";
+import { isNativeShellRequest } from "@/lib/native-shell";
 import { PHOTO_BUCKET, MAX_PHOTO_BYTES, normaliseQuotePhoto } from "@/lib/quote-photos";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,7 +42,8 @@ export async function POST(request: NextRequest, ctx: Context) {
   if (!consumeFixedWindow(`photos:${access.user.id}`, 20, 60_000).ok) return NextResponse.json({ error: "Please wait a minute." }, { status: 429 });
   try {
     const context = await getTeamContext(access.user.id);
-    if (!context.active || access.quote.status !== "draft") return NextResponse.json({ error: "Add photos to a draft with an active Crew or Builder plan." }, { status: 403 });
+    // The iPhone app never names a plan (App Store 3.1.3(f)).
+    if (!context.active || access.quote.status !== "draft") return NextResponse.json({ error: (await isNativeShellRequest()) ? "Photos can't be added to this quote." : "Add photos to a draft with an active Crew or Builder plan." }, { status: 403 });
     if (Number(request.headers.get("content-length")) > MAX_PHOTO_BYTES + 100_000) return NextResponse.json({ error: "Choose a photo under 10 MB." }, { status: 413 });
     const data = await request.formData(); const file = data.get("photo");
     if (!(file instanceof File) || file.size > MAX_PHOTO_BYTES) return NextResponse.json({ error: "Choose a photo under 10 MB." }, { status: 400 });

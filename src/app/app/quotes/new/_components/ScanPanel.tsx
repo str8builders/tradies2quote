@@ -28,6 +28,7 @@ import {
   readWallRunLine,
 } from "@/lib/aiTakeoffParser";
 import { METRES_BANDS, type MetresKind } from "@/lib/takeoff/plausibility";
+import { inIPhoneApp, trialEndedMessage } from "@/lib/trial-ended";
 
 type ScanState =
   | "idle"
@@ -636,9 +637,10 @@ const SCAN_ERROR_MESSAGES: Record<string, string> = {
  * Known codes (`trial_expired`, …) get plain words; a sentence the route
  * wrote for people is shown as-is; anything else — an unknown code, a
  * server-configuration detail, an empty body — gets a generic message.
- * A raw code is never shown.
+ * A raw code is never shown. `inApp`: inside the iPhone app a finished trial
+ * is only "paused", never "subscribe" (App Store 3.1.3(f)).
  */
-export function scanErrorMessage(status: number, body: unknown): string {
+export function scanErrorMessage(status: number, body: unknown, inApp: boolean = inIPhoneApp()): string {
   const data = (body && typeof body === "object" ? body : {}) as {
     error?: unknown;
     message?: unknown;
@@ -653,6 +655,7 @@ export function scanErrorMessage(status: number, body: unknown): string {
         : status === 429
           ? SCAN_ERROR_MESSAGES.rate_limited
           : undefined);
+  if (known === SCAN_ERROR_MESSAGES.trial_expired) return trialEndedMessage(known, inApp);
   if (known) return known;
   if (status === 503) {
     return "Drawing scan isn't available right now. Please try again later.";

@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { aiConsentGate } from "@/lib/ai-consent";
 import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
+import { trialEndedResponse } from "@/lib/trial-ended-response";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
 import { extractSheet, isSheetAlreadyExtracted } from "@/lib/planreader/extract";
 import { captureError } from "@/lib/observability";
@@ -56,6 +58,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  // Guideline 5.1.2(i) — plan pages go to Anthropic's vision model: not
+  // without recorded AI consent (iOS app only; web unaffected).
+  const consentGate = await aiConsentGate(supabase, user.id);
+  if (consentGate) return consentGate;
+
   const quota = consumeDailyQuota(`plans-extract:${user.id}`, 120);
   if (!quota.ok) return tooManyRequestsResponse(quota.resetAt);
 
@@ -65,14 +72,8 @@ export async function POST(request: NextRequest) {
     email: user.email,
   });
   if (!canWrite(sub)) {
-    return NextResponse.json(
-      {
-        error: "trial_expired",
-        message: "Your free trial has ended. Subscribe to keep reading plans.",
-        upgrade_url: "/app/upgrade",
-      },
-      { status: 402 },
-    );
+    // In the iPhone app: "New quotes are paused", no subscribe wording (3.1.3(f)).
+    return trialEndedResponse("Your free trial has ended. Subscribe to keep reading plans.");
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
