@@ -142,8 +142,8 @@ export function WeatherButtonView({
  * switching tabs is instant; looked up again when the app comes back after
  * that. Your trade is remembered on this device.
  */
-export function WeatherButton() {
-  const [state, setState] = useState<WeatherState>({ kind: "loading" });
+export function WeatherButton({ preview }: { preview?: WeatherState } = {}) {
+  const [state, setState] = useState<WeatherState>(preview ?? { kind: "loading" });
   const [trade, setTrade] = useState<WeatherImpactTrade>(DEFAULT_TRADE);
   const [open, setOpen] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -155,6 +155,8 @@ export function WeatherButton() {
   }, [state]);
 
   useEffect(() => {
+    // Sample data on the local preview page: nothing to look up.
+    if (preview) return;
     let live = true;
     const saved = readTrade(storage("localStorage"));
     void resolveWeather(browserDeps()).then((next) => {
@@ -174,7 +176,7 @@ export function WeatherButton() {
       live = false;
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, []);
+  }, [preview]);
 
   const retry = () => {
     setState({ kind: "loading" });

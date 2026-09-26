@@ -11,6 +11,7 @@ import { JobsBrowser } from "@/app/app/jobs/_components/JobsBrowser";
 import { MoreView } from "@/app/app/more/_components/MoreView";
 import { contrastAttributeValue } from "@/lib/ui/outdoor";
 import { TimesheetView } from "@/app/app/timesheet/_components/TimesheetView";
+import type { WeatherState } from "@/app/app/_v2/shell/weather-now";
 import type { TimesheetData } from "@/app/app/timesheet/_lib/types";
 import { ForgetWelcome } from "./ForgetWelcome";
 import { NativeTest } from "./NativeTest";
@@ -25,6 +26,34 @@ const bar = {
   letter: "C",
   businessName: "STR8 Builders",
   email: "challis@example.test",
+  weather: true,
+};
+
+/** Made-up weather for the top bar's button and its sheet. */
+const weather: WeatherState = {
+  kind: "ready",
+  today: "2026-09-26",
+  reading: {
+    source: "device",
+    key: "-37.69,176.17",
+    locality: null,
+    at: Date.parse("2026-09-26T08:00:00+12:00"),
+    weather: {
+      current: { summary: "Mostly clear", condition: "clear", temperatureC: 17.2, windGustKph: 24, rainProbabilityPct: 10 },
+      days: [
+        { date: "2026-09-26", status: "safe", condition: "clear", tempMaxC: 18, rainProbabilityMaxPct: 10, windGustMaxKph: 24, reason: "Good to work" },
+        { date: "2026-09-27", status: "caution", condition: "rain", tempMaxC: 15, rainProbabilityMaxPct: 70, windGustMaxKph: 38, reason: "Showers from midday" },
+        { date: "2026-09-28", status: "safe", condition: "cloud", tempMaxC: 16, rainProbabilityMaxPct: 20, windGustMaxKph: 22, reason: "Good to work" },
+        { date: "2026-09-29", status: "safe", condition: "clear", tempMaxC: 19, rainProbabilityMaxPct: 5, windGustMaxKph: 18, reason: "Good to work" },
+        { date: "2026-09-30", status: "caution", condition: "rain", tempMaxC: 14, rainProbabilityMaxPct: 60, windGustMaxKph: 30, reason: "Rain likely" },
+      ],
+      trades: [
+        { id: "general_outdoor", label: "General outdoor labour", status: "safe", reason: "No weather limits right now.", betterWindow: null },
+        { id: "roofing", label: "Roofing", status: "caution", reason: "Gusts near 25 kph: take care on the roof edge.", betterWindow: "Sat 2:00 pm-Sat 4:00 pm looks better: gusts around 15 kph." },
+        { id: "painting_exterior", label: "Painting (exterior)", status: "safe", reason: "No weather limits right now.", betterWindow: null },
+      ],
+    },
+  },
 };
 
 const todos: Todo[] = [
@@ -161,7 +190,11 @@ const timesheet: TimesheetData = {
       userId: "me",
       person: "You",
       mine: true,
-      invoice: null, pins: null, km: null
+      invoice: null,
+      pins: { start: "At the Hemi Walker job", end: "At the Hemi Walker job" },
+      km: 12.4,
+      site: { lat: -37.6868, lng: 176.1654, address: "14 Kauri Street, Tauranga" }, address: null,
+      clockPoints: { start: { lat: -37.6866, lng: 176.1657 }, end: { lat: -37.6869, lng: 176.1652 } },
     },
     {
       id: "e2",
@@ -176,7 +209,8 @@ const timesheet: TimesheetData = {
       userId: "s",
       person: "Sione",
       mine: false,
-      invoice: null, pins: null, km: null
+      invoice: null, pins: null, km: null,
+      site: { lat: -37.6868, lng: 176.1654, address: "14 Kauri Street, Tauranga" }, address: null,
     },
     {
       id: "e3",
@@ -253,6 +287,7 @@ export default async function DevNewLookPage({
       <main className={main}>
         <TabTopBar
           data={bar}
+          weatherPreview={weather}
           title="Jobs"
           description="Every quote, from first draft to paid."
         />
@@ -273,6 +308,7 @@ export default async function DevNewLookPage({
       <main className={main}>
         <TabTopBar
           data={bar}
+          weatherPreview={weather}
           title="Timesheet"
           description="Everyone's hours, and invoice a client for the week."
         />
@@ -290,7 +326,7 @@ export default async function DevNewLookPage({
   } else {
     content = (
       <main className={main}>
-        <TabTopBar data={bar} />
+        <TabTopBar data={bar} weatherPreview={weather} />
         <div className="mt-5">
           <HomeView
             summary="4 things need you today"

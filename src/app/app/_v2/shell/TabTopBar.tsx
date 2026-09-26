@@ -4,6 +4,7 @@ import { UI_TEXT } from "@/components/ui/styles";
 import type { TopBarData } from "../lib/top-bar";
 import { AccountButton } from "./AccountButton";
 import { WeatherButton } from "./WeatherButton";
+import type { WeatherState } from "./weather-now";
 
 export interface TabTopBarProps {
   data: TopBarData;
@@ -11,6 +12,8 @@ export interface TabTopBarProps {
   title?: string;
   /** A line of plain words under the bar. */
   description?: ReactNode;
+  /** Sample weather for the local preview page (the app looks it up itself). */
+  weatherPreview?: WeatherState;
 }
 
 /**
@@ -21,7 +24,7 @@ export interface TabTopBarProps {
  * over your name, or just "Good morning" when there's no name to use.
  * Holds the page's one h1.
  */
-export function TabTopBar({ data, title, description }: TabTopBarProps) {
+export function TabTopBar({ data, title, description, weatherPreview }: TabTopBarProps) {
   const greeting = !title;
   return (
     <header data-testid="tab-top-bar" className={cx("space-y-2", UI_TEXT)}>
@@ -37,7 +40,7 @@ export function TabTopBar({ data, title, description }: TabTopBarProps) {
             <h1 className="ui-heading truncate text-ui-2xl text-ui-text">{greeting ? data.greeting : title}</h1>
           )}
         </div>
-        {data.weather ? <WeatherButton /> : null}
+        {data.weather ? <WeatherButton preview={weatherPreview} /> : null}
       </div>
       {description ? <p className="text-ui-base text-ui-muted">{description}</p> : null}
     </header>
