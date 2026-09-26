@@ -100,7 +100,7 @@ export function JobSiteStory({ nativeShell }: { nativeShell: boolean }) {
 
         {/* 3 · Inside the house: Talk, Draft, Check, Send, Invoice */}
         <div data-scene="house" className="jobsite-scene jobsite-scene--house">
-          <HouseWalk />
+          <HouseWalk nativeShell={nativeShell} />
         </div>
 
         {/* 4 · The finished home, then the details */}

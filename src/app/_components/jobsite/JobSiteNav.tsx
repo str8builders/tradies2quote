@@ -23,7 +23,8 @@ export function JobSiteNav() {
     const steps = STEPS.map((s) => document.getElementById(s.anchor)).filter((el): el is HTMLElement => el !== null);
     const hero = document.getElementById("hero-heading");
     const talk = document.getElementById("talk");
-    const details = document.querySelector('[data-scene="details"]');
+    // The step links cover the five rooms: they go at the first "More in the app" section (or the details).
+    const details = document.querySelector("[data-steps-end]") ?? document.querySelector('[data-scene="details"]');
     const end = document.querySelector("[data-final-cta]");
     const root = document.querySelector<HTMLElement>("[data-jobsite-root]");
     let frame = 0;

@@ -15,7 +15,6 @@ import {
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { blendSlots, containIn, walkAt, type Box } from "../house-walk";
 import { STUDIO } from "../layout";
-import { ROOMS } from "../story";
 import { BODY, BODY_ASPECT, buildPhone, type PhoneModel } from "./phone-model";
 import { sceneState } from "./scene-state";
 import { StepScreens } from "./step-screens";
@@ -38,6 +37,8 @@ type Rig = {
   screens: StepScreens;
   rooms: HTMLElement[];
   slots: (HTMLElement | null)[];
+  /** Each stop's clip (its data-clip): talk … invoice, the features, t2qcal. */
+  clips: string[];
   /** The room whose step is on the screen, the room you're in, the room whose clip is playing (-1: none). */
   shown: number;
   want: number;
@@ -90,6 +91,7 @@ function buildRig(gl: WebGLRenderer, camera: Camera, group: Group, width: 600 | 
     screens,
     rooms,
     slots: rooms.map((el) => el.querySelector<HTMLElement>("[data-phone-slot]")),
+    clips: rooms.map((el) => el.dataset.clip ?? el.dataset.room ?? ""),
     shown: 0,
     want: 0,
     playing: -1,
@@ -109,12 +111,13 @@ function offScreen(rig: Rig) {
 
 /**
  * Inside the house: a real phone floating in each room, playing that step
- * of the job (Talk, Draft, Check, Send, Invoice). The page decides where:
- * each room has an empty phone slot beside its words, and the phone floats
- * over the slot of the room you're in, riding in with the first room and
- * away with the last. Walking into the next room turns it round; the
- * screen changes while its back is to you and the new step plays from the
- * start. It sways gently while you read.
+ * of the job (Talk, Draft, Check, Send, Invoice), then each "More in the
+ * app" feature and T2QCAL. The page decides where: each stop has an empty
+ * phone slot beside its words and names its clip (data-clip), and the phone
+ * floats over the slot of the stop you're in, riding in with the first room
+ * and away with the last stop. Walking on turns it round; the screen
+ * changes while its back is to you and the new clip plays from the start.
+ * It sways gently while you read.
  */
 export function HousePhone({
   level,
@@ -202,8 +205,8 @@ export function HousePhone({
     const t = state.clock.elapsedTime;
     const want = Math.max(0, walk.active);
     const prepare = (i: number) => {
-      r.screens.prepare(ROOMS[i].id);
-      if (i + 1 < ROOMS.length) r.screens.prepare(ROOMS[i + 1].id);
+      r.screens.prepare(r.clips[i]);
+      if (i + 1 < r.clips.length) r.screens.prepare(r.clips[i + 1]);
     };
     if (!r.onScreen) {
       r.onScreen = true;
@@ -240,10 +243,10 @@ export function HousePhone({
       }
     } else if (!facingAway && r.playing !== r.shown) {
       r.screens.pauseAll();
-      r.screens.play(ROOMS[r.shown].id);
+      r.screens.play(r.clips[r.shown]);
       r.playing = r.shown;
     }
-    r.model.screen.map = r.screens.texture(ROOMS[r.shown].id);
+    r.model.screen.map = r.screens.texture(r.clips[r.shown]);
 
     // The float: a slow bob and sway, turned a little towards the words.
     const yaw = REST_YAW + Math.sin(t * 0.5) * 0.08 + turn;

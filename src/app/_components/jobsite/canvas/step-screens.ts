@@ -1,12 +1,14 @@
 import { DataTexture, SRGBColorSpace, TextureLoader, VideoTexture, type Texture } from "three";
-import type { RoomId } from "../story";
 
-/** The clip sizes rendered by scripts/render-marketing.mjs (target "steps"). */
+/** The clip sizes rendered by scripts/render-marketing.mjs (targets "steps" and "features"). */
+
+/** A screen's clip name: a room (talk … invoice), a feature (barcode …) or t2qcal. */
+export type ClipId = string;
 export type ClipWidth = 600 | 420;
 
-export const clipSrc = (id: RoomId, width: ClipWidth) => `/jobsite/screens/${id}-${width}.mp4`;
-export const firstFrameSrc = (id: RoomId) => `/jobsite/screens/${id}-first.webp`;
-export const lastFrameSrc = (id: RoomId) => `/jobsite/screens/${id}.webp`;
+export const clipSrc = (id: ClipId, width: ClipWidth) => `/jobsite/screens/${id}-${width}.mp4`;
+export const firstFrameSrc = (id: ClipId) => `/jobsite/screens/${id}-first.webp`;
+export const lastFrameSrc = (id: ClipId) => `/jobsite/screens/${id}.webp`;
 
 type Clip = {
   video: HTMLVideoElement;
@@ -21,14 +23,15 @@ type Clip = {
 };
 
 /**
- * What the floating phone's screen shows: one clip per step of the job,
- * rendered by Remotion (src/remotion/marketing/step-screen.tsx). A clip
+ * What the floating phone's screen shows: one clip per stop of the walk,
+ * rendered by Remotion (src/remotion/marketing/step-screen.tsx and
+ * feature-screen.tsx). A clip
  * loads when its room is next, plays once from the start when you arrive
  * and holds on the result. Until it has a frame the screen shows its first
  * frame as a picture; if the browser won't play it, the finished screen.
  */
 export class StepScreens {
-  private readonly clips = new Map<RoomId, Clip>();
+  private readonly clips = new Map<ClipId, Clip>();
   private readonly loader = new TextureLoader();
   /** The screen's own near-black, before anything has loaded. */
   readonly blank: DataTexture;
@@ -52,7 +55,7 @@ export class StepScreens {
     return tex;
   }
 
-  private clip(id: RoomId): Clip {
+  private clip(id: ClipId): Clip {
     const found = this.clips.get(id);
     if (found) return found;
     const video = document.createElement("video");
@@ -88,12 +91,12 @@ export class StepScreens {
   }
 
   /** Start fetching a step's clip (its room is the one you're in, or the next). */
-  prepare(id: RoomId): void {
+  prepare(id: ClipId): void {
     this.clip(id);
   }
 
   /** Play a step's clip from the start; it holds on its last frame. */
-  play(id: RoomId): void {
+  play(id: ClipId): void {
     const clip = this.clip(id);
     clip.video.currentTime = 0;
     clip.video.play().catch((err: unknown) => {
@@ -120,7 +123,7 @@ export class StepScreens {
   }
 
   /** The best thing to show for a step right now. */
-  texture(id: RoomId): Texture {
+  texture(id: ClipId): Texture {
     const clip = this.clips.get(id);
     if (!clip) return this.blank;
     if (clip.blocked) {

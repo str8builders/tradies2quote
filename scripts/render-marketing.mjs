@@ -94,10 +94,24 @@ const TARGETS = {
   },
   steps: {
     composition: "StepScreen",
-    steps: ["talk", "draft", "check", "send", "invoice"],
+    screens: { prop: "step", ids: ["talk", "draft", "check", "send", "invoice"] },
     dir: "public/jobsite/screens",
     // H.264 only: phones decode it in hardware, and the 3D phone uploads
     // every frame as a texture. 600 px for computers, 420 px for phones.
+    web: { widths: [600, 420], mp4Crf: 26, gop: 60, stillWidth: 600 },
+  },
+  // The "More in the app" tour on the phone (same sizes and folder as the steps).
+  features: {
+    composition: "FeatureScreen",
+    screens: { prop: "feature", ids: ["barcode", "supplier", "request", "video"] },
+    dir: "public/jobsite/screens",
+    web: { widths: [600, 420], mp4Crf: 26, gop: 60, stillWidth: 600 },
+  },
+  // The T2QCAL stop: the real recording (scripts/record-t2qcal.mjs), then the draft it makes.
+  t2qcal: {
+    composition: "T2QCALScreen",
+    screens: { prop: "id", ids: ["t2qcal"] },
+    dir: "public/jobsite/screens",
     web: { widths: [600, 420], mp4Crf: 26, gop: 60, stillWidth: 600 },
   },
 };
@@ -247,11 +261,11 @@ async function main() {
         continue;
       }
 
-      if (target.steps) {
+      if (target.screens) {
         const dir = path.join(ROOT, target.dir);
         fs.mkdirSync(dir, { recursive: true });
-        for (const step of target.steps) {
-          const props = { step };
+        for (const step of target.screens.ids) {
+          const props = { [target.screens.prop]: step };
           const composition = await selectComposition({ serveUrl, id: target.composition, inputProps: props, ...common });
           const master = path.join(tmp, `step-${step}-master.mp4`);
           await renderMedia({

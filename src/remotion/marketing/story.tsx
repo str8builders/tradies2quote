@@ -83,11 +83,11 @@ function press(p: number, [a, b]: Span) {
 const [DECK, LABOUR] = EXAMPLE.lines;
 
 /** The decking line as every chapter shows it (never edited). */
-function deckingLine(extra: Partial<LineView> = {}): LineView {
+export function deckingLine(extra: Partial<LineView> = {}): LineView {
   return { enter: 1, quantity: DECK.quantity, unitPrice: DECK.unitPrice, badge: "library", ...extra };
 }
 /** The labour line after review: 24 hr × $65.00. */
-function finalLabour(extra: Partial<LineView> = {}): LineView {
+export function finalLabour(extra: Partial<LineView> = {}): LineView {
   return { enter: 1, quantity: LABOUR.quantity, unitPrice: LABOUR.unitPrice, ...extra };
 }
 /** The labour line as the AI drafted it: 26 hr × $60.00. */
