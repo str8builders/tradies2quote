@@ -8,6 +8,8 @@ import { DEMO_TIMELINE, HERO_LOOP_FRAMES, SOCIAL_TIMELINE, TOUR_TIMELINE, VIDEO_
 import { DemoTall, DemoWide, FullTour, HERO, HeroLoop, SocialCut, TALL, WIDE } from "./marketing/compositions";
 import { FEATURE_STILL, FeatureStill } from "./marketing/stills";
 import { STEP_SCREEN, STEP_SCREEN_FRAMES, StepScreen } from "./marketing/step-screen";
+import { FEATURE_FRAMES, FEATURE_SCREEN, FeatureScreen, featureMetadata } from "./marketing/feature-screen";
+import { T2QCAL_SCREEN, T2QCAL_SCREEN_FRAMES, T2QCALScreen } from "./marketing/t2qcal-screen";
 import { QuoteVideo } from "./quote-video/QuoteVideo";
 import { QUOTE_VIDEO_COMPOSITION } from "../lib/quote-video/constants";
 import { sampleQuoteVideoProps } from "../lib/quote-video/sample";
@@ -24,6 +26,18 @@ function Root() {
       <Still id="FeatureStill" component={FeatureStill} {...FEATURE_STILL} defaultProps={{ feature: "voice" as const }} />
       {/* The phone's own screen for one step, played on the job-site website's floating 3D phone. */}
       <Composition id="StepScreen" component={StepScreen} durationInFrames={STEP_SCREEN_FRAMES} fps={VIDEO_FPS} {...STEP_SCREEN} defaultProps={{ step: "talk" as const }} />
+      {/* One app feature as the phone's full screen, for the 3D phone's "More in the app" tour. */}
+      <Composition
+        id="FeatureScreen"
+        component={FeatureScreen}
+        durationInFrames={FEATURE_FRAMES.barcode}
+        fps={VIDEO_FPS}
+        {...FEATURE_SCREEN}
+        defaultProps={{ feature: "barcode" as const }}
+        calculateMetadata={featureMetadata}
+      />
+      {/* The real T2QCAL recording, then the draft it makes, for the 3D phone's T2QCAL stop. */}
+      <Composition id="T2QCALScreen" component={T2QCALScreen} durationInFrames={T2QCAL_SCREEN_FRAMES} fps={VIDEO_FPS} {...T2QCAL_SCREEN} />
       {/* Quote video for a client (rendered by scripts/quote-video-worker.mjs with a real quote's props). */}
       <Composition
         id={QUOTE_VIDEO_COMPOSITION.id}

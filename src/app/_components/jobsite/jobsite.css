@@ -187,6 +187,41 @@
   flex: none; margin-top: 8px; text-align: center; font: 500 10px/1.3 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase;
   color: rgba(242, 239, 234, 0.82); text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
 }
+/* "More in the app" and T2QCAL: no footage, a clean stage in the brand's
+   dark with a warm glow behind the phone (T2QCAL on drawing paper). */
+.house-stage {
+  position: absolute; inset: 0; z-index: -1;
+  background:
+    radial-gradient(90% 60% at 76% 62%, rgba(255, 95, 21, 0.18), rgba(255, 95, 21, 0) 62%),
+    linear-gradient(180deg, #0d0f0f 0%, #131515 100%);
+}
+.house-stage--grid {
+  background:
+    radial-gradient(90% 60% at 76% 62%, rgba(255, 95, 21, 0.13), rgba(255, 95, 21, 0) 62%),
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px) 0 0 / 32px 32px,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px) 0 0 / 32px 32px,
+    #0e1113;
+}
+.house-body p { margin: 0; }
+.house-inside { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 7px; font-size: 14.5px; line-height: 1.4; color: #e8e2d8; }
+.house-inside li { display: flex; align-items: flex-start; gap: 8px; }
+.house-inside svg { flex: none; margin-top: 3px; color: var(--js-accent); }
+.house-link {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 16px; min-height: 44px; padding: 0 16px;
+  border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.24); color: #fff; font-weight: 700; font-size: 15px; text-decoration: none;
+}
+.house-link:hover, .house-link:focus-visible { border-color: var(--js-accent); color: var(--js-accent); }
+/* On phones the list would crowd the phone; the paragraph says the same. */
+@media (max-width: 899px) { .house-inside { display: none; } }
+
+/* Coming to the iPhone app (not live on the web yet). */
+.house-soon {
+  position: relative; z-index: 1; max-width: 720px; margin: 0 auto; padding: 56px 16px 64px; background: var(--js-ink);
+}
+.house-soon-tag { margin: 0; font: 500 12px/1.4 var(--font-mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--js-accent); }
+.house-soon-title { margin: 8px 0 8px; font-family: var(--font-display); font-weight: 400; text-transform: uppercase; font-size: clamp(32px, 7vw, 56px); line-height: 0.95; color: #f7f4ef; }
+.house-soon-body { margin: 0; max-width: 48ch; font-size: 16px; line-height: 1.55; color: #d8d2c8; }
+
 /* Computers: the walkthrough fills the room, as on phones; the words and
    the phone stand in it, shaded from the side so the words stay readable. */
 @media (min-width: 900px) {

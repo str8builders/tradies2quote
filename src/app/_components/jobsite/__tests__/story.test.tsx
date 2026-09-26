@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { PLANS } from "@/lib/plans";
 import { FAQS } from "../../landing/FAQ";
 import { JobSiteStory } from "../JobSiteStory";
-import { EXAMPLE_LABEL, FILMED_ON, FINISHED, ROOMS, STEPS } from "../story";
+import { COMING_SOON, EXAMPLE_LABEL, FEATURES, FILMED_ON, FINISHED, ROOMS, STEPS, T2QCAL_STOP } from "../story";
 
 const html = renderToStaticMarkup(<JobSiteStory nativeShell={false} />);
 const text = html
@@ -15,19 +15,21 @@ const text = html
   .replace(/\s+/g, " ");
 
 describe("the job-site story is complete as plain HTML (search, screen readers, still version)", () => {
-  it("has one headline, a heading for every room, and the finished home", () => {
+  it("has one headline, a heading for every room, feature and T2QCAL, and the finished home", () => {
     expect(html.match(/<h1[\s>]/g)).toHaveLength(1);
     expect(text).toContain("Great at the job.");
     expect(text).toContain("Done with the paperwork.");
-    for (const word of [...ROOMS.map((r) => r.word), "Tools down. Quote sent."]) {
+    const words = [...ROOMS.map((r) => r.word), ...FEATURES.map((f) => f.word), T2QCAL_STOP.word, "Tools down. Quote sent."];
+    for (const word of words) {
       expect(html).toMatch(new RegExp(`<h2[^>]*>${word.replace(/\./g, "\\.")}</h2>`));
     }
   });
 
-  it("walks the house in the job's order, and every step link lands on its room", () => {
+  it("walks the house in the job's order, then the app's other features and T2QCAL; the step links land on the rooms", () => {
     expect(ROOMS.map((r) => r.id)).toEqual(["talk", "draft", "check", "send", "invoice"]);
     expect(STEPS.map((s) => s.anchor)).toEqual(ROOMS.map((r) => r.id));
-    const at = ROOMS.map((r) => html.indexOf(`id="${r.id}"`));
+    const stops = [...ROOMS.map((r) => r.id), ...FEATURES.map((f) => f.id), T2QCAL_STOP.id];
+    const at = stops.map((id) => html.indexOf(`id="${id}"`));
     expect(at.every((i) => i > 0)).toBe(true);
     expect([...at].sort((a, b) => a - b)).toEqual(at);
     const scenes = ["site", "portal", "house", "details"].map((id) => html.indexOf(`data-scene="${id}"`));
@@ -41,14 +43,40 @@ describe("the job-site story is complete as plain HTML (search, screen readers, 
       expect(text).toContain(room.body);
       expect(html).toContain(`alt="${room.screenAlt}"`);
     }
-    expect(text.split(EXAMPLE_LABEL).length - 1).toBe(ROOMS.length);
+    expect(text.split(EXAMPLE_LABEL).length - 1).toBe(ROOMS.length + FEATURES.length + 1);
     expect(text).toContain(FILMED_ON);
     expect(html).toContain(`alt="${FINISHED.photoAlt}"`);
   });
 
-  it("every room has a slot for the floating phone, holding that step's finished screen", () => {
-    expect(html.match(/data-phone-slot/g)).toHaveLength(ROOMS.length);
-    for (const room of ROOMS) expect(html).toContain(`jobsite%2Fscreens%2F${room.id}.webp`);
+  it("every room, feature and T2QCAL has a slot for the floating phone, naming its screen", () => {
+    const clips = [...ROOMS.map((r) => r.id), ...FEATURES.map((f) => f.id), T2QCAL_STOP.id];
+    expect(html.match(/data-phone-slot/g)).toHaveLength(clips.length);
+    for (const clip of clips) {
+      expect(html).toContain(`data-clip="${clip}"`);
+      expect(html).toContain(`jobsite%2Fscreens%2F${clip}.webp`);
+    }
+    // The step links (Talk … Invoice) end where "More in the app" begins.
+    expect(html.match(/data-steps-end/g)).toHaveLength(1);
+    expect(html.indexOf("data-steps-end")).toBeGreaterThan(html.indexOf('id="invoice"'));
+  });
+
+  it("says what each feature and T2QCAL does, in wording the code backs up", () => {
+    for (const feature of FEATURES) {
+      expect(text).toContain(feature.bold);
+      expect(text).toContain(feature.body);
+      expect(html).toContain(`alt="${feature.screenAlt}"`);
+      expect(feature.word.length).toBeLessThanOrEqual(7);
+    }
+    expect(text).toContain(T2QCAL_STOP.body);
+    for (const item of T2QCAL_STOP.inside) expect(text).toContain(item);
+    // Barcodes are looked up in the tradie's own prices: no outside product database.
+    expect(text).toContain("finds it in your own prices");
+    // The T2QCAL hand-off makes a draft (the tradie reviews it), with the working attached.
+    expect(text).toContain("turns the result into a draft quote, with your working attached");
+    // Features that are off, or only in the unreleased iPhone app, aren't offered as live.
+    const live = [...FEATURES.map((f) => `${f.bold} ${f.body}`), T2QCAL_STOP.body, ...T2QCAL_STOP.inside].join(" ");
+    expect(live).not.toMatch(/timesheet|clock in|deposit|pay online|plan reader|automatic follow|team|crew/i);
+    expect(text).toContain(`${COMING_SOON.tag} ${COMING_SOON.title}`);
   });
 
   it("shows the real plans and prices, in the app's own wording", () => {
@@ -104,5 +132,10 @@ describe("every picture and clip the rooms point at is in public/jobsite", () =>
       }
     }
     expect(file(FINISHED.photo.slice(1))).toBe(true);
+    for (const clip of [...FEATURES.map((f) => f.id), T2QCAL_STOP.id]) {
+      for (const f of [`${clip}-600.mp4`, `${clip}-420.mp4`, `${clip}-first.webp`, `${clip}.webp`]) {
+        expect(file(`jobsite/screens/${f}`), f).toBe(true);
+      }
+    }
   });
 });

@@ -1,17 +1,21 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useRef } from "react";
+import { ArrowUpRight, Check } from "@phosphor-icons/react";
 import { walkAt } from "./house-walk";
 import { useSiteLevel } from "./site-level";
-import { EXAMPLE_LABEL, FILMED_ON, ROOMS, type Room } from "./story";
+import { COMING_SOON, EXAMPLE_LABEL, FEATURES, FILMED_ON, ROOMS, T2QCAL_STOP, type Room } from "./story";
 
 /**
  * Inside the house: after the dive into the phone, one of the owner's
  * builds, one room per step of the job (Talk → Draft → Check → Send →
  * Invoice). Each room holds while you scroll, its walkthrough clip plays
  * once as you arrive, and the next room fades in over it as you step
- * forward. Invoice is the finished home.
+ * forward. Invoice is the finished home. The walk carries on with "More in
+ * the app" (barcode, supplier quotes, QR requests, the quote video) and
+ * T2QCAL, then a note on what's coming to the iPhone app.
  *
  * Beside the words each room has a phone slot. With 3D, a real phone floats
  * over it and plays that step (canvas/HousePhone.tsx, using the same walk
@@ -27,6 +31,21 @@ import { EXAMPLE_LABEL, FILMED_ON, ROOMS, type Room } from "./story";
 
 function clipSrc(id: string, level: "full" | "lite") {
   return `/jobsite/rooms/${id}-${level === "full" ? "720" : "540"}.mp4`;
+}
+
+/** The phone's spot beside the words; `clip` names its screen (public/jobsite/screens). */
+function PhoneFigure({ clip, alt }: { clip: string; alt: string }) {
+  return (
+    <figure className="house-phone">
+      {/* The floating 3D phone takes this spot; see canvas/HousePhone.tsx. */}
+      <div className="house-phone-slot" data-phone-slot>
+        <div className="house-phone-device">
+          <Image src={`/jobsite/screens/${clip}.webp`} alt={alt} width={600} height={1298} sizes="(min-width: 900px) 280px, 40vw" />
+        </div>
+      </div>
+      <figcaption>{EXAMPLE_LABEL}</figcaption>
+    </figure>
+  );
 }
 
 function RoomFootage({
@@ -76,7 +95,7 @@ function RoomFootage({
   );
 }
 
-export function HouseWalk() {
+export function HouseWalk({ nativeShell }: { nativeShell: boolean }) {
   const level = useSiteLevel();
   const moving = level !== "still";
   const walk = useRef<HTMLDivElement>(null);
@@ -155,6 +174,7 @@ export function HouseWalk() {
           key={room.id}
           id={room.id}
           data-room={room.id}
+          data-clip={room.id}
           className="house-room"
           aria-labelledby={`room-${room.id}`}
         >
@@ -175,25 +195,82 @@ export function HouseWalk() {
               </h2>
               <p className="house-bold">{room.bold}</p>
               <p className="house-body">{room.body}</p>
-              <figure className="house-phone">
-                {/* The floating 3D phone takes this spot; see canvas/HousePhone.tsx. */}
-                <div className="house-phone-slot" data-phone-slot>
-                  <div className="house-phone-device">
-                    <Image
-                      src={`/jobsite/screens/${room.id}.webp`}
-                      alt={room.screenAlt}
-                      width={600}
-                      height={1298}
-                      sizes="(min-width: 900px) 280px, 40vw"
-                    />
-                  </div>
-                </div>
-                <figcaption>{EXAMPLE_LABEL}</figcaption>
-              </figure>
+              <PhoneFigure clip={room.id} alt={room.screenAlt} />
             </div>
           </div>
         </section>
       ))}
+
+      {FEATURES.map((feature, i) => (
+        <section
+          key={feature.id}
+          id={feature.id}
+          data-room={feature.id}
+          data-clip={feature.id}
+          // The step links (Talk … Invoice) stop here.
+          data-steps-end={i === 0 ? "" : undefined}
+          className="house-room house-room--feature"
+          aria-labelledby={`room-${feature.id}`}
+        >
+          <div className="house-pin">
+            <div className="house-stage" aria-hidden="true" />
+            <div className="house-side">
+              <p className="house-count">
+                More in the app · {i + 1} / {FEATURES.length}
+              </p>
+              <h2 id={`room-${feature.id}`} className="house-word">
+                {feature.word}
+              </h2>
+              <p className="house-bold">{feature.bold}</p>
+              <p className="house-body">{feature.body}</p>
+              <PhoneFigure clip={feature.id} alt={feature.screenAlt} />
+            </div>
+          </div>
+        </section>
+      ))}
+
+      <section
+        id={T2QCAL_STOP.id}
+        data-room={T2QCAL_STOP.id}
+        data-clip={T2QCAL_STOP.id}
+        className="house-room house-room--t2qcal"
+        aria-labelledby="room-t2qcal"
+      >
+        <div className="house-pin">
+          <div className="house-stage house-stage--grid" aria-hidden="true" />
+          <div className="house-side">
+            <p className="house-count">{T2QCAL_STOP.eyebrow}</p>
+            <h2 id="room-t2qcal" className="house-word">
+              {T2QCAL_STOP.word}
+            </h2>
+            <p className="house-bold">{T2QCAL_STOP.bold}</p>
+            <div className="house-body">
+              <p>{T2QCAL_STOP.body}</p>
+              <ul className="house-inside" aria-label="Inside T2QCAL">
+                {T2QCAL_STOP.inside.map((item) => (
+                  <li key={item}>
+                    <Check size={14} weight="bold" aria-hidden="true" /> {item}
+                  </li>
+                ))}
+              </ul>
+              {nativeShell ? null : (
+                <Link href="/t2qcal" className="house-link">
+                  Open T2QCAL <ArrowUpRight size={16} weight="bold" aria-hidden="true" />
+                </Link>
+              )}
+            </div>
+            <PhoneFigure clip={T2QCAL_STOP.id} alt={T2QCAL_STOP.screenAlt} />
+          </div>
+        </div>
+      </section>
+
+      <aside className="house-soon" aria-labelledby="soon-title">
+        <p className="house-soon-tag">{COMING_SOON.tag}</p>
+        <h3 id="soon-title" className="house-soon-title">
+          {COMING_SOON.title}
+        </h3>
+        <p className="house-soon-body">{COMING_SOON.body}</p>
+      </aside>
     </div>
   );
 }
