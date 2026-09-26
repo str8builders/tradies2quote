@@ -64,6 +64,7 @@ export default async function CalendarPage() {
       <div className="mx-auto w-full max-w-3xl flex-1 space-y-4 px-4 pt-5 pb-10">
         <p className="text-ui-base text-ui-muted">Your booked jobs and your notes for each day. Tap a day to add a note.</p>
         <ScheduleCalendar
+          look="new"
           jobs={calendarJobsFromRows(jobRows ?? [])}
           notes={calendarNotesFromRows(noteRows ?? [])}
           todayISO={todayKey(zone)}

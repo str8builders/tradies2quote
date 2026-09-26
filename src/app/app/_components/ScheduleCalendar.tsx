@@ -18,6 +18,7 @@ import {
   deleteCalendarNote,
   updateCalendarNote,
 } from "./calendar-notes-actions";
+import { CalendarView } from "../calendar/_newlook/CalendarView";
 
 /**
  * Dashboard month calendar of scheduled jobs + personal day-notes.
@@ -73,12 +74,19 @@ export function ScheduleCalendar({
   notes,
   todayISO,
   weather = {},
+  look = "old",
 }: {
   jobs: CalendarJob[];
   notes: CalendarNote[];
   todayISO: string;
   /** Per-date work-suitability (YYYY-MM-DD keys) — forecast range only. */
   weather?: Record<string, CalendarDayWeather>;
+  /**
+   * "old": the dashboard card below (unchanged). "new": the redesign's
+   * calendar (../calendar/_newlook/CalendarView) for /app/calendar, with the
+   * same state, data and note actions.
+   */
+  look?: "old" | "new";
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -192,6 +200,39 @@ export function ScheduleCalendar({
       setEditingId(null);
       router.refresh();
     });
+  }
+
+  if (look === "new") {
+    return (
+      <CalendarView
+        monthLabel={monthLabel(year, month)}
+        onPrevMonth={() => step(-1)}
+        onNextMonth={() => step(1)}
+        cells={cells}
+        todayISO={todayISO}
+        selected={selected}
+        onSelect={setSelected}
+        jobsByDay={jobsByDay}
+        notesByDay={notesByDay}
+        weather={weather}
+        selectedLabel={longDate(selected)}
+        selectedJobs={selectedJobs}
+        selectedNotes={selectedNotes}
+        selectedWeather={selWx}
+        draft={draft}
+        onDraftChange={setDraft}
+        onAdd={onAdd}
+        editingId={editingId}
+        editDraft={editDraft}
+        onEditDraftChange={setEditDraft}
+        onStartEdit={startEdit}
+        onSaveEdit={saveEdit}
+        onCancelEdit={() => setEditingId(null)}
+        onDelete={onDelete}
+        pending={pending}
+        error={error}
+      />
+    );
   }
 
   return (

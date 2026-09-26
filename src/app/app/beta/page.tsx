@@ -2,9 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft, Check, Warning } from "@phosphor-icons/react/dist/ssr";
+import { Screen } from "@/components/ui/screen";
 import { createClient } from "@/lib/supabase/server";
+import { isNewLookOn } from "@/lib/ui/newLook";
 import { AppHeader } from "../_components/AppHeader";
 import { BetaFeedbackForm } from "./_components/BetaFeedbackForm";
+import { PRE_SEND_CHECKS } from "./_lib/checks";
+import { FeedbackBody } from "./_newlook/FeedbackBody";
 
 export const metadata: Metadata = { title: "Before you send" };
 export const dynamic = "force-dynamic";
@@ -18,13 +22,7 @@ export const dynamic = "force-dynamic";
  * Apple rejects apps that present as beta/trial builds (2.3.10 / 2.1).
  * The /app/beta route path is invisible in the native shell (no URL bar).
  */
-const CHECKS = [
-  "Materials & quantities are right — especially from a drawing or supplier scan.",
-  "Every line has a price — nothing sitting at $0 by accident (the app will warn you).",
-  "The total and GST look right for the job.",
-  "Supplier-quote imports: the lines match the supplier's quote (the app blocks if they don't).",
-  "Drawings: you've confirmed the key dimensions when the app asks.",
-];
+const CHECKS = PRE_SEND_CHECKS;
 
 export default async function BetaHelpPage() {
   const supabase = await createClient();
@@ -32,6 +30,17 @@ export default async function BetaHelpPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  // Redesign: the top bar and the More menu call this page "Send feedback",
+  // so the new look leads with the form, then the checklist. Off: unchanged.
+  if (await isNewLookOn()) {
+    return (
+      <Screen data-testid="feedback-screen">
+        <AppHeader context="Guide" />
+        <FeedbackBody />
+      </Screen>
+    );
+  }
 
   return (
     <div className="min-h-screen text-white">

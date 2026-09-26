@@ -1,15 +1,8 @@
 "use client";
-import { useEffect,useState } from "react";
-export type SavedClient={id:string;name:string;email:string|null;phone:string|null;address:string|null};
-const empty={name:'',email:'',phone:'',address:''};
+import { EMPTY_CLIENT_FORM, useClientsBook } from "./_lib/useClientsBook";
+export type { SavedClient } from "./_lib/useClientsBook";
 export function ClientsManager(){
- const [clients,setClients]=useState<SavedClient[]>([]);const[shared,setShared]=useState(false);const[search,setSearch]=useState('');const[form,setForm]=useState<{id?:string;name:string;email:string;phone:string;address:string}>(empty);const[error,setError]=useState('');const[notice,setNotice]=useState('');const[busy,setBusy]=useState(false);const[loaded,setLoaded]=useState(false);
- async function load(){try{const r=await fetch('/api/clients');const d=await r.json();if(!r.ok)throw Error(d.error);setClients(d.clients);setShared(d.shared);setLoaded(true);}catch(e){setError(e instanceof Error?e.message:'Could not load clients.');}}
- // Refresh state follows an asynchronous API response.
- // eslint-disable-next-line react-hooks/set-state-in-effect
- useEffect(()=>{void load();},[]);
- async function save(e:React.FormEvent){e.preventDefault();setBusy(true);setError('');setNotice('');try{const r=await fetch('/api/clients',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(form)});const d=await r.json();if(!r.ok)throw Error(d.error);setForm(empty);setNotice('Client saved. You can select this client when reviewing a quote.');await load();}catch(e){setError(e instanceof Error?e.message:'Could not save client.');}finally{setBusy(false);}}
- const visible=clients.filter(c=>[c.name,c.email,c.phone,c.address].some(v=>v?.toLowerCase().includes(search.toLowerCase())));
+ const {clients,shared,search,setSearch,form,setForm,error,notice,busy,loaded,save,visible}=useClientsBook();const empty=EMPTY_CLIENT_FORM;
  return <div className="mt-8 space-y-6"><p className="text-sm text-ink-300">{shared?'Shared with your active team. Team members can add and update these contacts.':'Your private address book. Save clients here or when you send a quote.'}</p>{error&&<p role="alert" className="text-sm text-red-300">{error}</p>}{notice&&<p role="status" className="text-sm text-green-300">{notice}</p>}
  <details className="t2q-card-pro p-5" open={!!form.id||clients.length===0}><summary className="min-h-11 cursor-pointer text-lg font-semibold">{form.id?'Edit client':'Add a client'}</summary><form onSubmit={save} className="mt-3 grid gap-4 sm:grid-cols-2">{(['name','email','phone','address'] as const).map(k=><label key={k} className="text-sm capitalize">{k}<input value={form[k]} onChange={e=>setForm({...form,[k]:e.target.value})} required={k==='name'} type={k==='email'?'email':k==='phone'?'tel':'text'} maxLength={k==='name'?150:k==='email'?254:k==='phone'?100:500} className="mt-2 min-h-11 w-full rounded-xl border border-white/15 bg-black/20 px-3 text-white"/></label>)}<div className="flex gap-3 sm:col-span-2"><button disabled={busy} className="t2q-btn-primary-pro">{busy?'Saving…':'Save client'}</button>{form.id&&<button type="button" onClick={()=>setForm(empty)} className="t2q-btn-ghost-pro">Cancel edit</button>}</div></form></details>
  <label className="block"><span className="sr-only">Search clients</span><input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name, email, phone or address" className="min-h-12 w-full rounded-xl border border-white/15 bg-black/20 px-4 text-sm"/></label>

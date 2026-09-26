@@ -2,9 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
+import { Screen } from "@/components/ui/screen";
 import { createClient } from "@/lib/supabase/server";
+import { isNewLookOn } from "@/lib/ui/newLook";
 import { AppHeader } from "@/app/app/_components/AppHeader";
 import { QuickStartForm } from "./_components/QuickStartForm";
+import { QuickStartBody } from "./_newlook/QuickStartBody";
 
 export const metadata: Metadata = {
   title: "Quick start your library",
@@ -28,6 +31,17 @@ export default async function MaterialsQuickStartPage() {
     .eq("id", user.id)
     .maybeSingle();
   const currency = profile?.currency ?? "NZD";
+
+  // Redesign: the new look's body under <AppHeader>'s top bar ("Quick
+  // start", back to Prices), so no second Back link. Off: unchanged below.
+  if (await isNewLookOn()) {
+    return (
+      <Screen data-testid="quick-start-screen">
+        <AppHeader />
+        <QuickStartBody currency={currency} />
+      </Screen>
+    );
+  }
 
   return (
     <div className="min-h-screen text-white">

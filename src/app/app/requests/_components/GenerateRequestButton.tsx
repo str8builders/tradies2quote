@@ -8,8 +8,9 @@ import { Sparkle } from "@phosphor-icons/react";
  * Recovery for a request whose automatic generation never finished (server
  * restart mid-run, provider outage, daily cap). Uses the tradie's own
  * generate route, so it behaves exactly like tapping Generate on the draft.
+ * Shared by both looks; each draws its own button.
  */
-export function GenerateRequestButton({ quoteId }: { quoteId: string }) {
+export function useGenerateRequest(quoteId: string) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -40,6 +41,12 @@ export function GenerateRequestButton({ quoteId }: { quoteId: string }) {
       setBusy(false);
     }
   }
+
+  return { busy, error, note, generate };
+}
+
+export function GenerateRequestButton({ quoteId }: { quoteId: string }) {
+  const { busy, error, note, generate } = useGenerateRequest(quoteId);
 
   return (
     <div className="flex flex-col items-end gap-1">

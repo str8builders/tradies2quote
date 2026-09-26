@@ -1,29 +1,27 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Screen } from "@/components/ui/screen";
 import { getCachedAuthUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { isNativeShellRequest } from "@/lib/native-shell";
 import { requestNoteForApp } from "@/lib/trial-ended";
+import { isNewLookOn } from "@/lib/ui/newLook";
 import { AppHeader } from "../_components/AppHeader";
 import { GenerateRequestButton } from "./_components/GenerateRequestButton";
 import { DismissRequestButton } from "./_components/DismissRequestButton";
+import {
+  canGenerateDraft,
+  requestContactLine,
+  requestReceivedLabel,
+  requestStatus,
+  toRequestItem,
+  type RequestRow,
+} from "./_lib/request-status";
+import { RequestsView } from "./_newlook/RequestsView";
 
 export const metadata: Metadata = { title: "Quote requests" };
 export const dynamic = "force-dynamic";
-
-const STALE_MS = 5 * 60 * 1000;
-/** A "new" request older than this never finished generating — offer recovery. */
-function isStale(createdAt: string): boolean {
-  return Date.now() - new Date(createdAt).getTime() > STALE_MS;
-}
-
-const STATUS_LABEL: Record<string, string> = {
-  new: "Draft being prepared",
-  generated: "Draft ready to review",
-  generation_failed: "Needs you to generate",
-  dismissed: "Dismissed",
-};
 
 export default async function RequestsPage({ searchParams }: { searchParams: Promise<{ show?: string }> }) {
   const { user } = await getCachedAuthUser();
@@ -31,7 +29,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
   const { show } = await searchParams;
   const showDismissed = show === "dismissed";
   // A saved note can talk about the subscription; the iPhone app shows plain words (3.1.3(f)).
-  const inApp = await isNativeShellRequest();
+  const [inApp, newLook] = await Promise.all([isNativeShellRequest(), isNewLookOn()]);
 
   const supabase = await createClient();
   let query = supabase
@@ -65,6 +63,20 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
       return [q.id, { hasLines: Array.isArray(data?.line_items), status: q.status }];
     }),
   );
+
+  // Redesign: the same requests and actions in the new look (the top bar
+  // comes from <AppHeader>). With the switch off, the page below is unchanged.
+  if (newLook) {
+    const items = (rows as RequestRow[]).map((r) =>
+      toRequestItem(r, r.quote_id ? quoteState.get(r.quote_id) : undefined, (note) => requestNoteForApp(note, inApp)),
+    );
+    return (
+      <Screen data-testid="requests-screen">
+        <AppHeader context="Quote requests" />
+        <RequestsView items={items} showDismissed={showDismissed} />
+      </Screen>
+    );
+  }
 
   return (
     <div className="min-h-screen text-white">
@@ -105,18 +117,11 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                   <div>
                     <h2 className="font-display text-lg uppercase tracking-tight">{!r.seen_at ? <span className="mr-2 inline-block h-2 w-2 rounded-full bg-hivis align-middle" aria-label="New" /> : null}{r.client_name}</h2>
                     <p className="text-xs text-ink-400">
-                      {[r.client_phone, r.client_email, r.site_address].filter(Boolean).join(" · ") || "No contact details"}
+                      {requestContactLine(r)}
                     </p>
                   </div>
                   <span className="rounded-sm border border-ink-600 px-2 py-1 font-mono text-[11px] uppercase tracking-[0.15em] text-ink-300">
-                    {(() => {
-                      const q = r.quote_id ? quoteState.get(r.quote_id) : undefined;
-                      if (q?.hasLines) return q.status === "draft" ? "Draft ready to review" : `Quote ${q.status}`;
-                      if (r.status === "new" && isStale(r.created_at)) {
-                        return "Needs you to generate";
-                      }
-                      return STATUS_LABEL[r.status] ?? r.status;
-                    })()}
+                    {requestStatus(r, r.quote_id ? quoteState.get(r.quote_id) : undefined).label}
                   </span>
                 </div>
                 <p className="mt-3 whitespace-pre-wrap text-sm text-ink-200">{r.description}</p>
@@ -125,18 +130,11 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                 ) : null}
                 <div className="mt-4 flex items-center justify-between">
                   <span className="text-xs text-ink-500">
-                    {new Intl.DateTimeFormat("en-NZ", {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                      timeZone: "Pacific/Auckland",
-                    }).format(new Date(r.created_at))}
+                    {requestReceivedLabel(r.created_at)}
                   </span>
                   <div className="flex flex-wrap items-center justify-end gap-2">
                     <DismissRequestButton id={r.id} dismissed={r.status === "dismissed"} />
-                    {r.quote_id &&
-                    !quoteState.get(r.quote_id)?.hasLines &&
-                    (r.status === "generation_failed" ||
-                      (r.status === "new" && isStale(r.created_at))) ? (
+                    {r.quote_id && canGenerateDraft(r, quoteState.get(r.quote_id)) ? (
                       <GenerateRequestButton quoteId={r.quote_id} />
                     ) : null}
                     {r.quote_id ? (
