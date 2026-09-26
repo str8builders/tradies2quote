@@ -29,6 +29,7 @@ export function RequestCodeCard({ slug }: { slug: string | null }) {
         <p className="mt-1 truncate font-mono text-sm text-hivis">{link.replace(/^https?:\/\//, "")}</p>
         <div className="mt-2 flex flex-wrap gap-2">
           <Link href="/print/request-poster" className="t2q-btn-primary-pro inline-flex h-9 px-3 text-xs"><Printer size={14} weight="bold" />Print poster</Link>
+          <Link href="/print/request-sticker" className="t2q-btn-ghost-pro inline-flex h-9 px-3 text-xs">Van sticker</Link>
           <Link href="/app/settings#request-link" className="t2q-btn-ghost-pro inline-flex h-9 px-3 text-xs">Downloads &amp; link</Link>
           <Link href="/app/requests" className="t2q-btn-ghost-pro inline-flex h-9 px-3 text-xs">Requests</Link>
         </div>

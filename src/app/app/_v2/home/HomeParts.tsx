@@ -14,6 +14,7 @@ import {
   Microphone,
   PaperPlaneTilt,
   Plus,
+  QrCode,
   Receipt,
   Scan,
   Timer,
@@ -28,7 +29,7 @@ import { Money } from "@/components/ui/money";
 import { SectionTitle } from "@/components/ui/section-title";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ICON_CHIP, PRESS, TAP, TONE_STRIPE, UI_TEXT, type IconTone } from "@/components/ui/styles";
-import { NEW_QUOTE_PATH } from "../lib/app-nav";
+import { NEW_QUOTE_PATH, QR_CODE_PATH } from "../lib/app-nav";
 import { T2QCALTile } from "../shell/T2QCALLauncher";
 import { countOf } from "../lib/dates";
 import { HOME_TODO_LIMIT, type MoneyTotal, type Todo, type TodoKind } from "../lib/home-todos";
@@ -326,6 +327,7 @@ type QuickAction =
 const TALK: QuickAction = { href: `${NEW_QUOTE_PATH}?start=talk`, label: "Talk a quote", kind: "talk" };
 const LOG_HOURS: QuickAction = { href: "/app/timesheet?add=today", label: "Log hours", kind: "tile", icon: Timer, tone: "info" };
 const SCAN: QuickAction = { href: "/app/materials/import-quote", label: "Scan a doc", kind: "tile", icon: Scan, tone: "ok" };
+const QR: QuickAction = { href: QR_CODE_PATH, label: "QR code", kind: "tile", icon: QrCode, tone: "violet" };
 
 const QUICK_TILE = "aspect-square w-full max-w-16 rounded-ui-lg";
 const QUICK_LINK =
@@ -371,13 +373,14 @@ function QuickLink({ action }: { action: QuickAction }) {
 
 /**
  * Big buttons under the hero: talk a quote (straight to the mic), log
- * today's hours, open the T2QCAL app (when offered: see shouldOfferT2QCAL)
- * and scan a supplier document. Each a coloured tile with its name under it.
+ * today's hours, open the T2QCAL app (when offered: see shouldOfferT2QCAL),
+ * scan a supplier document and your client request QR code (to show, print
+ * for the van, and how to use it). Each a coloured tile with its name under it.
  */
 export function QuickActions({ t2qcal = false }: { t2qcal?: boolean }) {
   return (
     <nav aria-label="Quick actions" data-testid="home-quick" className={UI_TEXT}>
-      <ul className={cx("grid gap-2 sm:gap-3", t2qcal ? "grid-cols-4" : "grid-cols-3")}>
+      <ul className={cx("grid gap-2 sm:gap-3", t2qcal ? "grid-cols-5" : "grid-cols-4")}>
         <li>
           <QuickLink action={TALK} />
         </li>
@@ -391,6 +394,9 @@ export function QuickActions({ t2qcal = false }: { t2qcal?: boolean }) {
         ) : null}
         <li>
           <QuickLink action={SCAN} />
+        </li>
+        <li>
+          <QuickLink action={QR} />
         </li>
       </ul>
     </nav>

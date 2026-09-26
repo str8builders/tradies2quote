@@ -109,6 +109,9 @@ export function QuoteRequestLinkCard({
                   <Printer size={16} weight="bold" />
                   Print poster
                 </Link>
+                <Link href="/print/request-sticker" className="t2q-btn-ghost-pro" data-testid="request-sticker-link">
+                  Van sticker
+                </Link>
                 <a href={`/api/account/request-qr?download=1&format=png&size=1024${hasLogo ? "&logo=1" : ""}`} className="t2q-btn-ghost-pro" data-testid="request-qr-png">
                   Download PNG{hasLogo ? " with logo" : ""}
                 </a>

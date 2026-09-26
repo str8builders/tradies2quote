@@ -103,13 +103,15 @@ describe("Home states", () => {
       "/app/quotes/new?start=talk",
       "/app/timesheet?add=today",
       "/app/materials/import-quote",
+      "/app/qr-code",
     ]);
+    expect(out).toContain("grid-cols-4");
     // T2QCAL is never the web copy: only a button that opens the T2QCAL app, when offered.
     expect(out).not.toContain("/t2qcal/");
     expect(quick).not.toContain('data-testid="launch-t2qcal"');
     const withApp = html(<HomeView {...base} todos={[todo(1)]} t2qcal />);
     expect(withApp).toContain('data-testid="launch-t2qcal"');
-    expect(withApp).toContain("grid-cols-4");
+    expect(withApp).toContain("grid-cols-5");
     expect(out.indexOf('data-testid="home-quick"')).toBeLessThan(out.indexOf('data-testid="home-todos"'));
   });
 

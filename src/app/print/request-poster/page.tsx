@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import QRCode from "qrcode";
-import { createClient } from "@/lib/supabase/server";
-import { isValidRequestSlug, requestLinkFor } from "@/lib/quote-requests/slug";
+import { QR_CODE_PATH } from "@/app/app/_v2/lib/app-nav";
+import { loadRequestPrint } from "../_lib/request-print";
 import { PrintButton } from "./PrintButton";
 
 export const metadata: Metadata = { title: "Request-a-quote poster", robots: { index: false, follow: false } };
@@ -15,25 +13,11 @@ export const dynamic = "force-dynamic";
  * outside the /app shell so nothing but the poster reaches the printer; the
  * page does its own sign-in check because the proxy only gates /app. The
  * actions sit in a bar pinned to the bottom of the screen, so they are in
- * reach on a phone whatever the poster's height.
+ * reach on a phone whatever the poster's height. The iPhone app can't print
+ * a web page, so there it says where printing works instead.
  */
 export default async function RequestPosterPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login?next=%2Fprint%2Frequest-poster");
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("business_name, phone, request_slug, logo_url")
-    .eq("id", user.id)
-    .maybeSingle();
-  const slug = profile?.request_slug ?? null;
-  if (!slug || !isValidRequestSlug(slug)) redirect("/app/settings#request-link");
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://tradies2quote.com";
-  const link = requestLinkFor(appUrl, slug);
-  const logo = profile?.logo_url && /^https:\/\//i.test(profile.logo_url) ? profile.logo_url : null;
-  const svg = await QRCode.toString(link, { type: "svg", errorCorrectionLevel: "H", margin: 1, width: 640, color: { dark: "#0A0A0A", light: "#FFFFFF" } });
-  const business = profile?.business_name?.trim() || "Request a quote";
-  const shortLink = link.replace(/^https?:\/\//, "");
+  const { business, phone, logo, shortLink, svg, inApp } = await loadRequestPrint("/print/request-poster");
   return <div className="t2q-poster-page">
     <style>{`
       .t2q-poster-page{min-height:100dvh;background:#0d0e0e;color:#111;padding:calc(env(safe-area-inset-top,0px) + 16px) 14px calc(env(safe-area-inset-bottom,0px) + 96px);}
@@ -63,6 +47,7 @@ export default async function RequestPosterPage() {
       .t2q-poster-hint a{color:#ffa06d;}
       .t2q-poster-actions{position:fixed;left:0;right:0;bottom:0;z-index:50;display:flex;flex-wrap:wrap;justify-content:center;gap:8px;padding:10px 12px calc(env(safe-area-inset-bottom,0px) + 10px);background:rgba(13,15,16,.94);border-top:1px solid #ffffff14;backdrop-filter:blur(14px);}
       .t2q-poster-actions a,.t2q-poster-actions button{min-height:44px;}
+      .t2q-poster-inapp{margin:0;max-width:560px;text-align:center;font-size:14px;line-height:1.4;color:#f4f3ef;}
       @media(max-width:520px){.t2q-poster-band{padding:20px 18px;}.t2q-poster-body{padding:24px 16px 22px;}.t2q-poster-steps{grid-template-columns:1fr;gap:10px;}.t2q-poster-logo{height:52px;}}
       @media print{
         html,body{background:#fff!important;}
@@ -76,7 +61,7 @@ export default async function RequestPosterPage() {
       }
     `}</style>
     <div className="t2q-poster-top">
-      <a href="/app/settings#request-link" data-testid="poster-back">‹ Settings</a>
+      <a href={QR_CODE_PATH} data-testid="poster-back">‹ Your QR code</a>
       <span>Print at A4 or Letter · Save as PDF from the print dialog to email it</span>
     </div>
     <article className="t2q-poster" data-testid="request-poster">
@@ -86,7 +71,7 @@ export default async function RequestPosterPage() {
         <div className="t2q-poster-band-text">
           <div className="t2q-poster-eyebrow">Scan for a quote</div>
           <p className="t2q-poster-business">{business}</p>
-          {profile?.phone ? <p className="t2q-poster-phone">{profile.phone}</p> : null}
+          {phone ? <p className="t2q-poster-phone">{phone}</p> : null}
         </div>
       </header>
       <div className="t2q-poster-body">
@@ -107,9 +92,15 @@ export default async function RequestPosterPage() {
     </article>
     {!logo ? <p className="t2q-poster-hint">Add your business logo in <a href="/app/settings#business">Business settings</a> and it appears on the band and in the middle of the code.</p> : null}
     <div className="t2q-poster-actions" data-testid="poster-actions">
-      <PrintButton />
-      <a href={`/api/account/request-qr?download=1&format=png&size=1024${logo ? "&logo=1" : ""}`} className="t2q-btn-ghost-pro">Download PNG</a>
-      <a href="/api/account/request-qr?download=1" className="t2q-btn-ghost-pro">Download SVG</a>
+      {inApp ? (
+        <p className="t2q-poster-inapp" data-testid="poster-in-app">To print it, sign in at tradies2quote.com on a computer or in your phone&apos;s browser and open Your QR code.</p>
+      ) : (
+        <>
+          <PrintButton />
+          <a href={`/api/account/request-qr?download=1&format=png&size=1024${logo ? "&logo=1" : ""}`} className="t2q-btn-ghost-pro">Download PNG</a>
+          <a href="/api/account/request-qr?download=1" className="t2q-btn-ghost-pro">Download SVG</a>
+        </>
+      )}
     </div>
   </div>;
 }

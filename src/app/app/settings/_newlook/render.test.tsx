@@ -208,6 +208,8 @@ describe("Your request link", () => {
     expect(out).toContain("Copy link");
     expect(out).toContain('src="/api/account/request-qr?v=bayside-builders"');
     expect(tagWith(out, 'data-testid="request-poster-link"')).toContain('href="/print/request-poster"');
+    expect(tagWith(out, 'data-testid="request-sticker-link"')).toContain('href="/print/request-sticker"');
+    expect(tagWith(out, 'data-testid="request-qr-guide"')).toContain('href="/app/qr-code"');
     expect(tagWith(out, 'data-testid="request-qr-png"')).toContain("&amp;logo=1");
     expect(out).toContain('href="/app/requests"');
     expect(out).toContain("Get a new link");

@@ -33,6 +33,8 @@ export const NEW_QUOTE_PATH = "/app/quotes/new";
 export const PRICES_PATH = "/app/materials";
 export const MORE_PATH = "/app/more";
 export const TIMESHEET_PATH = "/app/timesheet";
+/** The client request QR code: show it, print it, how to use it. */
+export const QR_CODE_PATH = "/app/qr-code";
 
 export const APP_TABS: readonly AppTab[] = [
   { id: "home", label: "Home", name: "Home", href: HOME_PATH },
@@ -111,6 +113,7 @@ const TO_MORE = { href: MORE_PATH, label: "More" };
  */
 const TITLES: ReadonlyArray<[base: string, title: string]> = [
   ["/app/requests", "Client requests"],
+  [QR_CODE_PATH, "Your QR code"],
   ["/app/materials/quick-start", "Quick start"],
   ["/app/materials/kits", "Kits"],
   ["/app/materials/capture", "Add from a photo"],

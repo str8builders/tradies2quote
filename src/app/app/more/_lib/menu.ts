@@ -1,4 +1,5 @@
 import type { IconTone } from "@/components/ui/styles";
+import { QR_CODE_PATH } from "../../_v2/lib/app-nav";
 
 /**
  * The More screen's rows (new look), as data. Pure.
@@ -13,12 +14,14 @@ export type MoreItemId =
   | "clients"
   | "prices"
   | "calendar"
+  | "qr"
   | "business"
   | "rates"
   | "payments"
   | "account"
   | "team"
   | "help"
+  | "tour"
   | "feedback"
   | "privacy"
   | "terms"
@@ -47,6 +50,7 @@ const BUSINESS: MoreGroup = {
     { id: "clients", label: "Clients", caption: "Saved contacts", href: "/app/clients" },
     { id: "prices", label: "Prices", caption: "Your price list", href: "/app/materials" },
     { id: "calendar", label: "Calendar", caption: "Booked jobs and day notes", href: "/app/calendar" },
+    { id: "qr", label: "Your QR code", caption: "For your van, sign or counter", href: QR_CODE_PATH },
     {
       id: "business",
       label: "Business details",
@@ -75,6 +79,8 @@ const TOOLS: MoreGroup = {
   items: [
     { id: "team", label: "Team", caption: "People and shared clients", href: "/app/team" },
     { id: "help", label: "Help", caption: "Questions, answers and support", href: "/help" },
+    // Home's first-run tour, again (HomeTour reads ?tour=1).
+    { id: "tour", label: "Take the tour", caption: "A quick look around the app", href: "/app?tour=1" },
     { id: "feedback", label: "Send feedback", caption: "Tell us what to fix", href: "/app/beta" },
     // Easy to find in the app, not only on the website (App Store 5.1.1(i)).
     { id: "privacy", label: "Privacy policy", caption: "What we keep and why", href: "/privacy" },
@@ -108,12 +114,14 @@ export const MORE_TONE: Readonly<Record<MoreItemId, IconTone>> = {
   clients: "violet",
   prices: "brand",
   calendar: "info",
+  qr: "violet",
   business: "info",
   rates: "warn",
   payments: "ok",
   account: "brand",
   team: "violet",
   help: "neutral",
+  tour: "neutral",
   feedback: "neutral",
   privacy: "neutral",
   terms: "neutral",
@@ -131,8 +139,8 @@ export interface MenuSection {
 
 const SECTIONS: ReadonlyArray<{ id: MenuSection["id"]; title: string; ids: readonly MoreItemId[] }> = [
   { id: "you", title: "You and your business", ids: ["account", "business", "rates", "payments"] },
-  { id: "work", title: "Work", ids: ["clients", "calendar", "team"] },
-  { id: "help", title: "Help", ids: ["help", "feedback", "privacy", "terms"] },
+  { id: "work", title: "Work", ids: ["qr", "clients", "calendar", "team"] },
+  { id: "help", title: "Help", ids: ["help", "tour", "feedback", "privacy", "terms"] },
 ];
 
 /**

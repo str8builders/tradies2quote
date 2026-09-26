@@ -10,12 +10,15 @@ import {
   LinkSimple,
   Printer,
   Tray,
+  Truck,
 } from "@phosphor-icons/react/dist/ssr";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button, ButtonLink, buttonClasses } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { SectionTitle } from "@/components/ui/section-title";
 import { useToast } from "@/components/ui/toast";
+import { STICKER_PATH } from "@/app/print/_lib/sticker";
+import { QR_CODE_PATH } from "../../_v2/lib/app-nav";
 import {
   disableQuoteRequestLink,
   enableQuoteRequestLink,
@@ -130,7 +133,10 @@ export function RequestLinkCard({
             />
             <p className="min-w-0 flex-1 text-ui-sm text-ui-muted">
               Put the QR code on your van, site sign, business cards or counter. Anyone who scans it
-              lands on your request page.
+              lands on your request page.{" "}
+              <Link href={QR_CODE_PATH} className="font-semibold text-ui-brand-text underline" data-testid="request-qr-guide">
+                How to print and use it
+              </Link>
             </p>
           </div>
 
@@ -143,6 +149,15 @@ export function RequestLinkCard({
               data-testid="request-poster-link"
             >
               Print a poster
+            </ButtonLink>
+            <ButtonLink
+              href={STICKER_PATH}
+              variant="secondary"
+              fullWidth
+              icon={<Truck weight="bold" />}
+              data-testid="request-sticker-link"
+            >
+              Print van stickers
             </ButtonLink>
             <div className="grid grid-cols-2 gap-2">
               <a
