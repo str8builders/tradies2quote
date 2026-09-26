@@ -122,7 +122,7 @@ export function ClockCard({
         if (!result.ok) return setError(result.error);
         done();
       } catch (e) {
-        if (isStaleDeployError(e)) return reloadForUpdate(setError);
+        if (isStaleDeployError(e)) return reloadForUpdate(setError, e);
         setError("Couldn't start work. Check your signal and try again.");
       }
     });
@@ -381,7 +381,7 @@ export function FinishForm({
         onClose();
         onDone();
       } catch (e) {
-        if (isStaleDeployError(e)) return reloadForUpdate(setError);
+        if (isStaleDeployError(e)) return reloadForUpdate(setError, e);
         setError("Couldn't finish work. Check your signal and try again.");
       }
     });
@@ -511,7 +511,7 @@ function PinSheet({
         onClose();
         onDone();
       } catch (e) {
-        if (isStaleDeployError(e)) return reloadForUpdate(setError);
+        if (isStaleDeployError(e)) return reloadForUpdate(setError, e);
         setError("Couldn't save the site. Try again.");
       }
     });

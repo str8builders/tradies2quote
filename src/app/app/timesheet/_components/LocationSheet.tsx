@@ -103,7 +103,7 @@ export function LocationForm({
         }
         onDone();
       } catch (e) {
-        if (isStaleDeployError(e)) return reloadForUpdate(setError);
+        if (isStaleDeployError(e)) return reloadForUpdate(setError, e);
         setError("Couldn't save that. Check your signal and try again.");
       }
     });

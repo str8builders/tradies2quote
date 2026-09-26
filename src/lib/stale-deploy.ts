@@ -5,16 +5,30 @@
  * That isn't the person's signal: load the new version instead of saying so.
  */
 
-/** The error a stale page gets when it calls a server action after an update. */
-export function isStaleDeployError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
-  return /server action/i.test(message) && /(not found|failed to find|older or newer deployment)/i.test(message);
+import { STALE_DEPLOY_RE, maybeRecoverFromStaleDeploy } from "./staleDeploy";
+
+function messageOf(error: unknown): string {
+  if (error instanceof Error) return `${error.name}: ${error.message}`;
+  return typeof error === "string" ? error : "";
 }
 
-/** Tell the person, then load the new version. */
-export function reloadForUpdate(show: (message: string) => void): void {
+/** The error a stale page gets after an update (old server action or page file). */
+export function isStaleDeployError(error: unknown): boolean {
+  return STALE_DEPLOY_RE.test(messageOf(error));
+}
+
+/**
+ * Tell the person, then load the new version (with the same loop guard as
+ * the error screens). If it just reloaded and that didn't help, say how to
+ * get going instead of looping.
+ */
+export function reloadForUpdate(show: (message: string) => void, error: unknown = "UnrecognizedActionError"): void {
   show("Tradies2Quote was just updated. Reloading…");
-  window.setTimeout(() => window.location.reload(), 800);
+  window.setTimeout(() => {
+    if (!maybeRecoverFromStaleDeploy(messageOf(error) || "UnrecognizedActionError")) {
+      show("Tradies2Quote was just updated. Close and reopen the app, then try again.");
+    }
+  }, 800);
 }
 
 /** The page was built from a different commit than the one now live. */

@@ -2296,6 +2296,21 @@ body:has([data-shell="app"]) {
   --t2q-app-orange-soft: #FFF1EA;
 }
 
+/* NEW-LOOK FORM FIELDS vs premium.css — premium.css paints every field in
+   the app shell dark ([data-shell="app"] select { background: #111516 }).
+   It's unlayered, so it beats the ui- utility classes (Tailwind's layer)
+   whatever their specificity: new-look dropdowns stayed dark in outdoor
+   mode. A field that asks for a ui- background gets its own classes back
+   (revert-layer rolls back to the utilities); old-look fields, which don't
+   use ui- classes, keep premium's styling. */
+[data-look="new"][data-shell="app"] :is(input, select, textarea)[class*="bg-ui-"] {
+  background-color: revert-layer;
+  color: revert-layer;
+  border-color: revert-layer;
+  border-radius: revert-layer;
+  box-shadow: revert-layer;
+}
+
 /* OUTDOOR SAFETY NET — screens not yet moved to the new look.
    They were built for the dark look (white text, ink greys) and don't react
    to outdoor mode, so on the new-look shell's white outdoor page they'd be

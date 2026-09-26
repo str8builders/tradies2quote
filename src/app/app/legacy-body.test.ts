@@ -33,3 +33,12 @@ describe("outdoor safety net for old-look screens", () => {
     expect(read(file)).toContain('data-legacy-body=""');
   });
 });
+
+describe("new-look form fields keep their own colours", () => {
+  it("fields that ask for a ui- background win back their classes from premium.css's dark fields", () => {
+    const css = read("../globals.css");
+    expect(css).toMatch(
+      /\[data-look="new"\]\[data-shell="app"\] :is\(input, select, textarea\)\[class\*="bg-ui-"\] \{[^}]*background-color: revert-layer;[^}]*color: revert-layer;/,
+    );
+  });
+});

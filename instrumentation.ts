@@ -54,6 +54,12 @@ export async function onRequestError(
       ) {
         return;
       }
+      // The phone left mid-page (tab closed, app sent to the background,
+      // signal dropped): Node reports the half-sent stream, but nothing is
+      // broken, so it isn't an app error.
+      if (/The destination stream closed early|ERR_STREAM_PREMATURE_CLOSE/i.test(message)) {
+        return;
+      }
       const { captureError } = await import("@/lib/observability");
       captureError(err, {
       route: request.path,
