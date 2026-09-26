@@ -4,12 +4,19 @@ import type {LibraryResource} from "./resource-library";
 /**
  * Which manuals and standards belong under each calculator.
  *
- * Every calculator gets the two documents a NZ builder is measured against —
- * NZS 3604 and B1 Structure — then the manuals for its trade, then anything
- * specific to the individual tool. Ids are catalogue ids (native-catalog.json);
- * the test proves each one exists.
+ * Every building calculator gets the two documents a NZ builder is measured
+ * against — NZS 3604 and B1 Structure — then the manuals for its trade, then
+ * anything specific to the individual tool. Ids are catalogue ids
+ * (native-catalog.json); the test proves each one exists.
+ *
+ * The converters and printable templates carry nothing, as in the native app
+ * (ResourceLinks.swift) and as /calculator says: no clause governs a
+ * millimetres-to-inches conversion, and a plausible-looking reference would
+ * be worse than none.
  */
 export const CORE_STANDARDS=["nzs3604","nzbc-b1"];
+/** The calculators no manual or clause governs: they list no references. */
+export const UNREFERENCED_CATEGORIES=new Set(["convert","templates"]);
 
 export const RESOURCES_BY_CATEGORY:Record<string,string[]>={
   roof:["mitek-truss-manual","mitek-truss-install","mitek-purlin","mitek-roof-bracing","mitek-gable-bracing","nzmrm-cop","nzbc-e2","worksafe-height"],
@@ -17,9 +24,7 @@ export const RESOURCES_BY_CATEGORY:Record<string,string[]>={
   spacing:["gib-site-guide","mitek-stud-topplate","mitek-stud-bottomplate","mitek-lintel","mitek-topplate-joint","pryda-builders"],
   concrete:["ccanz-ms17","ccanz-tm38","firth-ribraft","firth-paving","mitek-pile-12kn","worksafe-excavation"],
   metal:["codehub","mitek-timber-strength","worksafe-height"],
-  templates:["codehub","nzmrm-cop","mitek-easyfix"],
   deck:["mitek-deck-joist","mitek-joist-hangers","mitek-lumberlok","mitek-durability","mitek-exposure-map","nzbc-f4","pryda-connectors"],
-  convert:["codehub","nzbc-b2"],
   geometry:["codehub","mitek-timber-strength","pryda-builders"],
   materials:["gib-range","gib-site-guide","jh-best-practice","chh-ecoply","resene-paint-quantity","mitek-durability"],
 };
@@ -74,14 +79,13 @@ export const RESOURCES_BY_SLUG:Record<string,string[]>={
   "paving-ring":["firth-paving"],
   "timber-volume":["mitek-timber-strength"],
   "board-foot":["mitek-timber-strength"],
-  "bubble-level":["nzs3604"],
-  "quote-markup":["codehub"],
 };
 
 const byId=new Map(catalog.resources.map(r=>[r.id,r as LibraryResource]));
 
 /** Standards, codes and manuals to show under a calculator, most specific first. */
 export function resourcesForTool(slug:string,category:string,limit=9):LibraryResource[]{
+  if(UNREFERENCED_CATEGORIES.has(category))return [];
   const ids=[...CORE_STANDARDS,...(RESOURCES_BY_SLUG[slug]??[]),...(RESOURCES_BY_CATEGORY[category]??[])];
   const out:LibraryResource[]=[];
   for(const id of ids){const r=byId.get(id);if(r&&!out.includes(r))out.push(r);}

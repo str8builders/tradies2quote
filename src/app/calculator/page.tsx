@@ -230,7 +230,7 @@ export default async function CalculatorPage() {
             <Shot
               src="/screens/t2qcal-quote.jpg"
               alt="The review sheet before sending: the concrete slab's order volume ticked at 2.592 cubic metres, with net volume and plan area left unticked"
-              caption="The last look before it becomes a quote"
+              caption="In the iPhone app: the last look before it becomes a quote"
             />
 
             <div>
@@ -241,21 +241,23 @@ export default async function CalculatorPage() {
               />
               <p className="mt-5 text-lg leading-relaxed text-ink-200">
                 Work out the slab, tap <em>Send to a quote</em>, and the
-                quantities go across as a draft on your quote list — described,
-                measured and priced at your markup and your GST. Open it in
-                Tradies2Quote to add labour, pick the client and send it.
+                order quantity goes across as a draft on your quote list —
+                described, measured and priced at your markup and your GST.
+                Open it in Tradies2Quote to add labour, pick the client and
+                send it.
               </p>
               <ul className="mt-7 space-y-4">
                 <Point title="Nothing goes across unseen">
-                  Every quantity is listed with a tick and every figure stays
-                  editable. You approve the list, not a black box.
+                  The quantity and the working behind it are shown before you
+                  send, and every figure stays editable in the draft. You
+                  approve it, not a black box. The iPhone app goes further and
+                  lists each quantity with a tick.
                 </Point>
                 <Point title="It won't count the same concrete twice">
-                  On a slab, &ldquo;order volume&rdquo; is ticked and the
-                  &ldquo;net volume&rdquo; beside it isn&apos;t — they&apos;re
-                  the same pour, once with waste and once without. Cut lengths
-                  start unticked too: a rafter length is something you cut to,
-                  not something you order.
+                  On a slab it sends the order volume — the pour with its waste
+                  allowance — not the net volume as well. Where there are two
+                  ways to buy the same thing, like concrete to order or bagged
+                  concrete for post holes, only one goes across.
                 </Point>
                 <Point title="It won't re-ask what you just measured">
                   The lines are marked as calculated, which is the flag
