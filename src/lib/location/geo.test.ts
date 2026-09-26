@@ -43,10 +43,21 @@ describe("route km", () => {
     const wobble = Array.from({ length: 60 }, (_, i) => at(i, -37.6868 + (i % 2 ? 0.0001 : -0.0001), 176.1654));
     expect(routeKm(wobble)).toBe(0);
   });
-  it("drops rough fixes and impossible jumps", () => {
-    const pts = [at(0, -37.68, 176.16), { t: 1_000_000 + 10_000, lat: -36.8, lng: 174.7, acc: 8 }, at(1, -37.69, 176.16), at(2, -37.70, 176.16, 400)];
+  it("drops impossible jumps and fixes too rough to use", () => {
+    const pts = [at(0, -37.68, 176.16), { t: 1_000_000 + 10_000, lat: -36.8, lng: 174.7, acc: 8 }, at(1, -37.69, 176.16), at(2, -37.70, 176.16, 1500)];
     expect(routeKm(pts)).toBeCloseTo(1.1, 1);
     expect(routeKm([])).toBe(0);
+  });
+  it("counts rough background fixes only for moves bigger than their error", () => {
+    // The phone in a pocket with the app closed: wifi/cell fixes 300-400 m out.
+    const drive = [at(0, -37.68, 176.16, 300), at(5, -37.70, 176.16, 400), at(10, -37.72, 176.16, 300)];
+    expect(routeKm(drive)).toBeCloseTo(4.4, 1);
+    // Sitting on site, rough fixes wander 300 m: still 0 km.
+    const onSite = [at(0, -37.6868, 176.1654, 400), at(5, -37.6895, 176.1654, 400), at(10, -37.6868, 176.1654, 400)];
+    expect(routeKm(onSite)).toBe(0);
+    // Exact fixes around a rough one keep their own detail.
+    const mixed = [at(0, -37.68, 176.16), at(1, -37.69, 176.16), at(6, -37.71, 176.16, 500), at(7, -37.72, 176.16)];
+    expect(routeKm(mixed)).toBeCloseTo(4.4, 1);
   });
   it("sorts by time first", () => {
     const drive = [at(2, -37.70, 176.16), at(0, -37.68, 176.16), at(1, -37.69, 176.16)];

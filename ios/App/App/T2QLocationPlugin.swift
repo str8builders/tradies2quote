@@ -5,46 +5,44 @@ import Security
 import UIKit
 import UserNotifications
 
-/// Tradies2Quote's location module (JS name "T2QLocation"; the web side is
-/// src/lib/location/device.ts and the LocationBridge component).
+/// Tradies2Quote's location engine. It owns the one location manager and
+/// is started from AppDelegate at launch, so when iOS wakes the app for a
+/// job-site arrival (or a move while clocked in) with the app closed, the
+/// event is handled here without loading the website.
 ///
 /// Only what the person turned on in the app, and only for work:
-///  - While they're clocked in ("tracking"), the route: standard location
-///    updates every 50 m, sent to /api/location/points with this phone's
-///    upload key (kept in the keychain), even with the app in the
-///    background. iOS shows its blue location pill while this runs.
-///  - Automatic clock-in ("autoClock"): iOS region monitoring on up to 18
-///    job sites, which works with the app closed and costs almost no
-///    battery. Arrivals and departures inside the person's work hours are
-///    saved here with the time they happened and handed to the web page,
-///    which clocks in or out at that time. Nothing is sent on arrival until
-///    then; outside work hours nothing happens at all.
 ///  - Start/Finish work: a single current position.
-@objc(T2QLocationPlugin)
-public class T2QLocationPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegate {
-    public let identifier = "T2QLocationPlugin"
-    public let jsName = "T2QLocation"
-    public let pluginMethods: [CAPPluginMethod] = [
-        CAPPluginMethod(name: "currentPosition", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "permission", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "requestAlways", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "configure", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "drainEvents", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "stopAll", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "openSettings", returnType: CAPPluginReturnPromise),
-    ]
+///  - While clocked in ("tracking"): the route, to work out travel. Exact
+///    updates every 50 m while the app is open; with the app closed, iOS's
+///    significant-change updates (roughly every 500 m, needs "Always").
+///    The app declares no background-location mode.
+///  - Automatic clock-in ("autoClock"): iOS region monitoring on up to 18
+///    job sites (needs "Always"), which works with the app closed and costs
+///    almost no battery. Arrivals and departures inside the person's work
+///    hours are saved with the time they happened and handed to the page,
+///    which clocks in or out at that time.
+/// Route points go to /api/location/points with this phone's upload key
+/// (kept in the keychain).
+final class T2QLocationEngine: NSObject, CLLocationManagerDelegate {
+    static let shared = T2QLocationEngine()
 
-    private let manager = CLLocationManager()
+    let manager = CLLocationManager()
     private let store = UserDefaults.standard
     private let regionPrefix = "t2q.site."
-    private var fixCalls: [CAPPluginCall] = []
-    private var authCalls: [CAPPluginCall] = []
+    private var started = false
+    private var foreground = true
+    private var fixWaiters: [(CLLocation?) -> Void] = []
+    private var authWaiters: [(String) -> Void] = []
     private var wantsAlways = false
+    /// Asked for "Always" and waiting to see whether iOS shows its prompt.
+    private var alwaysPromptPending = false
     private var uploading = false
     private var flushTimer: Timer?
 
-    private enum Key {
+    /// Told when arrivals or departures are waiting (the plugin tells the page).
+    var onSiteEvent: (() -> Void)?
+
+    enum Key {
         static let endpoint = "t2q.location.endpoint"
         static let tracking = "t2q.location.tracking"
         static let autoClock = "t2q.location.autoClock"
@@ -53,94 +51,151 @@ public class T2QLocationPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDe
         static let openSite = "t2q.location.openSite"
         static let buffer = "t2q.location.buffer"
         static let events = "t2q.location.events"
+        /// An arrival saved with the app closed, not yet handed to the page:
+        /// leaving that site before the page sees it still counts.
+        static let pendingEnter = "t2q.location.pendingEnter"
     }
 
-    // MARK: - Lifecycle
+    // MARK: - Starting
 
-    override public func load() {
+    /// Main thread, at launch. Safe to call again.
+    func start() {
+        guard !started else { return }
+        started = true
+        foreground = UIApplication.shared.applicationState != .background
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
         manager.distanceFilter = 50
         manager.activityType = .otherNavigation
         manager.pausesLocationUpdatesAutomatically = false
+        let center = NotificationCenter.default
+        center.addObserver(self, selector: #selector(appBecameActive), name: UIApplication.didBecomeActiveNotification, object: nil)
+        center.addObserver(self, selector: #selector(appResigningActive), name: UIApplication.willResignActiveNotification, object: nil)
+        center.addObserver(self, selector: #selector(appEnteredBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
         apply()
     }
 
-    // MARK: - JS methods
-
-    @objc func permission(_ call: CAPPluginCall) {
-        call.resolve(["status": statusName()])
+    @objc private func appBecameActive() {
+        foreground = true
+        // Back from an iOS location prompt. Keeping "While using" on the
+        // "Always" prompt changes nothing, so iOS won't say; answer the page.
+        if !authWaiters.isEmpty, !wantsAlways, !alwaysPromptPending, manager.authorizationStatus != .notDetermined {
+            settleAuthWaiters()
+        }
+        apply()
     }
 
-    @objc func requestAlways(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
-            switch self.manager.authorizationStatus {
-            case .notDetermined:
-                self.wantsAlways = true
-                self.authCalls.append(call)
-                self.manager.requestWhenInUseAuthorization()
-            case .authorizedWhenInUse:
-                self.manager.requestAlwaysAuthorization()
-                call.resolve(["status": self.statusName()])
-            default:
-                call.resolve(["status": self.statusName()])
-            }
+    @objc private func appResigningActive() {
+        // The "Always" prompt is on screen: its answer comes on return.
+        alwaysPromptPending = false
+    }
+
+    @objc private func appEnteredBackground() {
+        foreground = false
+        apply()
+        flush()
+    }
+
+    // MARK: - Asking
+
+    func statusName() -> String {
+        switch manager.authorizationStatus {
+        case .authorizedAlways: return "always"
+        case .authorizedWhenInUse: return "whenInUse"
+        case .denied: return "denied"
+        case .restricted: return "restricted"
+        default: return "notDetermined"
         }
     }
 
-    @objc func currentPosition(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
-            let status = self.manager.authorizationStatus
-            if status == .denied || status == .restricted {
-                call.reject("Location is off for Tradies2Quote in Settings.", "denied")
-                return
-            }
-            if let last = self.manager.location, last.horizontalAccuracy > 0, last.horizontalAccuracy <= 100,
-               abs(last.timestamp.timeIntervalSinceNow) < 30 {
-                call.resolve(self.fix(last))
-                return
-            }
-            self.fixCalls.append(call)
-            if status == .notDetermined {
-                self.manager.requestWhenInUseAuthorization()
-            } else {
-                self.manager.requestLocation()
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 12) { [weak self] in
-                guard let self = self, let index = self.fixCalls.firstIndex(where: { $0 === call }) else { return }
-                self.fixCalls.remove(at: index)
-                if let last = self.manager.location, last.horizontalAccuracy > 0 {
-                    call.resolve(self.fix(last))
-                } else {
-                    call.reject("Couldn't find your location.", "timeout")
-                }
-            }
+    /// "While using the app": pins, travel while open, weather.
+    func requestWhenInUse(_ done: @escaping (String) -> Void) {
+        guard manager.authorizationStatus == .notDetermined else {
+            done(statusName())
+            return
+        }
+        authWaiters.append(done)
+        manager.requestWhenInUseAuthorization()
+    }
+
+    /// "Always": only for automatic clock-in. iOS asks "while using" first,
+    /// then offers "Always" straight after.
+    func requestAlways(_ done: @escaping (String) -> Void) {
+        switch manager.authorizationStatus {
+        case .notDetermined:
+            wantsAlways = true
+            authWaiters.append(done)
+            manager.requestWhenInUseAuthorization()
+        case .authorizedWhenInUse:
+            authWaiters.append(done)
+            askAlways()
+        default:
+            done(statusName())
         }
     }
 
-    @objc func status(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
-            call.resolve([
-                "hasToken": Keychain.read() != nil,
-                "tracking": self.store.bool(forKey: Key.tracking),
-                "watching": self.ourRegions().count,
-            ])
+    /// iOS shows the "Change to Always Allow" prompt only once. When it
+    /// doesn't appear, the app stays active and there'll be no answer to
+    /// wait for, so settle with what we have.
+    private func askAlways() {
+        alwaysPromptPending = true
+        manager.requestAlwaysAuthorization()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            guard let self = self, self.alwaysPromptPending, UIApplication.shared.applicationState == .active else { return }
+            self.alwaysPromptPending = false
+            self.settleAuthWaiters()
         }
     }
 
-    @objc func configure(_ call: CAPPluginCall) {
-        if let token = call.getString("token"), !token.isEmpty { Keychain.write(token) }
-        if let endpoint = call.getString("endpoint"), endpoint.hasPrefix("https://") || endpoint.hasPrefix("http://localhost") {
+    private func settleAuthWaiters() {
+        let waiting = authWaiters
+        authWaiters.removeAll()
+        let status = statusName()
+        waiting.forEach { $0(status) }
+    }
+
+    /// Where the phone is now: a fresh fix, or the last known one after 12 s.
+    func currentFix(_ done: @escaping (CLLocation?) -> Void) {
+        if let last = manager.location, last.horizontalAccuracy > 0, last.horizontalAccuracy <= 100,
+           abs(last.timestamp.timeIntervalSinceNow) < 30 {
+            done(last)
+            return
+        }
+        var answered = false
+        let waiter: (CLLocation?) -> Void = { location in
+            guard !answered else { return }
+            answered = true
+            done(location)
+        }
+        fixWaiters.append(waiter)
+        if manager.authorizationStatus == .notDetermined {
+            manager.requestWhenInUseAuthorization()
+        } else {
+            manager.requestLocation()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 12) { [weak self] in
+            guard let self = self, !answered else { return }
+            let last = self.manager.location
+            waiter(last.flatMap { $0.horizontalAccuracy > 0 ? $0 : nil })
+        }
+    }
+
+    // MARK: - Settings from the page
+
+    /// Main thread. Stores only plain values (see Plist.clean) and applies them.
+    func configure(endpoint: String?, token: String?, tracking: Bool, autoClock: Bool,
+                   sites: Any?, window: Any?, openSite: Any?) {
+        if let token = token, !token.isEmpty { Keychain.write(token) }
+        if let endpoint = endpoint, endpoint.hasPrefix("https://") || endpoint.hasPrefix("http://localhost") {
             store.set(endpoint, forKey: Key.endpoint)
         }
-        store.set(call.getBool("tracking") ?? false, forKey: Key.tracking)
-        let autoClock = call.getBool("autoClock") ?? false
+        store.set(tracking, forKey: Key.tracking)
         store.set(autoClock, forKey: Key.autoClock)
         // Only plain values reach UserDefaults: a JavaScript null arrives as
         // NSNull, which UserDefaults refuses by crashing the app.
-        store.set(Plist.clean(call.getArray("sites", JSObject.self) ?? []) ?? [], forKey: Key.sites)
-        store.set(Plist.clean(call.getObject("window") ?? [:]) ?? [:], forKey: Key.window)
-        if let open = call.getObject("openSite"), let clean = Plist.clean(open) {
+        store.set(Plist.clean(sites ?? []) ?? [], forKey: Key.sites)
+        store.set(Plist.clean(window ?? [:]) ?? [:], forKey: Key.window)
+        if let open = openSite, let clean = Plist.clean(open) as? [String: Any], !clean.isEmpty {
             store.set(clean, forKey: Key.openSite)
         } else {
             store.removeObject(forKey: Key.openSite)
@@ -148,40 +203,32 @@ public class T2QLocationPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDe
         if autoClock {
             UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         }
-        DispatchQueue.main.async {
-            self.apply()
-            call.resolve()
-        }
+        apply()
     }
 
     /// Arrivals and departures saved since the page last asked (oldest first).
-    @objc func drainEvents(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
-            let events = self.store.array(forKey: Key.events) ?? []
-            self.store.removeObject(forKey: Key.events)
-            call.resolve(["events": events])
-        }
+    /// From here the page is in charge of them.
+    func drainEvents() -> [Any] {
+        let events = store.array(forKey: Key.events) ?? []
+        store.removeObject(forKey: Key.events)
+        store.removeObject(forKey: Key.pendingEnter)
+        return events
     }
 
     /// Location turned off: stop everything and forget the upload key.
-    @objc func stopAll(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
-            self.store.set(false, forKey: Key.tracking)
-            self.store.set(false, forKey: Key.autoClock)
-            self.store.removeObject(forKey: Key.buffer)
-            self.store.removeObject(forKey: Key.events)
-            Keychain.delete()
-            self.apply()
-            call.resolve()
-        }
+    func stopAll() {
+        store.set(false, forKey: Key.tracking)
+        store.set(false, forKey: Key.autoClock)
+        store.removeObject(forKey: Key.buffer)
+        store.removeObject(forKey: Key.events)
+        store.removeObject(forKey: Key.pendingEnter)
+        Keychain.delete()
+        apply()
     }
 
-    @objc func openSettings(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
-            if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
-            call.resolve()
-        }
-    }
+    func watchingCount() -> Int { ourRegions().count }
+
+    func isTracking() -> Bool { store.bool(forKey: Key.tracking) }
 
     // MARK: - Applying the settings
 
@@ -208,62 +255,64 @@ public class T2QLocationPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDe
         let watching = Set(ourRegions().map(\.identifier))
         for (id, region) in wanted where !watching.contains(id) { manager.startMonitoring(for: region) }
 
-        // The route while clocked in.
-        if tracking, status == .authorizedAlways || status == .authorizedWhenInUse {
-            // Turning this on without the "location" background mode in
-            // Info.plist is a crash, so check rather than assume.
-            if Self.hasBackgroundLocationMode {
-                manager.allowsBackgroundLocationUpdates = true
-                manager.showsBackgroundLocationIndicator = true
-            }
+        // The route while clocked in: exact while the app is open...
+        let allowed = status == .authorizedAlways || status == .authorizedWhenInUse
+        if tracking, allowed, foreground {
             manager.startUpdatingLocation()
             if flushTimer == nil {
                 flushTimer = Timer.scheduledTimer(withTimeInterval: 120, repeats: true) { [weak self] _ in self?.flush() }
             }
         } else {
             manager.stopUpdatingLocation()
-            if Self.hasBackgroundLocationMode { manager.allowsBackgroundLocationUpdates = false }
             flushTimer?.invalidate()
             flushTimer = nil
-            flush()
         }
+        // ...and roughly with the app closed (no background mode needed).
+        if tracking, status == .authorizedAlways, CLLocationManager.significantLocationChangeMonitoringAvailable() {
+            manager.startMonitoringSignificantLocationChanges()
+        } else {
+            manager.stopMonitoringSignificantLocationChanges()
+        }
+        if !tracking { flush() }
     }
 
     // MARK: - CLLocationManagerDelegate
 
-    public func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         let status = manager.authorizationStatus
         if wantsAlways, status == .authorizedWhenInUse {
+            // Straight on to the "Always" question; answer the page after it.
             wantsAlways = false
-            manager.requestAlwaysAuthorization()
+            askAlways()
+        } else if status != .notDetermined {
+            wantsAlways = false
+            alwaysPromptPending = false
+            settleAuthWaiters()
         }
-        if status != .notDetermined {
-            let calls = authCalls
-            authCalls.removeAll()
-            calls.forEach { $0.resolve(["status": statusName()]) }
-            if !fixCalls.isEmpty {
-                if status == .denied || status == .restricted {
-                    let calls = fixCalls
-                    fixCalls.removeAll()
-                    calls.forEach { $0.reject("Location is off for Tradies2Quote in Settings.", "denied") }
-                } else {
-                    manager.requestLocation()
-                }
+        if status != .notDetermined, !fixWaiters.isEmpty {
+            if status == .denied || status == .restricted {
+                let waiting = fixWaiters
+                fixWaiters.removeAll()
+                waiting.forEach { $0(nil) }
+            } else {
+                manager.requestLocation()
             }
         }
         apply()
     }
 
-    public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let last = locations.last else { return }
-        if !fixCalls.isEmpty, last.horizontalAccuracy > 0 {
-            let calls = fixCalls
-            fixCalls.removeAll()
-            calls.forEach { $0.resolve(fix(last)) }
+        if !fixWaiters.isEmpty, last.horizontalAccuracy > 0 {
+            let waiting = fixWaiters
+            fixWaiters.removeAll()
+            waiting.forEach { $0(last) }
         }
         guard store.bool(forKey: Key.tracking) else { return }
         var buffer = store.array(forKey: Key.buffer) as? [[String: Any]] ?? []
-        for location in locations where location.horizontalAccuracy > 0 && location.horizontalAccuracy <= 100 {
+        // Rough fixes (wifi/cell, with the app closed) are kept too; the km
+        // sum only counts them for moves bigger than their error.
+        for location in locations where location.horizontalAccuracy > 0 && location.horizontalAccuracy <= 1000 {
             var point: [String: Any] = [
                 "t": location.timestamp.timeIntervalSince1970 * 1000,
                 "lat": location.coordinate.latitude,
@@ -276,21 +325,22 @@ public class T2QLocationPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDe
             buffer.append(point)
         }
         store.set(Array(buffer.suffix(2000)), forKey: Key.buffer)
-        if buffer.count >= 30 { flush() }
+        // With the app closed iOS gives only seconds: send each update now.
+        if buffer.count >= 30 || !foreground { flush() }
     }
 
-    public func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        guard !fixCalls.isEmpty, (error as? CLError)?.code != .locationUnknown else { return }
-        let calls = fixCalls
-        fixCalls.removeAll()
-        calls.forEach { $0.reject("Couldn't find your location.", "unavailable") }
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        guard !fixWaiters.isEmpty, (error as? CLError)?.code != .locationUnknown else { return }
+        let waiting = fixWaiters
+        fixWaiters.removeAll()
+        waiting.forEach { $0(nil) }
     }
 
-    public func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion) {
+    func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion) {
         siteEvent("enter", region)
     }
 
-    public func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion) {
+    func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion) {
         siteEvent("exit", region)
     }
 
@@ -299,14 +349,15 @@ public class T2QLocationPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDe
     private func siteEvent(_ type: String, _ region: CLRegion) {
         guard region.identifier.hasPrefix(regionPrefix), store.bool(forKey: Key.autoClock), inWorkWindow(Date()) else { return }
         let clientId = String(region.identifier.dropFirst(regionPrefix.count))
-        let tracking = store.bool(forKey: Key.tracking)
+        let pending = store.string(forKey: Key.pendingEnter)
+        let clockedIn = store.bool(forKey: Key.tracking) || pending != nil
         let open = store.dictionary(forKey: Key.openSite)
-        let openAuto = (open?["auto"] as? Bool) == true && (open?["clientId"] as? String) == clientId
+        let openAuto = pending == clientId || ((open?["auto"] as? Bool) == true && (open?["clientId"] as? String) == clientId)
         // Arriving counts when not clocked in; leaving only ends an automatic clock-in at this site.
-        guard (type == "enter" && !tracking) || (type == "exit" && tracking && openAuto) else { return }
+        guard (type == "enter" && !clockedIn) || (type == "exit" && clockedIn && openAuto) else { return }
 
         var event: [String: Any] = ["type": type, "clientId": clientId, "t": Date().timeIntervalSince1970 * 1000]
-        if let here = manager.location, abs(here.timestamp.timeIntervalSinceNow) < 120 {
+        if let here = manager.location, abs(here.timestamp.timeIntervalSinceNow) < 120, here.horizontalAccuracy > 0 {
             event["lat"] = here.coordinate.latitude
             event["lng"] = here.coordinate.longitude
             event["acc"] = here.horizontalAccuracy
@@ -314,7 +365,12 @@ public class T2QLocationPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDe
         var events = store.array(forKey: Key.events) ?? []
         events.append(event)
         store.set(Array(events.suffix(50)), forKey: Key.events)
-        notifyListeners("siteEvent", data: [:], retainUntilConsumed: true)
+        if type == "enter" {
+            store.set(clientId, forKey: Key.pendingEnter)
+        } else if pending == clientId {
+            store.removeObject(forKey: Key.pendingEnter)
+        }
+        onSiteEvent?()
 
         let name = sites().first(where: { $0.id == clientId })?.name ?? "the job"
         let time = clockTime(Date())
@@ -362,9 +418,6 @@ public class T2QLocationPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDe
     }
 
     // MARK: - Helpers
-
-    private static let hasBackgroundLocationMode: Bool =
-        (Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String])?.contains("location") == true
 
     private struct Site {
         let id: String
@@ -427,23 +480,115 @@ public class T2QLocationPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDe
         let request = UNNotificationRequest(identifier: "t2q.site.\(UUID().uuidString)", content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
     }
+}
 
-    private func fix(_ location: CLLocation) -> [String: Any] {
-        [
-            "lat": location.coordinate.latitude,
-            "lng": location.coordinate.longitude,
-            "acc": location.horizontalAccuracy,
-            "t": location.timestamp.timeIntervalSince1970 * 1000,
-        ]
+/// The page's side of location (JS name "T2QLocation"; the web side is
+/// src/lib/location/device.ts and the LocationBridge component). A thin
+/// bridge: the work happens in T2QLocationEngine.
+@objc(T2QLocationPlugin)
+public class T2QLocationPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "T2QLocationPlugin"
+    public let jsName = "T2QLocation"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "currentPosition", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "permission", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "requestWhenInUse", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "requestAlways", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "configure", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "drainEvents", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopAll", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openSettings", returnType: CAPPluginReturnPromise),
+    ]
+
+    private var engine: T2QLocationEngine { T2QLocationEngine.shared }
+
+    override public func load() {
+        DispatchQueue.main.async {
+            self.engine.start()
+            self.engine.onSiteEvent = { [weak self] in
+                self?.notifyListeners("siteEvent", data: [:], retainUntilConsumed: true)
+            }
+        }
     }
 
-    private func statusName() -> String {
-        switch manager.authorizationStatus {
-        case .authorizedAlways: return "always"
-        case .authorizedWhenInUse: return "whenInUse"
-        case .denied: return "denied"
-        case .restricted: return "restricted"
-        default: return "notDetermined"
+    @objc func permission(_ call: CAPPluginCall) {
+        DispatchQueue.main.async { call.resolve(["status": self.engine.statusName()]) }
+    }
+
+    @objc func requestWhenInUse(_ call: CAPPluginCall) {
+        DispatchQueue.main.async { self.engine.requestWhenInUse { call.resolve(["status": $0]) } }
+    }
+
+    @objc func requestAlways(_ call: CAPPluginCall) {
+        DispatchQueue.main.async { self.engine.requestAlways { call.resolve(["status": $0]) } }
+    }
+
+    @objc func currentPosition(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let status = self.engine.manager.authorizationStatus
+            if status == .denied || status == .restricted {
+                call.reject("Location is off for Tradies2Quote in Settings.", "denied")
+                return
+            }
+            self.engine.currentFix { location in
+                guard let location = location else {
+                    call.reject("Couldn't find your location.", "timeout")
+                    return
+                }
+                call.resolve([
+                    "lat": location.coordinate.latitude,
+                    "lng": location.coordinate.longitude,
+                    "acc": location.horizontalAccuracy,
+                    "t": location.timestamp.timeIntervalSince1970 * 1000,
+                ])
+            }
+        }
+    }
+
+    @objc func status(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            call.resolve([
+                "hasToken": Keychain.read() != nil,
+                "tracking": self.engine.isTracking(),
+                "watching": self.engine.watchingCount(),
+            ])
+        }
+    }
+
+    @objc func configure(_ call: CAPPluginCall) {
+        let endpoint = call.getString("endpoint")
+        let token = call.getString("token")
+        let tracking = call.getBool("tracking") ?? false
+        let autoClock = call.getBool("autoClock") ?? false
+        let sites = call.getArray("sites", JSObject.self)
+        let window = call.getObject("window")
+        let openSite = call.getObject("openSite")
+        DispatchQueue.main.async {
+            self.engine.configure(endpoint: endpoint, token: token, tracking: tracking, autoClock: autoClock,
+                                  sites: sites, window: window, openSite: openSite)
+            call.resolve()
+        }
+    }
+
+    @objc func drainEvents(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let events = Plist.clean(self.engine.drainEvents()) as? [Any] ?? []
+            call.resolve(["events": events])
+        }
+    }
+
+    @objc func stopAll(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            self.engine.stopAll()
+            call.resolve()
+        }
+    }
+
+    @objc func openSettings(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+            call.resolve()
         }
     }
 }

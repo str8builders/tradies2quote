@@ -13,6 +13,7 @@ import { TopProgressBar } from "./_components/TopProgressBar";
 import { TrialBanner } from "./_components/TrialBanner";
 import { BetaNoticeBanner } from "./_components/BetaNoticeBanner";
 import { isNewLookOn } from "@/lib/ui/newLook";
+import { isNativeShellRequest } from "@/lib/native-shell";
 import { NewLookShell } from "./_v2/shell/NewLookShell";
 import { NewLookWelcome } from "./_v2/shell/NewLookWelcome";
 import { loadTopBarData } from "./_v2/lib/top-bar";
@@ -83,7 +84,7 @@ export default async function AppLayout({
     // (the client then applies the same route rules as the old one).
     const welcome = welcomeSeen ? null : <NewLookWelcome serverOpen data={await loadTopBarData()} />;
     return (
-      <NewLookShell outdoor={outdoor} welcome={welcome}>
+      <NewLookShell outdoor={outdoor} inApp={await isNativeShellRequest()} welcome={welcome}>
         {children}
       </NewLookShell>
     );

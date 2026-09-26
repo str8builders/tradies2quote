@@ -7,7 +7,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // Location first: when iOS relaunches the app for a job-site arrival
+        // or a move while clocked in, the engine must be listening before
+        // the event is delivered (the website may never load in that case).
+        T2QLocationEngine.shared.start()
         return true
     }
 

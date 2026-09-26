@@ -7,6 +7,7 @@ import { TrialBanner } from "../../_components/TrialBanner";
 import { AppContent } from "./AppContent";
 import { AppNav } from "./AppNav";
 import { LocationBridge } from "./LocationBridge";
+import { StatusBarTint } from "./StatusBarTint";
 
 /**
  * The site-wide "pause motion" choice (landing footer toggle →
@@ -28,7 +29,10 @@ const SETTLE_KIT_MOTION =
  *     yet redesigned keep their look.
  *   - scrolling: the document (<AppContent> is `.t2q-app-scroll`).
  *   - top safe area: <AppContent> pads it; the strip above paints it so
- *     nothing scrolls visibly under the status bar.
+ *     nothing scrolls visibly under the status bar. In the iPhone app the
+ *     strip is the page's own colour (no band) and <StatusBarTint> sets the
+ *     clock to match; in a home-screen web app it stays the dark chrome,
+ *     because iOS always draws that clock white.
  *   - bottom safe area: the docked tab bar (<AppNav>) on phones, or the
  *     screen's own bottom action bar on focused routes.
  *
@@ -39,10 +43,13 @@ const SETTLE_KIT_MOTION =
  */
 export function NewLookShell({
   outdoor,
+  inApp = false,
   welcome,
   children,
 }: {
   outdoor: boolean;
+  /** This request comes from the iPhone app (isNativeShellRequest). */
+  inApp?: boolean;
   /** The welcome after signing in (<NewLookWelcome>), when it may play. */
   welcome?: ReactNode;
   children: ReactNode;
@@ -63,7 +70,10 @@ export function NewLookShell({
         <div
           aria-hidden="true"
           data-testid="status-bar-strip"
-          className="pointer-events-none fixed inset-x-0 top-0 z-50 h-[env(safe-area-inset-top)] bg-ui-chrome"
+          className={cx(
+            "pointer-events-none fixed inset-x-0 top-0 z-50 h-[env(safe-area-inset-top)]",
+            inApp ? "bg-ui-bg" : "bg-ui-chrome",
+          )}
         />
         <AppContent
           banners={
@@ -78,6 +88,7 @@ export function NewLookShell({
         <AppNav />
         <TopProgressBar />
         <LocationBridge />
+        {inApp ? <StatusBarTint outdoor={outdoor} /> : null}
       </div>
       {/* Outside the canvas, which is its own stacking context; the welcome
         lifts itself into the browser's top layer once it runs. */}

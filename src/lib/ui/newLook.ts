@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { getCachedAuthUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { isNativeShellRequest } from "@/lib/native-shell";
 import { isOwnerEmail } from "@/lib/owner";
 
 /**
@@ -15,6 +16,10 @@ import { isOwnerEmail } from "@/lib/owner";
  * stored value from anyone else is ignored, so switching the default back to
  * off is a real kill switch (and a hand-crafted API write cannot open the
  * preview early).
+ *
+ * The iPhone app always shows the new look, with no switch: Timesheet,
+ * location and the weather button only exist there, and Apple reviews what
+ * the app shows everyone.
  */
 
 export const NEW_LOOK_ENV = "T2Q_NEW_LOOK_DEFAULT";
@@ -84,12 +89,24 @@ async function readStoredChoice(userId: string): Promise<boolean | null> {
   }
 }
 
+/** This request comes from the iPhone app (false outside a request). */
+async function inIPhoneApp(): Promise<boolean> {
+  try {
+    return await isNativeShellRequest();
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Server helper: the signed-in user's new-look state for this request.
  * Request-scoped (React cache) and shares the auth round trip with the page.
  * Users who cannot choose cost no database read.
  */
 export const getNewLookState = cache(async (): Promise<NewLookState> => {
+  if (await inIPhoneApp()) {
+    return { on: true, choice: null, envDefault: "on", canChoose: false };
+  }
   const envDefault = newLookDefault();
   const { user } = await getCachedAuthUser();
   if (!user) {

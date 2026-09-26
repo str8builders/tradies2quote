@@ -29,17 +29,13 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Record your voice to describe a job — Tradies2Quote turns it into a quote draft.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Scan plans, site drawings and materials to add them to a quote.</string>
+	<string>Scan plans, site drawings, supplier quotes and price lists to add them to your quotes and prices.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Attach existing plan photos and site pictures to your quotes.</string>
+	<string>Attach plan photos, site pictures, supplier quotes and price lists to your quotes and prices.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>When you start or finish work, Tradies2Quote pins where you are (for example "At the Hemi Walker job") on your timesheet, and checks the weather at your site.</string>
+	<string>When you start or finish work, Tradies2Quote pins where you are (for example "At the Hemi Walker job") on your timesheet and works out your travel kilometres while you're clocked in. It also shows the weather where you are.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Only if you turn it on in the Timesheet: while you're clocked in, Tradies2Quote keeps your route to work out travel kilometres and show your boss where the team is; and with automatic clock-in, it starts and stops your hours when you arrive at and leave a job, in your work hours only.</string>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>location</string>
-	</array>
+	<string>Only if you turn on automatic clock-in in the Timesheet: Tradies2Quote starts and stops your hours when you arrive at and leave a job, during your work hours, even with the app closed, and keeps rough travel kilometres while you're clocked in. If you work for a business on Tradies2Quote, its owner sees your hours and where you clocked in.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

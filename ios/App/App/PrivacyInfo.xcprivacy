@@ -15,9 +15,11 @@
 	<key>NSPrivacyCollectedDataTypes</key>
 	<array>
 		<dict>
-			<!-- Timesheet location, only when the person turns it on: start and
-			     finish pins, the route while clocked in (travel km, the owner's
-			     team map), job-site arrivals for automatic clock-in. -->
+			<!-- One entry for every use of location, each only when the person
+			     turns it on or taps it: Timesheet start and finish pins, the
+			     route while clocked in (travel km, the owner's team map),
+			     job-site arrivals for automatic clock-in, and the weather where
+			     you are (rounded to ~1 km before the forecast is asked for). -->
 			<key>NSPrivacyCollectedDataType</key>
 			<string>NSPrivacyCollectedDataTypePreciseLocation</string>
 			<key>NSPrivacyCollectedDataTypeLinked</key>
@@ -113,16 +115,26 @@
 				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
 			</array>
 		</dict>
-		<!-- Weather risk: user-initiated "use my location" button on the
-		     weather screen (navigator.geolocation in the webview). Job-site
-		     weather assessments are stored against the user's account
-		     (job_weather_assessments), so this is honestly LINKED data —
-		     never used for tracking. Purged on account deletion. -->
+		<!-- Business and client addresses on quotes and invoices. -->
 		<dict>
 			<key>NSPrivacyCollectedDataType</key>
-			<string>NSPrivacyCollectedDataTypePreciseLocation</string>
+			<string>NSPrivacyCollectedDataTypePhysicalAddress</string>
 			<key>NSPrivacyCollectedDataTypeLinked</key>
 			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<!-- Error reports (src/lib/observability.ts): scrubbed, with no
+		     account ID, used only to fix crashes. Not linked. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeCrashData</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<false/>
 			<key>NSPrivacyCollectedDataTypeTracking</key>
 			<false/>
 			<key>NSPrivacyCollectedDataTypePurposes</key>
