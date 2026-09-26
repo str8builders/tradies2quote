@@ -100,9 +100,9 @@ export const metadata: Metadata = {
   authors: [{ name: "Tradies2Quote" }],
   creator: "Tradies2Quote",
   publisher: "Tradies2Quote",
-  alternates: {
-    canonical: "/",
-  },
+  // No site-wide canonical: every page inherited "/" from here, which told
+  // Google that T2QCAL and its calculators were copies of the home page.
+  // The home page and the landing pages set their own.
   openGraph: {
     type: "website",
     siteName: "Tradies2Quote",

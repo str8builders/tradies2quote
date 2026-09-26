@@ -84,7 +84,14 @@ export function CompanionApp() {
               </Link>
             </div>
             <p className="studio-fineprint">
-              Signed in, a calculator&apos;s quantities drop straight into a
+              <Link
+                href="/calculator"
+                className="underline underline-offset-2"
+                data-testid="calculator-how-it-quotes"
+              >
+                See how T2QCAL turns a measurement into a quote
+              </Link>
+              . Signed in, a calculator&apos;s quantities drop straight into a
               Tradies2Quote draft. T2QCAL is not affiliated with the
               manufacturers whose guides it links to.
             </p>

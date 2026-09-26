@@ -15,13 +15,17 @@ import { HideInNativeApp } from "./_components/HideInNativeApp";
 import { NativeAppRedirect } from "./_components/landing/NativeAppRedirect";
 import { isNativeShellRequest } from "@/lib/native-shell";
 import { faqPageLd, softwareApplicationLd } from "./_components/landing/structured-data";
-import type { Viewport } from "next";
+import type { Metadata, Viewport } from "next";
 import { redirect } from "next/navigation";
 
 // The public home page lets visitors pinch-zoom. The root layout locks zoom
 // for the installed app shell (see the mobile shell contract); the home page
 // never renders inside that shell (NativeAppRedirect), and T2QCAL already
 // overrides the lock the same way. Other fields mirror the root viewport.
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
+
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,

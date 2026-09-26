@@ -6,7 +6,10 @@ import { isNativeShellRequest } from "@/lib/native-shell";
 
 /** The tab title is in the HTML too: inside the iOS app no "free trial" (App Store 3.1.3(f)). */
 export async function generateMetadata(): Promise<Metadata> {
-  return { title: (await isNativeShellRequest()) ? "Create account" : "Start your free trial" };
+  return {
+    title: (await isNativeShellRequest()) ? "Create account" : "Start your free trial",
+    robots: { index: false, follow: true },
+  };
 }
 
 /**

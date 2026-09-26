@@ -13,6 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "Set a new password",
+  robots: { index: false, follow: true },
 };
 
 export default async function ResetPasswordPage({
