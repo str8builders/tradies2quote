@@ -414,6 +414,13 @@ export type QuoteData = {
    * `parseVerificationReport`.
    */
   verification?: unknown;
+  /**
+   * An invoice made from the Timesheet: the time entries it billed. Deleting
+   * the job frees those hours to be invoiced again, so restoring it later is
+   * refused if any of them sit on a newer live invoice (never bill twice).
+   * Server-side only, like `verification`: not in PublicQuotePayload.
+   */
+  timesheet?: { entry_ids: string[] };
 };
 
 export type SupplierSource = {

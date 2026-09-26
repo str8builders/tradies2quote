@@ -213,9 +213,11 @@ describe("restoreJobs", () => {
 
   it("brings back the jobs and only the invoices deleted with them", async () => {
     env.respond = script();
-    await expect(restoreJobs([A, B])).resolves.toEqual({ ok: true, count: 2, ids: [A, B] });
-    const [readQuotes, readInvoices, quotes, invoices] = ops();
-    expect(ops()).toHaveLength(4);
+    await expect(restoreJobs([A, B])).resolves.toEqual({ ok: true, count: 2, ids: [A, B], kept: 0 });
+    // (Leaving out the timesheet check's read, tested below.)
+    const main = ops().filter((op) => !(op.table === "quotes" && op.action === "select" && op.columns?.includes("timesheet")));
+    const [readQuotes, readInvoices, quotes, invoices] = main;
+    expect(main).toHaveLength(4);
     expect(readQuotes).toMatchObject({
       table: "quotes",
       action: "select",
@@ -317,5 +319,52 @@ describe("restoreJobs", () => {
     expect(env.db).toBeNull();
     env.user = null;
     await expect(restoreJobs([A])).rejects.toThrow("NEXT_REDIRECT /login");
+  });
+});
+
+describe("restoreJobs never bills the same hours twice", () => {
+  const T = "2026-09-27T05:00:00.000Z";
+  const E1 = uuid(11);
+  const E2 = uuid(12);
+  /** Job A: a timesheet invoice (inv-a) billing E1 and E2, deleted together. */
+  function timesheetJob(entryInvoice: Record<string, string | null>, otherInvoice: Record<string, unknown> = {}) {
+    return (op: FakeOp): FakeResult => {
+      if (op.table === "quotes" && op.action === "select") {
+        if (op.columns?.includes("timesheet")) return { data: [{ id: A, timesheet: { entry_ids: [E1, E2] } }] };
+        return { data: [{ id: A, deleted_at: T }] };
+      }
+      if (op.table === "invoices" && op.action === "select") {
+        if (op.columns?.includes("status")) return { data: [{ id: "inv-new", status: "sent", deleted_at: null, ...otherInvoice }] };
+        return { data: [{ id: "inv-a", quote_id: A, deleted_at: T }] };
+      }
+      if (op.table === "time_entries") return { data: [E1, E2].map((id) => ({ id, invoice_id: entryInvoice[id] ?? null })) };
+      if (op.table === "quotes" && op.action === "update") return echoIds(op);
+      return { data: [] };
+    };
+  }
+
+  it("keeps the job deleted when its hours were invoiced again", async () => {
+    env.respond = timesheetJob({ [E1]: "inv-new", [E2]: "inv-new" });
+    await expect(restoreJobs([A])).resolves.toEqual({ ok: true, count: 0, ids: [], kept: 1 });
+    expect(writes()).toHaveLength(0);
+  });
+
+  it("restores it when its hours are still on its own invoice", async () => {
+    env.respond = timesheetJob({ [E1]: "inv-a", [E2]: "inv-a" });
+    await expect(restoreJobs([A])).resolves.toEqual({ ok: true, count: 1, ids: [A], kept: 0 });
+  });
+
+  it("restores it when the newer invoice was itself deleted or cancelled", async () => {
+    env.respond = timesheetJob({ [E1]: "inv-new", [E2]: null }, { deleted_at: "2026-09-27T06:00:00.000Z" });
+    await expect(restoreJobs([A])).resolves.toMatchObject({ ok: true, count: 1, kept: 0 });
+    env.respond = timesheetJob({ [E1]: "inv-new", [E2]: null }, { status: "cancelled" });
+    await expect(restoreJobs([A])).resolves.toMatchObject({ ok: true, count: 1, kept: 0 });
+  });
+
+  it("restores nothing if the check can't be made", async () => {
+    const base = timesheetJob({ [E1]: "inv-new", [E2]: "inv-new" });
+    env.respond = (op) => (op.table === "time_entries" ? { error: { message: "timeout" } } : base(op));
+    await expect(restoreJobs([A])).resolves.toMatchObject({ ok: false });
+    expect(writes()).toHaveLength(0);
   });
 });

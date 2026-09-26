@@ -28,7 +28,8 @@ import { deletedTogether, parseJobIds } from "../_v2/lib/job-board";
  */
 
 export type JobsActionResult =
-  | { ok: true; count: number; ids: string[] }
+  /** `kept`: jobs left deleted because their timesheet hours are on a newer invoice. */
+  | { ok: true; count: number; ids: string[]; kept?: number }
   | { ok: false; error: string };
 
 type Db = Awaited<ReturnType<typeof createClient>>;
@@ -232,8 +233,19 @@ export async function restoreJobs(quoteIds: string[]): Promise<JobsActionResult>
     }
   }
 
+  // Never bill the same hours twice: a timesheet invoice whose hours went on
+  // a newer invoice after it was deleted stays deleted, job and all.
+  const rebilled = await rebilledJobs(db, userId, found, withTheirJob);
+  if (rebilled === null) return { ok: false, error: RESTORE_FAILED };
+  const toRestore = found.filter((id) => !rebilled.has(id));
+  const kept = rebilled.size;
+  if (toRestore.length === 0) {
+    refreshLists();
+    return { ok: true, count: 0, ids: [], kept };
+  }
+
   const restored: string[] = [];
-  for (const part of chunks(found)) {
+  for (const part of chunks(toRestore)) {
     const quotes = await db
       .from("quotes")
       .update({ deleted_at: null })
@@ -269,5 +281,70 @@ export async function restoreJobs(quoteIds: string[]): Promise<JobsActionResult>
   }
 
   refreshLists();
-  return { ok: true, count: restored.length, ids: restored };
+  return { ok: true, count: restored.length, ids: restored, kept };
+}
+
+/**
+ * Of these deleted jobs, the timesheet invoices whose hours are now on
+ * another live invoice (the hours were invoiced again after the delete).
+ * Null when the check itself failed (restore nothing rather than guess).
+ */
+async function rebilledJobs(
+  db: Db,
+  userId: string,
+  quoteIds: readonly string[],
+  invoices: ReadonlyArray<{ id: string; quoteId: string }>,
+): Promise<Set<string> | null> {
+  const entriesOf = new Map<string, string[]>();
+  for (const part of chunks(quoteIds)) {
+    const res = await db.from("quotes").select("id, timesheet:quote_data->timesheet").eq("user_id", userId).in("id", part);
+    if (res.error) {
+      report(res.error, "actions/restoreJobs:read-timesheet");
+      return null;
+    }
+    for (const row of rowsOf(res.data)) {
+      const ids = (row.timesheet as { entry_ids?: unknown } | null)?.entry_ids;
+      if (Array.isArray(ids) && ids.length > 0) entriesOf.set(String(row.id), ids.map(String));
+    }
+  }
+  const blocked = new Set<string>();
+  if (entriesOf.size === 0) return blocked;
+
+  const ownInvoices = new Map<string, Set<string>>();
+  for (const invoice of invoices) {
+    const set = ownInvoices.get(invoice.quoteId) ?? new Set<string>();
+    set.add(invoice.id);
+    ownInvoices.set(invoice.quoteId, set);
+  }
+  // Where each billed entry's hours are now.
+  const allEntries = [...new Set([...entriesOf.values()].flat())];
+  const nowOn = new Map<string, string | null>();
+  for (const part of chunks(allEntries)) {
+    const res = await db.from("time_entries").select("id, invoice_id").in("id", part);
+    if (res.error) {
+      report(res.error, "actions/restoreJobs:read-entries");
+      return null;
+    }
+    for (const row of rowsOf(res.data)) nowOn.set(String(row.id), row.invoice_id == null ? null : String(row.invoice_id));
+  }
+  const elsewhere = new Map<string, Set<string>>();
+  for (const [quoteId, entryIds] of entriesOf) {
+    const own = ownInvoices.get(quoteId) ?? new Set<string>();
+    const others = new Set(entryIds.map((id) => nowOn.get(id)).filter((inv): inv is string => Boolean(inv) && !own.has(inv as string)));
+    if (others.size > 0) elsewhere.set(quoteId, others);
+  }
+  if (elsewhere.size === 0) return blocked;
+  // Only a live invoice (not deleted, not cancelled) bills them.
+  const live = new Set<string>();
+  const otherIds = [...new Set([...elsewhere.values()].flatMap((s) => [...s]))];
+  for (const part of chunks(otherIds)) {
+    const res = await db.from("invoices").select("id, status, deleted_at").in("id", part);
+    if (res.error) {
+      report(res.error, "actions/restoreJobs:read-other-invoices");
+      return null;
+    }
+    for (const row of rowsOf(res.data)) if (row.deleted_at == null && row.status !== "cancelled") live.add(String(row.id));
+  }
+  for (const [quoteId, others] of elsewhere) if ([...others].some((id) => live.has(id))) blocked.add(quoteId);
+  return blocked;
 }

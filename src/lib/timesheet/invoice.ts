@@ -133,6 +133,7 @@ export function buildTimesheetInvoice(input: TimesheetInvoiceInput): TimesheetIn
     tax_rate: input.taxRate,
     terms: `Payment due within ${DEFAULT_INVOICE_TERM_DAYS} days.`,
     notes,
+    timesheet: { entry_ids: input.entries.map((e) => e.id) },
   };
   return { ok: true, quoteData, hours, km: Math.round(travelKm * 10) / 10, entryIds: input.entries.map((e) => e.id) };
 }

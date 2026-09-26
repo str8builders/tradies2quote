@@ -10,7 +10,7 @@ import { BetaFeedbackForm } from "./_components/BetaFeedbackForm";
 import { PRE_SEND_CHECKS } from "./_lib/checks";
 import { FeedbackBody } from "./_newlook/FeedbackBody";
 
-export const metadata: Metadata = { title: "Before you send" };
+export const metadata: Metadata = { title: "Send feedback" };
 export const dynamic = "force-dynamic";
 
 /**

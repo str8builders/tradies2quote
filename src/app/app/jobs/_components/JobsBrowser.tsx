@@ -86,8 +86,10 @@ async function attempt(action: () => Promise<JobsActionResult>): Promise<JobsAct
   }
 }
 
-function restoredMessage(count: number): string {
-  return count === 0 ? "Nothing to restore. They're already back." : `${countOf(count, "job")} restored`;
+function restoredMessage(count: number, kept = 0): string {
+  const why = kept > 0 ? `${countOf(kept, "job")} stayed deleted: its hours are on a newer invoice.` : "";
+  if (count === 0) return why || "Nothing to restore. They're already back.";
+  return why ? `${countOf(count, "job")} restored. ${why}` : `${countOf(count, "job")} restored`;
 }
 
 /**
@@ -446,7 +448,7 @@ export function JobsBrowser({ rows, deleted }: { rows: JobRow[]; deleted?: Delet
     setBusy(true);
     const result = await attempt(() => restoreJobs([...ids]));
     setBusy(false);
-    if (result.ok) say({ tone: "ok", message: restoredMessage(result.count) });
+    if (result.ok) say({ tone: "ok", message: restoredMessage(result.count, result.kept) });
     else say({ tone: "bad", message: result.error, undo: ids });
   };
   /** Restore one row (its own button) or the ticked ones (the select bar). */
@@ -466,7 +468,7 @@ export function JobsBrowser({ rows, deleted }: { rows: JobRow[]; deleted?: Delet
       return;
     }
     stopSelecting();
-    say({ tone: "ok", message: restoredMessage(result.count) });
+    say({ tone: "ok", message: restoredMessage(result.count, result.kept) });
   };
 
   const summary = selecting
