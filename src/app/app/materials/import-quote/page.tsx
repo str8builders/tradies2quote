@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
 import { createClient } from "@/lib/supabase/server";
+import { hasAiConsent } from "@/lib/ai-consent";
+import { isNativeShellRequest } from "@/lib/native-shell";
 import { NZ_DEFAULTS, resolveTaxLabel, resolveTaxRate } from "@/lib/quote-defaults";
 import { AppHeader } from "../../_components/AppHeader";
 import { QuoteImportClient } from "./_components/QuoteImportClient";
@@ -18,11 +20,17 @@ export default async function ImportQuotePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("currency, tax_rate, tax_label, country")
-    .eq("id", user.id)
-    .maybeSingle();
+  const [{ data: profile }, nativeShell] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("currency, tax_rate, tax_label, country")
+      .eq("id", user.id)
+      .maybeSingle(),
+    isNativeShellRequest(),
+  ]);
+  // App Store 5.1.2(i): in the iPhone app the scanner asks for AI consent
+  // before the first read (the route enforces it regardless). Web: never.
+  const needsAiConsent = nativeShell && !(await hasAiConsent(supabase, user.id));
   const currency = profile?.currency ?? NZ_DEFAULTS.currency;
   // The tradie's own tax label and rate (a UK profile is VAT 20 %, never
   // NZ's "GST" 15 %). Stored as a percentage; the client works in fractions.
@@ -49,8 +57,8 @@ export default async function ImportQuotePage() {
           </h1>
           <p className="mt-3 text-sm text-ink-300 sm:text-base">
             Snap a photo of a quote or invoice from ITM, PlaceMakers, Mitre 10
-            or similar, or pick photos already on your phone — every page of a
-            long quote in one go. We&apos;ll read the line items so you can check
+            or similar, or pick photos or a PDF already on your phone — every page
+            of a long quote in one go. We&apos;ll read the line items so you can check
             them, then turn them straight into a quote — same numbers — or add the
             prices to your library.
           </p>
@@ -61,7 +69,7 @@ export default async function ImportQuotePage() {
           </p>
         </div>
 
-        <QuoteImportClient currency={currency} taxRate={taxRate} taxLabel={taxLabel} />
+        <QuoteImportClient currency={currency} taxRate={taxRate} taxLabel={taxLabel} needsAiConsent={needsAiConsent} />
       </main>
     </div>
   );

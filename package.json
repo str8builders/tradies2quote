@@ -10,6 +10,7 @@
     "test": "vitest run",
     "eval:quotes": "RUN_QUOTE_EVAL=1 vitest run src/eval/quote-eval.test.ts",
     "eval:scan": "RUN_SCAN_EVAL=1 vitest run src/eval/scan-eval.test.ts",
+    "eval:supplier": "RUN_SUPPLIER_EVAL=1 vitest run src/eval/supplier-quote-eval.test.ts",
     "eval:plans": "RUN_PLAN_EVAL=1 vitest run src/eval/plan-reader-eval.test.ts",
     "eval:csi": "RUN_CSI_EVAL=1 vitest run src/eval/csi-mapper-eval.test.ts",
     "eval:quote-agent": "RUN_QUOTE_AGENT_EVAL=1 vitest run src/eval/quote-agent-eval.test.ts",

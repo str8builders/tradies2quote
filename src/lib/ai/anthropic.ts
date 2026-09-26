@@ -31,6 +31,33 @@ export type AnthropicImageBlock = {
   cache_control?: AnthropicCacheControl;
 };
 
+/**
+ * A PDF sent whole (quotes, invoices, price lists): the model reads its text
+ * and sees each page. Base64 with no line breaks; the API takes up to 32 MB
+ * per request. No beta header is needed.
+ */
+export type AnthropicDocumentBlock = {
+  type: "document";
+  source: { type: "base64"; media_type: "application/pdf"; data: string };
+  cache_control?: AnthropicCacheControl;
+};
+
+/** A PDF document block from raw bytes (or base64 already made). */
+export function pdfDocumentBlock(pdf: Uint8Array | string): AnthropicDocumentBlock {
+  const data =
+    typeof pdf === "string" ? pdf.replace(/\s+/g, "") : bytesToBase64(pdf);
+  return { type: "document", source: { type: "base64", media_type: "application/pdf", data } };
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  if (typeof Buffer !== "undefined") return Buffer.from(bytes).toString("base64");
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(binary);
+}
+
 /** Mark a block as the end of a cacheable prefix (5-minute TTL). */
 export const EPHEMERAL_CACHE: AnthropicCacheControl = { type: "ephemeral" };
 

@@ -224,7 +224,7 @@ describe("parseMaterialsCsvWithPreset", () => {
     expect(result.valid).toHaveLength(2);
     expect(result.invalid).toHaveLength(0);
     expect(result.valid[0].supplier).toBe("Mitre 10");
-    expect(result.valid[0].notes).toBe("SKU: MIT-90H32-2400");
+    expect(result.valid[0].sku).toBe("MIT-90H32-2400");
     expect(result.valid[0].name).toBe("90x45 H3.2 pine framing 2.4m");
     expect(result.valid[0].unit).toBe("LM");
     expect(result.valid[0].default_unit_price).toBe(8.75);
@@ -239,7 +239,7 @@ describe("parseMaterialsCsvWithPreset", () => {
     expect(result.valid).toHaveLength(1);
     expect(result.invalid).toHaveLength(0);
     expect(result.valid[0].supplier).toBe("Bunnings");
-    expect(result.valid[0].notes).toBe("SKU: BUN-PLY-CD17");
+    expect(result.valid[0].sku).toBe("BUN-PLY-CD17");
     expect(result.valid[0].default_unit_price).toBe(89.95);
   });
 

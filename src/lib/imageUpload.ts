@@ -129,3 +129,41 @@ export function sniffPreparedImageMime(bytes: Uint8Array): string | null {
   }
   return null;
 }
+
+/** Supplier PDFs (quotes, invoices, price lists) go to the reader whole. */
+export const MAX_PDF_UPLOAD_BYTES = 10 * 1024 * 1024;
+export const MAX_PDF_PAGES = 20;
+
+/**
+ * The "choose a file" picker for supplier documents: photos and PDFs, so an
+ * iPhone offers the Files app as well as Photos. (The camera input stays
+ * images only.)
+ */
+export const SCAN_DOC_ACCEPT = `image/*,.heic,.heif,application/pdf,.pdf`;
+
+/** A PDF by its type or name (octet-stream uploads from Files carry only the name). */
+export function isPdfFile(file: Pick<File, "name" | "type">): boolean {
+  const type = normaliseImageMime(file.type);
+  if (type === "application/pdf") return true;
+  if (type && !GENERIC_MIME.has(type)) return false;
+  return extensionFromName(file.name) === "pdf";
+}
+
+/** "%PDF-" in the first kilobyte (some writers put a few bytes before it). */
+export function sniffPdf(bytes: Uint8Array): boolean {
+  const head = bytes.subarray(0, Math.min(bytes.length, 1024));
+  for (let i = 0; i + 4 < head.length; i++) {
+    if (head[i] === 0x25 && head[i + 1] === 0x50 && head[i + 2] === 0x44 && head[i + 3] === 0x46 && head[i + 4] === 0x2d) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function pdfUploadSizeError(file: Pick<File, "size">): string | null {
+  if (file.size === 0) return "That file is empty.";
+  if (file.size > MAX_PDF_UPLOAD_BYTES) {
+    return `PDF is ${(file.size / 1024 / 1024).toFixed(1)} MB. Send PDFs up to ${MAX_PDF_UPLOAD_BYTES / 1024 / 1024} MB — split a bigger one into parts.`;
+  }
+  return null;
+}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Camera, CheckCircle, Plus, Upload } from "@phosphor-icons/react/dist/ssr";
 import { createClient } from "@/lib/supabase/server";
+import { isNativeShellRequest } from "@/lib/native-shell";
 import { kitsEnabled } from "@/lib/kits";
 import { NZ_DEFAULTS } from "@/lib/quote-defaults";
 import type { LibraryMaterial } from "@/lib/quote-types";
@@ -51,7 +52,7 @@ export default async function MaterialsPage() {
             Save your common materials with prices. Quotes will use these instead of T2Q estimates.
           </p>
           <p className="mt-2 text-xs text-ink-400">
-            Add them one at a time, import a CSV, or scan supplier quotes from your camera or the photos on your phone.
+            Add them one at a time, import a price list (CSV, Excel, PDF or photos), or scan supplier quotes from your camera, photos or PDFs.
           </p>
         </div>
 
@@ -74,10 +75,7 @@ export default async function MaterialsPage() {
           <p className="mt-2 text-sm text-ink-300">
             Share or paste supplier products into your materials list.
           </p>
-          <p className="mt-1 text-xs text-ink-400">
-            Android PWA users can share supplier pages into Tradies2Quote.
-            iPhone users can paste the product URL.
-          </p>
+          <ShareIntoAppNote />
           <div className="mt-4">
             <Link
               href="/app/materials/capture"
@@ -189,7 +187,7 @@ async function MaterialsBody({ userId }: { userId: string }) {
             className="t2q-btn-ghost-pro"
           >
             <Upload size={18} weight="bold" />
-            Import CSV
+            Import price list
           </Link>
           {/* Found → opens the item; new → saved to the library with its code. */}
           <ScanBarcodeButton mode="library" currency={currency} library={materials} />
@@ -206,6 +204,23 @@ async function MaterialsBody({ userId }: { userId: string }) {
 
       <MaterialsList materials={materials} currency={currency} />
     </>
+  );
+}
+
+/**
+ * How to get a supplier page in. The Android "share into the app" tip means
+ * nothing inside the iPhone app, so there it just says to paste the link.
+ * Its own server component so the page itself never reads request headers.
+ */
+async function ShareIntoAppNote() {
+  if (await isNativeShellRequest()) {
+    return <p className="mt-1 text-xs text-ink-400">Paste the product link from the supplier&apos;s website.</p>;
+  }
+  return (
+    <p className="mt-1 text-xs text-ink-400">
+      Android PWA users can share supplier pages into Tradies2Quote.
+      iPhone users can paste the product URL.
+    </p>
   );
 }
 

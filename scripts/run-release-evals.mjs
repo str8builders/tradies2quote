@@ -105,6 +105,14 @@ const SUITES = [
     optional: true,
   },
   {
+    id: "supplier",
+    title: "Supplier quotes read exactly (net prices, freight, GST, PDF)",
+    file: "src/eval/supplier-quote-eval.test.ts",
+    env: { RUN_SUPPLIER_EVAL: "1" },
+    min: 1,
+    needsModel: true,
+  },
+  {
     id: "plans",
     title: "Plan reader classifies + extracts",
     file: "src/eval/plan-reader-eval.test.ts",

@@ -48,6 +48,15 @@ export type ScanQuoteMeta = {
   subtotal?: number | null;
   gst?: number | null;
   total?: number | null;
+  /**
+   * Totals-block adjustments as scanned: an account discount (a positive
+   * amount off), freight / delivery, and any other adjustment. Reconciled
+   * into the expected total, and mirrored onto the quote as their own lines
+   * so it adds up to the supplier's total.
+   */
+  discount?: number | null;
+  freight?: number | null;
+  adjustments?: number | null;
   /** #2 — strict-extraction verdict from the scan route (provenance). */
   extractionStatus?: "ok" | "needs_review" | "blocked";
   extractionReasons?: string[];
@@ -128,6 +137,41 @@ function exGstSupplierSubtotal(
   return toExGst(meta.subtotal, true, taxRateFraction);
 }
 
+/** A usable totals-block amount (finite, non-zero), else null. */
+function amount(v: unknown): number | null {
+  const n = finite(v);
+  return n != null && n !== 0 ? round2(n) : null;
+}
+
+/**
+ * The totals-block adjustments as extra mirror lines (named plainly, one
+ * each, qty 1). They are not supplier product rows, so after mirroring they
+ * carry no `source_*` fields: the send gate's supplier-line checks leave them
+ * alone, like a line the tradie added.
+ */
+function adjustmentItems(meta: ScanQuoteMeta): ExtractedSupplierItem[] {
+  const out: ExtractedSupplierItem[] = [];
+  const add = (name: string, price: number | null) => {
+    if (price == null) return;
+    out.push({
+      name,
+      unit: "each",
+      price,
+      sku: null,
+      quantity: 1,
+      pieces: null,
+      source_line_total: price,
+      raw_text: null,
+      confidence: 1,
+    });
+  };
+  add("Freight", amount(meta.freight));
+  const discount = amount(meta.discount);
+  add("Account discount", discount == null ? null : -Math.abs(discount));
+  add("Other adjustment", amount(meta.adjustments));
+  return out;
+}
+
 export function buildScanQuote(
   lines: ScanQuoteLine[],
   meta: ScanQuoteMeta,
@@ -152,15 +196,28 @@ export function buildScanQuote(
     subtotal: meta.subtotal ?? null,
     gst: meta.gst ?? null,
     total: meta.total ?? null,
+    discount: amount(meta.discount),
+    freight: amount(meta.freight),
+    adjustments: amount(meta.adjustments),
     notes: [],
   };
   const validation = validateSupplierQuote(extraction, { taxRate: taxRateFraction });
 
-  const mirror = buildMirrorQuote(items, {
+  // Product lines first, then the totals-block adjustments, in one mirror so
+  // a GST-inclusive quote's cent rounding covers the whole printed total.
+  const mirror = buildMirrorQuote([...items, ...adjustmentItems(meta)], {
     gstInclusive: meta.gstInclusive ?? false,
     taxRate: taxRateFraction,
   });
   const lineItems = mirror.lines;
+  const productLines = lineItems.slice(0, items.length);
+  for (const line of lineItems.slice(items.length)) {
+    delete line.source_line_total;
+    delete line.source_description;
+    delete line.source_quantity;
+    delete line.source_unit;
+    delete line.source_unit_price;
+  }
   // markup 0 — a faithful mirror; total equals the supplier quote total.
   const totals = computeQuoteTotals(lineItems, {
     default_markup_pct: 0,
@@ -174,7 +231,7 @@ export function buildScanQuote(
 
   const supplier_source: SupplierSource = {
     supplier: supplierName,
-    subtotal: exGstSupplierSubtotal(meta, validation, lineItems, taxRateFraction),
+    subtotal: exGstSupplierSubtotal(meta, validation, productLines, taxRateFraction),
     gst: meta.gst ?? null,
     total: meta.total ?? null,
     // PHASE 2 — raw printed document totals, EXACTLY as scanned and never
@@ -184,9 +241,9 @@ export function buildScanQuote(
     source_subtotal: meta.subtotal ?? null,
     source_gst: meta.gst ?? null,
     source_total: meta.total ?? null,
-    source_discount: null,
-    source_freight: null,
-    source_adjustments: null,
+    source_discount: amount(meta.discount),
+    source_freight: amount(meta.freight),
+    source_adjustments: amount(meta.adjustments),
     // Deterministic reconciliation verdict (computed on the RAW extraction,
     // GST-aware), frozen onto the quote so the pre-send gate can hard-block
     // a critical mismatch.

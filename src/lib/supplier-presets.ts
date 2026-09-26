@@ -68,10 +68,12 @@ export interface SupplierPreset {
    * - `unit`               → required
    * - `supplier_url`       → optional, often missing
    * - `notes`              → optional
-   * - `code`               → optional; if present, the value is FOLDED
-   *                           into `notes` as `SKU: <value>` so the
-   *                           tradie can still find items by merchant
-   *                           code without needing a new table column.
+   * - `code`               → optional; the supplier's product code. The
+   *                           price-list import (./materials/priceList.ts)
+   *                           saves it to the item's code (`materials.sku`)
+   *                           and matches saved items on it first. (The
+   *                           older `remapCsvWithPreset` below still folds
+   *                           it into `notes`.)
    */
   candidates: Record<PresetFieldKey, ReadonlyArray<string>>;
 }
@@ -92,7 +94,7 @@ export const GENERIC_PRESET: SupplierPreset = {
   label: "Generic / our template",
   shortLabel: "Generic",
   hint:
-    "Use this when your CSV already has the columns name, unit, default_unit_price (and optional supplier / supplier_url / notes).",
+    "Any price list: we find the name, price, unit and code columns ourselves (Description, Nett, UOM, Code and the like).",
   defaultSupplier: null,
   portalUrl: null,
   candidates: {
@@ -110,7 +112,7 @@ const MITRE_10_TRADE: SupplierPreset = {
   label: "Mitre 10 Trade",
   shortLabel: "Mitre 10",
   hint:
-    "Export from your Mitre 10 Trade account. We map Description → name, Unit → unit, Trade Price → default_unit_price, Code/SKU → notes (as SKU).",
+    "Export from your Mitre 10 Trade account. We map Description → name, Unit → unit, Trade Price → price, Code/SKU → the item's code.",
   defaultSupplier: "Mitre 10",
   portalUrl: "https://www.mitre10.co.nz/trade",
   candidates: {
@@ -134,7 +136,7 @@ const BUNNINGS_POWERPASS: SupplierPreset = {
   label: "Bunnings PowerPass",
   shortLabel: "Bunnings",
   hint:
-    "Export from your Bunnings PowerPass account. We map Item Description → name, Unit of Measure → unit, Trade Price → default_unit_price, Item Code → notes (as SKU).",
+    "Export from your Bunnings PowerPass account. We map Item Description → name, Unit of Measure → unit, Trade Price → price, Item Code → the item's code.",
   defaultSupplier: "Bunnings",
   portalUrl: "https://www.bunnings.co.nz/trade",
   candidates: {
@@ -158,7 +160,7 @@ const ITM_TRADE: SupplierPreset = {
   label: "ITM Trade",
   shortLabel: "ITM",
   hint:
-    "Export from your ITM trade account. We map Description → name, Unit → unit, Trade Price (or Price) → default_unit_price, ITM Code → notes (as SKU).",
+    "Export from your ITM trade account. We map Description → name, Unit → unit, Trade Price (or Price) → price, ITM Code → the item's code.",
   defaultSupplier: "ITM",
   portalUrl: "https://www.itm.co.nz",
   candidates: {
@@ -176,7 +178,7 @@ const PLACEMAKERS_TRADE: SupplierPreset = {
   label: "PlaceMakers Trade",
   shortLabel: "PlaceMakers",
   hint:
-    "Export from your PlaceMakers trade account. We map Description → name, Unit → unit, Net Price (or Trade Price) → default_unit_price, Code → notes (as SKU).",
+    "Export from your PlaceMakers trade account. We map Description → name, Unit → unit, Net Price (or Trade Price) → price, Code → the item's code.",
   defaultSupplier: "PlaceMakers",
   portalUrl: "https://www.placemakers.co.nz",
   candidates: {

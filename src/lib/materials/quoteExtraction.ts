@@ -368,11 +368,33 @@ export function parseSupplierQuoteExtraction(raw: unknown): ParseResult {
       subtotal,
       gst,
       total,
+      ...totalsBlockAdjustments(obj),
       notes,
     },
     rowFailures,
     warnings,
   };
+}
+
+/**
+ * Freight, an account / trade discount and any other adjustment printed in
+ * the TOTALS block (not as product rows), as the validator expects them: the
+ * discount as a positive amount taken off ("-45.00" and "45.00" under "Less
+ * discount" are the same $45), freight and adjustments with their printed
+ * sign. Keys are left out when the quote prints none, so a plain quote reads
+ * exactly as before.
+ */
+export function totalsBlockAdjustments(
+  obj: Record<string, unknown>,
+): Pick<SupplierQuoteExtraction, "discount" | "freight" | "adjustments"> {
+  const out: Pick<SupplierQuoteExtraction, "discount" | "freight" | "adjustments"> = {};
+  const discount = toNumber(obj.discount);
+  const freight = toNumber(obj.freight);
+  const adjustments = toNumber(obj.adjustments);
+  if (discount != null && discount !== 0) out.discount = round2(Math.abs(discount));
+  if (freight != null && freight !== 0) out.freight = round2(freight);
+  if (adjustments != null && adjustments !== 0) out.adjustments = round2(adjustments);
+  return out;
 }
 
 /**
@@ -389,9 +411,12 @@ export function parseSupplierQuoteExtraction(raw: unknown): ParseResult {
 export function assessExtraction(
   value: SupplierQuoteExtraction,
   rowFailures: RowFailure[],
+  /** A price list prints no totals, so none are expected (default: a quote). */
+  opts: { expectTotals?: boolean } = {},
 ): { status: ExtractionStatus; reasons: string[] } {
   const items = value.items;
-  const noTotals = value.subtotal == null && value.total == null;
+  const expectTotals = opts.expectTotals !== false;
+  const noTotals = expectTotals && value.subtotal == null && value.total == null;
 
   if (items.length === 0) {
     return {
@@ -470,9 +495,10 @@ const EXTRACTION_STATUS_RANK: Record<ExtractionStatus, number> = {
  */
 export function chooseBestExtraction(
   attempts: ExtractionAttempt[],
+  opts: { expectTotals?: boolean } = {},
 ): ExtractionAttempt & { status: ExtractionStatus; reasons: string[] } {
   const scored = attempts.map((a) => {
-    const { status, reasons } = assessExtraction(a.value, a.rowFailures);
+    const { status, reasons } = assessExtraction(a.value, a.rowFailures, opts);
     return { ...a, status, reasons, score: reconciliationScore(a.value) };
   });
   scored.sort((x, y) => {

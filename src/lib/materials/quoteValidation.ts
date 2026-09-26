@@ -168,6 +168,17 @@ export function validateSupplierQuote(
     ? round2(baseNet)
     : round2(baseNet + (extraction.gst ?? recomputedGst));
 
+  // How the expected total was built, in the words the reasons use.
+  const totalFormula = [
+    "subtotal",
+    discount ? "− discount" : "",
+    freight ? "+ freight" : "",
+    adjustments ? "+ adjustments" : "",
+    "+ GST",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   const summary: ValidationCheck[] = [];
 
   // Subtotal check (structural — strong signal of a missed/extra line).
@@ -240,8 +251,8 @@ export function validateSupplierQuote(
       delta,
       severity: mismatch ? "error" : "ok",
       reason: mismatch
-        ? `Printed total (${extraction.total}) ≠ subtotal + GST (${recomputedTotal}).`
-        : "Total matches subtotal + GST.",
+        ? `Printed total (${extraction.total}) ≠ ${totalFormula} (${recomputedTotal}).`
+        : `Total matches ${totalFormula}.`,
     });
   }
 
