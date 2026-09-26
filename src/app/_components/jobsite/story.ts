@@ -89,7 +89,7 @@ export const ROOMS: readonly Room[] = [
   },
 ];
 
-export type FeatureId = "barcode" | "supplier" | "request" | "video" | "timesheet";
+export type FeatureId = "request" | "supplier" | "timesheet";
 
 export type Feature = {
   id: FeatureId;
@@ -103,11 +103,14 @@ export type Feature = {
 /**
  * "More in the app": features every new sign-up can use today, each played on
  * the phone (src/remotion/marketing/feature-screen.tsx). Checked against the
- * code on 27 Sep 2026: the barcode looks up the tradie's own price list only;
- * supplier quotes take photos (several pages) or a PDF and nothing is saved
- * until the tradie checks the lines; a QR request makes the client and a
- * filled-in draft and notifies the tradie; the quote video is the 15-second
- * video at the top of the client's quote link. The timesheet is in the new
+ * code on 27 Sep 2026: the QR code prints from Your QR code as a van sticker
+ * (one big, or four small) or a poster; whoever scans it fills in the
+ * request form (photos too, no account) and it makes the client and a
+ * filled-in draft and notifies the tradie. Supplier quotes take photos
+ * (several pages) or a PDF and nothing is saved until the tradie checks the
+ * lines. The barcode and the quote video were taken off the site on 27 Sep
+ * 2026 at the owner's request (the video is switched off in the app too;
+ * see lib/quote-video/flag.ts). The timesheet is in the new
  * look, which everyone on the web has had since 27 Sep 2026
  * (T2Q_NEW_LOOK_DEFAULT=on): Start work / Finish work, pinned to the job
  * when location's on, and "Invoice this week" at the labour rate. Travel km
@@ -117,11 +120,11 @@ export type Feature = {
  */
 export const FEATURES: readonly Feature[] = [
   {
-    id: "barcode",
-    word: "Barcode",
-    bold: "Scan it onto the quote.",
-    body: "Point your phone at a product’s barcode, or take a photo of it. The app finds it in your own prices and adds it to the quote at your price. New to you? Name and price it once and the barcode’s saved with it.",
-    screenAlt: "Scanning a box of stainless deck screws: found in your library at $45.00 a box and added to the quote",
+    id: "request",
+    word: "QR code",
+    bold: "Stick it on the van. The jobs come to you.",
+    body: "Print your QR code from the app as a sticker for the van or a poster for the site fence. Whoever scans it tells you about the job in their own words and can add photos, no app or account needed. You get a notification and a draft quote ready to check.",
+    screenAlt: "A phone camera scanning the QR sticker on the side of a van, the client’s request form, then the tradie’s phone: new request from Sam Taylor, draft ready to review",
   },
   {
     id: "supplier",
@@ -129,20 +132,6 @@ export const FEATURES: readonly Feature[] = [
     bold: "Photograph the supplier’s quote.",
     body: "Snap your supplier’s quote, a few pages if you need, or upload the PDF. The lines come off the paper into your prices or straight into a new quote, and you check every line first. Price lists import from CSV, Excel, PDF or a photo.",
     screenAlt: "A supplier’s quote photographed and read into three lines: decking boards, deck screws and joist hangers, $2,640.00",
-  },
-  {
-    id: "request",
-    word: "QR code",
-    bold: "Clients ask. The draft’s waiting.",
-    body: "Put your QR code on the van, the site fence or a flyer. Clients scan it and tell you what they need, no account needed. You get a notification and a draft quote ready to check. Print the poster from the app.",
-    screenAlt: "A client’s quote request from the QR code, then the tradie’s phone: new request from Sam Taylor, draft ready to review",
-  },
-  {
-    id: "video",
-    word: "Video",
-    bold: "A quote they’ll actually watch.",
-    body: "Turn a quote into a 15-second video: your logo, the job, the main items and the total, ending on tap to accept. It plays at the top of your client’s quote link.",
-    screenAlt: "The client’s quote link playing the 15-second quote video, ending on the $4,830.00 total and tap the link to accept",
   },
   {
     id: "timesheet",

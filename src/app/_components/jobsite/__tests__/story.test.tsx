@@ -69,8 +69,12 @@ describe("the job-site story is complete as plain HTML (search, screen readers, 
     }
     expect(text).toContain(T2QCAL_STOP.body);
     for (const item of T2QCAL_STOP.inside) expect(text).toContain(item);
-    // Barcodes are looked up in the tradie's own prices: no outside product database.
-    expect(text).toContain("finds it in your own prices");
+    // The QR code leads (in the barcode's old place): printed from the app for
+    // the van, as Your QR code does. The barcode and the quote video are gone
+    // from the site at the owner's request (the video is off in the app too).
+    expect(FEATURES[0].id).toBe("request");
+    expect(text).toContain("as a sticker for the van");
+    expect(text).not.toMatch(/barcode|quote video|15-second video/i);
     // The T2QCAL hand-off makes a draft (the tradie reviews it), with the working attached.
     expect(text).toContain("turns the result into a draft quote, with your working attached");
     // Features that are off, or only in the unreleased iPhone app (automatic

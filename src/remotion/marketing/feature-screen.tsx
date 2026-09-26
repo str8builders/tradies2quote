@@ -4,21 +4,22 @@
  * (the rooms use StepScreen the same way). Bare 390 × 844 screen at 2×, the
  * same example job as everything else:
  *
- *   barcode   the scan sheet over the quote: camera, library check, added
+ *   request   a client scans the QR sticker on the van, fills in the
+ *             request form, then the tradie's requests and the draft
  *   supplier  photograph a supplier's quote, read it, check the lines
- *   request   the client's QR request form, then the tradie's requests
- *   video     the client's quote link playing the real quote video
  *   timesheet finish work on site, the day's hours, invoice the week
+ *
+ * (The barcode and the quote video left the site on 27 Sep 2026: the owner
+ * swapped the barcode for the van QR code and took the video out.)
  */
 import type { ReactNode } from "react";
 import { AbsoluteFill, useCurrentFrame, type CalculateMetadataFunction } from "remotion";
 import { EXAMPLE } from "../demo-script";
-import { ADD_BUTTON_FROM_TOP, BARCODE_SHEET_TOP as TOP, BarcodeSheet, type BarcodeStage } from "../screens/BarcodeScreens";
-import { ClientVideoScreen } from "../screens/QuoteVideoScreen";
 import { SupplierCaptureScreen, SupplierScanScreen } from "../screens/SupplierScanScreen";
 import { FinishSheet, InvoiceWeekSheet, TimesheetPage } from "../screens/TimesheetScreens";
 import { Tap as TapMark } from "../screens/ui";
 import { PushBanner } from "../screens/SystemUI";
+import { VAN_SCAN_BEATS, VAN_SCAN_FRAMES, VanScanScreen } from "../screens/VanScanScreen";
 import { JobScreen } from "../screens/newlook/JobScreens";
 import { ClientRequestsScreen, PricesScreen } from "../screens/newlook/OtherScreens";
 import { eseg, seg } from "./anim";
@@ -27,7 +28,7 @@ import { Push } from "./Push";
 import { REQUEST_BEATS } from "./beats";
 import { storyShot } from "./story";
 
-export const FEATURE_IDS = ["barcode", "supplier", "request", "video", "timesheet"] as const;
+export const FEATURE_IDS = ["request", "supplier", "timesheet"] as const;
 export type FeatureId = (typeof FEATURE_IDS)[number];
 export type FeatureScreenProps = { feature: FeatureId };
 
@@ -35,14 +36,12 @@ const SCALE = 2;
 const FPS = 30;
 export const FEATURE_SCREEN = { width: SCREEN_W * SCALE, height: SCREEN_H * SCALE } as const;
 
-/** When the client taps play on the quote video (frames). */
-const VIDEO_TAP = 36;
-/** Frames each feature runs (30 fps); the video one plays the whole 15-second quote video. */
+/** Frames of the request story after the van scan: the form, the requests, the draft. */
+const REQUEST_FRAMES = 204;
+/** Frames each feature runs (30 fps). */
 export const FEATURE_FRAMES: Record<FeatureId, number> = {
-  barcode: 204,
+  request: VAN_SCAN_FRAMES + REQUEST_FRAMES,
   supplier: 204,
-  request: 204,
-  video: VIDEO_TAP + 450 + 18,
   timesheet: 255,
 };
 export const featureMetadata: CalculateMetadataFunction<FeatureScreenProps> = ({ props }) => ({
@@ -55,41 +54,6 @@ const pressAt = (p: number, a: number, b: number) => {
   const t = seg(p, a, b);
   return t > 0 && t < 1 ? Math.sin(Math.min(1, t / 0.6) * Math.PI) : 0;
 };
-
-function barcode(frame: number): ReactNode {
-  const p = frame / (FEATURE_FRAMES.barcode - 1);
-  const t = frame / FPS;
-  let stage: BarcodeStage = "camera";
-  if (p >= 0.5) stage = "checking";
-  if (p >= 0.58) stage = "found";
-  if (p >= 0.74) stage = "added";
-  // The sheet settles to each step's height, as the real one resizes to its content.
-  const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
-  const top =
-    p < 0.58
-      ? lerp(TOP.camera, TOP.checking, eseg(p, 0.5, 0.53))
-      : p < 0.74
-        ? lerp(TOP.checking, TOP.found, eseg(p, 0.58, 0.61))
-        : lerp(TOP.found, TOP.added, eseg(p, 0.74, 0.77));
-  // The job page scrolled to "Scan barcode", under "What's in the job".
-  const scanTap = tapAt(p, 0.01, 0.07, 195, 645);
-  return (
-    <>
-      <JobScreen stage="draft" scroll={120} scanPress={pressAt(p, 0.01, 0.07)} />
-      {scanTap ? <TapMark {...scanTap} /> : null}
-      <BarcodeSheet
-        enter={eseg(p, 0.07, 0.15)}
-        stage={stage}
-        top={top}
-        t={t}
-        scan={(t * 1.15) % 1}
-        locked={seg(p, 0.43, 0.49)}
-        press={pressAt(p, 0.66, 0.74)}
-        tap={tapAt(p, 0.66, 0.74, 195, TOP.found + ADD_BUTTON_FROM_TOP)}
-      />
-    </>
-  );
-}
 
 function supplier(frame: number): ReactNode {
   const p = frame / (FEATURE_FRAMES.supplier - 1);
@@ -116,11 +80,6 @@ function supplier(frame: number): ReactNode {
     </Screen>
   );
   return p < 0.5 ? <Push p={eseg(p, 0.08, 0.14)} from={prices} to={capture} /> : <Push p={eseg(p, 0.5, 0.57)} from={capture} to={check} />;
-}
-
-function video(frame: number): ReactNode {
-  const p = frame < VIDEO_TAP ? seg(frame, VIDEO_TAP - 18, VIDEO_TAP) : 0;
-  return <ClientVideoScreen startAt={VIDEO_TAP} tap={p > 0 && p < 1 ? { x: 195, y: 458, p } : null} />;
 }
 
 function timesheet(frame: number): ReactNode {
@@ -157,13 +116,20 @@ export function FeatureScreen({ feature }: FeatureScreenProps) {
   const frame = useCurrentFrame();
   let screen: ReactNode;
   if (feature === "request") {
-    // The client's request form (the public page, unchanged), then the
-    // tradie's "Client requests" in the new look, then the draft it made.
-    const p = Math.min(1, frame / 179);
+    // The client scans the sticker on the van, fills in the request form
+    // (the public page, unchanged), then the tradie's "Client requests" in
+    // the new look, then the draft it made.
+    const f = Math.max(0, frame - VAN_SCAN_FRAMES);
+    const p = Math.min(1, f / (REQUEST_FRAMES - 25));
     const T = REQUEST_BEATS;
-    const shot = storyShot("request", { p, frame, pace: "full" });
+    const shot = storyShot("request", { p, frame: f, pace: "full" });
     if (!shot) return null;
     const form = <Screen scale={SCALE}>{shot.a.screen}</Screen>;
+    const scan = (
+      <Screen scale={SCALE} background="#000">
+        <VanScanScreen frame={frame} />
+      </Screen>
+    );
     const banner = Math.min(eseg(p, T.banner[0], T.banner[1]), 1 - eseg(p, T.banner[2], T.banner[3]));
     const openTap = tapAt(p, T.open[0], T.open[1], 195, 462);
     const requests = (
@@ -179,11 +145,18 @@ export function FeatureScreen({ feature }: FeatureScreenProps) {
         <JobScreen stage="draft" />
       </Screen>
     );
-    screen = p < T.open[1] ? <Push p={eseg(p, T.swap[0], T.swap[1])} from={form} to={requests} /> : <Push p={eseg(p, T.open[1], 1)} from={requests} to={draft} />;
+    screen =
+      frame < VAN_SCAN_FRAMES ? (
+        <Push p={eseg(frame, VAN_SCAN_BEATS.push[0], VAN_SCAN_BEATS.push[1])} from={scan} to={form} />
+      ) : p < T.open[1] ? (
+        <Push p={eseg(p, T.swap[0], T.swap[1])} from={form} to={requests} />
+      ) : (
+        <Push p={eseg(p, T.open[1], 1)} from={requests} to={draft} />
+      );
   } else if (feature === "supplier") {
     screen = supplier(frame);
   } else {
-    screen = <Screen scale={SCALE}>{feature === "barcode" ? barcode(frame) : feature === "timesheet" ? timesheet(frame) : video(frame)}</Screen>;
+    screen = <Screen scale={SCALE}>{timesheet(frame)}</Screen>;
   }
   return (
     <AbsoluteFill style={{ background: "#0c0f0f" }}>

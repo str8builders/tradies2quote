@@ -14,7 +14,7 @@ import { COMING_SOON, EXAMPLE_LABEL, FEATURES, FILMED_ON, ROOMS, T2QCAL_STOP, ty
  * Invoice). Each room holds while you scroll, its walkthrough clip plays
  * once as you arrive, and the next room fades in over it as you step
  * forward. Invoice is the finished home. The walk carries on with "More in
- * the app" (barcode, supplier quotes, QR requests, the quote video) and
+ * the app" (the QR code on the van, supplier quotes, hours) and
  * T2QCAL, then a note on what's coming to the iPhone app.
  *
  * Beside the words each room has a phone slot. With 3D, a real phone floats

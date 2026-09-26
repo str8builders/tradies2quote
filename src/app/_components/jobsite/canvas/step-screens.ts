@@ -2,7 +2,7 @@ import { DataTexture, SRGBColorSpace, TextureLoader, VideoTexture, type Texture 
 
 /** The clip sizes rendered by scripts/render-marketing.mjs (targets "steps" and "features"). */
 
-/** A screen's clip name: a room (talk … invoice), a feature (barcode …) or t2qcal. */
+/** A screen's clip name: a room (talk … invoice), a feature (request, supplier, timesheet) or t2qcal. */
 export type ClipId = string;
 export type ClipWidth = 600 | 420;
 

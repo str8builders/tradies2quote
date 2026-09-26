@@ -103,7 +103,7 @@ const TARGETS = {
   // The "More in the app" tour on the phone (same sizes and folder as the steps).
   features: {
     composition: "FeatureScreen",
-    screens: { prop: "feature", ids: ["barcode", "supplier", "request", "video", "timesheet"] },
+    screens: { prop: "feature", ids: ["request", "supplier", "timesheet"] },
     dir: "public/jobsite/screens",
     web: { widths: [600, 420], mp4Crf: 26, gop: 60, stillWidth: 600 },
   },

@@ -30,10 +30,10 @@ function Root() {
       <Composition
         id="FeatureScreen"
         component={FeatureScreen}
-        durationInFrames={FEATURE_FRAMES.barcode}
+        durationInFrames={FEATURE_FRAMES.request}
         fps={VIDEO_FPS}
         {...FEATURE_SCREEN}
-        defaultProps={{ feature: "barcode" as const }}
+        defaultProps={{ feature: "request" as const }}
         calculateMetadata={featureMetadata}
       />
       {/* The real T2QCAL recording, then the draft it makes, for the 3D phone's T2QCAL stop. */}
