@@ -18,11 +18,17 @@ import { isNativeShellRequest } from "@/lib/native-shell";
  * cream/white tokens as the in-app surface, even though it's outside
  * the `[data-shell="app"]` boundary.
  */
-export const metadata: Metadata = {
-  title: "Help & FAQ — Tradies2Quote",
-  description:
-    "Answers to common questions about Tradies2Quote — the voice-first AI quoting app for tradies. Trial, billing, sending quotes, the materials library.",
-};
+// The description is in the HTML too, so the iPhone app's copy leaves out
+// "Trial, billing" like the page itself does (3.1.3(f)).
+export async function generateMetadata(): Promise<Metadata> {
+  const nativeShell = await isNativeShellRequest();
+  return {
+    title: "Help & FAQ — Tradies2Quote",
+    description: nativeShell
+      ? "Answers to common questions about Tradies2Quote — the voice-first AI quoting app for tradies. Sending quotes, the materials library."
+      : "Answers to common questions about Tradies2Quote — the voice-first AI quoting app for tradies. Trial, billing, sending quotes, the materials library.",
+  };
+}
 
 const SUPPORT_EMAIL = "support@tradies2quote.com";
 
@@ -329,12 +335,16 @@ export default async function HelpPage() {
             Back to the app
             <ArrowRight size={14} weight="bold" />
           </Link>
-          <Link
-            href="/"
-            className="text-ink-300 hover:text-white"
-          >
-            Tradies2Quote home →
-          </Link>
+          {/* Not in the iPhone app: the website's homepage carries its
+              trial offers (3.1.3(f)); "Back to the app" is the way out. */}
+          {nativeShell ? null : (
+            <Link
+              href="/"
+              className="text-ink-300 hover:text-white"
+            >
+              Tradies2Quote home →
+            </Link>
+          )}
         </div>
       </div>
     </div>

@@ -33,7 +33,7 @@ const config: CapacitorConfig = {
   },
   ios: {
     scheme: "Tradies2Quote",
-    contentInset: "automatic",
+    contentInset: "never",
     backgroundColor: "#0A0A0A",
     // 3.1.3(f) load-bearing: the SERVER detects this marker (see
     // src/lib/native-shell.ts) and never emits pricing/billing HTML to the

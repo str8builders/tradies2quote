@@ -3,6 +3,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCachedAuthUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { isNativeShellRequest } from "@/lib/native-shell";
+import { requestNoteForApp } from "@/lib/trial-ended";
 import { AppHeader } from "../_components/AppHeader";
 import { GenerateRequestButton } from "./_components/GenerateRequestButton";
 import { DismissRequestButton } from "./_components/DismissRequestButton";
@@ -28,6 +30,8 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
   if (!user) redirect("/login");
   const { show } = await searchParams;
   const showDismissed = show === "dismissed";
+  // A saved note can talk about the subscription; the iPhone app shows plain words (3.1.3(f)).
+  const inApp = await isNativeShellRequest();
 
   const supabase = await createClient();
   let query = supabase
@@ -117,7 +121,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                 </div>
                 <p className="mt-3 whitespace-pre-wrap text-sm text-ink-200">{r.description}</p>
                 {r.error_message ? (
-                  <p className="mt-2 text-xs text-hivis">{r.error_message}</p>
+                  <p className="mt-2 text-xs text-hivis">{requestNoteForApp(r.error_message, inApp)}</p>
                 ) : null}
                 <div className="mt-4 flex items-center justify-between">
                   <span className="text-xs text-ink-500">

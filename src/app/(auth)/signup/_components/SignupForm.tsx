@@ -30,9 +30,14 @@ import { signupAction } from "../actions";
 type Props = {
   error?: string;
   next?: string;
+  /**
+   * Inside the iOS app (isNativeShellRequest, on the server): "Create
+   * account", with no trial, price or "free" wording (App Store 3.1.3(f)).
+   */
+  native?: boolean;
 };
 
-export function SignupForm({ error, next }: Props) {
+export function SignupForm({ error, next, native = false }: Props) {
   const [show, setShow] = useState(false);
 
   return (
@@ -90,12 +95,14 @@ export function SignupForm({ error, next }: Props) {
 
       <Magnetic strength={0.18} className="w-full">
         <PendingSubmit data-testid="signup-submit" pendingLabel="Creating your account…">
-          Start 7-day trial <ArrowRight size={20} weight="bold" />
+          {native ? "Create account" : "Start 7-day trial"} <ArrowRight size={20} weight="bold" />
         </PendingSubmit>
       </Magnetic>
 
       <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-ink-500">
-        By signing up you agree to our terms · no card needed
+        {native
+          ? "By creating an account you agree to our terms and privacy policy"
+          : "By signing up you agree to our terms · no card needed"}
       </p>
 
       <div className="text-sm text-ink-400">

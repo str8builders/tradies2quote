@@ -8,6 +8,20 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { NZ_DEFAULTS, resolveTaxLabel, resolveTaxRate } from "@/lib/quote-defaults";
 import { preciseUnitPrice, unitPriceExGst } from "@/lib/materials/quoteExtraction";
+import { MAX_PRICE_LIST_ROWS } from "@/lib/materials/priceList";
+import {
+  chunks,
+  keepLater,
+  keepMoreReliable,
+  libraryPatch,
+  matchSavedItems,
+  mergeRepeatedNames,
+  type ImportMaterialsResult,
+  type ImportProblem,
+  type LibraryImportRow,
+  type MergedName,
+  type SavedItem,
+} from "@/lib/materials/libraryImport";
 import {
   buildScanQuote,
   type ScanQuoteLine as ScanQuoteLineInput,
@@ -196,56 +210,213 @@ export async function deleteMaterial(
 
 type ImportRow = {
   name: string;
-  unit: string;
+  /** Null = the file gave no unit: a new item is saved as "each", a saved one keeps its unit. */
+  unit: string | null;
   /** Null = the file gave no price (blank / POA). Never overwrites a price. */
   default_unit_price: number | null;
+  /** The supplier's product code: saved to the item's code, and matched on first. */
+  sku?: string | null;
   supplier: string | null;
   supplier_url: string | null;
   notes: string | null;
 };
 
+export type { ImportMaterialsResult };
+
 const textOrNull = (v: unknown): string | null =>
   typeof v === "string" && v.trim() ? v.trim() : null;
 
+/** Rows written per bulk request. */
+const WRITE_CHUNK = 500;
+
+type PendingInsert = { name: string; record: Record<string, unknown> };
+type PendingUpdate = { id: string; name: string; savedName: string; patch: Record<string, unknown> };
+
+function saveFailureReason(error: unknown): string {
+  return (error as { code?: string } | null)?.code === "23505"
+    ? "Already in your prices under that name"
+    : "Couldn't be saved — try again";
+}
+
+/** One bulk write; null when it errored or threw (the caller then goes row by row). */
+async function tryBulk(write: () => Promise<number>): Promise<number | null> {
+  try {
+    return await write();
+  } catch (e) {
+    console.error("materials bulk write failed; writing row by row", e);
+    return null;
+  }
+}
+
+async function tryOne(write: () => PromiseLike<{ error: unknown }>): Promise<unknown | null> {
+  try {
+    const { error } = await write();
+    return error ?? null;
+  } catch (e) {
+    return e;
+  }
+}
+
+/**
+ * Write imported rows in bulk with a safety net. New items go in 500 at a
+ * time; saved items are updated in bulk (an upsert on their id, grouped by
+ * the fields they change, carrying the saved name so it never changes). If
+ * a bulk write errors — or throws — that chunk is written row by row, so one
+ * bad line can't sink the rest, and each row that still fails is named.
+ */
+async function writeLibraryRows(
+  supabase: ServerClient,
+  userId: string,
+  inserts: PendingInsert[],
+  updates: PendingUpdate[],
+): Promise<{ inserted: number; updated: number; problems: ImportProblem[] }> {
+  let inserted = 0;
+  let updated = 0;
+  const problems: ImportProblem[] = [];
+
+  for (const part of chunks(inserts, WRITE_CHUNK)) {
+    const bulk = await tryBulk(async () => {
+      const { data, error } = await supabase
+        .from("materials")
+        .insert(part.map((p) => p.record))
+        .select("id");
+      if (error) throw error;
+      return data?.length ?? part.length;
+    });
+    if (bulk !== null) {
+      inserted += bulk;
+      continue;
+    }
+    for (const p of part) {
+      const error = await tryOne(() => supabase.from("materials").insert(p.record).select("id"));
+      if (error) problems.push({ name: p.name, reason: saveFailureReason(error) });
+      else inserted++;
+    }
+  }
+
+  const groups = new Map<string, PendingUpdate[]>();
+  for (const u of updates) {
+    const key = Object.keys(u.patch).sort().join("|");
+    groups.set(key, [...(groups.get(key) ?? []), u]);
+  }
+  for (const group of groups.values()) {
+    for (const part of chunks(group, WRITE_CHUNK)) {
+      const bulk = await tryBulk(async () => {
+        const { data, error } = await supabase
+          .from("materials")
+          .upsert(
+            part.map((u) => ({ id: u.id, user_id: userId, name: u.savedName, ...u.patch })),
+            { onConflict: "id" },
+          )
+          .select("id");
+        if (error) throw error;
+        return data?.length ?? part.length;
+      });
+      if (bulk !== null) {
+        updated += bulk;
+        continue;
+      }
+      for (const u of part) {
+        const error = await tryOne(() =>
+          supabase.from("materials").update(u.patch).eq("id", u.id).eq("user_id", userId),
+        );
+        if (error) problems.push({ name: u.name, reason: saveFailureReason(error) });
+        else updated++;
+      }
+    }
+  }
+  return { inserted, updated, problems };
+}
+
+/** The API returns at most this many rows per request. */
+const LIBRARY_PAGE = 1000;
+
+/**
+ * The tradie's saved items, as much as matching needs: all of them, a page
+ * at a time, so a big library (imported price lists run to thousands) is
+ * matched in full instead of creating clashing duplicates past row 1,000.
+ */
+async function loadSavedItems(
+  supabase: ServerClient,
+  userId: string,
+): Promise<SavedItem[] | null> {
+  const items: SavedItem[] = [];
+  for (let from = 0; ; from += LIBRARY_PAGE) {
+    const { data, error } = await supabase
+      .from("materials")
+      .select("id, name, sku, notes")
+      .eq("user_id", userId)
+      .order("id")
+      .range(from, from + LIBRARY_PAGE - 1);
+    if (error) {
+      console.error("materials import: reading the library failed", error);
+      return null;
+    }
+    const page = (data ?? []) as Array<Partial<SavedItem> & { id: string; name: string }>;
+    for (const m of page) items.push({ id: m.id, name: m.name, sku: m.sku ?? null, notes: m.notes ?? null });
+    if (page.length < LIBRARY_PAGE) return items;
+  }
+}
+
+/**
+ * Save a reviewed price list (CSV, Excel, PDF or photo) into the library.
+ * Names listed twice are saved once (the last row); saved items are matched
+ * by code first, then by name; blank cells never overwrite saved values and
+ * the tradie's own notes are never replaced. Up to 5,000 rows per import.
+ * Prices the AI read off a PDF or photo (`source: "scan"`) are marked as
+ * scanned estimates to confirm, as the supplier-quote scan marks its prices.
+ */
 export async function importMaterials(
   rows: ImportRow[],
-  options: { pricesIncludeGst?: boolean } = {},
-): Promise<{ inserted: number; updated: number; failed: number; error?: string }> {
+  options: { pricesIncludeGst?: boolean; source?: "file" | "scan" } = {},
+): Promise<ImportMaterialsResult> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const none = { inserted: 0, updated: 0, failed: 0, problems: [], merged: [], unchanged: 0 };
   if (!Array.isArray(rows) || rows.length === 0) {
-    return { inserted: 0, updated: 0, failed: 0, error: "No rows to import." };
+    return { ...none, error: "No rows to import." };
+  }
+  if (rows.length > MAX_PRICE_LIST_ROWS) {
+    return {
+      ...none,
+      error: `That's ${rows.length.toLocaleString("en-NZ")} rows. Import up to ${MAX_PRICE_LIST_ROWS.toLocaleString("en-NZ")} at a time: split the file and import the rest after.`,
+    };
   }
 
   // Defensive server-side validation — never trust the client's parse.
-  let failed = 0;
-  const clean: ImportRow[] = [];
+  const problems: ImportProblem[] = [];
+  const valid: LibraryImportRow[] = [];
   for (const r of rows) {
     const name = textOrNull(r?.name);
-    const unit = textOrNull(r?.unit);
     const price = r?.default_unit_price;
     const priceOk =
       price === null ||
       (typeof price === "number" && Number.isFinite(price) && price >= 0);
-    if (!name || !unit || !priceOk) {
-      failed++;
+    if (!name) {
+      problems.push({ name: "(no name)", reason: "No name" });
       continue;
     }
-    clean.push({
+    if (!priceOk) {
+      problems.push({ name, reason: "Price below zero or not a number" });
+      continue;
+    }
+    valid.push({
       name,
-      unit,
+      unit: textOrNull(r.unit),
       default_unit_price: price,
+      sku: textOrNull(r.sku),
       supplier: textOrNull(r.supplier),
       supplier_url: textOrNull(r.supplier_url),
       notes: textOrNull(r.notes),
     });
   }
-  if (clean.length === 0) {
-    return { inserted: 0, updated: 0, failed, error: "No valid rows to import." };
+  const badRows = problems.length;
+  if (valid.length === 0) {
+    return { ...none, failed: badRows, problems, error: "No valid rows to import." };
   }
 
   // Library prices are ex-GST: convert once when the file's prices include it.
@@ -255,96 +426,78 @@ export async function importMaterials(
   const stored = (p: number | null) =>
     p === null ? null : unitPriceExGst(p, options.pricesIncludeGst === true, taxFraction);
 
-  const { data: existing, error: selErr } = await supabase
-    .from("materials")
-    .select("id, name")
-    .eq("user_id", user.id);
+  const { rows: clean, merged } = mergeRepeatedNames(
+    valid.map((r) => ({ ...r, default_unit_price: stored(r.default_unit_price) })),
+    keepLater,
+  );
 
-  if (selErr) {
-    console.error("importMaterials select failed", selErr);
-    return {
-      inserted: 0,
-      updated: 0,
-      failed: rows.length,
-      error: "Could not read existing library.",
-    };
+  const saved = await loadSavedItems(supabase, user.id);
+  if (!saved) {
+    return { ...none, failed: rows.length, problems, error: "Could not read existing library." };
   }
 
-  const byName = new Map<string, string>();
-  for (const m of existing ?? []) {
-    byName.set(m.name.trim().toLowerCase(), m.id);
+  // How a new price is labelled: exact from a file, or an estimate to
+  // confirm when the AI read it off a PDF or photo.
+  const priceStamp =
+    options.source === "scan"
+      ? { is_ai_estimated: true, price_source: "supplier_import", price_confidence: "medium" }
+      : { is_ai_estimated: false };
+  const { inserts, updates, superseded } = matchSavedItems(clean, saved);
+  let unchanged = 0;
+  const pendingUpdates: PendingUpdate[] = [];
+  for (const { target, row } of updates) {
+    const patch = libraryPatch(row, target, priceStamp);
+    if (Object.keys(patch).length === 0) unchanged++;
+    else pendingUpdates.push({ id: target.id, name: row.name, savedName: target.name, patch });
   }
+  const written = await writeLibraryRows(
+    supabase,
+    user.id,
+    inserts.map((r) => ({
+      name: r.name,
+      record: {
+        user_id: user.id,
+        name: r.name,
+        unit: r.unit ?? "each",
+        default_unit_price: r.default_unit_price,
+        sku: r.sku,
+        supplier: r.supplier,
+        supplier_url: r.supplier_url,
+        notes: r.notes,
+        ...(r.default_unit_price === null ? { is_ai_estimated: false } : priceStamp),
+      },
+    })),
+    pendingUpdates,
+  );
 
-  const toInsert: ImportRow[] = [];
-  const toUpdate: Array<{ id: string; row: ImportRow }> = [];
-  for (const r of clean) {
-    const matchId = byName.get(r.name.toLowerCase());
-    if (matchId) toUpdate.push({ id: matchId, row: r });
-    else toInsert.push(r);
-  }
-
-  let inserted = 0;
-  let updated = 0;
-
-  if (toInsert.length > 0) {
-    const { data, error } = await supabase
-      .from("materials")
-      .insert(
-        toInsert.map((r) => ({
-          user_id: user.id,
-          name: r.name,
-          unit: r.unit,
-          default_unit_price: stored(r.default_unit_price),
-          supplier: r.supplier,
-          supplier_url: r.supplier_url,
-          notes: r.notes,
-          is_ai_estimated: false,
-        })),
-      )
-      .select("id");
-    if (error) {
-      console.error("importMaterials insert failed", error);
-      failed += toInsert.length;
-    } else {
-      inserted = data?.length ?? 0;
-    }
-  }
-
-  for (const u of toUpdate) {
-    // Only the fields this file actually carries — a re-import must never
-    // wipe the row's price, supplier, link or notes with blanks.
-    const patch: Record<string, unknown> = { unit: u.row.unit };
-    if (u.row.default_unit_price !== null) {
-      patch.default_unit_price = stored(u.row.default_unit_price);
-      patch.is_ai_estimated = false;
-    }
-    if (u.row.supplier) patch.supplier = u.row.supplier;
-    if (u.row.supplier_url) patch.supplier_url = u.row.supplier_url;
-    if (u.row.notes) patch.notes = u.row.notes;
-    const { error } = await supabase
-      .from("materials")
-      .update(patch)
-      .eq("id", u.id)
-      .eq("user_id", user.id);
-    if (error) {
-      failed++;
-    } else {
-      updated++;
-    }
-  }
-
+  console.log("[import-materials] saved", {
+    userId: user.id,
+    inserted: written.inserted,
+    updated: written.updated,
+    unchanged,
+    failed: badRows + written.problems.length,
+    merged: merged.length,
+  });
   revalidatePath("/app/materials");
-  return { inserted, updated, failed };
+  return {
+    inserted: written.inserted,
+    updated: written.updated,
+    failed: badRows + written.problems.length,
+    problems: [...problems, ...superseded, ...written.problems],
+    merged,
+    unchanged,
+  };
 }
 
 // ───────────────────────────────────────────────────────────────────────
 // Supplier-quote import (Wave 46).
 //
 // Sibling of importMaterials for rows the tradie reviewed off an AI-read
-// supplier quote photo. Same dedupe-by-name + bulk-insert / serial-update
-// shape, but the rows are marked is_ai_estimated + price_source so the
-// library makes clear these prices came from a scanned quote and should
-// be re-confirmed. The human has already reviewed every row in the UI.
+// supplier quote. Same matching (code first, then name) and bulk writes
+// with a row-by-row safety net, but the rows are marked is_ai_estimated +
+// price_source so the library makes clear these prices came from a scanned
+// quote and should be re-confirmed. The human has already reviewed every
+// row in the UI.
 // ───────────────────────────────────────────────────────────────────────
 
 export type SupplierQuoteRow = {
@@ -353,129 +506,121 @@ export type SupplierQuoteRow = {
   default_unit_price: number;
   sku: string | null;
   notes: string | null;
+  /** The scanner's confidence in the line (0..1): the clearer read wins a repeated name. */
+  confidence?: number;
+};
+
+export type SupplierImportResult = {
+  inserted: number;
+  updated: number;
+  failed: number;
+  /** Names that couldn't be saved (the done screen lists them). */
+  failedNames: string[];
+  /** Names on more than one line: saved once, with the clearest price. */
+  merged: MergedName[];
+  error?: string;
 };
 
 export async function importSupplierQuoteItems(
   rows: SupplierQuoteRow[],
   supplier: string | null,
-): Promise<{ inserted: number; updated: number; failed: number; error?: string }> {
+): Promise<SupplierImportResult> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const none = { inserted: 0, updated: 0, failed: 0, failedNames: [], merged: [] };
   if (!Array.isArray(rows) || rows.length === 0) {
-    return { inserted: 0, updated: 0, failed: 0, error: "No rows to import." };
+    return { ...none, error: "No rows to import." };
   }
   // Defensive server-side validation — the UI already enforces this, but
   // never trust the client. Drop rows with no name or no price above zero:
   // a library price is never overwritten with $0 or a discount.
-  const clean = rows
+  const supplierName =
+    typeof supplier === "string" && supplier.trim() ? supplier.trim() : null;
+  const valid: LibraryImportRow[] = rows
     .map((r) => ({
       name: typeof r.name === "string" ? r.name.trim() : "",
       unit: typeof r.unit === "string" && r.unit.trim() ? r.unit.trim() : "each",
       default_unit_price: preciseUnitPrice(Number(r.default_unit_price)),
       sku: typeof r.sku === "string" && r.sku.trim() ? r.sku.trim() : null,
+      supplier: supplierName,
+      supplier_url: null,
       notes: typeof r.notes === "string" && r.notes.trim() ? r.notes.trim() : null,
+      confidence: typeof r.confidence === "number" && Number.isFinite(r.confidence) ? r.confidence : undefined,
     }))
-    .filter((r) => r.name.length > 0 && r.default_unit_price > 0);
-  if (clean.length === 0) {
-    return { inserted: 0, updated: 0, failed: 0, error: "No valid rows to import." };
+    .filter((r) => r.name.length > 0 && (r.default_unit_price ?? 0) > 0);
+  if (valid.length === 0) {
+    return { ...none, error: "No valid rows to import." };
   }
 
-  const supplierName =
-    typeof supplier === "string" && supplier.trim() ? supplier.trim() : null;
+  // One name on two lines (a product delivered twice, or read twice): the
+  // library keeps one price — the clearest read — instead of both inserts
+  // tripping the one-name-per-item rule and failing together.
+  const { rows: clean, merged } = mergeRepeatedNames(valid, keepMoreReliable);
 
-  const { data: existing, error: selErr } = await supabase
-    .from("materials")
-    .select("id, name")
-    .eq("user_id", user.id);
-  if (selErr) {
-    console.error("importSupplierQuoteItems select failed", selErr);
+  const saved = await loadSavedItems(supabase, user.id);
+  if (!saved) {
     return {
-      inserted: 0,
-      updated: 0,
+      ...none,
       failed: clean.length,
+      failedNames: clean.map((r) => r.name),
+      merged,
       error: "Could not read existing library.",
     };
   }
 
-  const byName = new Map<string, string>();
-  for (const m of existing ?? []) {
-    byName.set(m.name.trim().toLowerCase(), m.id);
-  }
-
-  const toInsert: typeof clean = [];
-  const toUpdate: Array<{ id: string; row: (typeof clean)[number] }> = [];
-  for (const r of clean) {
-    const matchId = byName.get(r.name.toLowerCase());
-    if (matchId) toUpdate.push({ id: matchId, row: r });
-    else toInsert.push(r);
-  }
-
-  let inserted = 0;
-  let updated = 0;
-  let failed = 0;
-
-  if (toInsert.length > 0) {
-    const { data, error } = await supabase
-      .from("materials")
-      .insert(
-        toInsert.map((r) => ({
-          user_id: user.id,
-          name: r.name,
-          unit: r.unit,
-          default_unit_price: r.default_unit_price,
-          supplier: supplierName,
-          sku: r.sku,
-          notes: r.notes ?? "From scanned supplier quote — confirm price.",
-          is_ai_estimated: true,
-          price_source: "supplier_import",
-          price_confidence: "medium",
-          gst_included: false,
-        })),
-      )
-      .select("id");
-    if (error) {
-      console.error("importSupplierQuoteItems insert failed", error);
-      failed += toInsert.length;
-    } else {
-      inserted = data?.length ?? 0;
-    }
-  }
-
-  for (const u of toUpdate) {
-    // Only what the scan carried: keep the row's supplier, SKU and the
+  const scanned = {
+    is_ai_estimated: true,
+    price_source: "supplier_import",
+    price_confidence: "medium",
+    gst_included: false,
+  };
+  const { inserts, updates, superseded } = matchSavedItems(clean, saved);
+  const written = await writeLibraryRows(
+    supabase,
+    user.id,
+    inserts.map((r) => ({
+      name: r.name,
+      record: {
+        user_id: user.id,
+        name: r.name,
+        unit: r.unit ?? "each",
+        default_unit_price: r.default_unit_price,
+        supplier: supplierName,
+        sku: r.sku,
+        notes: r.notes ?? "From scanned supplier quote — confirm price.",
+        ...scanned,
+      },
+    })),
+    // Only what the scan carried: keep the item's supplier, code and the
     // tradie's own notes when the scan didn't read them.
-    const patch: Record<string, unknown> = {
-      unit: u.row.unit,
-      default_unit_price: u.row.default_unit_price,
-      is_ai_estimated: true,
-      price_source: "supplier_import",
-      price_confidence: "medium",
-      gst_included: false,
-    };
-    if (supplierName) patch.supplier = supplierName;
-    if (u.row.sku) patch.sku = u.row.sku;
-    if (u.row.notes) patch.notes = u.row.notes;
-    const { error } = await supabase
-      .from("materials")
-      .update(patch)
-      .eq("id", u.id)
-      .eq("user_id", user.id);
-    if (error) failed++;
-    else updated++;
-  }
+    updates.map(({ target, row }) => ({
+      id: target.id,
+      name: row.name,
+      savedName: target.name,
+      patch: libraryPatch(row, target, scanned),
+    })),
+  );
 
   console.log("[import-quote] saved", {
     userId: user.id,
-    inserted,
-    updated,
-    failed,
+    inserted: written.inserted,
+    updated: written.updated,
+    failed: written.problems.length,
+    merged: merged.length,
   });
   revalidatePath("/app/materials");
-  return { inserted, updated, failed };
+  return {
+    inserted: written.inserted,
+    updated: written.updated,
+    failed: written.problems.length,
+    failedNames: written.problems.map((p) => p.name),
+    // Two names with one supplier code land on the same saved item: one price is kept.
+    merged: [...merged, ...superseded.map((p) => ({ name: p.name, count: 2 }))],
+  };
 }
 
 // ───────────────────────────────────────────────────────────────────────

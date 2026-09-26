@@ -48,6 +48,8 @@ export interface WeatherImpactInput {
   observedAt?: string | null;
   source?: string | null;
   summary?: string | null;
+  /** Coarse condition right now (live fetches only), for an icon. */
+  condition?: WeatherDailyForecast["condition"] | null;
   rainProbabilityPct: number | null;
   precipitationMmPerHour: number | null;
   windSpeedKph: number | null;

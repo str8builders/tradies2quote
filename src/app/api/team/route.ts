@@ -6,6 +6,8 @@ import { sendTeamCode } from "@/lib/team-email";
 import { getTeamContext } from "@/lib/team";
 import { captureError } from "@/lib/observability";
 import { consumeFixedWindow } from "@/lib/rate-limit";
+import { isNativeShellRequest } from "@/lib/native-shell";
+import { teamMessageForApp } from "@/lib/team-copy";
 export const dynamic = "force-dynamic";
 export async function GET() {
   const db = await createClient(); const { data: { user } } = await db.auth.getUser();
@@ -40,7 +42,9 @@ export async function POST(request: NextRequest) {
   const data = { code_hash: input.action === "accept" ? createHash("sha256").update(`${token}:${user.id}:${input.code}`).digest("hex") : null, name: typeof input.name === "string" ? input.name.slice(0,100) : null, email: typeof input.email === "string" ? input.email.trim().toLowerCase() : null, id: input.id, user_id: input.user_id,
     token_hash: token ? createHash("sha256").update(token).digest("hex") : null };
   const result = await db.rpc("manage_team", { p_action: input.action, p_data: data });
-  if (result.error) return NextResponse.json({ error: result.error.message }, { status: 400 });
-  if (result.data?.error) return NextResponse.json({ error: result.data.error }, { status: 400 });
+  // The team rules name the paid plans in some refusals; the iPhone app gets plain words (3.1.3(f)).
+  const say = async (message: string) => ((await isNativeShellRequest()) ? teamMessageForApp(message) : message);
+  if (result.error) return NextResponse.json({ error: await say(result.error.message) }, { status: 400 });
+  if (result.data?.error) return NextResponse.json({ error: await say(String(result.data.error)) }, { status: 400 });
   return NextResponse.json({ ok: true, ...result.data, ...(input.action === "invite" ? { link: `${process.env.NEXT_PUBLIC_APP_URL || "https://tradies2quote.com"}/app/team?invite=${token}` } : {}) });
 }

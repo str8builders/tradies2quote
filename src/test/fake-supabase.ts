@@ -48,6 +48,7 @@ export function fakeSupabase(respond: (op: FakeOp) => FakeResult) {
       not: filter("not"),
       order: () => builder,
       limit: () => builder,
+      range: () => builder,
       single: () => finish("single"),
       maybeSingle: () => finish("maybeSingle"),
       then: (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) =>

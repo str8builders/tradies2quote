@@ -83,3 +83,8 @@ export function mapsLink(point: LatLng, label: string): string {
   const params = new URLSearchParams({ ll: `${point.lat.toFixed(6)},${point.lng.toFixed(6)}`, q: label });
   return `https://maps.apple.com/?${params}`;
 }
+
+/** A link that finds an address in Apple Maps, for a job with no point on the map yet. */
+export function addressMapsLink(address: string): string {
+  return `https://maps.apple.com/?${new URLSearchParams({ q: address.trim() })}`;
+}

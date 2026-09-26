@@ -36,6 +36,10 @@ export interface LegalConfig {
   lastUpdated: string;
   /** Human-readable version of `lastUpdated`. */
   lastUpdatedDisplay: string;
+  /** ISO date of the privacy policy's most recent revision (it changes more often than the terms). */
+  privacyLastUpdated: string;
+  /** Human-readable version of `privacyLastUpdated`. */
+  privacyLastUpdatedDisplay: string;
 }
 
 export const LEGAL: LegalConfig = {
@@ -51,4 +55,8 @@ export const LEGAL: LegalConfig = {
   privacyEmail: "privacy@tradies2quote.com",
   lastUpdated: "2026-07-18",
   lastUpdatedDisplay: "18 July 2026",
+  // Sydney hosting and the Location section (timesheet pins, travel,
+  // automatic clock-in, maps and weather).
+  privacyLastUpdated: "2026-09-26",
+  privacyLastUpdatedDisplay: "26 September 2026",
 };

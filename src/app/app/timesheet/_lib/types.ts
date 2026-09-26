@@ -22,6 +22,22 @@ export interface TimesheetEntry {
   pins: { start: string | null; end: string | null } | null;
   /** Kilometres travelled while clocked in (from the route), or null. */
   km: number | null;
+  /**
+   * The client's job site on the map (pinned on site, or found from the
+   * address), with the client's address; null when there's no site yet.
+   * Optional: hours built elsewhere (previews) leave it out.
+   */
+  site?: { lat: number; lng: number; address: string | null } | null;
+  /** The client's address, for hours at a client whose job isn't on the map yet. */
+  address?: string | null;
+  /** From clocking in and out: where you started and finished, when location was on. */
+  clockPoints?: { start: EntryPoint | null; end: EntryPoint | null } | null;
+}
+
+/** A spot on the map. */
+export interface EntryPoint {
+  lat: number;
+  lng: number;
 }
 
 export interface TimesheetClient {

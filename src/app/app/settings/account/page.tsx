@@ -105,7 +105,7 @@ export default async function AccountSettingsPage() {
         </form>
       </Card>
 
-      <DeleteAccountCard />
+      <DeleteAccountCard inApp={native} />
     </SettingsScreen>
   );
 }

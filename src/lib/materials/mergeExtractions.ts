@@ -10,8 +10,8 @@
  * Rules (page order is the order the photos were added):
  *   - supplier / quote number / currency: first non-empty value wins.
  *   - items: concatenated; row_failures re-indexed onto the merged list.
- *   - subtotal / gst / total: one page reporting them → that value; several
- *     pages reporting them → summed (the totals validator still reconciles
+ *   - subtotal / gst / total (and freight / discount / adjustments): one page
+ *     reporting them → that value; several pages reporting them → summed (the totals validator still reconciles
  *     the merged figures against the lines, so a "carried forward" running
  *     total is caught there and flagged for review rather than trusted).
  *   - gst_inclusive: true if any page says so, else false if any page says
@@ -47,6 +47,10 @@ export type ScanPage = {
   subtotal?: number | null;
   gst?: number | null;
   total?: number | null;
+  /** Totals-block adjustments as printed (discount as a positive amount off). */
+  discount?: number | null;
+  freight?: number | null;
+  adjustments?: number | null;
   notes: string[];
   extraction_status?: "ok" | "needs_review" | "blocked";
   extraction_reasons?: string[];
@@ -99,7 +103,12 @@ export function pageFingerprint(page: ScanPage): string | null {
   ]);
 }
 
-export function mergeExtractions(pages: ScanPage[]): ScanPage {
+export function mergeExtractions(
+  pages: ScanPage[],
+  /** Each page's photo number as the tradie added it (default 1, 2, 3…), so a
+   *  page that failed to read doesn't shift the numbers in the notes. */
+  photoNumbers?: number[],
+): ScanPage {
   if (pages.length === 0) throw new Error("No scan results to merge.");
   if (pages.length === 1) return pages[0];
 
@@ -107,7 +116,7 @@ export function mergeExtractions(pages: ScanPage[]): ScanPage {
   const entries: Entry[] = [];
   const duplicateNotes: string[] = [];
   pages.forEach((page, i) => {
-    const photo = i + 1;
+    const photo = photoNumbers?.[i] ?? i + 1;
     const fingerprint = pageFingerprint(page);
     const first = fingerprint ? firstPhotoByFingerprint.get(fingerprint) : undefined;
     if (first !== undefined) {
@@ -151,6 +160,7 @@ export function mergeExtractions(pages: ScanPage[]): ScanPage {
     subtotal: sumReported(kept.map((p) => p.subtotal)),
     gst: sumReported(kept.map((p) => p.gst)),
     total: sumReported(kept.map((p) => p.total)),
+    ...adjustmentsOf(kept),
     notes: prefixed(entries, true, (p) => p.notes),
     extraction_status: status,
     extraction_reasons: prefixed(entries, true, (p) => p.extraction_reasons),
@@ -158,6 +168,18 @@ export function mergeExtractions(pages: ScanPage[]): ScanPage {
     warnings: [...duplicateNotes, ...gstNotes, ...prefixed(entries, true, (p) => p.warnings)],
     attempts: kept.reduce((n, p) => n + (p.attempts ?? 1), 0),
   };
+}
+
+/** Freight / discount / adjustments across pages: summed, left out when none printed. */
+function adjustmentsOf(pages: ScanPage[]): Pick<ScanPage, "discount" | "freight" | "adjustments"> {
+  const out: Pick<ScanPage, "discount" | "freight" | "adjustments"> = {};
+  const discount = sumReported(pages.map((p) => p.discount));
+  const freight = sumReported(pages.map((p) => p.freight));
+  const adjustments = sumReported(pages.map((p) => p.adjustments));
+  if (discount != null) out.discount = discount;
+  if (freight != null) out.freight = freight;
+  if (adjustments != null) out.adjustments = adjustments;
+  return out;
 }
 
 /** Short human label for the chosen photo set. */

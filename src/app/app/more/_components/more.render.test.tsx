@@ -25,6 +25,8 @@ describe("More menu (data)", () => {
       ["Team", "/app/team"],
       ["Help", "/help"],
       ["Send feedback", "/app/beta"],
+      ["Privacy policy", "/privacy"],
+      ["Terms", "/terms"],
     ]);
     expect(owner).toBeNull();
   });
@@ -55,7 +57,15 @@ describe("More menu (data)", () => {
         ],
       ],
       ["Work", [["Clients", "/app/clients"], ["Calendar", "/app/calendar"], ["Team", "/app/team"]]],
-      ["Help", [["Help", "/help"], ["Send feedback", "/app/beta"]]],
+      [
+        "Help",
+        [
+          ["Help", "/help"],
+          ["Send feedback", "/app/beta"],
+          ["Privacy policy", "/privacy"],
+          ["Terms", "/terms"],
+        ],
+      ],
     ]);
     expect(JSON.stringify(accountMenuSections())).not.toContain("/t2qcal");
     expect(ownerMenu(false)).toBeNull();
@@ -88,6 +98,8 @@ describe("MoreView", () => {
       "/app/team",
       "/help",
       "/app/beta",
+      "/privacy",
+      "/terms",
     ]);
     expect(out.match(/min-h-16/g)?.length).toBeGreaterThanOrEqual(10);
   });

@@ -30,7 +30,9 @@ vi.mock("@/lib/supabase/server", () => ({
         };
       }
       return {
-        select: () => ({ eq: async () => ({ data: db.existing, error: null }) }),
+        select: () => ({
+          eq: () => ({ order: () => ({ range: async () => ({ data: db.existing, error: null }) }) }),
+        }),
         insert: (rows: Record<string, unknown> | Array<Record<string, unknown>>) => {
           const list = Array.isArray(rows) ? rows : [rows];
           db.inserts.push(...list);

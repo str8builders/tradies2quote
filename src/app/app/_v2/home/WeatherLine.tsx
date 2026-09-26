@@ -1,30 +1,10 @@
 import Link from "next/link";
-import type { Icon } from "@phosphor-icons/react";
-import {
-  CaretRight,
-  Cloud,
-  CloudFog,
-  CloudLightning,
-  CloudRain,
-  CloudSnow,
-  CloudSun,
-  Sun,
-} from "@phosphor-icons/react/dist/ssr";
+import { CaretRight, CloudSun } from "@phosphor-icons/react/dist/ssr";
 import { cx } from "@/components/ui/cx";
 import { ICON_CHIP, TAP, UI_TEXT } from "@/components/ui/styles";
 import { getWeekOutlook, type DayOutlook } from "@/lib/weather-impact/outlook";
 import { pickToday, weatherLine, type WeatherLineModel } from "../lib/weather-line";
-
-const CONDITION_ICON: Readonly<Record<DayOutlook["condition"], Icon>> = {
-  clear: Sun,
-  cloud: Cloud,
-  drizzle: CloudRain,
-  rain: CloudRain,
-  thunderstorm: CloudLightning,
-  fog: CloudFog,
-  snow: CloudSnow,
-  changing: CloudSun,
-};
+import { CONDITION_ICON } from "../shell/weather-icons";
 
 /**
  * The line itself: condition icon (tinted by the work call), words, and a

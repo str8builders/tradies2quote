@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { LEGAL } from "@/lib/legal";
 import { LegalSection } from "../_components/LegalSection";
+import { isNativeShellRequest } from "@/lib/native-shell";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
@@ -30,7 +31,18 @@ const SECTIONS = [
   { id: "contact", label: "Contact" },
 ];
 
-export default function TermsPage() {
+/**
+ * Withheld inside the iPhone app (decided on the server): the free trial and
+ * paid-plan sections (App Store 3.1.3(f): the app is free and never offers
+ * plans). They still apply, and still show, on the website, where plans are
+ * taken up. Section numbers follow what is shown.
+ */
+const HIDDEN_IN_APP: ReadonlySet<string> = new Set(["trial", "billing", "cancellation"]);
+
+export default async function TermsPage() {
+  const inApp = await isNativeShellRequest();
+  const sections = inApp ? SECTIONS.filter((s) => !HIDDEN_IN_APP.has(s.id)) : SECTIONS;
+  const num = (id: string) => String(sections.findIndex((s) => s.id === id) + 1).padStart(2, "0");
   return (
     <article className="bg-ink-900">
       <div className="max-w-3xl mx-auto px-6 md:px-12 py-16 md:py-24">
@@ -49,7 +61,7 @@ export default function TermsPage() {
           <p className="text-ink-100 leading-relaxed">
             Use {LEGAL.productName} to write quotes faster. Review every
             quote before you send it — AI helps but you are the qualified
-            tradie. Cancel any time. Don&apos;t use the service to break
+            tradie.{inApp ? "" : " Cancel any time."} Don&apos;t use the service to break
             the law. Standard stuff.
           </p>
         </div>
@@ -59,7 +71,7 @@ export default function TermsPage() {
             On this page
           </div>
           <ol className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm text-ink-300 list-decimal pl-5">
-            {SECTIONS.map((s) => (
+            {sections.map((s) => (
               <li key={s.id}>
                 <a href={`#${s.id}`} className="hover:text-brand">
                   {s.label}
@@ -69,7 +81,7 @@ export default function TermsPage() {
           </ol>
         </nav>
 
-        <LegalSection id="agreement" number="01" title="The agreement">
+        <LegalSection id="agreement" number={num("agreement")} title="The agreement">
           <p>
             These terms form a binding agreement between you and{" "}
             <strong>{LEGAL.companyName}</strong>
@@ -85,7 +97,7 @@ export default function TermsPage() {
           </p>
         </LegalSection>
 
-        <LegalSection id="the-service" number="02" title="The service">
+        <LegalSection id="the-service" number={num("the-service")} title="The service">
           <p>
             {LEGAL.productName} is a voice-first quoting and invoicing
             tool for tradespeople. You record a voice memo describing a
@@ -100,7 +112,7 @@ export default function TermsPage() {
           </p>
         </LegalSection>
 
-        <LegalSection id="your-account" number="03" title="Your account">
+        <LegalSection id="your-account" number={num("your-account")} title="Your account">
           <p>
             You are responsible for the security of your account. Keep
             your password private. Tell us straight away if you think
@@ -112,62 +124,66 @@ export default function TermsPage() {
           </p>
         </LegalSection>
 
-        <LegalSection id="trial" number="04" title="Free trial">
-          <p>
-            New accounts get a 7-day free trial. We do not ask for a
-            credit card up front to start your trial. When the trial ends,
-            you choose whether to subscribe — there is no automatic charge
-            without your explicit consent.
-          </p>
-        </LegalSection>
+        {inApp ? null : (
+          <>
+            <LegalSection id="trial" number={num("trial")} title="Free trial">
+              <p>
+                New accounts get a 7-day free trial. We do not ask for a
+                credit card up front to start your trial. When the trial ends,
+                you choose whether to subscribe — there is no automatic charge
+                without your explicit consent.
+              </p>
+            </LegalSection>
 
-        <LegalSection id="billing" number="05" title="Plans & billing">
-          <p>
-            Paid plans are billed monthly in advance. The price shown on
-            our pricing page is the price you pay, in New Zealand dollars
-            and inclusive of GST.
-          </p>
-          <p>
-            Subscriptions <strong>auto-renew</strong> at the start of each
-            billing period until you cancel. We send a receipt by email
-            after every successful payment. If a payment fails, we will
-            retry for up to 7 days and then pause your account.
-          </p>
-          <p>
-            We may change pricing from time to time. If we change the
-            price of your current plan, we will tell you by email at least
-            30 days before the new price applies. You can cancel before
-            the new price takes effect.
-          </p>
-        </LegalSection>
+            <LegalSection id="billing" number={num("billing")} title="Plans & billing">
+              <p>
+                Paid plans are billed monthly in advance. The price shown on
+                our pricing page is the price you pay, in New Zealand dollars
+                and inclusive of GST.
+              </p>
+              <p>
+                Subscriptions <strong>auto-renew</strong> at the start of each
+                billing period until you cancel. We send a receipt by email
+                after every successful payment. If a payment fails, we will
+                retry for up to 7 days and then pause your account.
+              </p>
+              <p>
+                We may change pricing from time to time. If we change the
+                price of your current plan, we will tell you by email at least
+                30 days before the new price applies. You can cancel before
+                the new price takes effect.
+              </p>
+            </LegalSection>
 
-        <LegalSection
-          id="cancellation"
-          number="06"
-          title="Cancellation & refunds"
-        >
-          <p>
-            You can cancel at any time by emailing{" "}
-            <a href={`mailto:${LEGAL.supportEmail}`}>
-              {LEGAL.supportEmail}
-            </a>{" "}
-            from the address on your account. Cancellation takes effect
-            at the end of your current billing period — you keep access
-            until then.
-          </p>
-          <p>
-            <strong>Refunds.</strong> If you are in the United Kingdom or
-            European Union, you have the statutory right to cancel within
-            14 days of your first paid charge and receive a full refund.
-            Outside that period, we do not offer pro-rata refunds for
-            partial months, but we will always consider individual
-            requests in good faith.
-          </p>
-        </LegalSection>
+            <LegalSection
+              id="cancellation"
+              number={num("cancellation")}
+              title="Cancellation & refunds"
+            >
+              <p>
+                You can cancel at any time by emailing{" "}
+                <a href={`mailto:${LEGAL.supportEmail}`}>
+                  {LEGAL.supportEmail}
+                </a>{" "}
+                from the address on your account. Cancellation takes effect
+                at the end of your current billing period — you keep access
+                until then.
+              </p>
+              <p>
+                <strong>Refunds.</strong> If you are in the United Kingdom or
+                European Union, you have the statutory right to cancel within
+                14 days of your first paid charge and receive a full refund.
+                Outside that period, we do not offer pro-rata refunds for
+                partial months, but we will always consider individual
+                requests in good faith.
+              </p>
+            </LegalSection>
+          </>
+        )}
 
         <LegalSection
           id="acceptable-use"
-          number="07"
+          number={num("acceptable-use")}
           title="Acceptable use"
         >
           <p>You agree not to:</p>
@@ -210,7 +226,7 @@ export default function TermsPage() {
           </p>
         </LegalSection>
 
-        <LegalSection id="your-content" number="08" title="Your content">
+        <LegalSection id="your-content" number={num("your-content")} title="Your content">
           <p>
             You own your content — your voice recordings, your transcripts,
             your quotes, your client list, your business branding. We
@@ -226,7 +242,7 @@ export default function TermsPage() {
 
         <LegalSection
           id="ai-output"
-          number="09"
+          number={num("ai-output")}
           title="AI-generated quotes"
         >
           <p>
@@ -253,7 +269,7 @@ export default function TermsPage() {
 
         <LegalSection
           id="our-ip"
-          number="10"
+          number={num("our-ip")}
           title="Our intellectual property"
         >
           <p>
@@ -266,21 +282,21 @@ export default function TermsPage() {
 
         <LegalSection
           id="availability"
-          number="11"
+          number={num("availability")}
           title="Service availability"
         >
           <p>
             We aim to keep {LEGAL.productName} available 24/7 but cannot
             guarantee uninterrupted access. Outages can happen because of
             maintenance, third-party provider failures, or events beyond
-            our reasonable control. We do not offer a formal uptime SLA
-            on current plans.
+            our reasonable control. We do not offer a formal uptime
+            SLA{inApp ? "." : " on current plans."}
           </p>
         </LegalSection>
 
         <LegalSection
           id="termination"
-          number="12"
+          number={num("termination")}
           title="Suspension & termination"
         >
           <p>
@@ -300,7 +316,7 @@ export default function TermsPage() {
           </p>
         </LegalSection>
 
-        <LegalSection id="disclaimer" number="13" title="Disclaimer">
+        <LegalSection id="disclaimer" number={num("disclaimer")} title="Disclaimer">
           <p>
             To the extent permitted by law, {LEGAL.productName} is
             provided <strong>&ldquo;as is&rdquo;</strong> and{" "}
@@ -319,7 +335,7 @@ export default function TermsPage() {
 
         <LegalSection
           id="liability"
-          number="14"
+          number={num("liability")}
           title="Limitation of liability"
         >
           <p>
@@ -341,7 +357,7 @@ export default function TermsPage() {
           </ul>
         </LegalSection>
 
-        <LegalSection id="indemnity" number="15" title="Indemnity">
+        <LegalSection id="indemnity" number={num("indemnity")} title="Indemnity">
           <p>
             You agree to indemnify {LEGAL.companyName} against any claim
             brought by a third party arising from your use of the service
@@ -350,7 +366,7 @@ export default function TermsPage() {
           </p>
         </LegalSection>
 
-        <LegalSection id="ios" number="16" title="If you use the iOS app">
+        <LegalSection id="ios" number={num("ios")} title="If you use the iOS app">
           <p>
             If you download {LEGAL.productName} from the Apple App Store,
             you also agree to Apple&apos;s Licensed Application End User
@@ -366,7 +382,7 @@ export default function TermsPage() {
           </p>
         </LegalSection>
 
-        <LegalSection id="law" number="17" title="Governing law">
+        <LegalSection id="law" number={num("law")} title="Governing law">
           <p>
             These terms are governed by the laws of New Zealand. You
             agree the New Zealand courts have exclusive jurisdiction over
@@ -377,7 +393,7 @@ export default function TermsPage() {
 
         <LegalSection
           id="changes"
-          number="18"
+          number={num("changes")}
           title="Changes to these terms"
         >
           <p>
@@ -389,7 +405,7 @@ export default function TermsPage() {
           </p>
         </LegalSection>
 
-        <LegalSection id="contact" number="19" title="Contact">
+        <LegalSection id="contact" number={num("contact")} title="Contact">
           <p>
             Questions about these terms?
           </p>

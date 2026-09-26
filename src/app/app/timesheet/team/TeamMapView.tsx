@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowSquareOut, MapPin, UserCircle } from "@phosphor-icons/react/dist/ssr";
 import { Card } from "@/components/ui/card";
 import { cx } from "@/components/ui/cx";
 import { EmptyState } from "@/components/ui/empty-state";
-import { fitView, mapsLink, placeOnView, tilesFor } from "@/lib/location/tiles";
+import { mapsLink } from "@/lib/location/tiles";
+import { StaticSiteMap } from "../../_v2/ui/StaticSiteMap";
 import type { TeamMember } from "../_lib/team-map";
 
 const REFRESH_MS = 60_000;
@@ -28,17 +29,7 @@ export function ago(iso: string, now: number): string {
  */
 export function TeamMapView({ members }: { members: TeamMember[] }) {
   const router = useRouter();
-  const box = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(360);
   const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(Math.round(entry.contentRect.width)));
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
 
   useEffect(() => {
     const tick = () => {
@@ -50,8 +41,7 @@ export function TeamMapView({ members }: { members: TeamMember[] }) {
     return () => window.clearInterval(timer);
   }, [router]);
 
-  const placed = members.filter((m) => m.at);
-  const view = fitView(placed.map((m) => m.at!), width, MAP_HEIGHT);
+  const pins = members.flatMap((m) => (m.at ? [{ key: m.userId, lat: m.at.lat, lng: m.at.lng, label: m.name }] : []));
 
   if (members.length === 0) {
     return (
@@ -63,57 +53,12 @@ export function TeamMapView({ members }: { members: TeamMember[] }) {
 
   return (
     <div className="space-y-4">
-      <div
-        ref={box}
-        data-testid="team-map"
-        className="relative w-full overflow-hidden rounded-ui-lg border border-ui-line bg-ui-surface-2"
-        style={{ height: MAP_HEIGHT }}
-      >
-        {view ? (
-          <>
-            {tilesFor(view).map((tile) => (
-              // eslint-disable-next-line @next/next/no-img-element -- map tiles from OpenStreetMap, not optimisable
-              <img
-                key={tile.key}
-                src={tile.src}
-                alt=""
-                width={256}
-                height={256}
-                draggable={false}
-                className="absolute max-w-none select-none"
-                style={{ left: tile.left, top: tile.top }}
-              />
-            ))}
-            {placed.map((m) => {
-              const at = placeOnView(m.at!, view);
-              return (
-                <span
-                  key={m.userId}
-                  className="absolute flex -translate-x-1/2 -translate-y-full flex-col items-center"
-                  style={{ left: at.left, top: at.top }}
-                >
-                  <span className="rounded-full bg-ui-bg px-2 py-0.5 text-ui-xs font-semibold whitespace-nowrap text-ui-text shadow-ui-raised">
-                    {m.name}
-                  </span>
-                  <MapPin aria-hidden="true" weight="fill" className="text-[2rem] text-ui-brand-text" />
-                </span>
-              );
-            })}
-            <a
-              href="https://www.openstreetmap.org/copyright"
-              target="_blank"
-              rel="noreferrer"
-              className="absolute right-1 bottom-1 rounded bg-ui-bg px-1.5 text-ui-xs text-ui-muted"
-            >
-              {"\u00A9"} OpenStreetMap contributors
-            </a>
-          </>
-        ) : (
-          <p className="flex h-full items-center justify-center px-6 text-center text-ui-sm text-ui-muted">
-            No locations yet. People show on the map once they&apos;ve turned location on.
-          </p>
-        )}
-      </div>
+      <StaticSiteMap
+        points={pins}
+        height={MAP_HEIGHT}
+        testId="team-map"
+        empty="No locations yet. People show on the map once they've turned location on."
+      />
 
       <Card padding="none">
         <ul className="divide-y divide-ui-line">

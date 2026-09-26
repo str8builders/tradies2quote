@@ -101,6 +101,7 @@ export function normalizeOpenMeteo(data: OpenMeteoResponse): WeatherImpactInput 
     observedAt: current.time ?? null,
     source: "Open-Meteo",
     summary: weatherCodeSummary(current.weather_code),
+    condition: current.weather_code == null ? null : codeCondition(current.weather_code),
     rainProbabilityPct: valueAt(hourly.precipitation_probability, currentHourIndex),
     precipitationMmPerHour: roundNumber(precipitation, 1),
     windSpeedKph: current.wind_speed_10m ?? null,

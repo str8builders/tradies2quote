@@ -47,7 +47,7 @@ export default async function LoginPage({
           <p className="text-ink-300 mt-3">Pick up where you left off.</p>
 
           <div className="mt-8">
-            <LoginForm next={next} error={error} message={message} />
+            <LoginForm next={next} error={error} message={message} native={native} />
           </div>
         </>
       }

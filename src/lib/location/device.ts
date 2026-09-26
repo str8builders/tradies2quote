@@ -1,8 +1,8 @@
 /**
  * Location on this device (browser code). Inside the Tradies2Quote iPhone
- * app it talks to the app's own T2QLocation module (background route while
- * clocked in, job-site arrival alerts, notifications); anywhere else it uses
- * the browser's location, and only while the page is open.
+ * app it talks to the app's own T2QLocation module (the route while clocked
+ * in, job-site arrival alerts, notifications); anywhere else it uses the
+ * browser's location, and only while the page is open.
  */
 
 import { Capacitor, registerPlugin, type PluginListenerHandle } from "@capacitor/core";
@@ -42,6 +42,9 @@ export interface NativeConfig {
 interface T2QLocationPlugin {
   currentPosition(): Promise<{ lat: number; lng: number; acc: number; t: number }>;
   permission(): Promise<{ status: LocationPermission }>;
+  /** "While using the app": pins, travel while it's open, weather. */
+  requestWhenInUse(): Promise<{ status: LocationPermission }>;
+  /** "Always": only for automatic clock-in (asks "while using" first when needed). */
   requestAlways(): Promise<{ status: LocationPermission }>;
   status(): Promise<{ hasToken: boolean; tracking: boolean; watching: number }>;
   configure(options: NativeConfig): Promise<void>;

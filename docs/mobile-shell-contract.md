@@ -140,7 +140,7 @@ the switch off nothing here changes. Same four owners, same rules:
 |---|---|
 | Page paint | the canvas: `studio-app t2q-app-canvas … bg-ui-bg!` (solid ui-bg, follows outdoor mode), normal flow, `min-h-dvh`, `overflow-x-clip` |
 | Scrolling | the document; `<AppContent>` is the `.t2q-app-scroll` wrapper (not a scroller) |
-| Top safe area | `<AppContent>` pads it on phones (as before); a fixed `bg-ui-bg` strip paints it so nothing scrolls visibly under the status bar. New-look top bars pass `safeArea={false}` and the kit TopBar then sticks at `top: env(safe-area-inset-top)` |
+| Top safe area | `<AppContent>` pads it on phones (as before); a fixed strip paints it so nothing scrolls visibly under the status bar. In the iPhone app (Capacitor `contentInset: "never"`, the page draws under the clock) the strip is `bg-ui-bg`, the page's own colour, so there's no band, and `<StatusBarTint>` sets the clock light or dark to match outdoor mode. In a home-screen web app it stays `bg-ui-chrome`, because iOS always draws that clock white. New-look top bars pass `safeArea={false}` and the kit TopBar then sticks at `top: env(safe-area-inset-top)` |
 | Bottom safe area | the docked tab bar (`<AppNav>`, fixed `bottom: 0`, own `bg-ui-bg`, `padding-bottom: env(safe-area-inset-bottom)`); on focused routes the screen's own `BottomActionBar` (kit default `safeArea`) |
 
 Geometry: tab bar 4rem + inset (the raised New tile rises 1rem). The

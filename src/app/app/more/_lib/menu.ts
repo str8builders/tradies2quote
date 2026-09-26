@@ -20,6 +20,8 @@ export type MoreItemId =
   | "team"
   | "help"
   | "feedback"
+  | "privacy"
+  | "terms"
   | "agents"
   | "debug"
   | "monitor"
@@ -74,6 +76,9 @@ const TOOLS: MoreGroup = {
     { id: "team", label: "Team", caption: "People and shared clients", href: "/app/team" },
     { id: "help", label: "Help", caption: "Questions, answers and support", href: "/help" },
     { id: "feedback", label: "Send feedback", caption: "Tell us what to fix", href: "/app/beta" },
+    // Easy to find in the app, not only on the website (App Store 5.1.1(i)).
+    { id: "privacy", label: "Privacy policy", caption: "What we keep and why", href: "/privacy" },
+    { id: "terms", label: "Terms", caption: "The rules for using Tradies2Quote", href: "/terms" },
   ],
 };
 
@@ -110,6 +115,8 @@ export const MORE_TONE: Readonly<Record<MoreItemId, IconTone>> = {
   team: "violet",
   help: "neutral",
   feedback: "neutral",
+  privacy: "neutral",
+  terms: "neutral",
   agents: "brand",
   debug: "brand",
   monitor: "brand",
@@ -125,7 +132,7 @@ export interface MenuSection {
 const SECTIONS: ReadonlyArray<{ id: MenuSection["id"]; title: string; ids: readonly MoreItemId[] }> = [
   { id: "you", title: "You and your business", ids: ["account", "business", "rates", "payments"] },
   { id: "work", title: "Work", ids: ["clients", "calendar", "team"] },
-  { id: "help", title: "Help", ids: ["help", "feedback"] },
+  { id: "help", title: "Help", ids: ["help", "feedback", "privacy", "terms"] },
 ];
 
 /**

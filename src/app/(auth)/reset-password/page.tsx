@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { isNativeShellRequest } from "@/lib/native-shell";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { resetPasswordAction } from "./actions";
@@ -20,6 +21,9 @@ export default async function ResetPasswordPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const { error } = await searchParams;
+  // In the iPhone app the logo leads back to sign in, not the website's
+  // homepage, whose HTML carries its trial offers (App Store 3.1.3(f)).
+  const native = await isNativeShellRequest();
 
   // The user must arrive here with an active session (set by the auth callback
   // after they click the email link). If not, send them to /forgot-password.
@@ -42,8 +46,8 @@ export default async function ResetPasswordPage({
       <header className="relative z-10 border-b border-ink-600">
         <div className="mx-auto flex h-16 max-w-6xl items-center px-6">
           <Link
-            href="/"
-            aria-label="tradies2Quote home"
+            href={native ? "/login" : "/"}
+            aria-label={native ? "Back to sign in" : "tradies2Quote home"}
             className="inline-flex w-fit items-center rounded-lg bg-[#0A0A0A] px-2.5 py-1.5"
           >
             {/* Dark plate so the near-white T/Q glyphs stay legible on the

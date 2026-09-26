@@ -29,9 +29,11 @@ type Props = {
   next?: string;
   error?: string;
   message?: string;
+  /** Inside the iOS app (on the server): "Create account", never "Start free" (App Store 3.1.3(f)). */
+  native?: boolean;
 };
 
-export function LoginForm({ next, error, message }: Props) {
+export function LoginForm({ next, error, message, native = false }: Props) {
   const [show, setShow] = useState(false);
 
   // Offer a confirmation-email resend whenever the banner is about
@@ -117,7 +119,7 @@ export function LoginForm({ next, error, message }: Props) {
             className="text-brand hover:text-hivis font-semibold"
             data-testid="login-to-signup"
           >
-            Start free
+            {native ? "Create account" : "Start free"}
           </Link>
         </span>
       </div>

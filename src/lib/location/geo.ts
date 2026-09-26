@@ -47,21 +47,27 @@ export function isValidLatLng(p: Partial<LatLng> | null | undefined): p is LatLn
   );
 }
 
-/** Fixes worse than this are too rough to count towards a route. */
+/** Fixes up to this are exact enough to count every step of a route. */
 export const MAX_TRACK_ACCURACY_M = 50;
+/**
+ * Rough fixes (the iPhone's background updates, from wifi and cell towers)
+ * up to this still count, but only for moves clearly bigger than their error.
+ */
+export const MAX_ROUGH_ACCURACY_M = 1000;
 /** Moves shorter than this are GPS jitter while standing still. */
 export const MIN_STEP_M = 25;
 /** Faster than this (~200 km/h) between two fixes is a GPS jump. */
 export const MAX_SPEED_MS = 55;
 
 /**
- * Kilometres travelled along a route (earliest first), to 0.1 km. Rough
- * fixes, jitter and impossible jumps are left out, so a day on one site
- * reads 0 km, not the wobble of the GPS.
+ * Kilometres travelled along a route (earliest first), to 0.1 km. Jitter
+ * and impossible jumps are left out, so a day on one site reads 0 km, not
+ * the wobble of the GPS. A step to or from a rough fix counts only when it
+ * is longer than both fixes' error together.
  */
 export function routeKm(points: readonly TrackPoint[]): number {
   const good = points
-    .filter((p) => isValidLatLng(p) && Number.isFinite(p.t) && (p.acc == null || p.acc <= MAX_TRACK_ACCURACY_M))
+    .filter((p) => isValidLatLng(p) && Number.isFinite(p.t) && (p.acc == null || p.acc <= MAX_ROUGH_ACCURACY_M))
     .slice()
     .sort((a, b) => a.t - b.t);
   let metres = 0;
@@ -73,6 +79,9 @@ export function routeKm(points: readonly TrackPoint[]): number {
     }
     const step = distanceM(last, p);
     if (step < MIN_STEP_M) continue;
+    const error = (last.acc ?? 0) + (p.acc ?? 0);
+    const rough = (last.acc ?? 0) > MAX_TRACK_ACCURACY_M || (p.acc ?? 0) > MAX_TRACK_ACCURACY_M;
+    if (rough && step <= error) continue;
     const seconds = Math.max(1, (p.t - last.t) / 1000);
     if (step / seconds > MAX_SPEED_MS) continue;
     metres += step;

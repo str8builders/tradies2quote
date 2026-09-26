@@ -1,45 +1,20 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { unstable_cache } from "next/cache";
+import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
-import { fetchOpenMeteoWeather } from "@/lib/weather-impact/open-meteo";
-import { classifyOutlookDay, type DayOutlook } from "@/lib/weather-impact/outlook";
-import { evaluateWeatherImpact } from "@/lib/weather-impact/evaluate";
-import { TRADE_PROFILES } from "@/lib/weather-impact/config";
-import type { WeatherImpactStatus, WeatherImpactTrade } from "@/lib/weather-impact/types";
+import { loadHereWeather, roundCoord } from "@/lib/weather-impact/here";
+
+export type { HereTrade, HereWeather } from "@/lib/weather-impact/here";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export interface HereWeather {
-  current: { summary: string | null; temperatureC: number | null; windGustKph: number | null; rainProbabilityPct: number | null };
-  days: DayOutlook[];
-  trades: Array<{ id: WeatherImpactTrade; label: string; status: WeatherImpactStatus; reason: string }>;
-}
-
-/** Forecast + a safe/caution/unsafe call for every trade, for one spot. Cached 30 min per ~1 km cell. */
-const loadHere = unstable_cache(
-  async (lat: number, lng: number): Promise<HereWeather> => {
-    const input = await fetchOpenMeteoWeather({ latitude: lat, longitude: lng });
-    const days = (input.daily ?? []).slice(0, 5).map(classifyOutlookDay);
-    const trades = (Object.keys(TRADE_PROFILES) as WeatherImpactTrade[]).map((id) => {
-      const result = evaluateWeatherImpact({ trade: id, weather: input });
-      return { id, label: TRADE_PROFILES[id].label, status: result.overall_status, reason: result.reasons[0] ?? (result.overall_status === "safe" ? "No weather limits" : result.weather_summary) };
-    });
-    return {
-      current: { summary: input.summary ?? null, temperatureC: input.temperatureC, windGustKph: input.windGustKph, rainProbabilityPct: input.rainProbabilityPct },
-      days,
-      trades,
-    };
-  },
-  ["t2q-weather-here"],
-  { revalidate: 1800 },
-);
-
 /**
- * Weather where the phone is. The browser sends its coordinates (only after
- * the tradie taps "Use my location"); nothing is stored. Rounded to two
- * decimals (~1 km) so the cache is shared and the exact position never
- * reaches the forecast provider.
+ * Weather where the phone is: forecast + a safe/caution/unsafe call for
+ * every trade (cached 30 min per ~1 km cell). The page sends its
+ * coordinates only when location is already allowed or after the tradie
+ * taps "Use my location"; nothing is stored. Rounded to two decimals
+ * (~1 km) so the cache is shared and the exact position never reaches the
+ * forecast provider.
  */
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -51,9 +26,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Send lat and lng." }, { status: 400 });
   }
   try {
-    const data = await loadHere(Math.round(lat * 100) / 100, Math.round(lng * 100) / 100);
+    const data = await loadHereWeather(roundCoord(lat), roundCoord(lng));
     return NextResponse.json(data, { headers: { "cache-control": "private, max-age=300" } });
-  } catch {
+  } catch (e) {
+    console.error("[api/weather/here]", e);
+    captureError(e, { route: "/api/weather/here" });
     return NextResponse.json({ error: "The forecast service did not answer. Try again shortly." }, { status: 502 });
   }
 }

@@ -22,6 +22,7 @@ import {
   Stack,
 } from "@phosphor-icons/react/dist/ssr";
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
+import { isNativeShellRequest } from "@/lib/native-shell";
 import { getCachedAuthUser } from "@/lib/supabase/auth";
 import { AppHeader } from "../../_components/AppHeader";
 
@@ -726,11 +727,23 @@ const SECTIONS: ReadonlyArray<Section> = [
   },
 ];
 
+/**
+ * Withheld inside the iPhone app, on the server: the install steps (Android,
+ * add to Home Screen: 2.3.10, and it IS the app) and "Your plan" (trial and
+ * plan talk: 3.1.3(f)).
+ */
+const HIDDEN_IN_APP: ReadonlySet<string> = new Set(["install-app", "billing"]);
+
+/** The manual's sections for this request: all on the website, fewer in the app. */
+function guideSections(inApp: boolean): ReadonlyArray<Section> {
+  return inApp ? SECTIONS.filter((s) => !HIDDEN_IN_APP.has(s.id)) : SECTIONS;
+}
+
 export default async function GuidePage() {
   const { user } = await getCachedAuthUser();
   if (!user) redirect("/login");
 
-  const sections = SECTIONS;
+  const sections = guideSections(await isNativeShellRequest());
 
   return (
     <div className="min-h-screen text-white">

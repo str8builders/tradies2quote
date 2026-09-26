@@ -19,6 +19,8 @@ export type ScanReviewRow = {
   /** A printed discount / credit line (negative). Goes on the quote, never the library. */
   credit: boolean;
   lowConfidence: boolean;
+  /** The scanner's confidence (0..1): a repeated name keeps the clearer read. */
+  confidence: number;
   /** Exactly what the scanner read for this row — provenance for spot-checks. */
   rawText: string | null;
 };
@@ -52,6 +54,7 @@ export function buildReviewRows(
       sourceLineTotal: it.source_line_total ?? null,
       credit,
       lowConfidence: it.confidence < LOW_CONFIDENCE,
+      confidence: it.confidence,
       rawText: it.raw_text ?? null,
     };
   });

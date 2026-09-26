@@ -12,6 +12,7 @@ import {
   ArrowRight,
 } from "@phosphor-icons/react/dist/ssr";
 import { LEGAL } from "@/lib/legal";
+import { isNativeShellRequest } from "@/lib/native-shell";
 
 export const metadata: Metadata = {
   title: "Support",
@@ -19,22 +20,32 @@ export const metadata: Metadata = {
   alternates: { canonical: "/support" },
 };
 
+const MIC_TOPIC = {
+  icon: Microphone,
+  title: "The mic won't record",
+  body: "Make sure your browser has permission to use the microphone. On iOS Safari, tap the AA icon in the address bar and check Microphone is set to Allow. Reload the page and try again.",
+};
+
+const BILLING_TOPIC = {
+  icon: CreditCard,
+  title: "Trial, plans & billing",
+  body: `New accounts get a 7-day free trial with no card required. Paid plans (when they launch) auto-renew monthly until you cancel. To cancel a paid plan, email ${LEGAL.supportEmail} from the address on your account — your access continues until the end of the current period.`,
+};
+
+/** The same answer for the iPhone app, which has no Safari address bar. */
+const MIC_TOPIC_IN_APP = {
+  ...MIC_TOPIC,
+  body: "Make sure Tradies2Quote is allowed to use the microphone: open the iPhone's Settings, then Tradies2Quote, and turn Microphone on. Then open the app and try again.",
+};
+
 const TOPICS = [
-  {
-    icon: Microphone,
-    title: "The mic won't record",
-    body: "Make sure your browser has permission to use the microphone. On iOS Safari, tap the AA icon in the address bar and check Microphone is set to Allow. Reload the page and try again.",
-  },
+  MIC_TOPIC,
   {
     icon: FilePdf,
     title: "The quote PDF looks wrong",
     body: "Every quote can be edited line-by-line before you export. Open the quote, tap a line item to change the price, quantity, or description, then re-export. If your logo or business details look off, update them in Settings.",
   },
-  {
-    icon: CreditCard,
-    title: "Trial, plans & billing",
-    body: `New accounts get a 7-day free trial with no card required. Paid plans (when they launch) auto-renew monthly until you cancel. To cancel a paid plan, email ${LEGAL.supportEmail} from the address on your account — your access continues until the end of the current period.`,
-  },
+  BILLING_TOPIC,
   {
     icon: LockKey,
     title: "I can't sign in",
@@ -42,7 +53,19 @@ const TOPICS = [
   },
 ];
 
-export default function SupportPage() {
+/**
+ * Inside the iPhone app (decided on the server): no trial, plan or billing
+ * card (App Store 3.1.3(f)), and the app's own steps for the microphone and
+ * for deleting an account. The website is unchanged.
+ */
+function topicsFor(inApp: boolean) {
+  return inApp
+    ? TOPICS.filter((topic) => topic !== BILLING_TOPIC).map((topic) => (topic === MIC_TOPIC ? MIC_TOPIC_IN_APP : topic))
+    : TOPICS;
+}
+
+export default async function SupportPage() {
+  const inApp = await isNativeShellRequest();
   return (
     <div className="bg-ink-900">
       {/* Hero */}
@@ -125,7 +148,7 @@ export default function SupportPage() {
           </p>
 
           <div className="mt-10 grid md:grid-cols-2 gap-4">
-            {TOPICS.map((topic) => {
+            {topicsFor(inApp).map((topic) => {
               const Icon = topic.icon;
               return (
                 <div
@@ -183,12 +206,23 @@ export default function SupportPage() {
                 days. Backups holding a copy are overwritten within a
                 further 30 days.
               </p>
-              <p className="mt-4 text-ink-300 text-sm leading-relaxed">
-                Prefer self-serve? You can delete your account directly
-                in the app — open <strong>Settings</strong> and scroll to
-                the delete-account section. It removes your quotes,
-                clients and account on the spot, no email needed.
-              </p>
+              {inApp ? (
+                <p className="mt-4 text-ink-300 text-sm leading-relaxed">
+                  Prefer self-serve? Delete your account right here in the
+                  app: tap your photo at the top left, choose{" "}
+                  <strong>Your profile</strong>, then{" "}
+                  <strong>Delete my account</strong> at the bottom. It
+                  removes your quotes, clients and account on the spot, no
+                  email needed.
+                </p>
+              ) : (
+                <p className="mt-4 text-ink-300 text-sm leading-relaxed">
+                  Prefer self-serve? You can delete your account directly
+                  in the app — open <strong>Settings</strong> and scroll to
+                  the delete-account section. It removes your quotes,
+                  clients and account on the spot, no email needed.
+                </p>
+              )}
             </div>
 
             <div className="rounded-md border border-ink-600 bg-ink-900 p-6">

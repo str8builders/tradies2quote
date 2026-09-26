@@ -11,6 +11,12 @@ import { SectionTabs } from "./_components/SectionTabs";
  * Slim sticky header (logo + "Back to site") + section tabs + the
  * landing footer underneath. Same brand, no marketing nav anchors —
  * those would break from a non-landing URL.
+ *
+ * Inside the iPhone app (decided on the server) these pages are reached
+ * from the photo menu and the sign-in screens: the way back is to the app,
+ * and the website's footer is left out. It links to the homepage, a trial
+ * sign-up and an install guide for other phones (App Store 3.1.3(f),
+ * 2.3.10); the Privacy, Terms and Support tabs stay.
  */
 export default async function LegalLayout({
   children,
@@ -18,6 +24,7 @@ export default async function LegalLayout({
   children: React.ReactNode;
 }) {
   const nativeShell = await isNativeShellRequest();
+  const home = nativeShell ? "/app" : "/";
   return (
     <div className="studio-public studio-legal min-h-screen flex flex-col text-white">
       <header
@@ -26,21 +33,27 @@ export default async function LegalLayout({
       >
         <div className="max-w-7xl mx-auto px-6 md:px-12 h-16 flex items-center justify-between">
           <Link
-            href="/"
+            href={home}
             data-testid="legal-logo"
             className="group inline-flex items-center"
-            aria-label="tradies2Quote home"
+            aria-label={nativeShell ? "Back to the app" : "tradies2Quote home"}
           >
             <Logo size={32} />
           </Link>
           <Link
-            href="/"
+            href={home}
             data-testid="legal-back-to-site"
             className="inline-flex items-center gap-2 text-sm font-medium text-ink-300 hover:text-white transition-colors"
           >
             <ArrowLeft size={16} weight="bold" />
-            <span className="hidden sm:inline">Back to site</span>
-            <span className="sm:hidden">Home</span>
+            {nativeShell ? (
+              <span>Back to the app</span>
+            ) : (
+              <>
+                <span className="hidden sm:inline">Back to site</span>
+                <span className="sm:hidden">Home</span>
+              </>
+            )}
           </Link>
         </div>
       </header>
@@ -49,7 +62,7 @@ export default async function LegalLayout({
 
       <main className="flex-1">{children}</main>
 
-      <Footer hidePricingLinks={nativeShell} />
+      {nativeShell ? null : <Footer />}
     </div>
   );
 }

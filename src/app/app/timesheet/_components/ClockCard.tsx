@@ -12,11 +12,14 @@ import { StatusPill } from "@/components/ui/status-pill";
 import { TAP } from "@/components/ui/styles";
 import { currentFix } from "@/lib/location/device";
 import { siteAt } from "@/lib/location/geo";
+import { mapsLink } from "@/lib/location/tiles";
 import { BREAK_CHOICES } from "@/lib/timesheet/hours";
 import { announceLocationChanged } from "../../_v2/shell/LocationBridge";
+import { StaticSiteMap } from "../../_v2/ui/StaticSiteMap";
 import { clockIn, clockOut, pinJobSite } from "../location-actions";
 import type { LocationState } from "../_lib/location-types";
 import type { TimesheetClient } from "../_lib/types";
+import { OpenInMaps } from "./JobLocationSheet";
 import { LocationSheet } from "./LocationSheet";
 
 const SELECT =
@@ -92,7 +95,9 @@ export function ClockCard({
     });
   };
 
-  const atSite = open?.clientId ? state.sites.some((s) => s.clientId === open.clientId) : false;
+  // Clocked in at a client whose job is on the map: show it.
+  const site = open?.clientId ? (state.sites.find((s) => s.clientId === open.clientId) ?? null) : null;
+  const atSite = Boolean(site);
 
   return (
     <Card className="space-y-3" data-testid="clock-card">
@@ -147,6 +152,16 @@ export function ClockCard({
           Start work
         </Button>
       )}
+
+      {open && site ? (
+        <div className="space-y-2" data-testid="clock-site">
+          <StaticSiteMap points={[{ key: site.clientId, lat: site.lat, lng: site.lng }]} height={140} label={`Map of the ${site.name} job`} />
+          <div className="flex items-center gap-3">
+            <p className="min-w-0 flex-1 text-ui-sm break-words text-ui-muted">{site.address?.trim() || `The ${site.name} job`}</p>
+            <OpenInMaps href={mapsLink(site, site.name)} size="sm" />
+          </div>
+        </div>
+      ) : null}
 
       {!on ? (
         <button type="button" onClick={() => setSettings(true)} className="ui-focus-ring rounded-ui-sm text-left text-ui-sm text-ui-brand-text underline-offset-4 hover:underline">

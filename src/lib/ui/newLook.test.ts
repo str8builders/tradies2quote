@@ -7,6 +7,9 @@ const state = vi.hoisted(() => ({
   selects: [] as Array<{ table: string; columns: string; id: unknown }>,
 }));
 
+const app = vi.hoisted(() => ({ native: false }));
+vi.mock("@/lib/native-shell", () => ({ isNativeShellRequest: async () => app.native }));
+
 vi.mock("@/lib/supabase/auth", () => ({
   getCachedAuthUser: async () => ({ user: state.user, error: null }),
 }));
@@ -127,5 +130,35 @@ describe("getNewLookState (server helper)", () => {
     state.row = { ui_new_look: false };
     const result = await getNewLookState();
     expect(result).toEqual({ on: false, choice: false, envDefault: "on", canChoose: true });
+  });
+});
+
+describe("in the iPhone app", () => {
+  beforeEach(() => {
+    state.user = null;
+    state.row = null;
+    state.error = null;
+    state.selects = [];
+    vi.unstubAllEnvs();
+  });
+
+  it("everyone gets the new look with no switch and no database read, whatever the default", async () => {
+    app.native = true;
+    try {
+      vi.stubEnv("T2Q_NEW_LOOK_DEFAULT", "off");
+      state.user = { id: "u-1", email: "someone@example.com" };
+      state.row = { ui_new_look: false };
+      const s = await getNewLookState();
+      expect(s).toEqual({ on: true, choice: null, envDefault: "on", canChoose: false });
+      expect(state.selects).toHaveLength(0);
+    } finally {
+      app.native = false;
+    }
+  });
+
+  it("the website keeps its own rules", async () => {
+    vi.stubEnv("T2Q_NEW_LOOK_DEFAULT", "off");
+    state.user = { id: "u-1", email: "someone@example.com" };
+    expect((await getNewLookState()).on).toBe(false);
   });
 });

@@ -16,6 +16,7 @@ import { NativeAppRedirect } from "./_components/landing/NativeAppRedirect";
 import { isNativeShellRequest } from "@/lib/native-shell";
 import { faqPageLd, softwareApplicationLd } from "./_components/landing/structured-data";
 import type { Viewport } from "next";
+import { redirect } from "next/navigation";
 
 // The public home page lets visitors pinch-zoom. The root layout locks zoom
 // for the installed app shell (see the mobile shell contract); the home page
@@ -40,6 +41,10 @@ export default async function HomePage() {
   // in the SSR payload). Server-gated via the shell's UA marker; the
   // <HideInNativeApp> wrapper below stays as defence-in-depth.
   const nativeShell = await isNativeShellRequest();
+  // The whole landing page carries trial wording ("Start your free trial"),
+  // so the App Store binary never gets its HTML: straight to the app, as
+  // /calculator does. <NativeAppRedirect> below stays for older shells.
+  if (nativeShell) redirect("/app");
   return (
     <div className="studio-site min-h-screen text-white relative">
       {/* 3.1.3(f) + 4.2 — the marketing landing never renders inside the

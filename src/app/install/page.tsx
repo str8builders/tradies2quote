@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
 import { Footer } from "../_components/landing/Footer";
 import { isNativeShellRequest } from "@/lib/native-shell";
@@ -29,6 +30,10 @@ export const metadata: Metadata = {
  */
 export default async function InstallPage() {
   const nativeShell = await isNativeShellRequest();
+  // Inside the iPhone app this page has nothing to offer (it IS the app) and
+  // walks through Android and add-to-Home-Screen steps (App Store 2.3.10):
+  // withheld on the server, the same way /calculator is.
+  if (nativeShell) redirect("/app");
   return (
     <div className="studio-public studio-install-page min-h-screen text-white">
       {/* Slim brand bar */}

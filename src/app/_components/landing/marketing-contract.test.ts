@@ -4,8 +4,6 @@ import { isValidElement, type ReactElement } from "react";
 vi.mock("@/lib/native-shell", () => ({ isNativeShellRequest: vi.fn() }));
 import { isNativeShellRequest } from "@/lib/native-shell";
 import HomePage from "../../page";
-import { Header } from "./Header";
-import { Footer } from "./Footer";
 import { Pricing } from "./Pricing";
 import { FAQ } from "./FAQ";
 import { CompanionApp } from "./CompanionApp";
@@ -20,12 +18,11 @@ function elements(node: unknown): ReactElement<ElementProps>[] {
 }
 
 describe("marketing release contract", () => {
-  it("withholds pricing, off-store calculator promotion and priced metadata in the native shell", async () => {
+  it("never renders in the native shell: the app goes straight to /app, so no trial, pricing or calculator HTML reaches it", async () => {
     vi.mocked(isNativeShellRequest).mockResolvedValue(true);
-    const tree = elements(await HomePage());
-    expect(tree.some(e => e.type === Pricing || e.type === FAQ || e.type === CompanionApp || e.type === "script")).toBe(false);
-    expect(tree.find(e => e.type === Header)?.props.hidePricingLinks).toBe(true);
-    expect(tree.find(e => e.type === Footer)?.props.hidePricingLinks).toBe(true);
+    const thrown = await HomePage().then(() => null, (e: unknown) => e as { digest?: string; message?: string });
+    expect(thrown?.message).toBe("NEXT_REDIRECT");
+    expect(thrown?.digest).toContain(";/app;");
   });
   it("preserves public pricing, calculator and FAQ journeys on the web", async () => {
     vi.mocked(isNativeShellRequest).mockResolvedValue(false);

@@ -8,7 +8,7 @@ import { cx } from "@/components/ui/cx";
 import { TextField } from "@/components/ui/text-field";
 import { Toggle } from "@/components/ui/toggle";
 import { TAP } from "@/components/ui/styles";
-import { hasNativeLocation, nativeLocation } from "@/lib/location/device";
+import { hasNativeLocation, nativeLocation, type LocationPermission } from "@/lib/location/device";
 import { announceLocationChanged } from "../../_v2/shell/LocationBridge";
 import { saveLocationConsent } from "../location-actions";
 import type { LocationState } from "../_lib/location-types";
@@ -26,6 +26,8 @@ const DAYS = [
 /**
  * Location, in the person's own hands: what it does in plain words, then
  * on/off, automatic clock-in (iPhone app) and the hours it may run in.
+ * In the iPhone app, turning location on asks iOS for "While using the
+ * app"; only automatic clock-in asks for "Always".
  */
 export function LocationSheet({
   open,
@@ -45,7 +47,17 @@ export function LocationSheet({
   );
 }
 
-function LocationForm({
+/**
+ * After iOS answers: close, or show how to fix it in Settings. "Always" only
+ * matters when automatic clock-in is on.
+ */
+export function permissionOutcome(wantsAuto: boolean, status: LocationPermission): "done" | "off" | "always" {
+  if (status === "denied" || status === "restricted") return "off";
+  if (wantsAuto && status !== "always") return "always";
+  return "done";
+}
+
+export function LocationForm({
   consent,
   canInvoice,
   onDone,
@@ -62,21 +74,32 @@ function LocationForm({
   const [workEnd, setWorkEnd] = useState(consent.workEnd);
   const [days, setDays] = useState<number[]>(consent.workDays);
   const [error, setError] = useState<string | null>(null);
+  /** iOS said no (or not "Always"): the steps to fix it in Settings. */
+  const [settingsHelp, setSettingsHelp] = useState<"off" | "always" | null>(null);
   const [pending, startTransition] = useTransition();
+  const wantsAuto = granted && autoClock;
 
   const save = () => {
     setError(null);
+    setSettingsHelp(null);
     startTransition(async () => {
       try {
-        const result = await saveLocationConsent({ granted, autoClock: granted && autoClock, workStart, workEnd, workDays: days });
+        const result = await saveLocationConsent({ granted, autoClock: wantsAuto, workStart, workEnd, workDays: days });
         if (!result.ok) {
           setError(result.error);
           return;
         }
-        // The route in the background and arrival alerts need "Always" from iOS.
-        if (native && granted) await nativeLocation.requestAlways().catch(() => null);
         announceLocationChanged();
         router.refresh();
+        if (native && granted) {
+          const unknown: { status: LocationPermission } = { status: "notDetermined" };
+          const { status } = await (wantsAuto ? nativeLocation.requestAlways() : nativeLocation.requestWhenInUse()).catch(() => unknown);
+          const outcome = permissionOutcome(wantsAuto, status);
+          if (outcome !== "done") {
+            setSettingsHelp(outcome);
+            return;
+          }
+        }
         onDone();
       } catch {
         setError("Couldn't save that. Check your signal and try again.");
@@ -88,9 +111,13 @@ function LocationForm({
     <div className="space-y-4" data-testid="location-form">
       <ul className="list-disc space-y-1.5 pl-5 text-ui-sm text-ui-muted">
         <li>When you start or finish work, the app saves where you are, e.g. &ldquo;At the Hemi Walker job&rdquo;.</li>
-        <li>While you&apos;re clocked in it keeps your route, to work out kilometres for travel{canInvoice ? "" : " and to show your boss where you are on the team map"}.</li>
+        <li>While you&apos;re clocked in it keeps your route, to work out kilometres for travel.</li>
         <li>Nothing is recorded when you&apos;re not clocked in. Your route is deleted after 90 days.</li>
-        <li>{canInvoice ? "You see everyone's; each person sees their own." : "You see your own; the business owner sees the team's."}</li>
+        <li>
+          {canInvoice
+            ? "You see where your team is while they're clocked in; each person sees their own."
+            : "You see your own; the business owner sees your hours and where you are while you're clocked in."}
+        </li>
       </ul>
 
       <Toggle checked={granted} onChange={setGranted} label="Use my location for work" />
@@ -140,11 +167,35 @@ function LocationForm({
         </div>
       ) : null}
 
-      {native && granted ? (
-        <p className="text-ui-sm text-ui-muted">
-          iPhone will ask to allow location &ldquo;Always&rdquo;: that&apos;s so it can keep your route and spot arrivals with the app closed.
-          You can change it in Settings, Tradies2Quote, Location.
+      {native && granted && !settingsHelp ? (
+        <p className="text-ui-sm text-ui-muted" data-testid="location-ios-note">
+          {wantsAuto ? (
+            <>
+              iPhone will ask to allow location &ldquo;Always&rdquo;. That&apos;s only so it can spot when you arrive at and leave a job with
+              the app closed. Change it any time in Settings, Tradies2Quote, Location.
+            </>
+          ) : (
+            <>iPhone will ask to use your location while you&apos;re using the app.</>
+          )}
         </p>
+      ) : null}
+
+      {settingsHelp ? (
+        <div role="status" className="space-y-3 rounded-ui-md bg-ui-warn-soft p-3 text-ui-sm text-ui-text" data-testid="location-settings-help">
+          <p>
+            {settingsHelp === "off"
+              ? "Location is off for Tradies2Quote on this iPhone. To use it, open Settings, then Location, and choose While Using the App (or Always for automatic clock-in)."
+              : "Automatic clock-in needs location set to Always. Open Settings, then Location, and choose Always. Until then your hours start and stop when you tap."}
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <Button variant="secondary" onClick={() => void nativeLocation.openSettings().catch(() => {})}>
+              Open Settings
+            </Button>
+            <Button variant="ghost" onClick={onDone}>
+              Done
+            </Button>
+          </div>
+        </div>
       ) : null}
 
       {error ? (
