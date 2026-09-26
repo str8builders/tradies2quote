@@ -117,7 +117,8 @@
 
 /* ── Scene 3: inside the house (HouseWalk.tsx) ─────────────────────── */
 .jobsite-scene--house { position: relative; }
-.house-room { position: relative; scroll-margin-top: 0; }
+/* A jump to a room lands with it filling the screen (beats `.jobsite [id]`). */
+.jobsite .house-room { position: relative; scroll-margin-top: 0; }
 .house-pin { position: relative; min-height: 100svh; overflow: hidden; background: var(--js-ink); isolation: isolate; }
 /* With motion, each room holds for 1.3 screens (ROOM_HOLD) and the next fades
    in over it: sections overlap by one screen, and HouseWalk sets each pin's

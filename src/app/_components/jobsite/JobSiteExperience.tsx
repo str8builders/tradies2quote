@@ -56,6 +56,22 @@ export function JobSiteExperience() {
     if (!live && flash.current) flash.current.style.opacity = "0";
   }, [live, level, ready]);
 
+  // A deep link (/site-preview#draft, #pricing) lands while the page is in
+  // its compact still layout. Once the motion layout makes the scenes taller
+  // the spot moves, so go back to it, unless the visitor has scrolled since.
+  const landing = useRef<{ id: string; y: number } | null>(null);
+  useEffect(() => {
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    if (id) landing.current = { id, y: window.scrollY };
+  }, []);
+  useEffect(() => {
+    const target = landing.current;
+    if (!live || !target) return;
+    landing.current = null;
+    if (Math.abs(window.scrollY - target.y) > 4) return;
+    document.getElementById(target.id)?.scrollIntoView({ behavior: "instant", block: "start" });
+  }, [live]);
+
   return (
     <>
       {live ? (
