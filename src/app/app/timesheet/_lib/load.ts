@@ -2,7 +2,8 @@ import "server-only";
 import { resolveTaxLabel, resolveTaxRate } from "@/lib/quote-defaults";
 import { createClient } from "@/lib/supabase/server";
 import { getTeamContext } from "@/lib/team";
-import { routeKm } from "@/lib/location/geo";
+import { isValidLatLng, routeKm, type JobSite, type LatLng } from "@/lib/location/geo";
+import { loadJobSites } from "@/lib/location/sites";
 import { workedTime } from "@/lib/timesheet/hours";
 import { addDays } from "@/lib/timesheet/week";
 import { nameFromEmail } from "./people";
@@ -91,8 +92,16 @@ export async function loadTimesheet({
     }
   }
 
-  // Pins and kilometres for hours made by clocking in and out.
-  const sessions = await sessionFacts(db, rows.map((r) => r.session_id).filter((v): v is string => typeof v === "string"));
+  // Pins, points and kilometres for hours made by clocking in and out, and
+  // where each client's job is (saved sites only: nothing is looked up here).
+  const [sessions, sites] = await Promise.all([
+    sessionFacts(db, rows.map((r) => r.session_id).filter((v): v is string => typeof v === "string")),
+    rows.some((r) => typeof r.client_id === "string")
+      ? loadJobSites(db, ownerId, { geocode: false }).catch((): JobSite[] => [])
+      : Promise.resolve<JobSite[]>([]),
+  ]);
+  const siteOf = new Map(sites.filter((s) => isValidLatLng(s)).map((s) => [s.clientId, s]));
+  const addressOf = new Map(clients.map((c) => [c.id, c.address?.trim() || null]));
 
   const entries: TimesheetEntry[] = rows.map((r) => {
     const start = hhmm(r.start_time);
@@ -101,6 +110,10 @@ export async function loadTimesheet({
     const worked = workedTime(start, finish, breakMinutes);
     const invoiceId = typeof r.invoice_id === "string" && live.has(r.invoice_id) ? r.invoice_id : null;
     const who = String(r.user_id);
+    const clientId = typeof r.client_id === "string" ? r.client_id : null;
+    const site = clientId ? siteOf.get(clientId) : undefined;
+    const address = clientId ? (addressOf.get(clientId) ?? null) : null;
+    const facts = typeof r.session_id === "string" ? sessions.get(r.session_id) : undefined;
     return {
       id: String(r.id),
       workDate: String(r.work_date),
@@ -115,8 +128,11 @@ export async function loadTimesheet({
       person: names.get(who) ?? "Team member",
       mine: who === userId,
       invoice: invoiceId ? { id: invoiceId, number: live.get(invoiceId)! } : null,
-      pins: typeof r.session_id === "string" ? (sessions.get(r.session_id)?.pins ?? null) : null,
-      km: typeof r.session_id === "string" ? (sessions.get(r.session_id)?.km ?? null) : null,
+      pins: facts?.pins ?? null,
+      km: facts?.km ?? null,
+      site: site ? { lat: site.lat, lng: site.lng, address: address ?? (site.address?.trim() || null) } : null,
+      address: site ? null : address,
+      clockPoints: facts?.points ?? null,
     };
   });
 
@@ -142,18 +158,28 @@ export async function loadTimesheet({
   };
 }
 
+export interface SessionFacts {
+  pins: { start: string | null; end: string | null };
+  km: number | null;
+  /** Where the start and finish pins are on the map (null when neither was kept). */
+  points: { start: LatLng | null; end: LatLng | null } | null;
+}
+
+function spot(lat: unknown, lng: unknown): LatLng | null {
+  const point = { lat: typeof lat === "number" ? lat : NaN, lng: typeof lng === "number" ? lng : NaN };
+  return isValidLatLng(point) ? point : null;
+}
+
 /**
- * For each clocked session: its start and finish pins, and the kilometres
- * along its route (points the person's location setting allowed).
+ * For each clocked session: its start and finish pins (words and points),
+ * and the kilometres along its route (points the person's location setting
+ * allowed).
  */
-export async function sessionFacts(
-  db: Db,
-  ids: readonly string[],
-): Promise<Map<string, { pins: { start: string | null; end: string | null }; km: number | null }>> {
-  const out = new Map<string, { pins: { start: string | null; end: string | null }; km: number | null }>();
+export async function sessionFacts(db: Db, ids: readonly string[]): Promise<Map<string, SessionFacts>> {
+  const out = new Map<string, SessionFacts>();
   if (ids.length === 0) return out;
   const [sessionsResult, pointsResult] = await Promise.all([
-    db.from("work_sessions").select("id, start_place, end_place").in("id", ids),
+    db.from("work_sessions").select("id, start_place, end_place, start_lat, start_lng, end_lat, end_lng").in("id", ids),
     db
       .from("location_points")
       .select("session_id, recorded_at, latitude, longitude, accuracy")
@@ -168,10 +194,13 @@ export async function sessionFacts(
     bySession.set(p.session_id, list);
   }
   for (const s of sessionsResult.data ?? []) {
-    const points = bySession.get(s.id) ?? [];
+    const route = bySession.get(s.id) ?? [];
+    const start = spot(s.start_lat, s.start_lng);
+    const end = spot(s.end_lat, s.end_lng);
     out.set(s.id, {
       pins: { start: s.start_place, end: s.end_place },
-      km: points.length > 1 ? routeKm(points) : null,
+      km: route.length > 1 ? routeKm(route) : null,
+      points: start || end ? { start, end } : null,
     });
   }
   return out;

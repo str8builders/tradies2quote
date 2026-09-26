@@ -9,6 +9,7 @@ import { getCachedAuthUser } from "@/lib/supabase/auth";
 import { getCachedTopBarProfile } from "@/lib/supabase/profile";
 import { getNewLookState } from "@/lib/ui/newLook";
 import { OUTDOOR_COOKIE, isOutdoorCookieValue } from "@/lib/ui/outdoor";
+import { isWeatherImpactEnabled } from "@/lib/weather-impact/feature-flag";
 import { businessTimeZone, greetingFor, type Greeting } from "./dates";
 
 /** Everything the top bar, its account sheet and the welcome show. */
@@ -32,6 +33,13 @@ export interface TopBarData {
   isOwner: boolean;
   /** The new-look preview switch goes in the photo menu. */
   canChooseLook: boolean;
+  /**
+   * Show the weather, top right (weather impact isn't parked for this
+   * account). The forecast itself loads in the browser: the phone's
+   * location when already allowed, else /api/weather/base (the business
+   * address), so no page waits on it.
+   */
+  weather?: boolean;
 }
 
 /** "Saturday 26 September" in a time zone; plain English whatever the device. */
@@ -80,5 +88,6 @@ export const loadTopBarData = cache(async (): Promise<TopBarData> => {
     t2qcal: shouldOfferT2QCAL({ nativeShell, appStoreUrl: process.env.NEXT_PUBLIC_T2QCAL_APPSTORE_URL, isOwner }),
     isOwner,
     canChooseLook: look.canChoose,
+    weather: isWeatherImpactEnabled(isOwner),
   };
 });

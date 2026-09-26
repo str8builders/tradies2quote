@@ -14,11 +14,13 @@ import { PRESS, TAP, UI_TEXT } from "@/components/ui/styles";
 import { formatHours, formatTime } from "@/lib/timesheet/hours";
 import { addDays, dayLabel, weekLabel } from "@/lib/timesheet/week";
 import type { LocationState } from "../_lib/location-types";
+import { entryPlace } from "../_lib/places";
 import type { TimesheetData, TimesheetEntry } from "../_lib/types";
 import { forPerson, groupByDay, unbilledByClient, weekTotals } from "../_lib/view";
 import { ClockCard } from "./ClockCard";
 import { EntrySheet, draftFrom, newDraft, type EntryDraft } from "./EntrySheet";
 import { InvoiceWeekSheet } from "./InvoiceWeekSheet";
+import { JobLocationSheet } from "./JobLocationSheet";
 
 const weekHref = (start: string) => `/app/timesheet?week=${start}`;
 
@@ -41,8 +43,18 @@ function WeekNav({ weekStart, today }: { weekStart: string; today: string }) {
   );
 }
 
-function EntryRow({ entry, onOpen }: { entry: TimesheetEntry; onOpen: (entry: TimesheetEntry) => void }) {
+function EntryRow({
+  entry,
+  onOpen,
+  onPlace,
+}: {
+  entry: TimesheetEntry;
+  onOpen: (entry: TimesheetEntry) => void;
+  /** Show where the hours were (its own button, so it never opens the edit). */
+  onPlace: (entry: TimesheetEntry) => void;
+}) {
   const editable = entry.mine && !entry.invoice;
+  const place = entryPlace(entry);
   const detail = [
     `${formatTime(entry.start)} to ${formatTime(entry.finish)}`,
     entry.breakMinutes ? `${entry.breakMinutes} min break` : "no break",
@@ -82,14 +94,37 @@ function EntryRow({ entry, onOpen }: { entry: TimesheetEntry; onOpen: (entry: Ti
     </>
   );
   const row = "flex w-full min-h-16 items-start gap-3 px-4 py-3 text-left text-ui-base";
-  return editable ? (
-    <button type="button" onClick={() => onOpen(entry)} data-entry={entry.id} className={cx(row, "ui-focus-ring hover:bg-ui-surface-2", TAP)}>
-      {body}
-    </button>
-  ) : (
-    <div data-entry={entry.id} className={row}>
-      {body}
-    </div>
+  return (
+    <>
+      {editable ? (
+        <button type="button" onClick={() => onOpen(entry)} data-entry={entry.id} className={cx(row, "ui-focus-ring hover:bg-ui-surface-2", TAP)}>
+          {body}
+        </button>
+      ) : (
+        <div data-entry={entry.id} className={row}>
+          {body}
+        </div>
+      )}
+      {place ? (
+        <div className="-mt-2 px-4 pb-2">
+          <button
+            type="button"
+            onClick={() => onPlace(entry)}
+            aria-haspopup="dialog"
+            aria-label={`${place.label}: ${entry.clientName ?? "no client"}, ${dayLabel(entry.workDate)}`}
+            data-testid="entry-place"
+            data-place={entry.id}
+            className={cx(
+              "ui-focus-ring -ml-2 inline-flex min-h-11 items-center gap-2 rounded-ui-md px-2 text-ui-sm font-semibold text-ui-brand-text hover:bg-ui-surface-2",
+              TAP,
+            )}
+          >
+            <MapTrifold aria-hidden="true" weight="duotone" className="text-[1.25rem]" />
+            {place.label}
+          </button>
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -114,6 +149,7 @@ export function TimesheetView({
   const [person, setPerson] = useState<string | null>(null);
 
   const [invoicing, setInvoicing] = useState(false);
+  const [where, setWhere] = useState<TimesheetEntry | null>(null);
 
   const shown = useMemo(() => forPerson(data.entries, person), [data.entries, person]);
   const days = useMemo(() => groupByDay(data.weekStart, shown), [data.weekStart, shown]);
@@ -215,7 +251,7 @@ export function TimesheetView({
                 <ul className="divide-y divide-ui-line">
                   {group.entries.map((entry) => (
                     <li key={entry.id}>
-                      <EntryRow entry={entry} onOpen={(e) => setDraft(draftFrom(e))} />
+                      <EntryRow entry={entry} onOpen={(e) => setDraft(draftFrom(e))} onPlace={setWhere} />
                     </li>
                   ))}
                 </ul>
@@ -234,6 +270,7 @@ export function TimesheetView({
       </ol>
 
       <EntrySheet draft={draft} clients={data.clients} onClose={() => setDraft(null)} />
+      <JobLocationSheet entry={where} onClose={() => setWhere(null)} />
       {data.canInvoice ? <InvoiceWeekSheet open={invoicing} onClose={() => setInvoicing(false)} data={data} /> : null}
     </div>
   );

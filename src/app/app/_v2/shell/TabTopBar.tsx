@@ -3,6 +3,7 @@ import { cx } from "@/components/ui/cx";
 import { UI_TEXT } from "@/components/ui/styles";
 import type { TopBarData } from "../lib/top-bar";
 import { AccountButton } from "./AccountButton";
+import { WeatherButton } from "./WeatherButton";
 
 export interface TabTopBarProps {
   data: TopBarData;
@@ -15,7 +16,8 @@ export interface TabTopBarProps {
 /**
  * The top of every main tab (Home, Jobs, Prices, Timesheet): your photo on
  * the left (a tap opens the menu with everything else), the page's heading
- * beside it. On Home the heading is the greeting: "Good morning,"
+ * beside it, and the weather on the right (when weather impact is on for
+ * the account). On Home the heading is the greeting: "Good morning,"
  * over your name, or just "Good morning" when there's no name to use.
  * Holds the page's one h1.
  */
@@ -35,6 +37,7 @@ export function TabTopBar({ data, title, description }: TabTopBarProps) {
             <h1 className="ui-heading truncate text-ui-2xl text-ui-text">{greeting ? data.greeting : title}</h1>
           )}
         </div>
+        {data.weather ? <WeatherButton /> : null}
       </div>
       {description ? <p className="text-ui-base text-ui-muted">{description}</p> : null}
     </header>
