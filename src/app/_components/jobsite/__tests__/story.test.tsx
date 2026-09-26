@@ -1,28 +1,49 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { PLANS } from "@/lib/plans";
 import { FAQS } from "../../landing/FAQ";
 import { JobSiteStory } from "../JobSiteStory";
-import { STEPS } from "../story";
+import { EXAMPLE_LABEL, FILMED_ON, FINISHED, ROOMS, STEPS } from "../story";
 
 const html = renderToStaticMarkup(<JobSiteStory nativeShell={false} />);
-const text = html.replace(/<[^>]+>/g, " ").replace(/&#x27;|&#39;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ");
+const text = html
+  .replace(/<[^>]+>/g, " ")
+  .replace(/&#x27;|&#39;/g, "'")
+  .replace(/&amp;/g, "&")
+  .replace(/\s+/g, " ");
 
 describe("the job-site story is complete as plain HTML (search, screen readers, still version)", () => {
-  it("has one headline and the three chapter words as headings", () => {
+  it("has one headline, a heading for every room, and the finished home", () => {
     expect(html.match(/<h1[\s>]/g)).toHaveLength(1);
     expect(text).toContain("Great at the job.");
     expect(text).toContain("Done with the paperwork.");
-    for (const word of ["Talk", "Quote", "Paid", "Tools down. Quote sent."]) {
+    for (const word of [...ROOMS.map((r) => r.word), "Tools down. Quote sent."]) {
       expect(html).toMatch(new RegExp(`<h2[^>]*>${word.replace(/\./g, "\\.")}</h2>`));
     }
   });
 
-  it("every step link has somewhere to land, and the six scenes are in order", () => {
-    for (const s of STEPS) expect(html).toContain(`id="${s.anchor}"`);
-    const order = ["site", "portal", "talk", "quote", "paid", "tools"].map((id) => html.indexOf(`data-scene="${id}"`));
-    expect(order.every((i) => i > 0)).toBe(true);
-    expect([...order].sort((a, b) => a - b)).toEqual(order);
+  it("walks the house in the job's order, and every step link lands on its room", () => {
+    expect(ROOMS.map((r) => r.id)).toEqual(["talk", "draft", "check", "send", "invoice"]);
+    expect(STEPS.map((s) => s.anchor)).toEqual(ROOMS.map((r) => r.id));
+    const at = ROOMS.map((r) => html.indexOf(`id="${r.id}"`));
+    expect(at.every((i) => i > 0)).toBe(true);
+    expect([...at].sort((a, b) => a - b)).toEqual(at);
+    const scenes = ["site", "portal", "house", "details"].map((id) => html.indexOf(`data-scene="${id}"`));
+    expect(scenes.every((i) => i > 0)).toBe(true);
+    expect([...scenes].sort((a, b) => a - b)).toEqual(scenes);
+  });
+
+  it("each room says what the step does, with its app screen labelled as example figures", () => {
+    for (const room of ROOMS) {
+      expect(text).toContain(room.bold);
+      expect(text).toContain(room.body);
+      expect(html).toContain(`alt="${room.screenAlt}"`);
+    }
+    expect(text.split(EXAMPLE_LABEL).length - 1).toBe(ROOMS.length);
+    expect(text).toContain(FILMED_ON);
+    expect(html).toContain(`alt="${FINISHED.photoAlt}"`);
   });
 
   it("shows the real plans and prices, in the app's own wording", () => {
@@ -57,5 +78,22 @@ describe("inside the iOS App Store shell (3.1.3(f))", () => {
     expect(shell).not.toContain('id="faq"');
     expect(shell).not.toContain('href="/t2qcal"');
     expect(shell).not.toContain("application/ld+json");
+  });
+});
+
+describe("every picture and clip the rooms point at is in public/jobsite", () => {
+  const file = (p: string) => existsSync(join(process.cwd(), "public", p));
+  it("clips (computer and phone cuts), stills, first frames, screens and photos", () => {
+    for (const room of ROOMS) {
+      expect(file(`jobsite/screens/${room.id}.jpg`), `${room.id} screen`).toBe(true);
+      if (room.media.kind === "clip") {
+        for (const f of [`${room.id}-720.mp4`, `${room.id}-540.mp4`, `${room.id}.jpg`, `${room.id}-first.jpg`]) {
+          expect(file(`jobsite/rooms/${f}`), f).toBe(true);
+        }
+      } else {
+        expect(file(room.media.src.slice(1)), room.media.src).toBe(true);
+      }
+    }
+    expect(file(FINISHED.photo.slice(1))).toBe(true);
   });
 });

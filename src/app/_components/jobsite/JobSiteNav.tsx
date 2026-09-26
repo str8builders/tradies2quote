@@ -5,7 +5,7 @@ import { STEPS, TRIAL_LINE } from "./story";
 
 /**
  * The five steps of the job as jump links (Talk → Draft → Check → Send →
- * Invoice), shown from TALK onwards (the walk-in stays clear), and the
+ * Invoice), shown while you walk the house (one room per step), and the
  * sticky "Start free" button for phones. Plain anchors, so they work
  * before any script and scroll back as naturally as forward.
  *
@@ -23,6 +23,7 @@ export function JobSiteNav() {
     const steps = STEPS.map((s) => document.getElementById(s.anchor)).filter((el): el is HTMLElement => el !== null);
     const hero = document.getElementById("hero-heading");
     const talk = document.getElementById("talk");
+    const details = document.querySelector('[data-scene="details"]');
     const end = document.querySelector("[data-final-cta]");
     const root = document.querySelector<HTMLElement>("[data-jobsite-root]");
     let frame = 0;
@@ -34,9 +35,11 @@ export function JobSiteNav() {
       for (const el of steps) if (el.getBoundingClientRect().top < h * 0.5) current = el.id;
       setActive(current);
       setPastHero(hero ? hero.getBoundingClientRect().bottom < 0 : false);
-      // The steps start at TALK; the walk-in and the tunnel stay clear.
+      // The steps are the rooms of the house: shown from Talk until you
+      // step out to the finished home.
       const reachedTalk = talk ? talk.getBoundingClientRect().top < h * 0.5 : false;
-      setAtTalk(reachedTalk);
+      const leftHouse = details ? details.getBoundingClientRect().top < h * 0.5 : false;
+      setAtTalk(reachedTalk && !leftHouse);
       root?.toggleAttribute("data-in-chapters", reachedTalk);
       const e = end?.getBoundingClientRect();
       setAtEnd(e ? e.top < h && e.bottom > 0 : false);

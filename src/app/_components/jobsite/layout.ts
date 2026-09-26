@@ -58,7 +58,3 @@ export function inFrontOfPhone(d: number): Vec3 {
   const [x, y, z] = PHONE.centre;
   return [x + PHONE_NORMAL[0] * d, y + PHONE_NORMAL[1] * d, z + PHONE_NORMAL[2] * d];
 }
-
-/** The waveform tunnel is built far from the site; the camera cuts to it. */
-export const PORTAL_ORIGIN: Vec3 = [0, 0, -600];
-export const TUNNEL = { rings: 44, spacing: 1.6, radius: 1.15 } as const;

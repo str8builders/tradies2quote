@@ -4,13 +4,12 @@ import { Canvas } from "@react-three/fiber";
 import { useEffect } from "react";
 import { CameraRig } from "./CameraRig";
 import { DawnSite } from "./DawnSite";
-import { Tunnel } from "./Portal";
 import type { CanvasProps } from "./types";
 
 /**
  * The one WebGL canvas behind the job-site story. It renders on demand:
  * a frame when the visitor scrolls, and continuously only while something
- * is animating (the phone's waveform, the tunnel). "full" adds shadows,
+ * is animating (the phone's waveform). "full" adds shadows,
  * antialiasing and sharper rendering; "lite" is the phone version.
  */
 export default function JobSiteCanvas({ level, layer, flash, onReady, onLost }: CanvasProps) {
@@ -29,7 +28,6 @@ export default function JobSiteCanvas({ level, layer, flash, onReady, onLost }: 
     >
       <CameraRig level={level} layer={layer} flash={flash} onReady={onReady} />
       <DawnSite level={level} />
-      <Tunnel level={level} />
     </Canvas>
   );
 }

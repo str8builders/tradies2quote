@@ -3,25 +3,21 @@
 
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
-import { Color, Vector3, type PerspectiveCamera } from "three";
+import { Vector3, type PerspectiveCamera } from "three";
 import { scrollStore } from "../scroll-store";
 import { damp, fovFor, locatedAt, progressOf, shotAt } from "../timeline";
 import { sceneState } from "./scene-state";
 import type { CanvasProps } from "./types";
 
-const DAWN = new Color("#e2a67c");
-const NIGHT = new Color("#0a0a0a");
-
 /**
  * The camera is the main character. It follows the scroll through the
  * master timeline, easing the journey (not its position) so it glides
  * along the route and never cuts through timber. It also drives the flash
- * into the phone and the fade at the end of the tunnel, and only asks for
- * new frames while something is moving.
+ * into the phone and hides the 3D once the flash covers it, and only asks
+ * for new frames while something is moving.
  */
 export function CameraRig({ level, layer, flash, onReady }: Pick<CanvasProps, "level" | "layer" | "flash" | "onReady">) {
   const camera = useThree((s) => s.camera) as PerspectiveCamera;
-  const scene = useThree((s) => s.scene);
   const invalidate = useThree((s) => s.invalidate);
   const progress = useRef<number | null>(null);
   const look = useRef(new Vector3());
@@ -54,11 +50,7 @@ export function CameraRig({ level, layer, flash, onReady }: Pick<CanvasProps, "l
       camera.updateProjectionMatrix();
     }
 
-    if (sceneState.space !== shot.space) {
-      sceneState.space = shot.space;
-      scene.fog?.color.copy(shot.space === "portal" ? NIGHT : DAWN);
-      scene.background = shot.space === "portal" ? NIGHT : null;
-    }
+    sceneState.space = shot.space;
     sceneState.located = located;
 
     if (flash.current) flash.current.style.opacity = shot.flash.toFixed(3);

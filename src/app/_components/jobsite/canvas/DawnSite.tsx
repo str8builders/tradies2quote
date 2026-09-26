@@ -31,7 +31,7 @@ const FOG = "#e2a67c";
 export function DawnSite({ level }: { level: ThreeLevel }) {
   const group = useRef<Group>(null);
   useFrame(() => {
-    if (group.current) group.current.visible = sceneState.space !== "portal";
+    if (group.current) group.current.visible = sceneState.space !== "none";
   });
   return (
     <>

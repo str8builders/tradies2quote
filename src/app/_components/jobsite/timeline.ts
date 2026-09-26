@@ -1,4 +1,4 @@
-import { BAY_X, PHONE, PORTAL_ORIGIN, inFrontOfPhone, type Vec3 } from "./layout";
+import { BAY_X, PHONE, inFrontOfPhone, type Vec3 } from "./layout";
 
 /**
  * The master timeline: scroll position → scene → camera shot.
@@ -7,8 +7,12 @@ import { BAY_X, PHONE, PORTAL_ORIGIN, inFrontOfPhone, type Vec3 } from "./layout
  * reaching the top of the screen to its bottom reaching the bottom (its copy
  * stays pinned meanwhile), so `t` goes 0 → 1 across it and scrolling back
  * plays it in reverse. Pure functions only, so the whole journey is tested.
+ *
+ * The 3D covers the first two scenes: the dawn site and the dive into the
+ * phone, which ends in a warm flash. The house (one room per step of the
+ * job) and the details after it are page content over the flash.
  */
-export const SCENES = ["site", "portal", "talk", "quote", "paid", "tools"] as const;
+export const SCENES = ["site", "portal", "house", "details"] as const;
 export type SceneId = (typeof SCENES)[number];
 
 export type SceneBox = { id: SceneId; top: number; height: number };
@@ -65,21 +69,12 @@ const SITE_KEYS: readonly Key[] = [
   { t: 1, pos: inFrontOfPhone(0.6), look: SCREEN },
 ];
 
-/** Scene 2, first part: the phone wakes and fills the frame. */
-export const PORTAL_CUT = 0.25;
+/** Scene 2: the camera pushes into the phone's screen; the flash takes over. */
+export const PHONE_FILLS = 0.85;
 const PHONE_KEYS: readonly Key[] = [
   { t: 0, pos: inFrontOfPhone(0.6), look: SCREEN },
-  { t: PORTAL_CUT, pos: inFrontOfPhone(0.11), look: SCREEN },
-];
-
-/** Scene 2, second part: through the waveform tunnel, speeding up. */
-const o = PORTAL_ORIGIN;
-const at = (x: number, y: number, z: number): Vec3 => [o[0] + x, o[1] + y, o[2] + z];
-const TUNNEL_KEYS: readonly Key[] = [
-  { t: PORTAL_CUT, pos: at(0, 0, 2), look: at(0, 0, -10) },
-  { t: 0.5, pos: at(0.15, 0.05, -12), look: at(0, 0, -30) },
-  { t: 0.75, pos: at(-0.12, -0.04, -34), look: at(0, 0, -56) },
-  { t: 1, pos: at(0, 0, -66), look: at(0, 0, -90) },
+  { t: PHONE_FILLS, pos: inFrontOfPhone(0.12), look: SCREEN },
+  { t: 1, pos: inFrontOfPhone(0.11), look: SCREEN },
 ];
 
 /** Uniform Catmull-Rom through the keys; passes every key with a smooth tangent. */
@@ -109,20 +104,19 @@ function along(keys: readonly Key[], t: number, pick: (k: Key) => Vec3): Vec3 {
 }
 
 /**
- * Where the camera is in the 3D world:
- *   site   — the dawn job site
- *   portal — the waveform tunnel inside the phone
- *   none   — past the portal; the story continues as page content (stage 1)
+ * Where the camera is:
+ *   site — the dawn job site (and the phone on the sawhorse)
+ *   none — inside the house and after: the 3D is hidden behind the page
  */
-export type Space = "site" | "portal" | "none";
+export type Space = "site" | "none";
 
 export type Shot = {
   space: Space;
   pos: Vec3;
   look: Vec3;
-  /** Warm white flash over the canvas that hides the cut into the phone (0–1). */
+  /** Warm white flash over the canvas as the phone's screen fills the frame (0–1). */
   flash: number;
-  /** Fade of the 3D layer to black at the end of the tunnel (0–1). */
+  /** Fade of the 3D layer, once the flash covers it (0–1). */
   fade: number;
 };
 
@@ -132,21 +126,31 @@ const smooth = (a: number, b: number, x: number) => {
 };
 
 export function shotAt({ scene, t }: Located): Shot {
-  const pos = (keys: readonly Key[]) => along(keys, t, (k) => k.pos);
-  const look = (keys: readonly Key[]) => along(keys, t, (k) => k.look);
   if (scene === "site") {
-    return { space: "site", pos: pos(SITE_KEYS), look: look(SITE_KEYS), flash: 0, fade: 0 };
+    return {
+      space: "site",
+      pos: along(SITE_KEYS, t, (k) => k.pos),
+      look: along(SITE_KEYS, t, (k) => k.look),
+      flash: 0,
+      fade: 0,
+    };
   }
   if (scene === "portal") {
-    // A quick flash right at the cut, so the phone's screen is seen first.
-    const flash = t < PORTAL_CUT ? smooth(0.19, PORTAL_CUT, t) : 1 - smooth(PORTAL_CUT, 0.33, t);
-    const fade = smooth(0.86, 1, t);
-    return t < PORTAL_CUT
-      ? { space: "site", pos: pos(PHONE_KEYS), look: look(PHONE_KEYS), flash, fade }
-      : { space: "portal", pos: pos(TUNNEL_KEYS), look: look(TUNNEL_KEYS), flash, fade };
+    // The flash peaks as the screen fills the frame and stays up; the first
+    // room then slides in over it. The 3D is hidden once it's fully covered.
+    return {
+      space: "site",
+      pos: along(PHONE_KEYS, t, (k) => k.pos),
+      look: along(PHONE_KEYS, t, (k) => k.look),
+      flash: smooth(PHONE_FILLS - 0.2, PHONE_FILLS, t),
+      fade: smooth(PHONE_FILLS, 1, t),
+    };
   }
-  const end = TUNNEL_KEYS[TUNNEL_KEYS.length - 1];
-  return { space: "none", pos: end.pos, look: end.look, flash: 0, fade: 1 };
+  const end = PHONE_KEYS[PHONE_KEYS.length - 1];
+  // Inside the house the rooms cover everything; the flash stays up under
+  // them for the moment the first room slides in, then drops.
+  const flash = scene === "house" ? 1 - smooth(0, 0.05, t) : 0;
+  return { space: "none", pos: end.pos, look: end.look, flash, fade: 1 };
 }
 
 /** Portrait phones need a wider lens to keep the frame in shot. */
@@ -156,7 +160,7 @@ export function fovFor(aspect: number): number {
   return 45;
 }
 
-/** The phone screen wakes (waveform starts) as the camera comes through the frame. */
+/** The phone screen wakes (someone talks the job through) as the camera comes through the frame. */
 export function phoneAwake({ scene, t }: Located): boolean {
-  return (scene === "site" && t > 0.5) || (scene === "portal" && t < PORTAL_CUT + 0.02);
+  return (scene === "site" && t > 0.5) || scene === "portal";
 }

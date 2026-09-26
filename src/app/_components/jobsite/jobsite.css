@@ -58,7 +58,7 @@
 .jobsite[data-level="full"] .jobsite-scene--site,
 .jobsite[data-level="lite"] .jobsite-scene--site { height: 300svh; }
 .jobsite[data-level="full"] .jobsite-scene--portal,
-.jobsite[data-level="lite"] .jobsite-scene--portal { height: 260svh; }
+.jobsite[data-level="lite"] .jobsite-scene--portal { height: 200svh; }
 
 /* The drawn still: the hero picture for the still version, and the
    placeholder over the canvas until the first 3D frame is drawn. */
@@ -109,52 +109,102 @@
 .jobsite-caption-track { display: none; }
 .jobsite[data-level="full"] .jobsite-caption-track,
 .jobsite[data-level="lite"] .jobsite-caption-track { display: block; height: 100svh; }
-.jobsite-caption,
-.jobsite-portal-line {
-  position: sticky; top: 42svh; margin: 0; padding: 0 16px; text-align: center;
-  font-family: var(--font-display); text-transform: uppercase; line-height: 0.95; color: var(--js-text);
-  text-shadow: 0 2px 30px rgba(0, 0, 0, 0.65);
+.jobsite-caption {
+  position: sticky; top: 42svh; max-width: 15ch; margin: 0 auto; padding: 0 16px; text-align: center;
+  font-family: var(--font-display); text-transform: uppercase; font-size: clamp(26px, 5vw, 60px); line-height: 0.95;
+  color: var(--js-text); text-shadow: 0 2px 30px rgba(0, 0, 0, 0.65);
 }
-.jobsite-caption { max-width: 15ch; margin: 0 auto; font-size: clamp(26px, 5vw, 60px); }
-.jobsite-portal-line { font-size: clamp(34px, 8vw, 96px); }
-/* In the tunnel, not over the phone: the line only rises into view at the cut
-   (40svh into the section = t 0.25 of 160svh of travel). */
-.jobsite[data-level="full"] .jobsite-portal-track,
-.jobsite[data-level="lite"] .jobsite-portal-track { height: 100%; padding-top: 140svh; }
-.jobsite[data-level="still"] .jobsite-portal-track { padding: 96px 0; }
-.jobsite[data-level="still"] .jobsite-portal-line { position: static; }
 
-/* ── Scenes 3–6: the chapters ───────────────────────────────────────── */
-.jobsite-chapter {
-  position: relative; z-index: 1; padding: 96px 0; background: var(--js-ink);
-  border-top: 1px solid rgba(242, 239, 234, 0.08);
+/* ── Scene 3: inside the house (HouseWalk.tsx) ─────────────────────── */
+.jobsite-scene--house { position: relative; }
+.house-room { position: relative; scroll-margin-top: 0; }
+.house-pin { position: relative; min-height: 100svh; overflow: hidden; background: var(--js-ink); isolation: isolate; }
+/* With motion, each room holds for 1.3 screens (ROOM_HOLD) and the next fades
+   in over it: sections overlap by one screen, and HouseWalk sets each pin's
+   opacity and --walk (0 = arrived) as you scroll. */
+.jobsite[data-level="full"] .house-room,
+.jobsite[data-level="lite"] .house-room { height: 230svh; }
+.jobsite[data-level="full"] .house-room + .house-room,
+.jobsite[data-level="lite"] .house-room + .house-room { margin-top: -100svh; }
+.jobsite[data-level="full"] .house-pin,
+.jobsite[data-level="lite"] .house-pin {
+  position: sticky; top: 0; height: 100svh; min-height: 0;
+  transform: scale(calc(1 + var(--walk, 0) * 0.05)); transform-origin: 50% 60%; will-change: opacity, transform;
 }
+
+.house-backdrop { position: absolute; inset: -40px; z-index: -2; display: none; }
+.house-backdrop-img { object-fit: cover; filter: blur(28px) brightness(0.42) saturate(0.9); }
+.house-footage { position: absolute; inset: 0; z-index: -1; }
+.house-still, .house-photo, .house-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.house-video { background: transparent; }
+/* A slow push-in on the finished home, as if walking up to it. */
+.house-photo { animation: house-drift 16s ease-out both; }
+@keyframes house-drift { from { transform: scale(1.08); } to { transform: scale(1); } }
+.jobsite[data-level="still"] .house-photo { animation: none; }
+@media (prefers-reduced-motion: reduce) { .house-photo { animation: none; } }
+.house-scrim {
+  position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(180deg, rgba(10, 10, 10, 0.8) 0%, rgba(10, 10, 10, 0.4) 36%, rgba(10, 10, 10, 0) 56%, rgba(10, 10, 10, 0.45) 100%);
+}
+.house-side { position: absolute; inset: 0; }
+/* Clear of the header and the step links above it. */
+.house-copy { position: relative; max-width: 560px; padding: calc(env(safe-area-inset-top, 0px) + 124px) 16px 0; }
+.house-count { margin: 0; font: 500 12px/1.5 var(--font-mono); letter-spacing: 0.16em; text-transform: uppercase; color: rgba(242, 239, 234, 0.82); }
+.house-filmed { letter-spacing: 0.06em; }
+.house-word {
+  margin: 6px 0 10px; font-family: var(--font-display); font-weight: 400; text-transform: uppercase;
+  font-size: clamp(64px, 17vw, 168px); line-height: 0.86; letter-spacing: -0.02em; color: #f7f4ef;
+  text-shadow: 0 4px 40px rgba(0, 0, 0, 0.45);
+}
+.house-bold { margin: 0 0 10px; max-width: 22ch; font: 700 clamp(20px, 5.4vw, 32px)/1.15 var(--font-sans); color: #fff; text-shadow: 0 2px 20px rgba(0, 0, 0, 0.6); }
+.house-body { margin: 0; max-width: 42ch; font-size: 15px; line-height: 1.55; color: #e8e2d8; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.75); }
+.house-phone { position: absolute; right: 16px; bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); width: 44vw; max-width: 230px; margin: 0; }
+.house-phone-frame {
+  padding: 6px; border-radius: 18px; background: #111; border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+.house-phone-frame img { display: block; width: 100%; height: auto; border-radius: 12px; }
+.house-phone figcaption {
+  margin-top: 6px; text-align: center; font: 500 10px/1.3 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase;
+  color: rgba(242, 239, 234, 0.7);
+}
+/* Computers: the footage stands as a tall panel (never stretched), a soft
+   copy of the room fills the rest, words and the phone sit beside it. */
+@media (min-width: 900px) {
+  .house-pin { display: flex; align-items: center; }
+  .house-backdrop { display: block; }
+  .house-footage {
+    position: relative; inset: auto; flex: none; z-index: 0; height: 88svh; width: calc(88svh * 9 / 16);
+    margin-left: 6vw; border-radius: 8px; overflow: hidden; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+  }
+  .house-scrim { display: none; }
+  .house-side { position: relative; inset: auto; flex: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 28px 48px; padding: 0 6vw 0 5vw; }
+  .house-copy { flex: 1 1 340px; max-width: 600px; padding: 0; }
+  .house-word { font-size: clamp(56px, 6vw, 120px); }
+  .house-body { font-size: 16px; }
+  .house-phone { position: relative; right: auto; bottom: auto; flex: 0 0 220px; width: 220px; max-width: none; }
+}
+
+/* ── Scene 4: the finished home, then the details ───────────────────── */
+.jobsite-details { position: relative; z-index: 1; background: var(--js-ink); }
+.finished { position: relative; display: flex; align-items: flex-end; min-height: 100svh; overflow: hidden; isolation: isolate; }
+.finished-photo { object-fit: cover; object-position: 50% 45%; z-index: -2; }
+.finished-scrim {
+  position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(0deg, rgba(10, 10, 10, 0.92) 0%, rgba(10, 10, 10, 0.55) 38%, rgba(10, 10, 10, 0.05) 70%);
+}
+.finished-copy { width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 16px calc(env(safe-area-inset-bottom, 0px) + 56px); }
+.finished-title {
+  margin: 10px 0 12px; font-family: var(--font-display); font-weight: 400; text-transform: uppercase;
+  font-size: clamp(44px, 10vw, 128px); line-height: 0.9; text-wrap: balance;
+}
+.finished-body { margin: 0 0 6px; font-size: clamp(18px, 2.4vw, 24px); font-weight: 500; }
+.finished-trades { margin: 0; color: #ddd6cc; }
 .jobsite-container { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
-.jobsite-word {
-  margin: 10px 0 8px; font-family: var(--font-display); font-weight: 400; text-transform: uppercase;
-  font-size: clamp(88px, 24vw, 280px); line-height: 0.82; letter-spacing: -0.02em;
-}
-#talk .jobsite-word { color: var(--js-timber); }
-#quote .jobsite-word { color: var(--js-blueprint); }
-#paid .jobsite-word { color: var(--js-hivis); }
-.jobsite-kicker { margin: 0 0 28px; font-size: clamp(20px, 3vw, 28px); font-weight: 500; line-height: 1.3; }
-.jobsite-body { max-width: 60ch; color: var(--js-muted); font-size: 17px; line-height: 1.6; }
-.jobsite-body--lead { color: #e2dcd2; font-size: clamp(18px, 2.2vw, 22px); }
-.jobsite-trades {
-  display: flex; flex-wrap: wrap; gap: 4px 20px; margin: 20px 0 0; padding: 0; list-style: none;
-  font-family: var(--font-display); text-transform: uppercase; font-size: clamp(22px, 4vw, 40px); color: var(--js-faint);
-}
-.jobsite-grid { display: grid; grid-template-columns: 1fr; gap: 8px 28px; margin: 36px 0 8px; }
-@media (min-width: 760px) { .jobsite-grid { grid-template-columns: repeat(3, 1fr); } }
-.jobsite-station { padding: 20px 0; border-top: 1px solid var(--js-line); }
-.jobsite-station h3 { margin: 10px 0 6px; font: 600 20px/1.25 var(--font-sans); }
-.jobsite-station p { margin: 0; max-width: 60ch; color: var(--js-muted); font-size: 16px; line-height: 1.6; }
-.jobsite-station--wide { max-width: 760px; }
-.jobsite-station--loud h3 {
-  font-family: var(--font-display); font-weight: 400; text-transform: uppercase;
-  font-size: clamp(28px, 5vw, 60px); line-height: 1; color: var(--js-text);
-}
-.jobsite-station--loud p { color: #e2dcd2; font-size: 18px; }
+.details { padding-block: 64px 80px; }
+.details > .jobsite-founder { margin-top: 0; padding-top: 0; border-top: 0; }
+.jobsite-closing { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 24px; margin-top: 56px; padding-top: 28px; border-top: 1px solid var(--js-line); }
+.jobsite-closing .jobsite-help { margin: 0; }
 
 .jobsite-founder { margin: 48px 0 0; padding: 28px 0 0; border-top: 1px solid var(--js-line); }
 .jobsite-founder blockquote { margin: 0; max-width: 28ch; font-size: clamp(22px, 3.2vw, 34px); line-height: 1.3; font-weight: 500; }
@@ -203,11 +253,6 @@
 .jobsite-pillar ul { display: grid; gap: 10px; margin: auto 0 0; padding: 0; list-style: none; color: var(--js-muted); font-size: 15px; }
 .jobsite-pillar li { display: flex; gap: 8px; align-items: baseline; }
 
-.jobsite-chapter--end { padding-bottom: 72px; }
-.jobsite-end-title {
-  margin: 0 0 12px; font-family: var(--font-display); font-weight: 400; text-transform: uppercase;
-  font-size: clamp(44px, 10vw, 128px); line-height: 0.9; text-wrap: balance;
-}
 .jobsite-faq { margin-top: 64px; max-width: 820px; }
 .jobsite-faq h3 { margin: 0 0 12px; font: 600 22px/1.3 var(--font-sans); }
 .jobsite-faq details { border-top: 1px solid var(--js-line); }

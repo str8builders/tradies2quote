@@ -1,5 +1,6 @@
+import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight, Check, Microphone, TextAa, FileImage, QrCode } from "@phosphor-icons/react/dist/ssr";
+import { ArrowUpRight, Check } from "@phosphor-icons/react/dist/ssr";
 import { PLANS } from "@/lib/plans";
 import { LEGAL } from "@/lib/legal";
 import { getPlanPriceId, isStripeConfigured } from "@/lib/stripe-client";
@@ -9,12 +10,11 @@ import { Logo } from "../landing/Logo";
 import { WorkflowExample } from "../landing/WorkflowExample";
 import { faqPageLd, softwareApplicationLd } from "../landing/structured-data";
 import { DemoButton } from "./DemoButton";
+import { HouseWalk } from "./HouseWalk";
 import { JobSiteExperience } from "./JobSiteExperience";
 import { StillDawn } from "./StillDawn";
-import { HERO, PAID, PORTAL_LINE, PROOF, QUOTE, TALK, TOOLS_DOWN, TRADES, TRIAL_LINE } from "./story";
+import { FILMED_ON, FINISHED, FOUNDER, HELP_LINE, HERO, PRICING, PROOF, T2QCAL, TRADES, TRIAL_LINE } from "./story";
 import "./jobsite.css";
-
-const WAY_ICONS = [Microphone, TextAa, FileImage] as const;
 
 /** Crew and Builder are on sale only when team plans and their Stripe prices are live (as on the current homepage). */
 function onSale(id: keyof typeof PLANS): boolean {
@@ -30,14 +30,21 @@ function StartButton({ className = "" }: { className?: string }) {
   );
 }
 
+const tradesLine = `For ${TRADES.slice(0, -1).map((t) => t.toLowerCase()).join(", ")} and ${TRADES[TRADES.length - 1].toLowerCase()}.`;
+
 /**
  * The job-site website: one job followed from first light to tools down.
  *
+ *   1. site    — a 3D building site at dawn; the camera walks through the frame
+ *   2. portal  — into the phone on the sawhorse, ending in a warm flash
+ *   3. house   — one of the owner's builds, a room per step (Talk → Invoice)
+ *   4. details — the finished home, T2QCAL, pricing, the FAQ, the sign-up
+ *
  * Everything readable is real HTML in this component, in story order, so
  * search engines, screen readers, slow phones and the still version get the
- * whole story. <JobSiteExperience> adds the 3D world behind it on devices
- * that can take it. Tier prices and the FAQ never render inside the iOS
- * App Store shell (3.1.3(f)), the same rule as the current homepage.
+ * whole story. <JobSiteExperience> adds the 3D; <HouseWalk> adds the walk.
+ * Tier prices and the FAQ never render inside the iOS App Store shell
+ * (3.1.3(f)), the same rule as the current homepage.
  */
 export function JobSiteStory({ nativeShell }: { nativeShell: boolean }) {
   return (
@@ -88,86 +95,60 @@ export function JobSiteStory({ nativeShell }: { nativeShell: boolean }) {
           </div>
         </section>
 
-        {/* 2 · Into the phone */}
-        <section id="portal" data-scene="portal" className="jobsite-scene jobsite-scene--portal" aria-label="Voice in, quote out">
-          <div className="jobsite-portal-track">
-            <p className="jobsite-portal-line">{PORTAL_LINE}</p>
-          </div>
-        </section>
+        {/* 2 · Into the phone: the camera's push and the flash (3D only) */}
+        <div data-scene="portal" className="jobsite-scene jobsite-scene--portal" aria-hidden="true" />
 
-        {/* 3 · TALK */}
-        <section id="talk" data-scene="talk" className="jobsite-chapter" aria-labelledby="talk-heading">
-          <div className="jobsite-container">
-            <p className="jobsite-eyebrow">{"// 01 · Talk the job through"}</p>
-            <h2 id="talk-heading" className="jobsite-word">{TALK.title}</h2>
-            <p className="jobsite-kicker">{TALK.kicker}</p>
-            <p className="jobsite-body jobsite-body--lead">{TALK.what}</p>
-            <ul className="jobsite-trades" aria-label="Who it’s for">
-              {TRADES.map((trade) => (
-                <li key={trade}>{trade}</li>
-              ))}
-            </ul>
-            <div className="jobsite-grid">
-              {TALK.ways.map((way, i) => {
-                const Icon = WAY_ICONS[i];
-                return (
-                  <article key={way.name} className="jobsite-station">
-                    <Icon size={28} weight="duotone" aria-hidden="true" className="text-brand" />
-                    <h3>{way.name}</h3>
-                    <p>{way.body}</p>
-                  </article>
-                );
-              })}
+        {/* 3 · Inside the house: Talk, Draft, Check, Send, Invoice */}
+        <div data-scene="house" className="jobsite-scene jobsite-scene--house">
+          <HouseWalk />
+        </div>
+
+        {/* 4 · The finished home, then the details */}
+        <section id="tools-down" data-scene="details" className="jobsite-details" aria-labelledby="finished-heading">
+          <div className="finished">
+            <Image src={FINISHED.photo} alt={FINISHED.photoAlt} fill sizes="100vw" className="finished-photo" />
+            <div className="finished-scrim" aria-hidden="true" />
+            <div className="finished-copy">
+              <p className="jobsite-eyebrow">{"// "}{FILMED_ON}</p>
+              <h2 id="finished-heading" className="finished-title">
+                {FINISHED.title}
+              </h2>
+              <p className="finished-body">{FINISHED.body}</p>
+              <p className="finished-trades">{tradesLine}</p>
+              <div className="jobsite-actions" data-final-cta>
+                <StartButton />
+                <DemoButton className="jobsite-secondary">Watch the 30-second demo</DemoButton>
+                {nativeShell ? null : (
+                  <Link href="/t2qcal" className="jobsite-secondary">
+                    Open T2QCAL
+                  </Link>
+                )}
+              </div>
+              <p className="jobsite-assure">
+                <Check size={15} aria-hidden="true" /> {TRIAL_LINE}
+              </p>
             </div>
-            <article className="jobsite-station jobsite-station--wide">
-              <QrCode size={28} weight="duotone" aria-hidden="true" className="text-brand" />
-              <h3>{TALK.qr.title}</h3>
-              <p>{TALK.qr.body}</p>
-            </article>
+          </div>
+
+          <div className="jobsite-container details">
             <figure className="jobsite-founder">
-              <blockquote>“{TALK.founder.quote}”</blockquote>
+              <blockquote>“{FOUNDER.quote}”</blockquote>
               <figcaption>
                 <span className="jobsite-founder-badge" aria-hidden="true">
-                  {TALK.founder.initials}
+                  {FOUNDER.initials}
                 </span>
                 <span>
-                  <strong>{TALK.founder.name}</strong>
+                  <strong>{FOUNDER.name}</strong>
                   <br />
-                  {TALK.founder.role}
+                  {FOUNDER.role}
                 </span>
               </figcaption>
             </figure>
-          </div>
-        </section>
 
-        {/* 4 · QUOTE */}
-        <section id="quote" data-scene="quote" className="jobsite-chapter" aria-labelledby="quote-heading">
-          <div className="jobsite-container">
-            <p className="jobsite-eyebrow">{"// 02 · The quote builds itself"}</p>
-            <h2 id="quote-heading" className="jobsite-word">{QUOTE.title}</h2>
-            <p className="jobsite-kicker">{QUOTE.kicker}</p>
-            <div className="jobsite-grid">
-              <article id="draft" className="jobsite-station">
-                <h3>{QUOTE.draft.title}</h3>
-                <p>{QUOTE.draft.body}</p>
-              </article>
-              <article className="jobsite-station">
-                <h3>{QUOTE.supplier.title}</h3>
-                <p>{QUOTE.supplier.body}</p>
-              </article>
-              <article className="jobsite-station">
-                <h3>{QUOTE.numbers.title}</h3>
-                <p>{QUOTE.numbers.body}</p>
-              </article>
-            </div>
-            <article id="check" className="jobsite-station jobsite-station--loud">
-              <h3>{QUOTE.check.title}</h3>
-              <p>{QUOTE.check.body}</p>
-            </article>
             <div className="jobsite-t2qcal">
               <div>
-                <h3>{QUOTE.t2qcal.title}</h3>
-                <p>{QUOTE.t2qcal.body}</p>
+                <h3>{T2QCAL.title}</h3>
+                <p>{T2QCAL.body}</p>
                 {nativeShell ? null : (
                   <Link href="/t2qcal" className="jobsite-inline-link">
                     Open T2QCAL <ArrowUpRight size={16} weight="bold" aria-hidden="true" />
@@ -180,33 +161,7 @@ export function JobSiteStory({ nativeShell }: { nativeShell: boolean }) {
                 </div>
               )}
             </div>
-          </div>
-        </section>
 
-        {/* 5 · PAID */}
-        <section id="paid" data-scene="paid" className="jobsite-chapter" aria-labelledby="paid-heading">
-          <div className="jobsite-container">
-            <p className="jobsite-eyebrow">{"// 03 · Sent, signed, invoiced"}</p>
-            <h2 id="paid-heading" className="jobsite-word">{PAID.title}</h2>
-            <p className="jobsite-kicker">{PAID.kicker}</p>
-            <div className="jobsite-grid">
-              <article id="send" className="jobsite-station">
-                <h3>{PAID.send.title}</h3>
-                <p>{PAID.send.body}</p>
-              </article>
-              <article className="jobsite-station">
-                <h3>{PAID.sign.title}</h3>
-                <p>{PAID.sign.body}</p>
-              </article>
-              <article id="invoice" className="jobsite-station">
-                <h3>{PAID.invoice.title}</h3>
-                <p>{PAID.invoice.body}</p>
-              </article>
-            </div>
-            <article className="jobsite-station jobsite-station--wide">
-              <h3>{PAID.together.title}</h3>
-              <p>{PAID.together.body}</p>
-            </article>
             <ul className="jobsite-proof" aria-label="The numbers">
               {PROOF.map((p) => (
                 <li key={p.label}>
@@ -215,11 +170,12 @@ export function JobSiteStory({ nativeShell }: { nativeShell: boolean }) {
                 </li>
               ))}
             </ul>
+
             {nativeShell ? null : (
               <div id="pricing" className="jobsite-pricing" data-testid="jobsite-pricing">
-                <h3 className="jobsite-pricing-title">{PAID.pricing.title}</h3>
+                <h3 className="jobsite-pricing-title">{PRICING.title}</h3>
                 <p className="jobsite-pricing-note">
-                  {PAID.pricing.note} · {TRIAL_LINE}
+                  {PRICING.note} · {TRIAL_LINE}
                 </p>
                 <div className="jobsite-pillars">
                   {Object.values(PLANS).map((plan) => {
@@ -244,26 +200,7 @@ export function JobSiteStory({ nativeShell }: { nativeShell: boolean }) {
                 </div>
               </div>
             )}
-          </div>
-        </section>
 
-        {/* 6 · Tools down */}
-        <section id="tools-down" data-scene="tools" className="jobsite-chapter jobsite-chapter--end" aria-labelledby="end-heading">
-          <div className="jobsite-container">
-            <h2 id="end-heading" className="jobsite-end-title">{TOOLS_DOWN.title}</h2>
-            <p className="jobsite-kicker">{TOOLS_DOWN.body}</p>
-            <div className="jobsite-actions" data-final-cta>
-              <StartButton />
-              <DemoButton className="jobsite-secondary">Watch the 30-second demo</DemoButton>
-              {nativeShell ? null : (
-                <Link href="/t2qcal" className="jobsite-secondary">
-                  Open T2QCAL
-                </Link>
-              )}
-            </div>
-            <p className="jobsite-assure">
-              <Check size={15} aria-hidden="true" /> {TRIAL_LINE}
-            </p>
             {nativeShell ? null : (
               <div id="faq" className="jobsite-faq">
                 <h3>Questions tradies ask</h3>
@@ -275,10 +212,13 @@ export function JobSiteStory({ nativeShell }: { nativeShell: boolean }) {
                 ))}
               </div>
             )}
-            <p className="jobsite-help">
-              {TOOLS_DOWN.help}{" "}
-              <a href={`mailto:${LEGAL.supportEmail}`}>{LEGAL.supportEmail}</a>
-            </p>
+
+            <div className="jobsite-closing">
+              <StartButton />
+              <p className="jobsite-help">
+                {HELP_LINE} <a href={`mailto:${LEGAL.supportEmail}`}>{LEGAL.supportEmail}</a>
+              </p>
+            </div>
           </div>
         </section>
       </main>
