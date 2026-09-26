@@ -44,7 +44,7 @@ function RoomFootage({
         src={room.media.src}
         alt={room.media.alt}
         fill
-        sizes="(min-width: 900px) 52svh, 100vw"
+        sizes="100vw"
         className="house-photo"
       />
     );
@@ -55,7 +55,7 @@ function RoomFootage({
         src={`/jobsite/rooms/${room.id}.jpg`}
         alt=""
         fill
-        sizes="(min-width: 900px) 52svh, 100vw"
+        sizes="100vw"
         className="house-still"
         priority={index === 0}
       />
@@ -159,20 +159,6 @@ export function HouseWalk() {
           aria-labelledby={`room-${room.id}`}
         >
           <div className="house-pin">
-            <div className="house-backdrop" aria-hidden="true">
-              <Image
-                src={
-                  room.media.kind === "photo"
-                    ? room.media.src
-                    : `/jobsite/rooms/${room.id}.jpg`
-                }
-                alt=""
-                fill
-                // Blurred to a soft wash: a small image is all it needs.
-                sizes="320px"
-                className="house-backdrop-img"
-              />
-            </div>
             <div className="house-footage">
               <RoomFootage room={room} index={i} level={level} />
             </div>
