@@ -136,8 +136,6 @@
   transform: scale(calc(1 + var(--walk, 0) * 0.05)); transform-origin: 50% 60%; will-change: opacity, transform;
 }
 
-.house-backdrop { position: absolute; inset: -40px; z-index: -2; display: none; }
-.house-backdrop-img { object-fit: cover; filter: blur(28px) brightness(0.42) saturate(0.9); }
 .house-footage { position: absolute; inset: 0; z-index: -1; }
 .house-still, .house-photo, .house-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .house-video { background: transparent; }
@@ -187,21 +185,20 @@
 .jobsite[data-ready] .house-phone-device { opacity: 0; }
 .house-phone figcaption {
   flex: none; margin-top: 8px; text-align: center; font: 500 10px/1.3 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase;
-  color: rgba(242, 239, 234, 0.7);
+  color: rgba(242, 239, 234, 0.82); text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
 }
-/* Computers: the footage stands as a tall panel (never stretched), a soft
-   copy of the room fills the rest, words and the phone sit beside it. */
+/* Computers: the walkthrough fills the room, as on phones; the words and
+   the phone stand in it, shaded from the side so the words stay readable. */
 @media (min-width: 900px) {
   .house-pin { display: flex; align-items: center; }
-  .house-backdrop { display: block; }
-  .house-footage {
-    position: relative; inset: auto; flex: none; z-index: 0; height: 88svh; width: calc(88svh * 9 / 16);
-    margin-left: 6vw; border-radius: 8px; overflow: hidden; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+  .house-scrim {
+    background:
+      linear-gradient(90deg, rgba(10, 10, 10, 0.8) 0%, rgba(10, 10, 10, 0.62) 34%, rgba(10, 10, 10, 0.3) 62%, rgba(10, 10, 10, 0.42) 100%),
+      linear-gradient(180deg, rgba(10, 10, 10, 0.45) 0%, rgba(10, 10, 10, 0) 22%, rgba(10, 10, 10, 0) 78%, rgba(10, 10, 10, 0.5) 100%);
   }
-  .house-scrim { display: none; }
-  /* The words, and the phone standing tall beside them. */
+  /* The words, and the phone standing tall beside them, in a centred band. */
   .house-side {
-    position: relative; inset: auto; flex: 1; align-self: stretch;
+    position: relative; inset: auto; flex: 1; align-self: stretch; max-width: 1320px; margin: 0 auto;
     grid-template-columns: minmax(0, 1fr) clamp(210px, 20vw, 290px);
     grid-template-rows: 1fr auto auto auto auto 1fr;
     grid-template-areas: ". phone" "count phone" "word phone" "bold phone" "body phone" ". phone";
