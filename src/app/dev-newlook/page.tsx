@@ -276,10 +276,10 @@ const timesheet: TimesheetData = {
 export default async function DevNewLookPage({
   searchParams,
 }: {
-  searchParams: Promise<{ screen?: string; outdoor?: string }>;
+  searchParams: Promise<{ screen?: string; outdoor?: string; t2qcal?: string }>;
 }) {
   if (process.env.NODE_ENV === "production") notFound();
-  const { screen = "home", outdoor } = await searchParams;
+  const { screen = "home", outdoor, t2qcal } = await searchParams;
   const main = "mx-auto w-full max-w-2xl px-4 pt-6 pb-10 sm:px-6 sm:pt-10";
   let content;
   if (screen === "jobs") {
@@ -346,7 +346,7 @@ export default async function DevNewLookPage({
             hasJobs
             tiles={{ owed, paidThisMonth: paid }}
             failed={false}
-            t2qcal
+            t2qcal={t2qcal !== "0"}
           />
         </div>
       </main>
