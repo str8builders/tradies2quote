@@ -12,6 +12,9 @@
  *   public/videos/hero-loop.{mp4,webm}   HeroLoop, 720×1440 seamless loop
  *   public/images/marketing/poster-{demo-wide,demo-tall,hero}.webp
  *   public/images/marketing/feature-*.webp  (960×1200)
+ *   public/jobsite/screens/<step>.{mp4,webm}   StepScreen per step (Talk … Invoice),
+ *     the 3D phone's screen on the job-site website, 600 px wide, plus
+ *     <step>-first.webp (its first frame) and <step>.webp (the finished screen)
  * Sharing files (marketing-media/, git-ignored):
  *   social-15s.mp4, full-tour.mp4, demo-wide.mp4, demo-tall.mp4
  *
@@ -89,6 +92,14 @@ const TARGETS = {
     composition: "FeatureStill",
     stills: ["voice", "supplier-scan", "qr-request", "client-accept", "numbers", "invoices"],
   },
+  steps: {
+    composition: "StepScreen",
+    steps: ["talk", "draft", "check", "send", "invoice"],
+    dir: "public/jobsite/screens",
+    // H.264 only: phones decode it in hardware, and the 3D phone uploads
+    // every frame as a texture. 600 px for computers, 420 px for phones.
+    web: { widths: [600, 420], mp4Crf: 26, gop: 60, stillWidth: 600 },
+  },
 };
 
 function parseArgs(argv) {
@@ -112,9 +123,10 @@ function parseArgs(argv) {
  * Remotion's masters are full-range BT.601 (decoded JPEG frames). Web files
  * are converted to standard limited-range BT.709 yuv420p and tagged as such.
  */
+const COLOR_SCALE = "in_range=full:out_range=limited:in_color_matrix=bt601:out_color_matrix=bt709";
 const WEB_COLOR = [
   "-vf",
-  "scale=in_range=full:out_range=limited:in_color_matrix=bt601:out_color_matrix=bt709",
+  `scale=${COLOR_SCALE}`,
   "-pix_fmt",
   "yuv420p",
   "-color_range",
@@ -126,6 +138,8 @@ const WEB_COLOR = [
   "-color_trc",
   "bt709",
 ];
+/** WEB_COLOR that also resizes to `width` (one -vf: a second one would replace the first). */
+const webColorAt = (width) => WEB_COLOR.map((arg) => (arg === `scale=${COLOR_SCALE}` ? `scale=${width}:-2:flags=lanczos:${COLOR_SCALE}` : arg));
 
 const log = (...args) => console.log("[render-marketing]", ...args);
 const rel = (file) => path.relative(ROOT, file);
@@ -229,6 +243,38 @@ async function main() {
           const { bytes, quality } = await toWebp(png, out, 118_000);
           written.push(out);
           log(`${rel(out)}  ${kb(bytes)} (q${quality})`);
+        }
+        continue;
+      }
+
+      if (target.steps) {
+        const dir = path.join(ROOT, target.dir);
+        fs.mkdirSync(dir, { recursive: true });
+        for (const step of target.steps) {
+          const props = { step };
+          const composition = await selectComposition({ serveUrl, id: target.composition, inputProps: props, ...common });
+          const master = path.join(tmp, `step-${step}-master.mp4`);
+          await renderMedia({
+            composition, serveUrl, codec: "h264", crf: 10, pixelFormat: "yuv444p", imageFormat: "jpeg", jpegQuality: 95,
+            outputLocation: master, inputProps: props, muted: true, enforceAudioTrack: false, concurrency, ...common,
+          });
+          const { widths, mp4Crf, gop, stillWidth } = target.web;
+          const sizes = [];
+          for (const width of widths) {
+            const mp4 = path.join(dir, `${step}-${width}.mp4`);
+            await ff(["-y", "-i", master, "-an", ...webColorAt(width), "-c:v", "libx264", "-preset", "veryslow", "-tune", "animation", "-crf", String(mp4Crf), "-profile:v", "high", "-g", String(gop), "-movflags", "+faststart", mp4]);
+            assertFaststart(mp4);
+            written.push(mp4);
+            sizes.push(`${rel(mp4)}  ${kb(fs.statSync(mp4).size)}`);
+          }
+          for (const [frame, name] of [[0, `${step}-first.webp`], [composition.durationInFrames - 1, `${step}.webp`]]) {
+            const png = path.join(tmp, `step-${step}-${frame}.png`);
+            await renderStill({ composition, serveUrl, output: png, frame, inputProps: props, imageFormat: "png", scale: stillWidth / composition.width, ...common });
+            const out = path.join(dir, name);
+            await toWebp(png, out, 90_000);
+            written.push(out);
+          }
+          log(sizes.join(" · "));
         }
         continue;
       }

@@ -58,3 +58,10 @@ export function inFrontOfPhone(d: number): Vec3 {
   const [x, y, z] = PHONE.centre;
   return [x + PHONE_NORMAL[0] * d, y + PHONE_NORMAL[1] * d, z + PHONE_NORMAL[2] * d];
 }
+
+/**
+ * Inside the house the 3D is only the floating phone, filmed here: well away
+ * from the site (hidden by then), straight on, through a long lens so the
+ * phone keeps its shape wherever it floats on the screen.
+ */
+export const STUDIO = { centre: [0, -40, 0] as Vec3, distance: 12, fov: 15 } as const;

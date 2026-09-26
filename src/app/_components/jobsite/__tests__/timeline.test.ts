@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PHONE } from "../layout";
+import { PHONE, STUDIO } from "../layout";
 import { PHONE_FILLS, damp, fovFor, locate, locatedAt, phoneAwake, progressOf, shotAt, type SceneBox } from "../timeline";
 
 const VH = 800;
@@ -54,10 +54,18 @@ describe("shotAt — the camera path", () => {
     expect(shotAt({ scene: "portal", t: 1 })).toMatchObject({ flash: 1, fade: 1 });
   });
 
-  it("the first room slides in over the flash, then the flash drops; the house has no 3D", () => {
-    expect(shotAt({ scene: "house", t: 0 })).toMatchObject({ space: "none", flash: 1, fade: 1 });
+  it("the first room slides in over the flash, then the flash drops; in the house the camera faces the phone", () => {
+    expect(shotAt({ scene: "house", t: 0 })).toMatchObject({ space: "house", flash: 1, fade: 0 });
     expect(shotAt({ scene: "house", t: 0.2 }).flash).toBe(0);
-    expect(shotAt({ scene: "details", t: 0.5 })).toMatchObject({ space: "none", flash: 0, fade: 1 });
+    expect(shotAt({ scene: "details", t: 0.5 })).toMatchObject({ space: "house", flash: 0, fade: 0 });
+    const shot = shotAt({ scene: "house", t: 0.6 });
+    expect(shot.look).toEqual(STUDIO.centre);
+    // Straight on, from the studio distance: the phone keeps its shape anywhere on the screen.
+    expect(shot.pos[0]).toBe(STUDIO.centre[0]);
+    expect(shot.pos[1]).toBe(STUDIO.centre[1]);
+    expect(dist(shot.pos, STUDIO.centre)).toBeCloseTo(STUDIO.distance, 9);
+    expect(fovFor(0.46, "house")).toBe(STUDIO.fov);
+    expect(fovFor(1.6, "house")).toBe(STUDIO.fov);
   });
 
   it("the phone wakes as the camera comes through the frame and stays awake into the screen", () => {

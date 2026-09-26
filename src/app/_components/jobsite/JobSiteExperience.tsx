@@ -58,18 +58,36 @@ export function JobSiteExperience() {
 
   // A deep link (/site-preview#draft, #pricing) lands while the page is in
   // its compact still layout. Once the motion layout makes the scenes taller
-  // the spot moves, so go back to it, unless the visitor has scrolled since.
-  const landing = useRef<{ id: string; y: number } | null>(null);
+  // the spot moves, so go back to it, unless the visitor has taken over
+  // (scrolled, touched or pressed a key) in the meantime. The scroll position
+  // alone can't tell: the browser's own jump to the #id can come later.
+  const landing = useRef<string | null>(null);
   useEffect(() => {
     const id = decodeURIComponent(window.location.hash.slice(1));
-    if (id) landing.current = { id, y: window.scrollY };
+    if (!id) return;
+    landing.current = id;
+    const takeOver = () => {
+      landing.current = null;
+    };
+    const inputs = ["wheel", "touchstart", "pointerdown", "keydown"] as const;
+    inputs.forEach((e) => window.addEventListener(e, takeOver, { passive: true, once: true }));
+    return () => inputs.forEach((e) => window.removeEventListener(e, takeOver));
   }, []);
   useEffect(() => {
-    const target = landing.current;
-    if (!live || !target) return;
+    const id = landing.current;
+    const el = id ? document.getElementById(id) : null;
+    if (!live || !el) return;
     landing.current = null;
-    if (Math.abs(window.scrollY - target.y) > 4) return;
-    document.getElementById(target.id)?.scrollIntoView({ behavior: "instant", block: "start" });
+    // The browser's own jump to the #id is a smooth scroll that may still be
+    // running: stop it, then go straight there, and check again next frame.
+    const place = () => {
+      const margin = parseFloat(getComputedStyle(el).scrollMarginTop) || 0;
+      window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - margin, behavior: "instant" });
+    };
+    window.scrollTo({ top: window.scrollY, behavior: "instant" });
+    place();
+    const frame = window.requestAnimationFrame(place);
+    return () => window.cancelAnimationFrame(frame);
   }, [live]);
 
   return (

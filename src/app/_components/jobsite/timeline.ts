@@ -1,4 +1,4 @@
-import { BAY_X, PHONE, inFrontOfPhone, type Vec3 } from "./layout";
+import { BAY_X, PHONE, STUDIO, inFrontOfPhone, type Vec3 } from "./layout";
 
 /**
  * The master timeline: scroll position → scene → camera shot.
@@ -10,10 +10,13 @@ import { BAY_X, PHONE, inFrontOfPhone, type Vec3 } from "./layout";
  *
  * The 3D covers the first two scenes: the dawn site and the dive into the
  * phone, which ends in a warm flash. The house (one room per step of the
- * job) and the details after it are page content over the flash.
+ * job) and the details after it are page content over the flash, with one
+ * piece of 3D on top: the phone floating in each room, playing that step.
  */
 export const SCENES = ["site", "portal", "house", "details"] as const;
 export type SceneId = (typeof SCENES)[number];
+/** Where the house starts on the journey (see progressOf). */
+export const HOUSE_FROM = SCENES.indexOf("house");
 
 export type SceneBox = { id: SceneId; top: number; height: number };
 export type Located = { scene: SceneId; t: number };
@@ -105,10 +108,11 @@ function along(keys: readonly Key[], t: number, pick: (k: Key) => Vec3): Vec3 {
 
 /**
  * Where the camera is:
- *   site — the dawn job site (and the phone on the sawhorse)
- *   none — inside the house and after: the 3D is hidden behind the page
+ *   site  — the dawn job site (and the phone on the sawhorse)
+ *   house — inside the house and after: the site is hidden and the camera
+ *           faces the floating phone, which the rooms place on the page
  */
-export type Space = "site" | "none";
+export type Space = "site" | "house";
 
 export type Shot = {
   space: Space;
@@ -116,7 +120,7 @@ export type Shot = {
   look: Vec3;
   /** Warm white flash over the canvas as the phone's screen fills the frame (0–1). */
   flash: number;
-  /** Fade of the 3D layer, once the flash covers it (0–1). */
+  /** Fade of the 3D layer, once the flash covers it (0–1). In the house the phone fades the layer itself. */
   fade: number;
 };
 
@@ -124,6 +128,9 @@ const smooth = (a: number, b: number, x: number) => {
   const u = clamp01((x - a) / (b - a));
   return u * u * (3 - 2 * u);
 };
+
+/** The camera in the house: straight out from the studio, facing the phone. */
+const STUDIO_EYE: Vec3 = [STUDIO.centre[0], STUDIO.centre[1], STUDIO.centre[2] + STUDIO.distance];
 
 export function shotAt({ scene, t }: Located): Shot {
   if (scene === "site") {
@@ -146,15 +153,15 @@ export function shotAt({ scene, t }: Located): Shot {
       fade: smooth(PHONE_FILLS, 1, t),
     };
   }
-  const end = PHONE_KEYS[PHONE_KEYS.length - 1];
-  // Inside the house the rooms cover everything; the flash stays up under
-  // them for the moment the first room slides in, then drops.
+  // Inside the house the rooms cover everything but the floating phone; the
+  // flash stays up under them for the moment the first room slides in, then drops.
   const flash = scene === "house" ? 1 - smooth(0, 0.05, t) : 0;
-  return { space: "none", pos: end.pos, look: end.look, flash, fade: 1 };
+  return { space: "house", pos: STUDIO_EYE, look: STUDIO.centre, flash, fade: 0 };
 }
 
-/** Portrait phones need a wider lens to keep the frame in shot. */
-export function fovFor(aspect: number): number {
+/** Portrait phones need a wider lens to keep the frame in shot. The house uses the studio's long lens. */
+export function fovFor(aspect: number, space: Space = "site"): number {
+  if (space === "house") return STUDIO.fov;
   if (aspect < 0.8) return 62;
   if (aspect < 1.2) return 52;
   return 45;

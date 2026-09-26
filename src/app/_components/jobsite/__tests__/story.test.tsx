@@ -46,6 +46,11 @@ describe("the job-site story is complete as plain HTML (search, screen readers, 
     expect(html).toContain(`alt="${FINISHED.photoAlt}"`);
   });
 
+  it("every room has a slot for the floating phone, holding that step's finished screen", () => {
+    expect(html.match(/data-phone-slot/g)).toHaveLength(ROOMS.length);
+    for (const room of ROOMS) expect(html).toContain(`jobsite%2Fscreens%2F${room.id}.webp`);
+  });
+
   it("shows the real plans and prices, in the app's own wording", () => {
     for (const plan of Object.values(PLANS)) {
       expect(text).toContain(plan.name);
@@ -85,7 +90,11 @@ describe("every picture and clip the rooms point at is in public/jobsite", () =>
   const file = (p: string) => existsSync(join(process.cwd(), "public", p));
   it("clips (computer and phone cuts), stills, first frames, screens and photos", () => {
     for (const room of ROOMS) {
-      expect(file(`jobsite/screens/${room.id}.jpg`), `${room.id} screen`).toBe(true);
+      // The phone's screen for the step: the clip for computers and phones,
+      // its first frame (shown until the clip has one) and the finished screen.
+      for (const f of [`${room.id}-600.mp4`, `${room.id}-420.mp4`, `${room.id}-first.webp`, `${room.id}.webp`]) {
+        expect(file(`jobsite/screens/${f}`), f).toBe(true);
+      }
       if (room.media.kind === "clip") {
         for (const f of [`${room.id}-720.mp4`, `${room.id}-540.mp4`, `${room.id}.jpg`, `${room.id}-first.jpg`]) {
           expect(file(`jobsite/rooms/${f}`), f).toBe(true);

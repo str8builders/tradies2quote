@@ -7,6 +7,7 @@ import { WelcomeScene, WELCOME_FPS, WELCOME_FRAMES } from "./WelcomeScene";
 import { DEMO_TIMELINE, HERO_LOOP_FRAMES, SOCIAL_TIMELINE, TOUR_TIMELINE, VIDEO_FPS } from "./demo-script";
 import { DemoTall, DemoWide, FullTour, HERO, HeroLoop, SocialCut, TALL, WIDE } from "./marketing/compositions";
 import { FEATURE_STILL, FeatureStill } from "./marketing/stills";
+import { STEP_SCREEN, STEP_SCREEN_FRAMES, StepScreen } from "./marketing/step-screen";
 import { QuoteVideo } from "./quote-video/QuoteVideo";
 import { QUOTE_VIDEO_COMPOSITION } from "../lib/quote-video/constants";
 import { sampleQuoteVideoProps } from "../lib/quote-video/sample";
@@ -21,6 +22,8 @@ function Root() {
       <Composition id="SocialCut" component={SocialCut} durationInFrames={SOCIAL_TIMELINE.durationInFrames} fps={VIDEO_FPS} {...TALL} defaultProps={{}} />
       <Composition id="FullTour" component={FullTour} durationInFrames={TOUR_TIMELINE.durationInFrames} fps={VIDEO_FPS} {...WIDE} defaultProps={{}} />
       <Still id="FeatureStill" component={FeatureStill} {...FEATURE_STILL} defaultProps={{ feature: "voice" as const }} />
+      {/* The phone's own screen for one step, played on the job-site website's floating 3D phone. */}
+      <Composition id="StepScreen" component={StepScreen} durationInFrames={STEP_SCREEN_FRAMES} fps={VIDEO_FPS} {...STEP_SCREEN} defaultProps={{ step: "talk" as const }} />
       {/* Quote video for a client (rendered by scripts/quote-video-worker.mjs with a real quote's props). */}
       <Composition
         id={QUOTE_VIDEO_COMPOSITION.id}
