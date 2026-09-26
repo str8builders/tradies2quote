@@ -301,3 +301,17 @@ describe("loadHomeData: the day, from real rows", () => {
     expect(data.tiles).toBeNull();
   });
 });
+
+describe("Home order", () => {
+  it("the money sits right under the quick actions, above getting set up", () => {
+    const setup = setupSteps({ businessName: null, logoUrl: null, labourRate: null, pricedMaterials: 0, quoteCount: 1 });
+    const owed: MoneyTotal = { amount: 480, count: 1, currency: "NZD", otherCurrencies: 0 };
+    const paid: MoneyTotal = { amount: 0, count: 0, currency: "NZD", otherCurrencies: 0 };
+    const out = html(
+      <HomeView summary="2 things need you today" weather={null} setup={setup} todos={[]} hasJobs tiles={{ owed, paidThisMonth: paid }} failed={false} />,
+    );
+    const money = out.indexOf('data-testid="money-tiles"');
+    expect(money).toBeGreaterThan(out.indexOf("Talk a quote"));
+    expect(money).toBeLessThan(out.indexOf(setup[0].label));
+  });
+});

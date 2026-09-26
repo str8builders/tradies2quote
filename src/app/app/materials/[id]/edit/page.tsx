@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { isNewLookOn } from "@/lib/ui/newLook";
 import { MaterialForm } from "../../_components/MaterialForm";
+import { PriceFormScreen } from "../../_newlook/PriceFormScreen";
 
 export const metadata: Metadata = {
   title: "Edit material",
@@ -32,6 +34,22 @@ export default async function EditMaterialPage({
     .single();
   if (error || !material) redirect("/app/materials");
 
+  const initial = {
+    id: material.id,
+    name: material.name,
+    unit: material.unit ?? "each",
+    default_unit_price:
+      material.default_unit_price !== null
+        ? Number(material.default_unit_price)
+        : null,
+    supplier: material.supplier,
+    supplier_url: material.supplier_url,
+    notes: material.notes,
+  };
+
+  // Redesign: "Change price" in the new look. Off: unchanged below.
+  if (await isNewLookOn()) return <PriceFormScreen mode="edit" initial={initial} />;
+
   return (
     <div className="min-h-screen text-white">
       <header className="border-b border-ink-700/60 bg-ink-950/85 backdrop-blur">
@@ -57,21 +75,7 @@ export default async function EditMaterialPage({
         </div>
 
         <section className="t2q-card-pro p-5 sm:p-6">
-          <MaterialForm
-            mode="edit"
-            initial={{
-              id: material.id,
-              name: material.name,
-              unit: material.unit ?? "each",
-              default_unit_price:
-                material.default_unit_price !== null
-                  ? Number(material.default_unit_price)
-                  : null,
-              supplier: material.supplier,
-              supplier_url: material.supplier_url,
-              notes: material.notes,
-            }}
-          />
+          <MaterialForm mode="edit" initial={initial} />
         </section>
       </main>
     </div>

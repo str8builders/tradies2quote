@@ -167,7 +167,10 @@ async function weatherAt(deps: WeatherDeps, fix: Fix, fresh: boolean): Promise<W
   const [lat, lng] = key.split(",");
   const res = await deps.getJson(`/api/weather/here?lat=${lat}&lng=${lng}`);
   if (!res.ok || !isHereWeather(res.body)) return { kind: "error" };
-  const stored: Stored = { at: now, source: "device", key, locality: null, weather: res.body };
+  const { current, days, trades } = res.body;
+  const town = (res.body as { locality?: unknown }).locality;
+  const locality = typeof town === "string" && town.trim() ? town.trim() : null;
+  const stored: Stored = { at: now, source: "device", key, locality, weather: { current, days, trades } };
   keep(deps.storage, stored);
   return stateOf(stored, now);
 }
@@ -322,7 +325,7 @@ export function upcomingDays(days: readonly DayOutlook[], today: string): DayOut
 
 /** Where the forecast is for, under the sheet's title. */
 export function sourceLine(reading: WeatherReading): string {
-  if (reading.source === "device") return "Where you are now";
+  if (reading.source === "device") return reading.locality ? `Where you are now, ${reading.locality}` : "Where you are now";
   return reading.locality ? `At your business address, ${reading.locality}` : "At your business address";
 }
 
@@ -340,7 +343,11 @@ export function weatherButtonLabel(state: WeatherState, trade: WeatherImpactTrad
     case "ready": {
       const { weather } = state.reading;
       const temp = weather.current.temperatureC;
-      const now = [temp == null || !Number.isFinite(temp) ? null : `${Math.round(temp)} degrees`, CONDITION_WORDS[conditionNow(weather, state.today)]]
+      const now = [
+        temp == null || !Number.isFinite(temp) ? null : `${Math.round(temp)} degrees`,
+        CONDITION_WORDS[conditionNow(weather, state.today)],
+        state.reading.locality ? `in ${state.reading.locality}` : null,
+      ]
         .filter(Boolean)
         .join(", ");
       const call = tradeCall(weather, trade);

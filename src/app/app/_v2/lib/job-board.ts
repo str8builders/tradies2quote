@@ -22,7 +22,7 @@ import type { IconTone, Tone } from "@/components/ui/styles";
 import { displayClientName, isPlaceholderClientName } from "@/lib/quote-defaults";
 import type { QuoteStatus } from "@/lib/quote-types";
 import type { InvoiceStatus } from "@/lib/types/invoice";
-import { countOf, dayKeyInZone, daysBetweenKeys, shortDay } from "./dates";
+import { agoText, countOf, dayKeyInZone, daysBetweenKeys, shortDay } from "./dates";
 
 export interface BoardQuote {
   id: string;
@@ -255,6 +255,10 @@ export interface JobRow {
   archived: boolean;
   /** Place within its own filter's list (0 = first). */
   rank: number;
+  /** Its live invoice's status; null before there is one. */
+  invoiceStatus?: InvoiceStatus | null;
+  /** The client has had the quote (sent, seen or answered), so may hold its link. */
+  sentToClient?: boolean;
 }
 
 export const NO_CLIENT_NAME = "No client name yet";
@@ -384,8 +388,17 @@ export function buildJobRows(
       filter: state.filter,
       archived: quote.archived,
       rank: rank.get(quote.id) ?? 0,
+      invoiceStatus: invoice?.status ?? null,
+      sentToClient: wasSentToClient(quote),
     };
   });
+}
+
+const SENT_STATUSES: ReadonlySet<QuoteStatus> = new Set(["sent", "viewed", "accepted", "declined", "expired"]);
+
+/** Sent, seen or answered: the client may have the quote's link. */
+function wasSentToClient(quote: BoardQuote): boolean {
+  return Boolean(quote.sentAt || quote.viewedAt || quote.acceptedAt) || SENT_STATUSES.has(quote.status);
 }
 
 /** The rows a filter shows, in its order. */
@@ -492,4 +505,155 @@ export function clientTone(client: string): IconTone {
   let hash = 0;
   for (const ch of client.toLocaleLowerCase()) hash = (hash * 31 + (ch.codePointAt(0) ?? 0)) >>> 0;
   return CLIENT_TONES[hash % CLIENT_TONES.length];
+}
+
+// ── Deleting and restoring jobs (select mode, Recently deleted) ─────────────
+//
+// Deleting a job soft-deletes its quote and every invoice of it in one go,
+// all stamped with the same time, so the job never counts in a total or a
+// to-do while it is gone. Restoring it brings back the quote and the
+// invoices deleted with it (same time, give or take a few seconds); an
+// invoice deleted on its own earlier stays deleted.
+
+/** Most jobs one delete or restore takes (the server actions refuse more). */
+export const JOBS_ACTION_LIMIT = 200;
+/** Recently deleted lists the jobs deleted in the last this-many days. */
+export const DELETED_JOBS_DAYS = 90;
+/** An invoice deleted this close to its quote went with it, and comes back with it. */
+export const CO_DELETED_WITHIN_MS = 5_000;
+/** `?show=deleted` opens Recently deleted. */
+export const DELETED_SHOW = "deleted";
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export type JobIdsCheck = { ok: true; ids: string[] } | { ok: false; error: string };
+
+/**
+ * The job (quote) ids a delete or restore was sent, checked: real ids,
+ * each once, lower case, and no more than JOBS_ACTION_LIMIT.
+ */
+export function parseJobIds(input: unknown): JobIdsCheck {
+  if (!Array.isArray(input) || input.length === 0) {
+    return { ok: false, error: "Pick at least one job first." };
+  }
+  if (input.length > JOBS_ACTION_LIMIT) {
+    return { ok: false, error: `Pick up to ${JOBS_ACTION_LIMIT} jobs at a time.` };
+  }
+  const ids = new Set<string>();
+  for (const value of input) {
+    const id = typeof value === "string" ? value.trim().toLowerCase() : "";
+    if (!UUID_PATTERN.test(id)) {
+      return { ok: false, error: "Some of those jobs couldn't be found. Refresh the page and try again." };
+    }
+    ids.add(id);
+  }
+  return { ok: true, ids: [...ids] };
+}
+
+/** True when an invoice was deleted together with its quote (within a few seconds). */
+export function deletedTogether(
+  quoteDeletedAt: string | null | undefined,
+  invoiceDeletedAt: string | null | undefined,
+): boolean {
+  const a = ms(quoteDeletedAt);
+  const b = ms(invoiceDeletedAt);
+  if (Number.isNaN(a) || Number.isNaN(b)) return false;
+  return Math.abs(a - b) <= CO_DELETED_WITHIN_MS;
+}
+
+/** A deleted job's quote, as Recently deleted reads it. */
+export interface DeletedQuote extends BoardQuote {
+  deletedAt: string;
+}
+
+/** An invoice with its delete time (null: not deleted). */
+export interface DeletedInvoice extends BoardInvoice {
+  deletedAt: string | null;
+}
+
+/** A row in Recently deleted: the job as it was, and when it went. */
+export interface DeletedJobRow extends JobRow {
+  deletedAt: string;
+  /** "Deleted today", "Deleted yesterday", "Deleted 4 days ago". */
+  deletedLabel: string;
+}
+
+function deletedLabel(deletedAt: string, now: Date, timeZone: string): string {
+  const t = ms(deletedAt);
+  if (Number.isNaN(t)) return "Deleted";
+  const days = daysBetweenKeys(dayKeyInZone(new Date(t), timeZone), dayKeyInZone(now, timeZone));
+  return days === null ? "Deleted" : `Deleted ${agoText(days)}`;
+}
+
+/**
+ * Recently deleted, newest deletion first. Each job shows the pill and
+ * amount it would come back with: its invoices deleted with it, plus any
+ * that were never deleted. Invoices deleted on their own are left out
+ * (restoring the job doesn't bring them back).
+ */
+export function buildDeletedJobRows(
+  quotes: readonly DeletedQuote[],
+  invoices: ReadonlyArray<BoardInvoice & { deletedAt?: string | null }>,
+  now: Date,
+  timeZone: string,
+): DeletedJobRow[] {
+  const deletedAt = new Map(quotes.map((q) => [q.id, q.deletedAt]));
+  const comesBack = invoices.filter((invoice) => {
+    const quoteDeletedAt = deletedAt.get(invoice.quoteId);
+    if (quoteDeletedAt === undefined) return false;
+    return !invoice.deletedAt || deletedTogether(quoteDeletedAt, invoice.deletedAt);
+  });
+  return buildJobRows(quotes, comesBack, now, timeZone)
+    .map((row) => {
+      const at = deletedAt.get(row.id) ?? "";
+      return { ...row, deletedAt: at, deletedLabel: deletedLabel(at, now, timeZone) };
+    })
+    .sort((a, b) => asc(ms(b.deletedAt), ms(a.deletedAt)));
+}
+
+const BILLED: ReadonlySet<InvoiceStatus> = new Set(["sent", "overdue", "paid"]);
+
+/** The client has been sent this invoice, or has paid it. */
+export function isBilledInvoice(status: InvoiceStatus | null | undefined): boolean {
+  return status ? BILLED.has(status) : false;
+}
+
+export interface DeleteJobsCopy {
+  title: string;
+  body: string;
+  /** Some have invoices the client has been sent or has paid. */
+  billed: string | null;
+  /** Clients may hold links that stop working. */
+  links: string | null;
+  confirm: string;
+  keep: string;
+}
+
+/** The words of the "Delete 3 jobs?" check, for the jobs picked. */
+export function deleteJobsCopy(rows: ReadonlyArray<Pick<JobRow, "invoiceStatus" | "sentToClient">>): DeleteJobsCopy {
+  const n = rows.length;
+  const one = n === 1;
+  const billed = rows.filter((row) => isBilledInvoice(row.invoiceStatus)).length;
+  const shared = billed > 0 || rows.some((row) => row.sentToClient);
+  let billedLine: string | null = null;
+  if (billed > 0) {
+    if (one) billedLine = "It has an invoice you've already sent or been paid for.";
+    else if (billed === 1) billedLine = "1 has an invoice you've already sent or been paid for.";
+    else if (billed === n) billedLine = `${n === 2 ? "Both" : `All ${n}`} have invoices you've already sent or been paid for.`;
+    else billedLine = `${billed} have invoices you've already sent or been paid for.`;
+  }
+  return {
+    title: one ? "Delete this job?" : `Delete ${n} jobs?`,
+    body: one
+      ? "It's removed from Jobs and your totals. You can restore it from Recently deleted."
+      : "They're removed from Jobs and your totals. You can restore them from Recently deleted.",
+    billed: billedLine,
+    links: shared
+      ? one
+        ? "Your client can't open this quote any more."
+        : "Clients can't open these quotes any more."
+      : null,
+    confirm: `Delete ${countOf(n, "job")}`,
+    keep: one ? "Keep it" : "Keep them",
+  };
 }

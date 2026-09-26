@@ -5,6 +5,8 @@ import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
 import { createClient } from "@/lib/supabase/server";
 import { BUSINESS_NAME_REQUIRED, businessNameForDocuments } from "@/lib/business-name";
 import { BusinessSettingsLink } from "@/app/app/_components/BusinessSettingsLink";
+import { isNewLookOn } from "@/lib/ui/newLook";
+import { PdfNotReadyScreen, PdfViewerScreen } from "../_v2/parts/PdfScreen";
 
 /**
  * /app/quotes/preview/[id]/pdf — in-app PDF viewer with a back button.
@@ -20,6 +22,10 @@ import { BusinessSettingsLink } from "@/app/app/_components/BusinessSettingsLink
  * the same way (proxy.ts + this page's getUser()), and the underlying
  * binary route is untouched so the public quote view and email PDF
  * attachment paths keep working unchanged.
+ *
+ * Redesign: with the new-look switch on, the same gates end in the kit's
+ * top bar and callouts (../_v2/parts/PdfScreen.tsx), readable in dark and
+ * outdoor mode. Switched off, the markup below is unchanged.
  */
 export const metadata: Metadata = {
   title: "Quote PDF",
@@ -52,6 +58,9 @@ export default async function QuotePdfPage({
   if (!quote) redirect("/app/quotes");
   const { data: profile, error: profileError } = await supabase.from("profiles").select("business_name").eq("id", user.id).maybeSingle();
   if (profileError || !businessNameForDocuments(profile?.business_name)) {
+    if (await isNewLookOn()) {
+      return <PdfNotReadyScreen quoteId={id} problem={profileError ? "profile-error" : "no-business-name"} />;
+    }
     return <main className="mx-auto max-w-xl space-y-5 p-6">
       <Link href={`/app/quotes/preview/${id}`} className="t2q-btn-back">Back to quote</Link>
       <h1 className="text-2xl font-semibold">Your quote PDF</h1>
@@ -60,6 +69,8 @@ export default async function QuotePdfPage({
     </main>;
   }
   if (!quote.pdf_path) redirect(`/app/quotes/preview/${id}`);
+
+  if (await isNewLookOn()) return <PdfViewerScreen quoteId={id} />;
 
   return (
     <div className="fixed inset-0 flex flex-col bg-ink-950 text-white">

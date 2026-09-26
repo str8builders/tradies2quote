@@ -5,13 +5,34 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { QuoteGenerationProgress } from "./QuoteGenerationProgress";
 
-function fmtElapsed(s: number): string {
+export function fmtElapsed(s: number): string {
   const m = Math.floor(s / 60);
   const r = s % 60;
   return `${m}:${String(r).padStart(2, "0")}`;
 }
 
-export function QuoteGenerator({ id }: { id: string }) {
+/** Where a quote being written is up to. The same for both looks. */
+export interface QuoteGeneration {
+  /** Writing, or waiting on another run; false once a try has failed. */
+  pending: boolean;
+  /** The quote came back: the page is refreshing into the review. */
+  complete: boolean;
+  /** Why the last try failed ("" while writing). */
+  error: string;
+  /** Set while another request is already writing this quote. */
+  waitingNote: string;
+  /** Seconds on the clock. */
+  elapsedS: number;
+  /** Start again after a failure. */
+  retry: () => void;
+}
+
+/**
+ * Writes the quote once, on mount, then refreshes the page into the review.
+ * Shared by the classic card below and the new look's panel
+ * (_v2/parts/GeneratingPanel.tsx), so both behave exactly alike.
+ */
+export function useQuoteGeneration(id: string): QuoteGeneration {
   const router = useRouter();
   const [error, setError] = useState<string>("");
   const [pending, setPending] = useState<boolean>(true);
@@ -89,6 +110,22 @@ export function QuoteGenerator({ id }: { id: string }) {
     }
   }
 
+  return {
+    pending,
+    complete,
+    error,
+    waitingNote,
+    elapsedS,
+    retry: () => {
+      startedRef.current = true;
+      void generate();
+    },
+  };
+}
+
+export function QuoteGenerator({ id }: { id: string }) {
+  const { pending, complete, error, waitingNote, elapsedS, retry } = useQuoteGeneration(id);
+
   return (
     <section
       data-testid="quote-generator"
@@ -131,10 +168,7 @@ export function QuoteGenerator({ id }: { id: string }) {
             <button
               type="button"
               data-testid="quote-generator-retry"
-              onClick={() => {
-                startedRef.current = true;
-                void generate();
-              }}
+              onClick={retry}
               className="t2q-btn-primary-pro inline-flex h-11 items-center justify-center px-5"
             >
               Try again

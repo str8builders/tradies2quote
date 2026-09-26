@@ -254,10 +254,10 @@ describe("the words", () => {
 
   it("the button's label in every state", () => {
     expect(weatherButtonLabel(readyState(), "roofing")).toBe(
-      "Weather: 14 degrees, light rain. Caution for roofing. Tap for the impact on today's work.",
+      "Weather: 14 degrees, light rain, in Tauranga. Caution for roofing. Tap for the impact on today's work.",
     );
     expect(weatherButtonLabel(readyState({ temperatureC: null, condition: null }), "general_outdoor")).toBe(
-      "Weather: rain. Safe for general outdoor labour. Tap for the impact on today's work.",
+      "Weather: rain, in Tauranga. Safe for general outdoor labour. Tap for the impact on today's work.",
     );
     expect(weatherButtonLabel({ kind: "loading" }, "roofing")).toBe("Weather: getting the forecast. Tap for the impact on today's work.");
     expect(weatherButtonLabel({ kind: "error" }, "roofing")).toBe("Weather's not available right now. Tap to try again.");
@@ -273,7 +273,8 @@ describe("the words", () => {
     const base = { source: "base" as const, key: "base", locality: "Tauranga", at: NOW, weather: WEATHER };
     expect(sourceLine(base)).toBe("At your business address, Tauranga");
     expect(sourceLine({ ...base, locality: null })).toBe("At your business address");
-    expect(sourceLine({ ...base, source: "device", key: "-37.69,176.17" })).toBe("Where you are now");
+    expect(sourceLine({ ...base, source: "device", key: "-37.69,176.17" })).toBe("Where you are now, Tauranga");
+    expect(sourceLine({ ...base, source: "device", key: "-37.69,176.17", locality: null })).toBe("Where you are now");
   });
 
   it("days, degrees and the spot", () => {

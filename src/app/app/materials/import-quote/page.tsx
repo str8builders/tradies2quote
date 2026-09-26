@@ -41,7 +41,7 @@ export default async function ImportQuotePage() {
     <div className="min-h-screen text-white">
       <AppHeader context="Materials" />
 
-      <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
+      <main data-legacy-body="" className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
         <Link
           href="/app/materials"
           className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-300 hover:text-brand"

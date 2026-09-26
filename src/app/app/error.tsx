@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
+import { ArrowClockwise, House } from "@phosphor-icons/react/dist/ssr";
 import { captureToSentry } from "@/lib/observability/sentryBrowser";
 import { reportClientError } from "@/lib/observability/clientReport";
 import { maybeRecoverFromStaleDeploy } from "@/lib/staleDeploy";
-import { ArrowClockwise, House, WarningOctagon } from "@phosphor-icons/react";
+import { Button, ButtonLink } from "@/components/ui/button";
+import { Callout } from "@/components/ui/callout";
+import { Screen } from "@/components/ui/screen";
 
 /**
  * Global error boundary for every `/app/*` page.
@@ -13,11 +15,15 @@ import { ArrowClockwise, House, WarningOctagon } from "@phosphor-icons/react";
  * Wave 11 — Next 16's app-router error.tsx convention. If any /app page
  * throws during render, Next mounts this component instead of the blank
  * white screen. It logs the error to the console for owner debugging
- * and gives the user three calm exits: retry, dashboard, or just back.
+ * and gives the user two calm exits: try again, or Home.
  *
  * No PII in the message. We never show the raw stack to end users —
  * only Next's error digest if present, so owner support can correlate
  * it with the build logs.
+ *
+ * An error boundary can't ask which look is on, so this is drawn once in
+ * ui- tokens and kit parts (as settings' LoadFailed is): it paints its own
+ * ui background, so it reads right in both shells, dark or outdoor.
  */
 export default function AppError({
   error,
@@ -41,52 +47,36 @@ export default function AppError({
   }, [error]);
 
   return (
-    <div className="min-h-screen text-white">
-      <main className="mx-auto max-w-3xl px-4 py-20 sm:px-6">
-        <div className="t2q-card-pro p-6 sm:p-10">
-          <span
-            aria-hidden="true"
-            className="inline-flex h-12 w-12 items-center justify-center rounded-sm border border-red-500/40 bg-red-500/10 text-red-300"
-          >
-            <WarningOctagon size={22} weight="fill" />
-          </span>
-          <h1 className="mt-5 font-display text-3xl uppercase tracking-tight sm:text-4xl">
-            Something tripped a circuit.
-          </h1>
-          <p className="mt-3 text-sm text-ink-300 sm:text-base">
-            Tradies2Quote hit an unexpected error on this page. Your work
-            isn&apos;t lost — quotes save before this point. Try again, or
-            head back to the dashboard.
-          </p>
-
+    <Screen data-testid="app-error">
+      <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-5 px-4 pt-10 pb-10">
+        <h1 className="ui-heading text-ui-2xl text-ui-text">Something went wrong</h1>
+        <Callout
+          tone="bad"
+          title="This page hit an unexpected error"
+          action={
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <Button
+                variant="secondary"
+                icon={<ArrowClockwise weight="bold" />}
+                onClick={() => reset()}
+                data-testid="app-error-retry"
+              >
+                Try again
+              </Button>
+              <ButtonLink href="/app" variant="ghost" icon={<House weight="bold" />} data-testid="app-error-dashboard">
+                Back to Home
+              </ButtonLink>
+            </div>
+          }
+        >
+          <p>Your work isn&apos;t lost: quotes save before this point. Try again, or head back to Home.</p>
           {error?.digest ? (
-            <p className="mt-4 inline-flex items-center gap-2 rounded-sm border border-ink-700 bg-ink-900 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-300">
-              <span aria-hidden="true">{"//"}</span>
-              <span>error id {error.digest}</span>
+            <p className="mt-2 text-ui-muted">
+              Error code: <span className="tabular-nums">{error.digest}</span>
             </p>
           ) : null}
-
-          <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-            <button
-              type="button"
-              onClick={() => reset()}
-              data-testid="app-error-retry"
-              className="t2q-btn-primary-pro inline-flex h-11 items-center justify-center gap-2 px-5"
-            >
-              <ArrowClockwise size={16} weight="bold" />
-              Try again
-            </button>
-            <Link
-              href="/app"
-              data-testid="app-error-dashboard"
-              className="t2q-btn-ghost-pro inline-flex h-11 items-center justify-center gap-2 px-5"
-            >
-              <House size={16} weight="bold" />
-              Back to dashboard
-            </Link>
-          </div>
-        </div>
+        </Callout>
       </main>
-    </div>
+    </Screen>
   );
 }

@@ -128,7 +128,7 @@ export default async function WeatherImpactPage({
     <div className="min-h-screen text-white">
       <AppHeader context="Weather Impact" />
 
-      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
+      <main data-legacy-body="" className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
         <div className="t2q-page-intro mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
             <Link href="/app" className="t2q-btn-back mb-4">

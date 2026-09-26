@@ -114,12 +114,21 @@ describe("switch on: the new look, behind the same gates", () => {
     state.newLook = true;
   });
 
-  it("renders the new flow instead of the tabs, with the header for wider screens", async () => {
+  it("renders the new flow instead of the tabs, and nothing else: the flow draws its own top bar", async () => {
     const html = await render();
     expect(html).not.toContain('data-testid="old-flow"');
     expect(html).not.toContain("step 1 of 3");
-    expect(html).toContain('data-testid="app-header" data-context="New quote"');
+    // <AppHeader> becomes a second "Cancel / New quote" bar (and a second h1) in the new look.
+    expect(html).not.toContain('data-testid="app-header"');
+    expect(html).toMatch(/^<div data-testid="new-flow" data-props="[^"]*"><\/div>$/);
     expect(newFlowProps(html)).toEqual({ needsAiConsent: false, voiceEnabled: true, scanEnabled: true, start: null });
+  });
+
+  it("no second top bar with a page error either", async () => {
+    const html = await render("draft-failed");
+    expect(html).not.toContain('data-testid="app-header"');
+    expect(html).not.toContain('data-testid="new-quote-error"');
+    expect(newFlowProps(html).errorKey).toBe("draft-failed");
   });
 
   it("?start=talk (Home's Talk a quote) opens on the mic; anything else is ignored", async () => {

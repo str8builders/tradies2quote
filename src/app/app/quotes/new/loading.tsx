@@ -1,50 +1,56 @@
+import { SpinnerGap } from "@phosphor-icons/react/dist/ssr";
+import { Screen } from "@/components/ui/screen";
+import { Skeleton } from "@/components/ui/skeleton";
+import { TopBar } from "@/components/ui/top-bar";
+
 /**
  * Fast loading state for `/app/quotes/new`.
  *
- * Kept route-local so tapping "New quote" from the dashboard gets an
- * immediate, useful loading screen while the auth/subscription gate resolves,
- * without bringing the heavier app splash back between every /app tab.
+ * Kept route-local so tapping "New quote" gets an immediate, useful loading
+ * screen while the auth/subscription gate resolves, without bringing the
+ * heavier app splash back between every /app tab.
+ *
+ * A loading file can't ask which look is on, so this is drawn once, in ui-
+ * tokens, and reads right in both shells, dark or outdoor: it paints its own
+ * ui background, so words and page always flip together. It mirrors the new
+ * flow's first screen (FlowFrame + the three ways in) so nothing jumps when
+ * the flow arrives. The top bar shows only inside the new-look shell
+ * (`data-look="new"`), where the flow's own bar replaces it; the old page
+ * brings its own header.
  */
 export default function NewQuoteLoading() {
   return (
-    <div className="min-h-screen text-white">
-      <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
-        <div className="mb-8">
-          <div className="t2q-section-label-pro mb-3">{"// step 1 of 3"}</div>
-          <h1 className="font-display text-3xl uppercase tracking-tight sm:text-4xl">
-            Getting the <span className="text-brand">recorder</span> ready.
-          </h1>
-          <p className="mt-3 max-w-xl text-sm text-ink-300 sm:text-base">
-            Checking access and warming up the quote flow.
+    <Screen data-new-quote-screen="loading">
+      <div className="sticky top-[env(safe-area-inset-top)] z-20 hidden sm:static [[data-look=new]_&]:block">
+        <TopBar title="New quote" safeArea={false} back={{ href: "/app", label: "Cancel" }} />
+      </div>
+      <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-5 px-4 pt-5 pb-8">
+        <div data-testid="new-quote-loading" role="status" aria-live="polite">
+          <h2 className="ui-heading text-ui-2xl text-ui-text">Getting ready…</h2>
+          <p className="mt-2 flex items-center gap-2 text-ui-base text-ui-muted">
+            <SpinnerGap
+              aria-hidden="true"
+              weight="bold"
+              className="shrink-0 animate-spin text-[1.25rem] text-ui-brand-text motion-reduce:animate-none"
+            />
+            Checking your account and warming up the recorder.
           </p>
         </div>
-
-        <section
-          data-testid="new-quote-loading"
-          role="status"
-          aria-live="polite"
-          className="t2q-card-pro p-6 sm:p-8"
-        >
-          <div className="flex flex-col items-center text-center">
-            <div
-              aria-hidden="true"
-              className="relative grid h-28 w-28 place-items-center rounded-full border-2 border-brand bg-ink-900 text-brand"
+        <ul aria-hidden="true" className="space-y-3">
+          {[0, 1, 2].map((row) => (
+            <li
+              key={row}
+              className="flex min-h-20 items-center gap-4 rounded-ui-lg border-2 border-ui-line bg-ui-surface px-4 py-3 shadow-ui-card"
             >
-              <span className="absolute inset-0 rounded-full border-2 border-brand animate-pulse-ring" />
-              <span className="h-10 w-10 rounded-full border-4 border-brand/40 border-t-brand animate-spin" />
-            </div>
-
-            <p className="t2q-loading-caption mt-6 font-mono text-xs uppercase tracking-[0.22em] text-ink-300">
-              {"// loading new quote"}
-            </p>
-
-            <div className="mt-6 w-full max-w-sm space-y-3 animate-pulse">
-              <div className="h-3 rounded-sm bg-ink-700" />
-              <div className="mx-auto h-3 w-2/3 rounded-sm bg-ink-700" />
-            </div>
-          </div>
-        </section>
+              <Skeleton className="h-12 w-12 shrink-0" />
+              <span className="min-w-0 flex-1 space-y-2">
+                <Skeleton shape="line" className="w-2/5" />
+                <Skeleton shape="line" className="w-4/5" />
+              </span>
+            </li>
+          ))}
+        </ul>
       </main>
-    </div>
+    </Screen>
   );
 }

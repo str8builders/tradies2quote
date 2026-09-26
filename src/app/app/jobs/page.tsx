@@ -7,8 +7,14 @@ import { getCachedAuthUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { isNewLookOn } from "@/lib/ui/newLook";
 import { businessTimeZone } from "../_v2/lib/dates";
-import { JOBS_PATH, buildJobRows, oldLookHrefForJobs, parseJobFilter } from "../_v2/lib/job-board";
-import { loadBoard } from "../_v2/lib/load-board";
+import {
+  JOBS_PATH,
+  buildDeletedJobRows,
+  buildJobRows,
+  oldLookHrefForJobs,
+  parseJobFilter,
+} from "../_v2/lib/job-board";
+import { loadBoard, loadDeletedJobs } from "../_v2/lib/load-board";
 import { loadTopBarData } from "../_v2/lib/top-bar";
 import { TabTopBar } from "../_v2/shell/TabTopBar";
 import { JobsBrowser } from "./_components/JobsBrowser";
@@ -32,7 +38,8 @@ function firstValue(value: string | string[] | undefined): string | undefined {
  * /app/jobs — new look only (redesign phase 2): one list, one row per
  * quote, its invoice folded in. Replaces the Quotes and Invoices lists in
  * the new look. With the new look off it hands over to the old list that
- * fits the filter, so the old look is unchanged.
+ * fits the filter, so the old look is unchanged. Jobs deleted in the last
+ * 90 days are loaded too, for Recently deleted (never for the totals).
  */
 export default async function JobsPage({
   searchParams,
@@ -45,15 +52,21 @@ export default async function JobsPage({
   if (!(await isNewLookOn())) redirect(oldLookHrefForJobs(parseJobFilter(firstValue(show))));
 
   const supabase = await createClient();
-  const [board, profile, bar] = await Promise.all([
+  const now = requestTime();
+  const [board, deleted, profile, bar] = await Promise.all([
     loadBoard(supabase, user.id),
+    loadDeletedJobs(supabase, user.id, now),
     supabase.from("profiles").select("country, currency").eq("id", user.id).maybeSingle(),
     loadTopBarData(),
   ]);
   const place = (profile.data ?? {}) as { country?: string | null; currency?: string | null };
-  const rows = board.failed
-    ? []
-    : buildJobRows(board.quotes, board.invoices, requestTime(), businessTimeZone(place.country, place.currency));
+  const zone = businessTimeZone(place.country, place.currency);
+  const rows = board.failed ? [] : buildJobRows(board.quotes, board.invoices, now, zone);
+  // Each deleted job with the invoices it would come back with: the ones
+  // deleted with it, and any never deleted (still on the board).
+  const deletedRows = deleted.failed
+    ? null
+    : buildDeletedJobRows(deleted.quotes, [...deleted.invoices, ...board.invoices], now, zone);
 
   return (
     <Screen height="fill" data-testid="jobs-screen">
@@ -74,7 +87,7 @@ export default async function JobsPage({
             </Callout>
           </div>
         ) : (
-          <JobsBrowser rows={rows} />
+          <JobsBrowser rows={rows} deleted={deletedRows} />
         )}
       </main>
     </Screen>

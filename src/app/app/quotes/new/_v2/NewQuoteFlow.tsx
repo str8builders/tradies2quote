@@ -186,7 +186,7 @@ export function NewQuoteFlow({ needsAiConsent, voiceEnabled, scanEnabled, errorK
 
   return (
     <>
-      <AiConsentModal open={consentBlocked} onGranted={() => setConsentBlocked(false)} />
+      <AiConsentModal look="new" open={consentBlocked} onGranted={() => setConsentBlocked(false)} />
       {screen}
       <form ref={formRef} action={createDraftQuote} data-testid="new-quote-form">
         <input ref={transcriptRef} type="hidden" name="transcript" defaultValue="" />

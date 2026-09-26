@@ -268,8 +268,10 @@ export default function PrivacyPage() {
               <strong>Maps and addresses</strong> — job-site addresses are
               looked up with OpenStreetMap&apos;s Nominatim service, and maps
               are drawn with OpenStreetMap map tiles, which your phone loads
-              straight from OpenStreetMap. Only the address, or the area of
-              the map on screen, is sent — not who you are.
+              straight from OpenStreetMap. To name the town on the weather
+              button, your location rounded to about 1 km is looked up there
+              too. Only the address, the rounded area, or the area of the map
+              on screen is sent — not who you are.
             </li>
             <li>
               <strong>Weather</strong> — the weather button shows the forecast
@@ -331,9 +333,10 @@ export default function PrivacyPage() {
             </li>
             <li>
               <strong>OpenStreetMap</strong> — maps. Its Nominatim service
-              turns job-site addresses into map points, and its map tiles
-              draw the maps. Receives only the address or the map area; no
-              account identifiers are sent with it.
+              turns job-site addresses into map points and names the town
+              for the weather button, and its map tiles draw the maps.
+              Receives only the address, a location rounded to about 1 km, or
+              the map area; no account identifiers are sent with it.
             </li>
             <li>
               <strong>Stripe</strong> — payment processing, including

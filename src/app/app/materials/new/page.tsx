@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { isNewLookOn } from "@/lib/ui/newLook";
 import { MaterialForm } from "../_components/MaterialForm";
+import { PriceFormScreen } from "../_newlook/PriceFormScreen";
 
 export const metadata: Metadata = {
   title: "Add material",
@@ -14,6 +16,9 @@ export default async function NewMaterialPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  // Redesign: "Add a price" in the new look. Off: unchanged below.
+  if (await isNewLookOn()) return <PriceFormScreen mode="create" />;
 
   return (
     <div className="min-h-screen text-white">

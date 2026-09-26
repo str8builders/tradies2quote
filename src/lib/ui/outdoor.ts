@@ -59,7 +59,16 @@ export function outdoorCookieString(on: boolean, secure: boolean): string {
 export interface ContrastRootLike {
   setAttribute(name: string, value: string): void;
   removeAttribute(name: string): void;
+  getAttribute?(name: string): string | null;
+  classList?: { toggle(token: string, force?: boolean): boolean };
 }
+
+/**
+ * The class the new-look shell carries while outdoor mode is on, so screens
+ * not yet in the new look keep a dark panel on its white page (globals.css,
+ * "OUTDOOR SAFETY NET"). Outdoor itself only swaps --ui-* variables.
+ */
+export const OUTDOOR_SHELL_CLASS = "t2q-outdoor";
 
 export interface ContrastDocumentLike {
   querySelectorAll(selector: string): Iterable<ContrastRootLike> | ArrayLike<ContrastRootLike>;
@@ -71,6 +80,7 @@ export function applyOutdoorAttribute(doc: ContrastDocumentLike, on: boolean): n
   for (const root of roots) {
     if (on) root.setAttribute(CONTRAST_ATTRIBUTE, OUTDOOR_CONTRAST);
     else root.removeAttribute(CONTRAST_ATTRIBUTE);
+    if (root.getAttribute?.("data-look") === "new") root.classList?.toggle(OUTDOOR_SHELL_CLASS, on);
   }
   return roots.length;
 }

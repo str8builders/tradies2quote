@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { CheckCircle, PaperPlaneTilt } from "@phosphor-icons/react";
 import { submitBetaFeedback } from "../actions";
 
-const FIELDS = [
+export const FIELDS = [
   {
     key: "whatWorked" as const,
     label: "What worked?",
@@ -36,12 +36,44 @@ const EMPTY: FormState = {
   wouldPay: "",
 };
 
-export function BetaFeedbackForm() {
+export type FeedbackKey = keyof FormState;
+
+/** The feedback form's state and its one action, shared by both looks. */
+export function useBetaFeedback() {
   const [values, setValues] = useState<FormState>(EMPTY);
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">(
     "idle",
   );
   const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setStatus("sending");
+    setError(null);
+    const res = await submitBetaFeedback(values);
+    if (res.ok) {
+      setStatus("sent");
+    } else {
+      setStatus("error");
+      setError(res.error ?? "Something went wrong.");
+    }
+  }
+
+  const setField = (key: FeedbackKey, value: string) =>
+    setValues((v) => ({ ...v, [key]: value }));
+
+  const reset = () => {
+    setValues(EMPTY);
+    setStatus("idle");
+  };
+
+  return { values, status, error, submit, setField, reset };
+}
+
+export type BetaFeedbackState = ReturnType<typeof useBetaFeedback>;
+
+export function BetaFeedbackForm() {
+  const { values, status, error, submit, setField, reset } = useBetaFeedback();
 
   if (status === "sent") {
     return (
@@ -52,10 +84,7 @@ export function BetaFeedbackForm() {
         </p>
         <button
           type="button"
-          onClick={() => {
-            setValues(EMPTY);
-            setStatus("idle");
-          }}
+          onClick={reset}
           className="mt-4 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-400 hover:text-brand"
         >
           Send another
@@ -67,18 +96,7 @@ export function BetaFeedbackForm() {
   return (
     <form
       data-testid="beta-feedback-form"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        setStatus("sending");
-        setError(null);
-        const res = await submitBetaFeedback(values);
-        if (res.ok) {
-          setStatus("sent");
-        } else {
-          setStatus("error");
-          setError(res.error ?? "Something went wrong.");
-        }
-      }}
+      onSubmit={submit}
       className="t2q-card-pro p-5 sm:p-7"
     >
       <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-brand">
@@ -96,9 +114,7 @@ export function BetaFeedbackForm() {
             <textarea
               name={f.key}
               value={values[f.key]}
-              onChange={(e) =>
-                setValues((v) => ({ ...v, [f.key]: e.target.value }))
-              }
+              onChange={(e) => setField(f.key, e.target.value)}
               rows={2}
               placeholder={f.placeholder}
               className="mt-1.5 w-full resize-y rounded-xl border border-ink-700 bg-ink-900/50 px-3 py-2.5 text-sm text-white placeholder:text-ink-500 focus:border-brand focus:outline-none"

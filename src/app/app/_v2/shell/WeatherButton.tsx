@@ -83,7 +83,16 @@ function WeatherFace({ state, trade }: { state: WeatherState; trade: WeatherImpa
             />
           ) : null}
         </span>
-        {temp ? <span className="font-semibold tabular-nums text-ui-text">{temp}</span> : null}
+        {temp || state.reading.locality ? (
+          <span className="flex min-w-0 flex-col items-start leading-tight">
+            {temp ? <span className="font-semibold tabular-nums text-ui-text">{temp}</span> : null}
+            {state.reading.locality ? (
+              <span data-testid="weather-town" className="max-w-24 truncate text-ui-sm text-ui-muted">
+                {state.reading.locality}
+              </span>
+            ) : null}
+          </span>
+        ) : null}
       </>
     );
   }

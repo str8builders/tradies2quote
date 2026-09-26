@@ -47,7 +47,8 @@ export function ScanScreen({
       >
         Snap the drawing
       </ScreenHeading>
-      <div inert={writing !== "idle"} data-testid="scan-panel-wrap">
+      {/* The plan reader is still the old look: a dark panel in outdoor mode (globals.css safety net). */}
+      <div inert={writing !== "idle"} data-testid="scan-panel-wrap" data-legacy-body="" className="p-2">
         <ScanPanel transcript={scanned} setTranscript={onScanned} />
       </div>
     </FlowFrame>

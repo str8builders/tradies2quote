@@ -363,6 +363,7 @@ export default async function QuotePreviewPage({
       <AppHeader context={headerNumber} />
 
       <main
+        data-legacy-body=""
         data-preview-quote-number={headerNumber}
         // pb-24 (mobile): the fixed StickyActionBar covers ~3.5rem above the
         // island nav — page-tail cards (Review tools, invoice draft) need

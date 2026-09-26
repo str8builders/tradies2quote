@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ShieldCheck, X } from "@phosphor-icons/react/dist/ssr";
+import { ButtonLink } from "@/components/ui/button";
+import { cx } from "@/components/ui/cx";
+import { IconButton } from "@/components/ui/icon-button";
+import { NoticeStrip } from "../_v2/ui/NoticeStrip";
 
 /**
  * Lightweight, dismissible beta safety reminder.
@@ -16,13 +20,17 @@ import { ArrowRight, ShieldCheck, X } from "@phosphor-icons/react/dist/ssr";
  * Renders nothing on the server / first client paint (visible starts false),
  * then the effect decides — so there's no hydration mismatch and no flash
  * for users who already dismissed it.
+ *
+ * `look="new"` (passed by the new-look shell) draws it as a slim ui-token
+ * strip (<BetaNoticeStrip>) with a 48 px dismiss button; when and how long it
+ * shows is the same for both looks.
  */
 const STORAGE_KEY = "t2q-beta-notice-dismissed-v1";
 /** Auto-dismiss after this long on screen, then fade out. */
 const AUTO_HIDE_MS = 10000;
 const FADE_MS = 350;
 
-export function BetaNoticeBanner() {
+export function BetaNoticeBanner({ look = "old" }: { look?: "new" | "old" } = {}) {
   const [visible, setVisible] = useState(false);
   const [leaving, setLeaving] = useState(false);
 
@@ -67,6 +75,8 @@ export function BetaNoticeBanner() {
   }
 
   if (!visible) return null;
+
+  if (look === "new") return <BetaNoticeStrip leaving={leaving} onDismiss={beginExit} />;
 
   return (
     <div
@@ -114,5 +124,49 @@ export function BetaNoticeBanner() {
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * The reminder in the new look: the words, "How T2Q quotes" from `sm` up
+ * (as before), and Dismiss. Leaving fades it out (opacity only, none for
+ * reduced motion) before the banner unmounts.
+ */
+export function BetaNoticeStrip({ leaving, onDismiss }: { leaving: boolean; onDismiss: () => void }) {
+  return (
+    <NoticeStrip
+      tone="info"
+      icon={<ShieldCheck weight="bold" />}
+      data-testid="beta-review-notice"
+      className={cx(
+        "transition-opacity duration-ui-slow ease-ui-out motion-reduce:transition-none",
+        leaving && "opacity-0",
+      )}
+      end={
+        <>
+          <span className="hidden sm:inline-flex">
+            <ButtonLink
+              href="/app/beta"
+              variant="ghost"
+              size="sm"
+              iconEnd={<ArrowRight weight="bold" />}
+              data-testid="beta-review-link"
+            >
+              How T2Q quotes
+            </ButtonLink>
+          </span>
+          <IconButton
+            label="Dismiss reminder"
+            icon={<X weight="bold" />}
+            onClick={onDismiss}
+            data-testid="beta-review-dismiss"
+          />
+        </>
+      }
+    >
+      {/* Neutral wording, never "beta" (App Review 2.1), as above. */}
+      <span className="font-semibold">Heads up:</span> treat T2Q scopes, quantities and prices as drafts, and
+      check each quote before you send it.
+    </NoticeStrip>
   );
 }

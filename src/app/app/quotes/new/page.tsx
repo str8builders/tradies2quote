@@ -66,19 +66,18 @@ export default async function NewQuotePage({
   const scanEnabled = Boolean(process.env.ANTHROPIC_API_KEY?.trim());
 
   // Redesign (new look, behind the switch): the same gates and inputs above,
-  // new screens in ./_v2. Switched off, everything below is unchanged.
+  // new screens in ./_v2. No <AppHeader> here: every flow screen draws its
+  // own top bar (Cancel / New quote), and the shell's tab bar or side rail
+  // does the rest. Switched off, everything below is unchanged.
   if (newLook) {
     return (
-      <>
-        <AppHeader context="New quote" />
-        <NewQuoteFlow
-          errorKey={errorKey}
-          start={start}
-          needsAiConsent={needsAiConsent}
-          voiceEnabled={voiceEnabled}
-          scanEnabled={scanEnabled}
-        />
-      </>
+      <NewQuoteFlow
+        errorKey={errorKey}
+        start={start}
+        needsAiConsent={needsAiConsent}
+        voiceEnabled={voiceEnabled}
+        scanEnabled={scanEnabled}
+      />
     );
   }
 

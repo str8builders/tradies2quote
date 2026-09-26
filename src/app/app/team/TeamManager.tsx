@@ -1,24 +1,14 @@
 "use client";
 import { formatNZNumericDate } from "@/lib/format-date";
-import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { PLANS, type PlanId } from "@/lib/plans";
+import { PLANS } from "@/lib/plans";
 import { teamWords } from "@/lib/team-copy";
-type TeamData = { team: { name: string; id: string } | null; isOwner: boolean; active: boolean; plan: PlanId; seats: number; roster: { members: { user_id: string; email: string; owner: boolean }[]; invitations: { id: string; email: string; expires_at: string }[] } };
+import { useTeam } from "./_lib/useTeam";
 const field = "min-h-11 w-full rounded-xl border border-white/15 bg-black/20 px-4 py-3 text-sm text-white placeholder:text-ink-500";
 /** `inApp` (from the server): inside the iPhone app there are no plan names, subscriptions or plan links (3.1.3(f)). */
 export function TeamManager({ initialInvite = "", inApp = false }: { initialInvite?: string; inApp?: boolean }) {
   const words=teamWords(inApp);
-  const [code,setCode]=useState("");const [codeSent,setCodeSent]=useState(false);
-  const [data,setData]=useState<TeamData|null>(null);const [error,setError]=useState("");const [busy,setBusy]=useState(false);const [link,setLink]=useState("");const [notice,setNotice]=useState("");const [invite,setInvite]=useState(initialInvite);
-  const load=useCallback(async()=>{try{const r=await fetch('/api/team');const d=await r.json();if(!r.ok)throw Error(d.error);setData(d);}catch(e){setError(e instanceof Error?e.message:'Unable to load your team.');}},[]);
-  // Refresh state follows an asynchronous API response; this is external data synchronisation.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(()=>{void load();},[load]);
-  async function act(action:string,values:Record<string,string>={}){
-    setBusy(true);setError("");setNotice("");
-    try{const r=await fetch('/api/team',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,...values})});const d=await r.json();if(!r.ok)throw Error(d.error);if(d.codeSent){setCodeSent(true);setNotice('Check your inbox for an 8-digit verification code.');}else if(d.link)setLink(d.link);else setNotice(action==='accept'?'You have joined the team.':'Changes saved.');if(action==='accept'){setInvite('');window.history.replaceState(window.history.state,'','/app/team');}await load();}catch(e){setError(e instanceof Error?e.message:'Please try again.');}finally{setBusy(false);}
-  }
+  const {code,setCode,codeSent,data,error,busy,link,notice,invite,load,act,copyLink}=useTeam(initialInvite);
   return <div className="mt-8 space-y-6">
     {error&&<p role="alert" className="rounded-xl border border-red-400/30 bg-red-400/10 p-4 text-sm text-red-200">{error}</p>}{notice&&<p role="status" className="text-sm text-green-300">{notice}</p>}
     {invite&&<section className="t2q-card-pro p-6"><h2 className="text-xl font-semibold">You have a team invitation</h2><p className="my-4 text-sm text-ink-300">{words.invite}</p><button disabled={busy} onClick={()=>void act('verify',{token:invite})} className="t2q-btn-ghost-pro">{codeSent?'Resend email code':'Email me a verification code'}</button>{codeSent&&<form className="mt-4 space-y-3" onSubmit={e=>{e.preventDefault();void act('accept',{token:invite,code});}}><label className="block text-sm">Email verification code<input value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,''))} inputMode="numeric" autoComplete="one-time-code" maxLength={8} minLength={8} required className={`${field} mt-2`} /></label><p className="text-xs text-ink-400">The code expires in 10 minutes.</p><button disabled={busy} className="t2q-btn-primary-pro">Verify & join team</button></form>}</section>}
@@ -32,7 +22,7 @@ export function TeamManager({ initialInvite = "", inApp = false }: { initialInvi
       {data.roster.members.length>data.seats&&<p role="alert" className="mt-3 text-sm text-amber-300">{words.overLimit}</p>}
       <ul className="mt-5 divide-y divide-white/10">{data.roster.members.map(m=><li key={m.user_id} className="flex flex-wrap items-center justify-between gap-2 py-3"><span className="break-all text-sm">{m.email}{m.owner&&<span className="ml-2 text-ink-400">Owner</span>}</span>{!m.owner&&<button disabled={busy} onClick={()=>void act('remove',{user_id:m.user_id})} className="min-h-11 text-sm text-ink-300 underline">Remove member</button>}</li>)}{data.roster.invitations.map(i=><li key={i.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"><span className="break-all">{i.email}<small className="block text-ink-400">Invitation expires {formatNZNumericDate(i.expires_at)}</small></span><button disabled={busy} onClick={()=>void act('revoke',{id:i.id})} className="min-h-11 underline">Revoke invitation</button></li>)}</ul>
       {data.active&&<form className="mt-5 space-y-3" onSubmit={e=>{e.preventDefault();void act('invite',{email:String(new FormData(e.currentTarget).get('email'))});}}><label className="block text-sm">Invite a teammate<input name="email" type="email" maxLength={254} required placeholder="name@business.co.nz" className={`${field} mt-2`}/></label><p className="text-xs leading-relaxed text-ink-400">Create a private link for this email address. Share it with that person yourself. Links expire after 7 days and reserve a seat.</p><button disabled={busy} className="t2q-btn-primary-pro">Create invitation link</button></form>}
-      {link&&<div className="mt-5 rounded-xl border border-brand/30 bg-brand/5 p-4"><label className="text-sm">Invitation link<input readOnly value={link} onFocus={e=>e.currentTarget.select()} className={`${field} mt-2`}/></label><button className="mt-2 min-h-11 text-sm font-semibold text-brand" onClick={async()=>{try{await navigator.clipboard.writeText(link);setNotice('Invitation link copied.');}catch{setNotice('Select and copy the link above.');}}}>Copy link</button></div>}
+      {link&&<div className="mt-5 rounded-xl border border-brand/30 bg-brand/5 p-4"><label className="text-sm">Invitation link<input readOnly value={link} onFocus={e=>e.currentTarget.select()} className={`${field} mt-2`}/></label><button className="mt-2 min-h-11 text-sm font-semibold text-brand" onClick={()=>void copyLink()}>Copy link</button></div>}
       </section>}
       <div className="flex flex-wrap gap-3"><Link href="/app/clients" className="t2q-btn-ghost-pro">Open client list</Link>{data.plan==='builder'&&<Link href="/app/templates" className="t2q-btn-ghost-pro">Terms templates</Link>}</div>
     </>}

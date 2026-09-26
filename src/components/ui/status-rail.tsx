@@ -13,7 +13,7 @@ const DOT: Record<RailState, string> = {
 const LABEL: Record<RailState, string> = {
   done: "text-ui-muted",
   current: "font-semibold text-ui-text",
-  upcoming: "text-ui-faint",
+  upcoming: "text-ui-muted",
 };
 
 /** Read after each step's name by screen readers. */
