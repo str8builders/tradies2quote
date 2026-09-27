@@ -78,7 +78,7 @@ describe("the top bar old pages get in the new look", () => {
     ["/app/requests", "Client requests", { href: "/app", label: "Home" }],
     ["/app/weather", "Weather", { href: "/app", label: "Home" }],
     ["/app/materials/quick-start", "Quick start", { href: "/app/materials", label: "Prices" }],
-    ["/app/materials/capture", "Add from a photo", { href: "/app/materials", label: "Prices" }],
+    ["/app/materials/capture", "Copy a supplier's price", { href: "/app/materials", label: "Prices" }],
     ["/app/suppliers", "Suppliers", { href: "/app/materials", label: "Prices" }],
     ["/app/settings", "Settings", { href: "/app/more", label: "More" }],
     ["/app/settings/guide", "How to use T2Q", { href: "/app/more", label: "More" }],
