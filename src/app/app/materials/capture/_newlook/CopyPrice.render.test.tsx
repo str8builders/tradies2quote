@@ -49,7 +49,7 @@ function state(typed: Partial<Typed> = {}): CaptureFormState {
     ...typed,
   };
   const priceNum = Number(t.displayPrice);
-  const isValidPrice = Number.isFinite(priceNum) && priceNum >= 0;
+  const isValidPrice = t.displayPrice.trim() !== "" && Number.isFinite(priceNum) && priceNum >= 0;
   const finalPrice = isValidPrice ? round2(t.incGst ? priceNum / 1.15 : priceNum) : null;
   const detected = supplierFromUrl(t.url);
   return {
