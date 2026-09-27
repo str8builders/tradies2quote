@@ -336,6 +336,7 @@ export default async function DevNewLookPage({
       </main>
     );
   } else if (screen === "qr") {
+    const qrSvg = await QRCode.toString("https://tradies2quote.com/r/str8-builders", { type: "svg", margin: 1, color: { dark: "#0A0A0A", light: "#FFFFFF" } });
     content = (
       <ToastProvider>
         <LegacyTopBar context="Your QR code" />
@@ -345,6 +346,7 @@ export default async function DevNewLookPage({
           hasBusinessName
           hasLogo={false}
           inApp={inapp === "1"}
+          qrSrc={`data:image/svg+xml;utf8,${encodeURIComponent(qrSvg)}`}
         />
       </ToastProvider>
     );

@@ -125,12 +125,15 @@ export function QrCodeView({
   hasBusinessName,
   hasLogo,
   inApp,
+  qrSrc,
 }: {
   initialSlug: string | null;
   appUrl: string;
   hasBusinessName: boolean;
   hasLogo: boolean;
   inApp: boolean;
+  /** The code's image; the signed-in route unless given (the local preview page passes its own). */
+  qrSrc?: string;
 }) {
   const toast = useToast();
   const [slug, setSlug] = useState<string | null>(initialSlug);
@@ -175,7 +178,7 @@ export function QrCodeView({
             <div style={{ backgroundColor: "white" }} className="mx-auto w-full max-w-72 rounded-ui-lg p-3">
               {/* eslint-disable-next-line @next/next/no-img-element -- signed-in SVG route, no optimiser */}
               <img
-                src={`/api/account/request-qr?v=${encodeURIComponent(slug)}`}
+                src={qrSrc ?? `/api/account/request-qr?v=${encodeURIComponent(slug)}`}
                 alt="QR code for your request link"
                 width={288}
                 height={288}
