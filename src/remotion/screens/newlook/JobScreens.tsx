@@ -111,10 +111,16 @@ function Group({ name, lines, highlight = 0 }: { name: string; lines: LineView[]
   );
 }
 
+/** Who the quote is for (the example's Sam Taylor unless given). */
+export type JobClient = { name: string; email: string };
+const SAM: JobClient = { name: EXAMPLE.client, email: EXAMPLE.clientEmail };
+
 /**
  * The job page. `labour` null leaves the job with just its materials (the
- * T2QCAL hand-off makes a one-line draft). `bottom` replaces the bar (e.g.
- * while a sheet is up the page underneath keeps its bar).
+ * T2QCAL hand-off makes a one-line draft). `client` null is a draft nobody's
+ * been picked for yet (what T2QCAL's Send to a quote makes): the page says
+ * so the way job-view.ts does ("Next: add who the quote is for…", "No
+ * client details yet", "Send the quote").
  */
 export function JobScreen({
   stage,
@@ -126,6 +132,7 @@ export function JobScreen({
   scanPress = 0,
   total,
   title = EXAMPLE.job,
+  client = SAM,
 }: {
   stage: JobStage;
   labour?: LineView | null;
@@ -136,8 +143,12 @@ export function JobScreen({
   scanPress?: number;
   total?: number;
   title?: string;
+  client?: JobClient | null;
 }) {
   const s = STAGE[stage];
+  const noClient = stage === "draft" && !client;
+  const hint = noClient ? "Next: add who the quote is for, then send it." : s.hint;
+  const main = noClient ? "Send the quote" : s.main;
   const before = (labour ? labour.qty * labour.price : 0) + materials.qty * materials.price;
   const sum = total ?? Math.round(before * 1.15 * 100) / 100;
   const locked = stage !== "draft";
@@ -146,7 +157,7 @@ export function JobScreen({
       <Page top={130} scroll={scroll}>
         <StatusRail current={s.rail} />
         <Muted size={15} style={{ marginTop: 10 }}>
-          {s.hint}
+          {hint}
         </Muted>
         <Card style={{ marginTop: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
@@ -175,15 +186,24 @@ export function JobScreen({
         ) : null}
         <SectionTitle>Client</SectionTitle>
         <Card>
-          <Row title={EXAMPLE.client} subtitle={EXAMPLE.clientEmail} trailing={<Button variant="ghost">Edit</Button>} />
+          {client ? (
+            <Row title={client.name} subtitle={client.email} trailing={<Button variant="ghost">Edit</Button>} />
+          ) : (
+            <>
+              <Muted>No client details yet.</Muted>
+              <Button variant="secondary" style={{ marginTop: 12 }}>
+                Add the client
+              </Button>
+            </>
+          )}
         </Card>
       </Page>
-      <TopBar title={title} subtitle={EXAMPLE.client} more />
-      {s.main ? (
+      <TopBar title={title} subtitle={client?.name} more />
+      {main ? (
         <BottomBar>
           {s.secondary ? <Button variant="secondary">{s.secondary}</Button> : null}
           <Button pressed={pressMain} icon={stage === "draft" ? <PaperPlaneTilt size={20} weight="bold" /> : stage === "done" ? <Receipt size={20} weight="bold" /> : undefined}>
-            {s.main}
+            {main}
           </Button>
         </BottomBar>
       ) : (
@@ -327,14 +347,25 @@ export function MarkPaidSheet({ enter, press }: { enter: number; press: number }
 }
 
 /** "More tools" opened on "How the numbers were worked out" (the T2QCAL line's record). */
-export function MoreToolsSheet({ enter, rows }: { enter: number; rows: ReadonlyArray<readonly [string, string]> }) {
+export function MoreToolsSheet({
+  enter,
+  rows,
+  line = "Decking & fixings",
+  tool = "Deck subframe",
+}: {
+  enter: number;
+  rows: ReadonlyArray<readonly [string, string]>;
+  /** The quote line the working belongs to, and the T2QCAL calculator that made it. */
+  line?: string;
+  tool?: string;
+}) {
   return (
     <Sheet enter={enter} top={170} title="More tools" description="Everything else for this job.">
       <div style={{ fontSize: 18, fontWeight: 700 }}>How the numbers were worked out</div>
-      <div style={{ marginTop: 10, fontSize: 17, fontWeight: 600 }}>Decking &amp; fixings</div>
+      <div style={{ marginTop: 10, fontSize: 17, fontWeight: 600 }}>{line}</div>
       <div style={{ marginTop: 10, paddingTop: 12, borderTop: `1px solid ${NL.line}` }}>
         <div style={{ fontFamily: "monospace", fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: NL.brand }}>T2QCAL calculation record</div>
-        <div style={{ marginTop: 4, fontSize: 15, color: NL.text }}>Deck subframe</div>
+        <div style={{ marginTop: 4, fontSize: 15, color: NL.text }}>{tool}</div>
         <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 7 }}>
           {rows.map(([label, value]) => (
             <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: 15 }}>

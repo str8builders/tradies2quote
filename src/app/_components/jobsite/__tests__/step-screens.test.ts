@@ -11,6 +11,7 @@ describe("clip addresses", () => {
 
   it("the others keep their plain file names", () => {
     expect(clipSrc("talk", 420)).toBe("/jobsite/screens/talk-420.mp4");
+    expect(clipSrc("t2qcal", 600)).toBe("/jobsite/screens/t2qcal-600.mp4?v=2");
     expect(firstFrameSrc("supplier")).toBe("/jobsite/screens/supplier-first.webp");
   });
 

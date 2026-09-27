@@ -10,13 +10,14 @@ vi.mock("../settings/request-link-actions", () => ({
   disableQuoteRequestLink: vi.fn(),
 }));
 
-import { ToastProvider } from "@/components/ui/toast";
 import { markupRuleBreaks } from "@/test/design-rules";
 import { legacyTopBar } from "../_v2/lib/app-nav";
 import { QR_GUIDE } from "./_lib/guide";
 import { QrCodeView } from "./_components/QrCodeView";
 
-const html = (node: ReactNode) => renderToStaticMarkup(<ToastProvider>{node}</ToastProvider>);
+// No ToastProvider here on purpose: the /app shell doesn't have one, so the
+// screen must bring its own (it crashed live without it on 27 Sep 2026).
+const html = (node: ReactNode) => renderToStaticMarkup(<>{node}</>);
 
 /** The opening tag of the element that holds a fragment. */
 const tagWith = (markup: string, fragment: string) => {
