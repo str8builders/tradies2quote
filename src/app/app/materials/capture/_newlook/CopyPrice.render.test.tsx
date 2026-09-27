@@ -293,3 +293,16 @@ describe("the new-look source files follow the design rules", () => {
     expect(sourceRuleBreaks(readFileSync(join(__dirname, name), "utf8"))).toEqual([]);
   });
 });
+
+describe("CaptureScreen: the price is required", () => {
+  it("a product with no price typed can't be saved as $0", () => {
+    const html = screen({
+      initialUrl: "https://www.placemakers.co.nz/online/pine-90x45",
+      initialName: "Pine 90x45 H3.2",
+      initialSupplier: "PlaceMakers",
+      isPasteFallback: false,
+      taxRate: 0.15,
+    });
+    expect(tag(html, 'data-testid="capture-review"')).toMatch(/\sdisabled=""/);
+  });
+});

@@ -97,7 +97,8 @@ export function useCaptureForm({
   // GST math for save value + the inline preview — to the cent, exact
   // half-up (the app's one money rounding rule).
   const priceNum = Number(displayPrice);
-  const isValidPrice = Number.isFinite(priceNum) && priceNum >= 0;
+  // An empty box is no price, not $0 (Number("") is 0): the price is required.
+  const isValidPrice = displayPrice.trim() !== "" && Number.isFinite(priceNum) && priceNum >= 0;
   const finalPrice = isValidPrice
     ? round2(incGst ? priceNum / (1 + taxRate) : priceNum)
     : null;
