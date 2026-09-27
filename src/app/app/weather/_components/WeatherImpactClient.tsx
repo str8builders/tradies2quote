@@ -51,7 +51,14 @@ export type JobLocation = {
   resolvedFrom: "site_context" | "geocoded_now";
 };
 
-const EMPTY_WEATHER: WeatherImpactInput = {
+export type WeatherImpactProps = {
+  jobOptions: JobOption[];
+  selectedQuoteId: string | null;
+  jobLocation: JobLocation | null;
+  geocodeFailed: boolean;
+};
+
+export const EMPTY_WEATHER: WeatherImpactInput = {
   rainProbabilityPct: null,
   precipitationMmPerHour: null,
   windSpeedKph: null,
@@ -64,7 +71,7 @@ const EMPTY_WEATHER: WeatherImpactInput = {
   forecast: [],
 };
 
-const WEATHER_FIELDS: ReadonlyArray<{
+export const WEATHER_FIELDS: ReadonlyArray<{
   key: keyof Pick<
     WeatherImpactInput,
     | "rainProbabilityPct"
@@ -90,7 +97,7 @@ const WEATHER_FIELDS: ReadonlyArray<{
   { key: "visibilityKm", label: "Visibility", suffix: "km", step: "0.5" },
 ];
 
-const CONTEXT_TOGGLES: ReadonlyArray<{
+export const CONTEXT_TOGGLES: ReadonlyArray<{
   key: keyof WeatherImpactContext;
   label: string;
 }> = [
@@ -102,17 +109,13 @@ const CONTEXT_TOGGLES: ReadonlyArray<{
   { key: "exteriorFinishApplication", label: "Exterior finish / adhesive" },
 ];
 
-export function WeatherImpactClient({
-  jobOptions,
-  selectedQuoteId,
-  jobLocation,
-  geocodeFailed,
-}: {
-  jobOptions: JobOption[];
-  selectedQuoteId: string | null;
-  jobLocation: JobLocation | null;
-  geocodeFailed: boolean;
-}) {
+/**
+ * The check itself, shared by both looks: WeatherImpactClient below draws it
+ * in the old look, ../_newlook/WeatherImpact.tsx in the new one. Only the
+ * markup differs, so the job-site fetch, the device fallback, the manual
+ * numbers and the safe / caution / unsafe call behave the same in either.
+ */
+export function useWeatherImpact({ jobLocation }: Pick<WeatherImpactProps, "jobLocation">) {
   const router = useRouter();
   const [trade, setTrade] = useState<WeatherImpactTrade>("roofing");
   const [context, setContext] = useState<WeatherImpactContext>({
@@ -131,7 +134,6 @@ export function WeatherImpactClient({
     () => evaluateWeatherImpact({ trade, weather, context }),
     [trade, weather, context],
   );
-  const status = STATUS_COPY[result.overall_status];
 
   // Job-location-first: when the server resolved the selected job's site,
   // fetch the live weather for THAT location automatically. All state
@@ -177,6 +179,12 @@ export function WeatherImpactClient({
     // Refetch when the selected job (or its resolved coords) changes.
   }, [jobLocation?.quoteId, jobLocation?.latitude, jobLocation?.longitude]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The weather follows the job: picking one reloads the page for it, and
+  // the server resolves that job's site.
+  function pickJob(id: string) {
+    router.push(id ? `/app/weather?quote=${id}` : "/app/weather");
+  }
+
   function retryJobWeather() {
     if (!jobLocation) return;
     setFetchState("loading");
@@ -202,7 +210,7 @@ export function WeatherImpactClient({
 
   // EXPLICIT device fallback — never a default. Clearly labeled as the
   // tradie's device location, not the job site.
-  async function useDeviceWeather() {
+  async function loadDeviceWeather() {
     setFetchState("loading");
     setFetchError(null);
     try {
@@ -233,6 +241,51 @@ export function WeatherImpactClient({
       [key]: rawValue.trim() === "" ? null : Number(rawValue),
     }));
   }
+
+  return {
+    trade,
+    setTrade,
+    context,
+    setContext,
+    weather,
+    setWeather,
+    fetchState,
+    fetchError,
+    locationFor,
+    result,
+    pickJob,
+    retryJobWeather,
+    loadDeviceWeather,
+    updateWeatherNumber,
+  };
+}
+
+export type WeatherImpactState = ReturnType<typeof useWeatherImpact>;
+
+/** The check in the old look. */
+export function WeatherImpactClient({
+  jobOptions,
+  selectedQuoteId,
+  jobLocation,
+  geocodeFailed,
+}: WeatherImpactProps) {
+  const {
+    trade,
+    setTrade,
+    context,
+    setContext,
+    weather,
+    setWeather,
+    fetchState,
+    fetchError,
+    locationFor,
+    result,
+    pickJob,
+    retryJobWeather,
+    loadDeviceWeather,
+    updateWeatherNumber,
+  } = useWeatherImpact({ jobLocation });
+  const status = STATUS_COPY[result.overall_status];
 
   return (
     <div className="space-y-5">
@@ -306,12 +359,7 @@ export function WeatherImpactClient({
                   <span className="sr-only">Select job</span>
                   <select
                     value={selectedQuoteId ?? ""}
-                    onChange={(event) => {
-                      const id = event.target.value;
-                      router.push(
-                        id ? `/app/weather?quote=${id}` : "/app/weather",
-                      );
-                    }}
+                    onChange={(event) => pickJob(event.target.value)}
                     data-testid="weather-job-picker"
                     className="h-12 w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 text-base font-semibold text-white"
                   >
@@ -412,7 +460,7 @@ export function WeatherImpactClient({
               </div>
               <button
                 type="button"
-                onClick={useDeviceWeather}
+                onClick={loadDeviceWeather}
                 disabled={fetchState === "loading"}
                 data-testid="weather-device-location"
                 className="inline-flex h-11 items-center gap-2 rounded-lg border border-white/15 bg-white/[0.04] px-3 text-sm font-semibold text-ink-300 disabled:opacity-60"
@@ -673,7 +721,7 @@ function getCurrentPosition(): Promise<GeolocationPosition> {
   });
 }
 
-function formatObserved(value: string) {
+export function formatObserved(value: string) {
   const label = formatNZTime(value);
   return label === "—" ? value : label;
 }

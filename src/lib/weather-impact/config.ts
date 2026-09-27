@@ -1,5 +1,8 @@
 import type { WeatherImpactContext, WeatherImpactTrade } from "./types";
 
+/** A safe call in plain words (the weather sheet and the new-look weather page). */
+export const ALL_CLEAR_REASON = "No weather limits right now.";
+
 export const WEATHER_IMPACT_ADVISORY =
   "Advisory only — always assess site conditions before starting.";
 

@@ -8,9 +8,11 @@ import {
   type JobLocation,
   type JobOption,
 } from "./_components/WeatherImpactClient";
+import { WeatherScreen } from "./_newlook/WeatherScreen";
 import { getCachedAuthUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { isOwnerEmail } from "@/lib/owner";
+import { isNewLookOn } from "@/lib/ui/newLook";
 import { isWeatherImpactEnabled } from "@/lib/weather-impact";
 import { geocodeAddress } from "@/lib/weather-planning/geocode";
 import { addressFromQuoteData } from "@/lib/weather-planning/jobAddress";
@@ -35,6 +37,9 @@ export const dynamic = "force-dynamic";
  *   3. passes the resolved location to the client, which fetches live
  *      weather for IT. Device location exists only as an explicit, labeled
  *      user choice inside the client component.
+ *
+ * With the new look on (always, in the iPhone app) the same jobs and site
+ * go to the new-look screen; off, the old page as before.
  */
 export default async function WeatherImpactPage({
   searchParams,
@@ -45,7 +50,7 @@ export default async function WeatherImpactPage({
   if (!user) redirect("/login");
 
   const enabled = isWeatherImpactEnabled(isOwnerEmail(user.email));
-  const { quote: selectedQuoteId } = await searchParams;
+  const [{ quote: selectedQuoteId }, newLook] = await Promise.all([searchParams, isNewLookOn()]);
 
   let jobOptions: JobOption[] = [];
   let jobLocation: JobLocation | null = null;
@@ -122,6 +127,18 @@ export default async function WeatherImpactPage({
         }
       }
     }
+  }
+
+  if (newLook) {
+    return (
+      <WeatherScreen
+        enabled={enabled}
+        jobOptions={jobOptions}
+        selectedQuoteId={selectedQuoteId ?? null}
+        jobLocation={jobLocation}
+        geocodeFailed={geocodeFailed}
+      />
+    );
   }
 
   return (

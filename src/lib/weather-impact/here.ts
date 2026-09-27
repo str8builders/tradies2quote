@@ -1,6 +1,6 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
-import { TRADE_PROFILES } from "./config";
+import { ALL_CLEAR_REASON, TRADE_PROFILES } from "./config";
 import { evaluateWeatherImpact } from "./evaluate";
 import { fetchOpenMeteoWeather } from "./open-meteo";
 import { classifyOutlookDay, type DayOutlook } from "./outlook";
@@ -48,7 +48,7 @@ export function hereWeatherFrom(input: WeatherImpactInput): HereWeather {
       id,
       label: TRADE_PROFILES[id].label,
       status: result.overall_status,
-      reason: safe ? "No weather limits right now." : (result.reasons[0] ?? result.weather_summary),
+      reason: safe ? ALL_CLEAR_REASON : (result.reasons[0] ?? result.weather_summary),
       betterWindow: safe ? null : result.next_better_window,
     };
   });

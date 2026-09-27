@@ -12,6 +12,9 @@ import type {
   WeatherImpactTrade,
 } from "./types";
 
+/** The engine's reason when no weather rule fires (the call is safe). */
+export const NO_THRESHOLDS_REASON = "No deterministic weather thresholds were triggered for the selected trade.";
+
 const REQUIRED_FIELDS: Array<keyof WeatherImpactInput> = [
   "rainProbabilityPct",
   "precipitationMmPerHour",
@@ -364,7 +367,7 @@ export function evaluateWeatherImpact({
             id: "clear-working-window",
             status: "caution" as const,
             score: 0,
-            reason: "No deterministic weather thresholds were triggered for the selected trade.",
+            reason: NO_THRESHOLDS_REASON,
             controls: ["Keep monitoring conditions and reassess if weather changes."],
             blockedTasks: [],
             safeTasks: profile.defaultSafeTasks,
@@ -378,7 +381,7 @@ export function evaluateWeatherImpact({
     confidence: missingFields.length > 0 ? "degraded" : "normal",
     reasons:
       overallStatus === "safe"
-        ? ["No deterministic weather thresholds were triggered for the selected trade."]
+        ? [NO_THRESHOLDS_REASON]
         : unique(rules.map((rule) => rule.reason)),
     controls:
       overallStatus === "safe"
