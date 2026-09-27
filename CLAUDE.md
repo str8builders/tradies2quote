@@ -37,7 +37,8 @@ Avoid adding dependencies unless absolutely necessary.
 src/
 ├── app/
 │   ├── page.tsx              — marketing landing (server-rendered)
-│   ├── _components/landing/  — landing-only components
+│   ├── _components/jobsite/  — the 3D job-site homepage
+│   ├── _components/landing/  — the previous homepage (/classic)
 │   ├── (auth)/               — login, signup, forgot-password, reset-password
 │   ├── app/                  — protected app pages (dashboard, /app/quotes/new, …)
 │   ├── api/                  — route handlers (POST /api/quotes/transcribe, …)
@@ -108,7 +109,7 @@ Out of scope for the MVP — do not build:
 
 **Now in scope (opted in by the owner):** lightweight **job scheduling** — a quote can carry a job date (`quotes.scheduled_for`, set via the date picker on the LifecycleCard schedule step) and the dashboard shows a month **calendar** (`src/app/app/_components/ScheduleCalendar.tsx`) of scheduled jobs plus personal day-**notes** (`calendar_notes` table, owner-only RLS). Full job management / time tracking is still out.
 
-Do **not** modify the marketing landing page (`src/app/page.tsx` and `src/app/_components/landing/*`) without an explicit request.
+Do **not** modify the marketing website without an explicit request: the homepage (`src/app/page.tsx`, the 3D job-site website in `src/app/_components/jobsite/*`, live since 27 Sep 2026) and the previous homepage kept at `/classic` (`src/app/classic/page.tsx` + `src/app/_components/landing/*`, not indexed; also git tag `website-classic-2026-09-27`).
 
 ## Observability (current posture)
 
