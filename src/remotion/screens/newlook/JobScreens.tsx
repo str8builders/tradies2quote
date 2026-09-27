@@ -364,13 +364,14 @@ export function MoreToolsSheet({
       <div style={{ fontSize: 18, fontWeight: 700 }}>How the numbers were worked out</div>
       <div style={{ marginTop: 10, fontSize: 17, fontWeight: 600 }}>{line}</div>
       <div style={{ marginTop: 10, paddingTop: 12, borderTop: `1px solid ${NL.line}` }}>
-        <div style={{ fontFamily: "monospace", fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: NL.brand }}>T2QCAL calculation record</div>
-        <div style={{ marginTop: 4, fontSize: 15, color: NL.text }}>{tool}</div>
+        {/* As T2QCALWorking draws it in the new look: sentence case, orange, semibold. */}
+        <div style={{ fontSize: 15, fontWeight: 600, color: NL.brandText }}>T2QCAL calculation record</div>
+        <div style={{ marginTop: 4, fontSize: 17, color: NL.text }}>{tool}</div>
         <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 7 }}>
           {rows.map(([label, value]) => (
             <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: 15 }}>
               <span style={{ color: NL.muted }}>{label}</span>
-              <span style={{ fontFamily: "monospace", color: NL.text }}>{value}</span>
+              <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums", color: NL.text }}>{value}</span>
             </div>
           ))}
         </div>

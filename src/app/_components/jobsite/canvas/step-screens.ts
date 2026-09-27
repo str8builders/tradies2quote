@@ -10,9 +10,9 @@ export type ClipWidth = 600 | 420;
  * Bumped when a clip is re-rendered under the same name. The files are
  * cached for a day (then a week stale-while-revalidate), so without a new
  * address a returning visitor would keep the old one. request: 2 is the van
- * scan, t2qcal: 2 the native iPhone app (both 27 Sep 2026).
+ * scan, t2qcal: 3 the native iPhone app with the new-look working sheet (27 Sep 2026).
  */
-export const CLIP_VERSION: Readonly<Record<ClipId, number>> = { request: 2, t2qcal: 2 };
+export const CLIP_VERSION: Readonly<Record<ClipId, number>> = { request: 2, t2qcal: 3 };
 const version = (id: ClipId) => (CLIP_VERSION[id] ? `?v=${CLIP_VERSION[id]}` : "");
 
 export const clipSrc = (id: ClipId, width: ClipWidth) => `/jobsite/screens/${id}-${width}.mp4${version(id)}`;
