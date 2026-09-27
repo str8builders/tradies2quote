@@ -35,7 +35,7 @@ WHAT IT IS
 Tradies2Quote helps tradespeople quote, invoice and keep a timesheet. Describe a job by voice, typing or a photo of a plan; AI drafts the quote (materials, labour, GST) to check and send.
 
 GETTING AROUND
-Tabs: Home, Jobs, New (+), Prices, Timesheet. Your photo (top left) opens the menu: Your profile, Business details, Rates and quotes, Payments, Clients, Calendar, Team, Help, Send feedback, Privacy policy, Terms, Outdoor mode, Sign out. The weather (top right) opens "Weather impact".
+Tabs: Home, Jobs, New (+), Prices, Timesheet. Your photo (top left) opens the menu: Your profile, Business details, Rates and quotes, Payments, Your QR code, Clients, Calendar, Team, Help, Take the tour, Send feedback, Privacy policy, Terms, Outdoor mode, Sign out. The weather (top right) opens "Weather impact". A short tour runs on first sign-in (replay: photo > Take the tour).
 
 TRY IT
 1. Jobs: open a job. More tools (the ... button) > "Download the PDF" opens the iOS share sheet (Save to Files, Mail).
@@ -45,10 +45,11 @@ TRY IT
 5. Start work, wait a minute or more, then Finish work (set Break to None). The hours land on today.
 6. Location: the gear on the Start work card. The sheet says what is kept. Turn on "Use my location for work" > Save: iOS asks for While Using. Turn on "Automatic clock-in at jobs" > Save: iOS asks for Always. The demo's job sites are in Tauranga, NZ, so arrival notifications ("Arrived at the Hemi Walker job") only fire there.
 7. Weather (top right) > "Use my location": iOS asks for While Using.
-8. Delete account: photo > Your profile > "Delete my account" (bottom) > type DELETE > "Delete forever". You land on the sign-in screen ("Your account has been deleted."). The demo account is only signed out, so you can sign in again.
+8. Photo > Your QR code: the code clients scan to send a job request. Share opens the iOS share sheet (Print, Save Image, AirDrop).
+9. Delete account: photo > Your profile > "Delete my account" (bottom) > type DELETE > "Delete forever". You land on the sign-in screen ("Your account has been deleted."). The demo account is only signed out, so you can sign in again.
 
 LOCATION
-Off until the person turns it on in the Timesheet. No background location mode is used. Automatic clock-in uses iOS region monitoring (up to 18 job sites) and acts only in the person's work hours. Travel kilometres: precise updates while the app is open; iOS significant-change updates in the background, only while clocked in with Always. Route points are deleted after 90 days. Weather rounds the location to about 1 km and doesn't save it (only that area's forecast is cached for 30 minutes).
+Off until the person turns it on in the Timesheet. No background location mode is used. Automatic clock-in uses iOS region monitoring (up to 18 job sites) and acts only in the person's work hours. Travel kilometres: precise updates while the app is open; iOS significant-change updates in the background, only while clocked in with Always. Route points are deleted after 90 days. Weather rounds the location to about 1 km and doesn't save it.
 
 AI CONSENT (5.1.2(i))
 Before anything is sent to AI the app names the providers (Anthropic, OpenAI) and asks: "I agree — continue" or "Not now". Until then the server refuses AI requests from the app. Withdraw any time: Your profile > AI features.
@@ -137,7 +138,7 @@ ads; the website's opt-in analytics script never loads in the app).
    notes above say none is used) and that both location purpose strings
    (While Using, Always) read as intended.
 5. Run the demo seed on the VPS (Section 1). Then, ON THE BUILT BINARY: sign
-   in with the demo account and walk steps 1–8 of the notes, including the
+   in with the demo account and walk steps 1–9 of the notes, including the
    While Using and Always prompts, Start/Finish work, and a new quote (proves
    the review comp is active).
 6. Keep weather impact on (`T2Q_WEATHER_IMPACT` / `NEXT_PUBLIC_T2Q_WEATHER_IMPACT`
