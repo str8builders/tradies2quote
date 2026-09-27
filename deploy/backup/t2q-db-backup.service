@@ -1,0 +1,11 @@
+[Unit]
+Description=Tradies2Quote nightly backup (database and uploaded files)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/srv/t2q/bin/t2q-db-backup.sh
+TimeoutStartSec=30min
+Nice=10
+IOSchedulingClass=idle
