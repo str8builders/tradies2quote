@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { isNewLookOn } from "@/lib/ui/newLook";
 import { AppHeader } from "../../_components/AppHeader";
 import { CaptureForm } from "./_components/CaptureForm";
 import { cleanSharedTitle, supplierFromUrl } from "./_lib/supplier-from-url";
+import { CaptureScreen } from "./_newlook/CaptureScreen";
 
 export const metadata: Metadata = {
   title: "Capture from supplier",
@@ -49,7 +51,10 @@ export default async function CapturePage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
   // The tradie's own tax rate (stored as a percentage) drives the inc/ex-GST maths.
-  const { data: profile } = await supabase.from("profiles").select("tax_rate").eq("id", user.id).maybeSingle();
+  const [{ data: profile }, newLook] = await Promise.all([
+    supabase.from("profiles").select("tax_rate").eq("id", user.id).maybeSingle(),
+    isNewLookOn(),
+  ]);
   const taxRate = Number(profile?.tax_rate ?? 15) / 100;
 
   // Some share-sheet integrations stuff the URL into `text` rather than `url`.
@@ -63,6 +68,20 @@ export default async function CapturePage({
 
   // True if no useful share data arrived — surfaces the "paste flow" hint.
   const isPasteFallback = !sharedUrl;
+
+  // Redesign: the new look is "Copy a supplier's price", back to Prices, with
+  // the same shared values. Off: unchanged below.
+  if (newLook) {
+    return (
+      <CaptureScreen
+        taxRate={taxRate}
+        initialUrl={sharedUrl}
+        initialName={initialName}
+        initialSupplier={initialSupplier}
+        isPasteFallback={isPasteFallback}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen text-white">

@@ -26,6 +26,9 @@ const DIRS = [
   "src/app/app/beta/_lib",
   "src/app/app/calendar/_newlook",
   "src/app/app/materials/import-quote/_newlook",
+  "src/app/app/weather/_newlook",
+  "src/app/app/suppliers/_newlook",
+  "src/app/app/materials/capture/_newlook",
 ];
 const FILES = [
   "src/app/app/materials/_newlook/PriceForm.tsx",

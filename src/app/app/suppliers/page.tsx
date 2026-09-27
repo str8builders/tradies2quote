@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { isNewLookOn } from "@/lib/ui/newLook";
 import { AppHeader } from "../_components/AppHeader";
 import { SupplierBrowser } from "./_components/SupplierBrowser";
+import { SuppliersScreen } from "./_newlook/SuppliersScreen";
 
 export const metadata: Metadata = {
   title: "Suppliers",
@@ -39,6 +41,10 @@ export default async function SuppliersPage({
 
   const initialUrl =
     typeof sp.url === "string" && /^https?:\/\//i.test(sp.url) ? sp.url : "";
+
+  // Redesign: the new look is "Shop supplier websites", back to Prices, with
+  // the same link. Off: unchanged below.
+  if (await isNewLookOn()) return <SuppliersScreen initialUrl={initialUrl} />;
 
   return (
     <div className="min-h-screen text-white">

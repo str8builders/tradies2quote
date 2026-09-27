@@ -34,7 +34,7 @@ import { supplierFromUrl } from "../_lib/supplier-from-url";
  */
 
 const NOTES_DEFAULT = "Captured manually. Confirm price with supplier.";
-const UNIT_SUGGESTIONS = [
+export const UNIT_SUGGESTIONS = [
   "each",
   "sheet",
   "m",
@@ -56,13 +56,20 @@ type Props = {
   isPasteFallback: boolean;
 };
 
-export function CaptureForm({
+export type CaptureFormProps = Props & { /** Fraction, e.g. 0.15 — the tradie's configured rate, not a fixed GST. */ taxRate?: number };
+
+/**
+ * The capture form's state, shared by both looks: CaptureForm below draws
+ * it in the old look, ../_newlook/CopyPrice.tsx in the new one. Only the
+ * markup differs, so the supplier detection, the GST maths and the save
+ * (createMaterial) behave the same in either.
+ */
+export function useCaptureForm({
   initialUrl,
   initialName,
   initialSupplier,
-  isPasteFallback,
   taxRate = 0.15,
-}: Props & { /** Fraction, e.g. 0.15 — the tradie's configured rate, not a fixed GST. */ taxRate?: number }) {
+}: CaptureFormProps) {
   const [url, setUrl] = useState(initialUrl);
   const [name, setName] = useState(initialName);
   const [unit, setUnit] = useState("each");
@@ -107,6 +114,26 @@ export function CaptureForm({
     ACTION_INITIAL,
   );
   const errorMessage = state && "error" in state ? state.error : null;
+
+  return {
+    url, setUrl, name, setName, unit, setUnit, displayPrice, setDisplayPrice, incGst, setIncGst,
+    supplier, setSupplier, setSupplierEdited, notes, setNotes, confirming, setConfirming,
+    priceNum, isValidPrice, finalPrice, canConfirm, supplierBadgeLabel, isKnownSupplier,
+    formAction, errorMessage,
+  };
+}
+
+export type CaptureFormState = ReturnType<typeof useCaptureForm>;
+
+/** The capture form in the old look. */
+export function CaptureForm(props: CaptureFormProps) {
+  const { isPasteFallback } = props;
+  const {
+    url, setUrl, name, setName, unit, setUnit, displayPrice, setDisplayPrice, incGst, setIncGst,
+    supplier, setSupplier, setSupplierEdited, notes, setNotes, confirming, setConfirming,
+    priceNum, isValidPrice, finalPrice, canConfirm, supplierBadgeLabel, isKnownSupplier,
+    formAction, errorMessage,
+  } = useCaptureForm(props);
 
   return (
     <div className="space-y-6">
