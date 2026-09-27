@@ -2,18 +2,23 @@
 
 import { useState } from "react";
 import { Check, Copy } from "@phosphor-icons/react";
+import { Button } from "@/components/ui/button";
 
 /**
  * Small copy-to-clipboard button shared by every agent panel.
  *
  * The text it copies is fully passed in as a prop. The button never
  * reads or writes anything else. Two-second "copied" pill, then resets.
+ *
+ * `look="new"` draws it as a small secondary kit button (the new-look job
+ * page); what it copies and when is the same for both looks.
  */
 interface Props {
   text: string;
   label?: React.ReactNode;
   testId?: string;
   disabled?: boolean;
+  look?: "classic" | "new";
 }
 
 export function CopyButton({
@@ -21,6 +26,7 @@ export function CopyButton({
   label = "Copy",
   testId,
   disabled = false,
+  look = "classic",
 }: Props) {
   const [copied, setCopied] = useState(false);
 
@@ -47,6 +53,22 @@ export function CopyButton({
       }
       document.body.removeChild(ta);
     }
+  }
+
+  if (look === "new") {
+    return (
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={onClick}
+        disabled={disabled}
+        data-testid={testId}
+        icon={copied ? <Check weight="bold" /> : <Copy weight="bold" />}
+        className="shrink-0"
+      >
+        {copied ? "Copied" : label}
+      </Button>
+    );
   }
 
   return (

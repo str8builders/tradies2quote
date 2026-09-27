@@ -25,6 +25,7 @@ import {
   type ClarificationAnswers,
 } from "@/lib/compliance/panel-helpers";
 import { ClarificationForm } from "./ClarificationForm";
+import { CompliancePassedV2, ComplianceReviewV2, ComplianceUnavailableV2 } from "./CompliancePanelV2";
 
 /**
  * Compliance review panel rendered into the quote preview page.
@@ -43,6 +44,9 @@ import { ClarificationForm } from "./ClarificationForm";
  * customer-facing quote page (`/quote/[token]`) reads via the Supabase
  * RPC which projects only the 6-field `PublicLineItem` shape, so none
  * of the metadata rendered here can leak.
+ *
+ * `look="new"` draws the same statuses with the kit (CompliancePanelV2) for
+ * the new-look job page; the answers and their save stay here.
  */
 
 type Props = {
@@ -55,9 +59,10 @@ type Props = {
    * editor's order.
    */
   items: ComplianceLineItem[];
+  look?: "classic" | "new";
 };
 
-export function CompliancePanel({ quoteId, review, items }: Props) {
+export function CompliancePanel({ quoteId, review, items, look = "classic" }: Props) {
   const router = useRouter();
   const summary = useMemo(() => summariseReview(review), [review]);
   const grouped = useMemo(
@@ -73,6 +78,7 @@ export function CompliancePanel({ quoteId, review, items }: Props) {
   if (review.status === "disabled") return null;
 
   if (review.status === "error") {
+    if (look === "new") return <ComplianceUnavailableV2 />;
     return (
       <section
         data-testid="compliance-panel-error"
@@ -94,6 +100,7 @@ export function CompliancePanel({ quoteId, review, items }: Props) {
   }
 
   if (review.status === "ok") {
+    if (look === "new") return <CompliancePassedV2 review={review} showSources={summary.citationCount > 0} />;
     return (
       <section
         data-testid="compliance-panel-ok"
@@ -139,6 +146,18 @@ export function CompliancePanel({ quoteId, review, items }: Props) {
       setSubmitting(false);
     }
   };
+
+  if (look === "new") {
+    return (
+      <ComplianceReviewV2
+        review={review}
+        items={items}
+        summary={summary}
+        grouped={grouped}
+        form={{ answers, onChange: setAnswers, onSubmit: handleSubmitAnswers, submitting, submitError }}
+      />
+    );
+  }
 
   return (
     <section

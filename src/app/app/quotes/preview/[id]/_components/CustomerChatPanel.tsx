@@ -4,6 +4,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import type { QuoteData } from "@/lib/quote-types";
 import { ChatModerationControls } from "./ChatModerationControls";
+import { CustomerChatEmptyV2, CustomerChatThreadV2 } from "./CustomerChatPanelV2";
 
 /**
  * CustomerChatPanel — Wave 36 — read-only tradie view of the
@@ -23,6 +24,9 @@ import { ChatModerationControls } from "./ChatModerationControls";
  * Server component — pure rendering of already-fetched data. No
  * client-side fetch, no live updates. The tradie refreshes the page
  * to see new messages (rare enough on a beta trial).
+ *
+ * `look="new"` hands the same history to the new-look views
+ * (CustomerChatPanelV2) for the new-look job page.
  */
 
 type ChatHistoryEntry = {
@@ -66,14 +70,17 @@ export function CustomerChatPanel({
   quoteData,
   quoteId,
   chatDisabled = false,
+  look = "classic",
 }: {
   quoteData: QuoteData | null;
   quoteId: string;
   chatDisabled?: boolean;
+  look?: "classic" | "new";
 }) {
   const history = extractChatHistory(quoteData);
 
   if (history.length === 0) {
+    if (look === "new") return <CustomerChatEmptyV2 quoteId={quoteId} chatDisabled={chatDisabled} />;
     return (
       <div className="space-y-3">
         <ChatModerationControls quoteId={quoteId} chatDisabled={chatDisabled} />
@@ -103,6 +110,18 @@ export function CustomerChatPanel({
       (n): n is { note: string; index: number; role: "customer" | "assistant" } =>
         typeof n.note === "string" && n.note.length > 0,
     );
+
+  if (look === "new") {
+    return (
+      <CustomerChatThreadV2
+        quoteId={quoteId}
+        chatDisabled={chatDisabled}
+        messages={history.map((m) => ({ role: m.role, content: m.content, when: formatTime(m.timestamp) }))}
+        customerCount={customerCount}
+        notes={notes.map((n) => n.note)}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4">

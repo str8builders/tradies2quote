@@ -9,6 +9,7 @@ import {
   type ComplianceSeverity,
 } from "@/lib/agents/compliance";
 import type { QuoteData } from "@/lib/quote-types";
+import { ComplianceAgentV2 } from "./ComplianceAgentV2";
 import { CopyButton } from "./CopyButton";
 
 /**
@@ -21,9 +22,13 @@ import { CopyButton } from "./CopyButton";
  *
  * Wave 12 — NZ builder-focused, not legal advice (disclaimer below
  * the cards).
+ *
+ * `look="new"` draws the same report with the kit (ComplianceAgentV2) for
+ * the new-look job page.
  */
 interface Props {
   quoteData: QuoteData | null;
+  look?: "classic" | "new";
 }
 
 const SEVERITY_GLYPH: Record<ComplianceSeverity, React.ReactNode> = {
@@ -38,8 +43,9 @@ const SEVERITY_STYLES: Record<ComplianceSeverity, string> = {
   high: "border-red-500/40 bg-red-500/10 text-red-300",
 };
 
-export function ComplianceAgent({ quoteData }: Props) {
+export function ComplianceAgent({ quoteData, look = "classic" }: Props) {
   const report = runComplianceAgent(quoteData);
+  if (look === "new") return <ComplianceAgentV2 report={report} />;
 
   return (
     <section

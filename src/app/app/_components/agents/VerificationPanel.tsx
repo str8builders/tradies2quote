@@ -2,6 +2,7 @@
 
 import { CheckCircle, Warning } from "@phosphor-icons/react";
 import type { VerificationReport } from "@/lib/agents/verify/quoteVerify";
+import { VerificationPanelV2 } from "./VerificationPanelV2";
 
 /**
  * Renders a quote's verification report. Pure + presentational so it can be
@@ -9,8 +10,19 @@ import type { VerificationReport } from "@/lib/agents/verify/quoteVerify";
  *   - no issues  → a quiet green "checks passed" line
  *   - warnings   → amber callout, "worth a glance"
  *   - any error  → red callout, "fix before sending"
+ *
+ * `look="new"` draws the same report with the kit (VerificationPanelV2) for
+ * the new-look job page.
  */
-export function VerificationPanel({ report }: { report: VerificationReport }) {
+export function VerificationPanel({
+  report,
+  look = "classic",
+}: {
+  report: VerificationReport;
+  look?: "classic" | "new";
+}) {
+  if (look === "new") return <VerificationPanelV2 report={report} />;
+
   if (report.issues.length === 0) {
     return (
       <p

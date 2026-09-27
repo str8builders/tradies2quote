@@ -2,6 +2,7 @@ import { Coins, TrendUp, CheckCircle } from "@phosphor-icons/react/dist/ssr";
 import { detectForgottenCosts } from "@/lib/agents/forgotten-costs";
 import { formatCurrency } from "@/lib/quote-defaults";
 import type { QuoteData } from "@/lib/quote-types";
+import { ForgottenCostsAgentV2 } from "./ForgottenCostsAgentV2";
 
 /**
  * Forgotten-Cost Detector panel — read-only.
@@ -13,14 +14,19 @@ import type { QuoteData } from "@/lib/quote-types";
  *
  * Advisory only — it never edits the quote. The tradie reviews each
  * flagged cost and adds the lines they agree with in the editor above.
+ *
+ * `look="new"` draws the same report with the kit (ForgottenCostsAgentV2)
+ * for the new-look job page.
  */
 interface Props {
   quoteData: QuoteData | null;
+  look?: "classic" | "new";
 }
 
-export function ForgottenCostsAgent({ quoteData }: Props) {
+export function ForgottenCostsAgent({ quoteData, look = "classic" }: Props) {
   const report = detectForgottenCosts(quoteData);
   const currency = quoteData?.currency || "NZD";
+  if (look === "new") return <ForgottenCostsAgentV2 report={report} currency={currency} />;
 
   return (
     <section

@@ -13,6 +13,7 @@ import {
   newRunId,
 } from "@/lib/agent-monitor/logger";
 import { CopyButton } from "./CopyButton";
+import { FollowupAgentV2 } from "./FollowupAgentV2";
 
 /**
  * Follow-up Agent — server component that pre-computes 4 templates
@@ -23,10 +24,14 @@ import { CopyButton } from "./CopyButton";
  * or SMS app. The "applies" flag on each template hides ones that
  * don't make sense for the current quote state (e.g. no follow-up on
  * a quote that hasn't been sent yet).
+ *
+ * `look="new"` draws the same messages with the kit (FollowupAgentV2) for
+ * the new-look job page.
  */
 interface Props extends FollowupContext {
   /** When true, render only templates that apply to the current state. */
   hideInapplicable?: boolean;
+  look?: "classic" | "new";
 }
 
 export function FollowupAgent(props: Props) {
@@ -60,6 +65,8 @@ export function FollowupAgent(props: Props) {
   } catch {
     // Telemetry failures must never break the page render.
   }
+
+  if (props.look === "new") return <FollowupAgentV2 messages={visible} />;
 
   return (
     <section

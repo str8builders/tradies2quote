@@ -10,6 +10,7 @@ import {
   type ReadinessStatus,
 } from "@/lib/quote-readiness";
 import type { QuoteData } from "@/lib/quote-types";
+import { QuoteReadinessCheckV2 } from "./QuoteReadinessCheckV2";
 
 /**
  * Quote readiness panel — shown above the editor on `/app/quotes/preview/[id]`.
@@ -24,11 +25,15 @@ import type { QuoteData } from "@/lib/quote-types";
  * Per the Wave 11 brief, this does **not** block the Send button. It
  * just informs the user before they hit send. The Send button itself
  * lives in the existing `QuoteEditor` and is unchanged by this wave.
+ *
+ * `look="new"` draws the same checks with the kit (QuoteReadinessCheckV2)
+ * for the new-look job page.
  */
 interface Props {
   quoteData: QuoteData | null;
   profile: ProfileForReadiness | null;
   expiresAt: string | null;
+  look?: "classic" | "new";
 }
 
 const BANNER_STYLES: Record<
@@ -68,9 +73,10 @@ function itemGlyph(status: ReadinessStatus) {
   return <WarningOctagon size={14} weight="fill" />;
 }
 
-export function QuoteReadinessCheck({ quoteData, profile, expiresAt }: Props) {
+export function QuoteReadinessCheck({ quoteData, profile, expiresAt, look = "classic" }: Props) {
   const items = checkQuoteReadiness(quoteData, profile, expiresAt);
   const summary = summarizeReadiness(items);
+  if (look === "new") return <QuoteReadinessCheckV2 items={items} summary={summary} />;
   const banner = BANNER_STYLES[summary.status];
 
   return (

@@ -5,6 +5,7 @@ import { Microphone, MagicWand } from "@phosphor-icons/react";
 import { runVoiceCleanup } from "@/lib/agents/voice-cleanup";
 import { logClientAgentRun } from "./_log-run";
 import { CopyButton } from "./CopyButton";
+import { VoiceCleanupAgentV2 } from "./VoiceCleanupAgentV2";
 
 /**
  * Voice Cleanup Agent — pure presentational client component.
@@ -16,12 +17,16 @@ import { CopyButton } from "./CopyButton";
  * puts the cleaned string on the clipboard.
  *
  * The original transcript is NEVER modified by this component.
+ *
+ * `look="new"` draws the same result with the kit (VoiceCleanupAgentV2) for
+ * the new-look job page.
  */
 interface Props {
   transcript: string | null;
+  look?: "classic" | "new";
 }
 
-export function VoiceCleanupAgent({ transcript }: Props) {
+export function VoiceCleanupAgent({ transcript, look = "classic" }: Props) {
   const original = (transcript ?? "").trim();
   const result = useMemo(() => runVoiceCleanup(original), [original]);
 
@@ -47,6 +52,8 @@ export function VoiceCleanupAgent({ transcript }: Props) {
   if (!original) {
     return null;
   }
+
+  if (look === "new") return <VoiceCleanupAgentV2 original={original} result={result} />;
 
   return (
     <section

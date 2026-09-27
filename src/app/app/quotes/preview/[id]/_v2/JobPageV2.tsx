@@ -179,7 +179,12 @@ export async function JobPageV2({ id }: { id: string }) {
       title: "Customer chat",
       subtitle: "What your client asked on the quote link",
       content: (
-        <CustomerChatPanel quoteData={quoteData} quoteId={quote.id} chatDisabled={quote.chat_disabled === true} />
+        <CustomerChatPanel
+          quoteData={quoteData}
+          quoteId={quote.id}
+          chatDisabled={quote.chat_disabled === true}
+          look="new"
+        />
       ),
     },
     {
@@ -187,35 +192,41 @@ export async function JobPageV2({ id }: { id: string }) {
       title: "Check the quote",
       subtitle: "Anything missing before it goes",
       content: (
-        <>
-          <QuoteReadinessCheck quoteData={quoteData} profile={profile ?? null} expiresAt={quote.expires_at ?? null} />
+        <div className="space-y-4">
+          <QuoteReadinessCheck
+            quoteData={quoteData}
+            profile={profile ?? null}
+            expiresAt={quote.expires_at ?? null}
+            look="new"
+          />
           {(() => {
             const report = parseVerificationReport(quoteData.verification);
-            return report ? <VerificationPanel report={report} /> : null;
+            return report ? <VerificationPanel report={report} look="new" /> : null;
           })()}
-        </>
+        </div>
       ),
     },
     {
       id: "missed-costs",
       title: "Commonly missed costs",
       subtitle: "Things jobs like this often leave out",
-      content: <ForgottenCostsAgent quoteData={quoteData} />,
+      content: <ForgottenCostsAgent quoteData={quoteData} look="new" />,
     },
     {
       id: "compliance",
       title: "Compliance checks",
       content: (
-        <>
-          <ComplianceAgent quoteData={quoteData} />
+        <div className="space-y-4">
+          <ComplianceAgent quoteData={quoteData} look="new" />
           {quoteData.compliance_review ? (
             <CompliancePanel
               quoteId={quote.id}
               review={quoteData.compliance_review as ComplianceReview}
               items={quoteData.line_items as ComplianceLineItem[]}
+              look="new"
             />
           ) : null}
-        </>
+        </div>
       ),
     },
     {
@@ -231,6 +242,7 @@ export async function JobPageV2({ id }: { id: string }) {
           status={status}
           sentAtIso={quote.sent_at ?? null}
           businessName={profile?.business_name ?? null}
+          look="new"
         />
       ),
     },
@@ -255,7 +267,7 @@ export async function JobPageV2({ id }: { id: string }) {
     serverTools.push({
       id: "voice-cleanup",
       title: "Tidy up your recording",
-      content: <VoiceCleanupAgent transcript={quote.voice_transcript} />,
+      content: <VoiceCleanupAgent transcript={quote.voice_transcript} look="new" />,
     });
   }
 

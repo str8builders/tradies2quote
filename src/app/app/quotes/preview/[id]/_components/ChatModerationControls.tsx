@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Flag, Prohibit, ChatCircle } from "@phosphor-icons/react";
+import { ChatModerationControlsV2 } from "./ChatModerationControlsV2";
 
 /**
  * Tradie-side Guideline 1.2 controls for the public customer chat:
@@ -13,13 +14,18 @@ import { Flag, Prohibit, ChatCircle } from "@phosphor-icons/react";
  * Mounted at the top of <CustomerChatPanel>. Server enforcement lives in
  * /api/quote/[token]/chat (403 when disabled); this UI drives
  * /api/quotes/[id]/chat/moderate.
+ *
+ * `look="new"` draws the same controls with the kit (ChatModerationControlsV2)
+ * for the new-look job page.
  */
 export function ChatModerationControls({
   quoteId,
   chatDisabled,
+  look = "classic",
 }: {
   quoteId: string;
   chatDisabled: boolean;
+  look?: "classic" | "new";
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -43,6 +49,19 @@ export function ChatModerationControls({
     } finally {
       setPending(false);
     }
+  }
+
+  if (look === "new") {
+    return (
+      <ChatModerationControlsV2
+        chatDisabled={chatDisabled}
+        pending={pending}
+        reported={reported}
+        error={error}
+        onToggle={() => call(chatDisabled ? "enable" : "disable")}
+        onReport={() => call("report")}
+      />
+    );
   }
 
   return (
