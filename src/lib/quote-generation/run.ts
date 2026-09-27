@@ -686,6 +686,7 @@ async function generateAndSaveQuote(g: {
       ];
     }
     parsed.takeoff_inputs = parsedTakeoff.input as TakeoffInputsSnapshot;
+    if (parsedTakeoff.type !== "unknown") parsed.takeoff_type = parsedTakeoff.type;
 
     // #1 — for a RISKY drawing (low confidence, plan/prose disagreement, no
     // scale, or a large footprint) freeze the exact key dimensions the

@@ -135,11 +135,22 @@ describe("the job page offers the old editor's tools itself", () => {
   });
 
   it("Change the measurements is offered on the page only for a wall worked out from measurements", () => {
-    const out = screen({ data: quote([LABOUR, DECKING], { takeoff_inputs: { wallLengthM: 12, wallHeightM: 2.4 } }) });
+    const out = screen({ data: quote([LABOUR, DECKING], { takeoff_inputs: { wallLengthM: 12, wallHeightM: 2.4, gibSides: 2 } }) });
     expect(out).toContain('data-testid="job-measurements-open"');
     expect(out).toContain("Change the measurements");
     expect(out).not.toContain("sm:col-span-2");
     expect(markupRuleBreaks(out)).toEqual([]);
+  });
+
+  it("a deck or cladding quote never gets the wall form under its lines", () => {
+    for (const takeoff of [
+      { takeoff_inputs: { deckLengthM: 4.8, deckWidthM: 3 } },
+      { takeoff_inputs: { wallLengthM: 20, wallHeightM: 2.4 }, takeoff_type: "cladding" },
+    ]) {
+      const out = screen({ data: quote([LABOUR, DECKING], takeoff as never) });
+      expect(out).not.toContain("job-measurements-open");
+      expect(out).not.toContain("Change the measurements");
+    }
   });
 
   it("an accepted quote offers neither: its lines can't change", () => {

@@ -217,6 +217,123 @@ export function takeoffEvaluation(
   };
 }
 
+export type TakeoffKind = NonNullable<QuoteData["takeoff_type"]>;
+
+const DECK_KEYS = ["deckLengthM", "deckWidthM"];
+const FLOOR_KEYS = ["floorLengthM", "floorWidthM", "plywoodSheetWidthM", "includePlywoodFloor"];
+const CLADDING_KEYS = [
+  "openingAreaM2",
+  "claddingCoverageMm",
+  "battenSpacingMm",
+  "numberOfOpenings",
+  "buildingPerimeterM",
+  "includeCavityBattens",
+  "includeBuildingWrap",
+  "includeFlashings",
+];
+const WALL_KEYS = [
+  "exteriorWallLengthM",
+  "studSpacingMm",
+  "numberOfDoors",
+  "numberOfWindows",
+  "gibSides",
+  "includeInsulation",
+  "includeSkirting",
+  "includeArchitraves",
+];
+
+/** The wall calculator's own lines (materialCalculator.ts), and the cladding calculator's. */
+const WALL_LINE_KEYS = new Set([
+  "90x45-sg8-studs",
+  "90x45-sg8-plates",
+  "90x45-sg8-nogs",
+  "10mm-gib-board",
+  "gib-screws",
+  "gib-adhesive",
+  "pink-batts",
+  "skirting",
+  "architraves",
+  "framing-nails",
+]);
+const CLADDING_LINE_KEYS = new Set([
+  "weatherboard-cladding",
+  "building-wrap",
+  "cavity-battens",
+  "cladding-nails",
+  "aluminium-flashing",
+]);
+
+/**
+ * Which calculator a quote's stored measurements are for. New quotes say
+ * (takeoff_type), a drawing's size check says, and older ones are told apart
+ * by the calculator's own input names, then by its own lines (a wall and
+ * cladding share length and height). Anything still unclear is left
+ * undecided (null) rather than guessed — the wall form must never rewrite a
+ * deck, a subfloor or cladding.
+ */
+export function takeoffKind(data: QuoteData): TakeoffKind | null {
+  const inputs = data?.takeoff_inputs as Record<string, unknown> | undefined;
+  if (!inputs || typeof inputs !== "object" || Object.keys(inputs).length === 0) return null;
+  const stated = data.takeoff_type ?? data.dimension_confirmation?.takeoff_type ?? null;
+  if (stated) return stated;
+  const has = (keys: string[]) => keys.some((key) => inputs[key] !== undefined && inputs[key] !== null);
+  if (has(DECK_KEYS)) return "deck";
+  if (has(FLOOR_KEYS)) return "subfloor";
+  if (has(CLADDING_KEYS)) return "cladding";
+  if (has(WALL_KEYS)) return "wall";
+  const keys = (data.line_items ?? []).flatMap((line) =>
+    line.is_calculated_takeoff && line.price_match_key ? [line.price_match_key] : [],
+  );
+  const wall = keys.some((key) => WALL_LINE_KEYS.has(key));
+  const cladding = keys.some((key) => CLADDING_LINE_KEYS.has(key));
+  if (wall !== cladding) return wall ? "wall" : "cladding";
+  return null;
+}
+
+/**
+ * A wall quote's measurements as they stand: the stored inputs with the
+ * drawing's checked sizes on top (the size check keeps its corrections there,
+ * and works the materials out from both). Null when it isn't a wall.
+ */
+export function wallMeasurements(data: QuoteData): Partial<MaterialTakeoffInput> | null {
+  if (takeoffKind(data) !== "wall") return null;
+  const checked = data.dimension_confirmation?.takeoff_type === "wall" ? data.dimension_confirmation.dimensions : [];
+  return {
+    ...(data.takeoff_inputs as Partial<MaterialTakeoffInput>),
+    ...Object.fromEntries(checked.map((size) => [size.key, size.value])),
+  };
+}
+
+/**
+ * Everything a measurements apply saves: the patch (lines, fresh check), the
+ * measurements themselves (so the form and the size check start from them
+ * next time), and the drawing's sizes the tradie just typed, now confirmed.
+ */
+export function measurementsSave(
+  data: QuoteData,
+  patch: MeasurementsPatch,
+  input: MaterialTakeoffInput,
+): Partial<QuoteData> {
+  const typed = input as unknown as Record<string, unknown>;
+  const dc = data.dimension_confirmation;
+  return {
+    ...patch,
+    takeoff_type: "wall",
+    takeoff_inputs: { ...(data.takeoff_inputs ?? {}), ...input } as QuoteData["takeoff_inputs"],
+    ...(dc && dc.takeoff_type === "wall"
+      ? {
+          dimension_confirmation: {
+            ...dc,
+            dimensions: dc.dimensions.map((size) => {
+              const value = Number(typed[size.key]);
+              return Number.isFinite(value) && value > 0 ? { ...size, value, confirmed: true } : size;
+            }),
+          },
+        }
+      : {}),
+  };
+}
+
 /** What applying measurements changes in quote_data: the lines, and the check that judges them. */
 export type MeasurementsPatch = Required<Pick<QuoteData, "line_items" | "takeoff_evaluation">>;
 

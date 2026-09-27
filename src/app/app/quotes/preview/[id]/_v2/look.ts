@@ -2,8 +2,8 @@
  * Which job page a request gets. The new look only ever renders while the
  * new-look switch is on for this user; with it off the classic page renders
  * exactly as before, whatever the URL says. With it on, `?view=classic` still
- * opens the classic page on purpose — the "detailed editor" the new page links
- * to for terms, markup, measurements, drawing sizes and supplier checks.
+ * opens the classic page — a way back in by address only: the new page does
+ * everything the old "detailed editor" did and no longer links to it.
  */
 export type JobPageLook = "new" | "classic";
 

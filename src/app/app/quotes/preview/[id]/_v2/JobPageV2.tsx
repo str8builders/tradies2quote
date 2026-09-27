@@ -100,7 +100,7 @@ export async function JobPageV2({ id }: { id: string }) {
     // the library (where each price came from), like the classic page loads.
     supabase
       .from("materials")
-      .select("id, name, unit, default_unit_price, supplier, supplier_url, is_ai_estimated")
+      .select("id, name, unit, default_unit_price, supplier, supplier_url, is_ai_estimated, usage_count, last_used_at")
       .eq("user_id", user.id),
     isNativeShellRequest(),
     // A quote made from a supplier's quote: the lines as scanned in, so the
@@ -327,6 +327,9 @@ export async function JobPageV2({ id }: { id: string }) {
         name: r.name,
         unit: r.unit,
         default_unit_price: r.default_unit_price !== null ? Number(r.default_unit_price) : null,
+        // The matcher breaks ties on these, as on the classic page.
+        usage_count: r.usage_count ?? 0,
+        last_used_at: r.last_used_at ?? null,
       }))}
       libraryMatches={matchedLibrary(libraryRows ?? [], quoteData.line_items)}
       supplierImported={supplierImported}

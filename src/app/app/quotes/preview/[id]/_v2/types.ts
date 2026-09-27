@@ -64,7 +64,8 @@ export interface JobScreenProps {
   smsEnabled: boolean;
   /** The follow-up message to send now (sent / viewed quotes). */
   reminder: { label: string; body: string } | null;
-  library: LibraryPick[];
+  /** With the use count and last use: the library matcher breaks ties on them, as the classic page does. */
+  library: Array<LibraryPick & { usage_count?: number; last_used_at?: string | null }>;
   /** The library items the lines are matched to, for where each price came from. */
   libraryMatches?: LineLibraryItem[];
   /**

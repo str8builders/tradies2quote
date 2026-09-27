@@ -343,6 +343,8 @@ export type QuoteData = {
   terms: string;
   notes: string[];
   takeoff_inputs?: TakeoffInputsSnapshot;
+  /** Which calculator takeoff_inputs are for (written at generation; older quotes are inferred, lib/takeoffLines takeoffKind). */
+  takeoff_type?: "deck" | "subfloor" | "cladding" | "wall";
   /**
    * Wave 45 — frozen evaluator verdict for the takeoff. Read by the
    * pre-send safety gate. Absent on legacy quotes (treated as unknown,

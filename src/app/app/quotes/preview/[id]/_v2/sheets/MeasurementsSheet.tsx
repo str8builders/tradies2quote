@@ -20,12 +20,14 @@ import { formatQuantity } from "@/lib/quantity-display";
 import type { LibraryMaterial, QuoteData, TakeoffEvaluationSummary } from "@/lib/quote-types";
 import {
   libraryMaterials,
+  type LibraryRow,
   measurementsPatch,
+  type MeasurementsPatch,
+  measurementsSave,
   pricedMaterialLines,
   takeoffLinesPreview,
-  type LibraryRow,
-  type MeasurementsPatch,
   type TakeoffPreviewRow,
+  wallMeasurements,
 } from "@/lib/takeoffLines";
 import { takeoffFormInput, useTakeoffForm, type TakeoffForm } from "../../_components/TakeoffPanel";
 import { quantityText, saveErrorMessage } from "../lines";
@@ -418,7 +420,7 @@ export function MeasurementsSheet({ data, onApply, onClose, locked = false, libr
   // the button is tapped, and the sheet shouldn't change under the thumb.
   const [opened] = useState(data);
   const [materials] = useState(() => libraryMaterials(library ?? []));
-  const { form, update } = useTakeoffForm(opened.takeoff_inputs);
+  const { form, update } = useTakeoffForm(wallMeasurements(opened) ?? opened.takeoff_inputs);
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -426,13 +428,13 @@ export function MeasurementsSheet({ data, onApply, onClose, locked = false, libr
   async function apply() {
     if (locked || busy) return;
     setTried(true);
-    const { patch } = checkMeasurements(opened, form, materials);
+    const { patch, input } = checkMeasurements(opened, form, materials);
     if (!patch) return;
     setBusy(true);
     setError(null);
     let result: { ok: true } | { error: string };
     try {
-      result = await onApply(patch);
+      result = await onApply(measurementsSave(opened, patch, input));
     } catch {
       result = { error: saveErrorMessage("network", QUOTE_LOCKED_MESSAGE) };
     }

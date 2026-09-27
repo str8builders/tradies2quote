@@ -14,11 +14,15 @@ import type { ExtractedExtraction } from "@/lib/takeoff/schemas";
 import {
   libraryMaterials,
   measurementsPatch,
+  measurementsSave,
   pricedMaterialLines,
   replaceMaterialLines,
   takeoffEvaluation,
+  takeoffKind,
   takeoffLinesPreview,
   takeoffMaterialLines,
+  wallMeasurements,
+  type MeasurementsPatch,
 } from "./takeoffLines";
 
 /**
@@ -385,5 +389,68 @@ describe("pricedMaterialLines", () => {
   it("counts the material lines a replacement takes prices off", () => {
     expect(pricedMaterialLines(CURRENT)).toBe(2);
     expect(pricedMaterialLines(CURRENT.filter((l) => l.type !== "material"))).toBe(0);
+  });
+});
+
+/* ── Which calculator, and the measurements as they stand ─────────────── */
+
+describe("takeoffKind: the wall form only ever opens on a wall", () => {
+  const q = (extra: Partial<QuoteData>, lines: Partial<QuoteLineItem>[] = []) =>
+    ({ line_items: lines as QuoteLineItem[], ...extra }) as QuoteData;
+  const calc = (price_match_key: string) => ({ type: "material", is_calculated_takeoff: true, price_match_key }) as Partial<QuoteLineItem>;
+
+  it("a quote that says, or whose drawing check says", () => {
+    expect(takeoffKind(q({ takeoff_inputs: { wallLengthM: 12 }, takeoff_type: "cladding" }))).toBe("cladding");
+    expect(
+      takeoffKind(q({ takeoff_inputs: { wallLengthM: 12 }, dimension_confirmation: { takeoff_type: "deck" } as QuoteData["dimension_confirmation"] })),
+    ).toBe("deck");
+  });
+
+  it("older quotes by the calculator's own inputs", () => {
+    expect(takeoffKind(q({ takeoff_inputs: { deckLengthM: 4.8, deckWidthM: 3 } as QuoteData["takeoff_inputs"] }))).toBe("deck");
+    expect(takeoffKind(q({ takeoff_inputs: { floorLengthM: 8, floorWidthM: 6 } as QuoteData["takeoff_inputs"] }))).toBe("subfloor");
+    expect(takeoffKind(q({ takeoff_inputs: { wallLengthM: 20, includeBuildingWrap: true } as QuoteData["takeoff_inputs"] }))).toBe("cladding");
+    expect(takeoffKind(q({ takeoff_inputs: { wallLengthM: 12, gibSides: 2 } }))).toBe("wall");
+  });
+
+  it("length and height only (wall or cladding): told apart by the lines, else left undecided", () => {
+    const inputs = { takeoff_inputs: { wallLengthM: 12, wallHeightM: 2.4 } };
+    expect(takeoffKind(q(inputs, [calc("90x45-sg8-studs")]))).toBe("wall");
+    expect(takeoffKind(q(inputs, [calc("weatherboard-cladding")]))).toBe("cladding");
+    expect(takeoffKind(q(inputs))).toBeNull();
+  });
+
+  it("no measurements stored: nothing to change", () => {
+    expect(takeoffKind(q({}))).toBeNull();
+    expect(takeoffKind(q({ takeoff_inputs: {} }))).toBeNull();
+  });
+});
+
+describe("the measurements as they stand, and what applying them saves", () => {
+  const wall = {
+    line_items: [],
+    takeoff_type: "wall",
+    takeoff_inputs: { wallLengthM: 10, wallHeightM: 2.4, gibSides: 2 },
+    dimension_confirmation: {
+      required: true,
+      reasons: ["no_scale"],
+      takeoff_type: "wall",
+      dimensions: [{ key: "wallLengthM", label: "Wall length", value: 12, unit: "m", confirmed: true }],
+    },
+  } as unknown as QuoteData;
+
+  it("the form opens on the stored measurements with the checked sizes on top", () => {
+    expect(wallMeasurements(wall)).toMatchObject({ wallLengthM: 12, wallHeightM: 2.4, gibSides: 2 });
+    expect(wallMeasurements({ ...wall, takeoff_type: "deck" } as QuoteData)).toBeNull();
+  });
+
+  it("applying saves the measurements and confirms the sizes typed, so a later size check starts from them", () => {
+    const input = { wallLengthM: 14, wallHeightM: 2.7, gibSides: 2 as const, studSpacingMm: 600 } as MaterialTakeoffInput;
+    const patch = { line_items: [], takeoff_evaluation: { status: "pass", reasons: [], confidence: 1 } } as unknown as MeasurementsPatch;
+    const saved = measurementsSave(wall, patch, input);
+    expect(saved.takeoff_type).toBe("wall");
+    expect(saved.takeoff_inputs).toMatchObject({ wallLengthM: 14, wallHeightM: 2.7, studSpacingMm: 600 });
+    expect(saved.dimension_confirmation?.dimensions[0]).toMatchObject({ key: "wallLengthM", value: 14, confirmed: true });
+    expect(saved.takeoff_evaluation).toEqual(patch.takeoff_evaluation);
   });
 });

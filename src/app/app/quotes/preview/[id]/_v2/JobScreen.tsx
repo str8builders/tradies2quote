@@ -22,7 +22,7 @@ import { canTransition } from "@/lib/lifecycle/stages";
 import { scannedMaterialLine } from "@/lib/materials/barcodeLine";
 import { isSupplierLine, supplierMismatches } from "@/lib/materials/supplierReconcile";
 import type { DimensionConfirmation, QuoteClient, QuoteData, QuoteLineItem, QuoteStatus } from "@/lib/quote-types";
-import { libraryMaterials } from "@/lib/takeoffLines";
+import { libraryMaterials, takeoffKind } from "@/lib/takeoffLines";
 import { QuoteVideoCard } from "../_components/QuoteVideoCard";
 import {
   acceptQuote,
@@ -229,7 +229,7 @@ function JobScreenInner(props: JobScreenProps) {
   const fromSupplier = !!current.supplier_source || current.line_items.some(isSupplierLine);
   // A wall worked out from measurements: they can be changed here, and a
   // failed quantity check re-run on the new lines.
-  const wallTakeoff = !!current.takeoff_inputs;
+  const wallTakeoff = takeoffKind(current) === "wall";
   const checkFailed = current.takeoff_evaluation?.status === "fail";
   const canDecline = (["draft", "sent", "viewed"] as string[]).includes(status) && canTransition(status as QuoteStatus, "declined");
 
@@ -263,17 +263,21 @@ function JobScreenInner(props: JobScreenProps) {
    * typed elsewhere teach the library; these changes don't.
    */
   async function commitData(patch: Partial<QuoteData>): Promise<SaveOutcome> {
-    const { line_items: patchLines, ...rest } = patch;
-    const before = { lines, edits };
+    // Drawing sizes live in their own state (confirmSizes), never in edits,
+    // so a later size check can't be overruled by an older copy here.
+    const { line_items: patchLines, dimension_confirmation: patchSizes, ...rest } = patch;
+    const before = { lines, edits, sizes };
     const nextLines = patchLines ?? lines;
     const nextEdits = { ...edits, ...rest };
+    const nextSizes = patchSizes === undefined ? sizes : patchSizes;
     cancelRefresh();
     setSaving(true);
     setLines(nextLines);
     setEdits(nextEdits);
+    setSizes(nextSizes);
     let result: Awaited<ReturnType<typeof saveQuoteChanges>>;
     try {
-      const next = withEdits(withSizes(props.data, sizes), nextEdits);
+      const next = withEdits(withSizes(props.data, nextSizes), nextEdits);
       result = await saveQuoteChanges(quoteId, withLines(next, nextLines, client), saveOptionsFor(false));
     } catch {
       result = { error: "network" };
@@ -282,6 +286,7 @@ function JobScreenInner(props: JobScreenProps) {
     if ("error" in result) {
       setLines(before.lines);
       setEdits(before.edits);
+      setSizes(before.sizes);
       if (result.error === QUOTE_LOCKED_MESSAGE) router.refresh();
       return { error: saveErrorMessage(result.error, QUOTE_LOCKED_MESSAGE) };
     }
@@ -952,7 +957,7 @@ function JobScreenInner(props: JobScreenProps) {
           dayNotes={props.dayNotes}
           serverTools={props.serverTools}
           onDecline={canDecline ? () => setSheet({ kind: "decline" }) : undefined}
-          onMeasurements={locked ? undefined : () => setSheet({ kind: "measurements" })}
+          onMeasurements={locked || !wallTakeoff ? undefined : () => setSheet({ kind: "measurements" })}
           onSupplierCheck={fromSupplier ? () => setSheet({ kind: "supplier" }) : undefined}
           onClose={close}
         />
