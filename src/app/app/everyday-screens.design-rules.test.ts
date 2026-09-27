@@ -25,8 +25,15 @@ const DIRS = [
   "src/app/app/beta/_newlook",
   "src/app/app/beta/_lib",
   "src/app/app/calendar/_newlook",
+  "src/app/app/materials/import-quote/_newlook",
 ];
-const FILES = ["src/app/app/materials/_newlook/PriceForm.tsx", "src/app/app/materials/_newlook/PriceFormScreen.tsx"];
+const FILES = [
+  "src/app/app/materials/_newlook/PriceForm.tsx",
+  "src/app/app/materials/_newlook/PriceFormScreen.tsx",
+  "src/app/app/materials/_components/BarcodeScanViewsV2.tsx",
+  "src/app/app/quotes/new/_v2/PlanReader.tsx",
+  "src/app/app/quotes/preview/[id]/_v2/sheets/SizesSheet.tsx",
+];
 
 function sources(dir: string): string[] {
   const out: string[] = [];

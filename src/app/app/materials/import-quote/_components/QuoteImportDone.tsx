@@ -1,25 +1,68 @@
 import Link from "next/link";
 import { Camera, CheckCircle, Warning, WarningOctagon } from "@phosphor-icons/react/dist/ssr";
+import { Button, ButtonLink } from "@/components/ui/button";
+import { Callout } from "@/components/ui/callout";
 import type { MergedName, SaveOutcome } from "@/lib/materials/libraryImport";
 
 /**
  * After "Add to library" on a scanned supplier quote. Says exactly what
  * happened: all saved, some saved (and which weren't), or nothing saved —
  * which is an error with a way back to the lines, never "Added".
+ * `look="new"` says the same in the kit (the new-look scan).
  */
 export function QuoteImportDone({
   outcome,
   merged = [],
   onScanAnother,
   onBack,
+  look = "old",
 }: {
   outcome: SaveOutcome;
   merged?: MergedName[];
   onScanAnother: () => void;
   onBack: () => void;
+  look?: "old" | "new";
 }) {
   const Icon = outcome.tone === "ok" ? CheckCircle : outcome.tone === "partial" ? Warning : WarningOctagon;
   const colour = outcome.tone === "ok" ? "text-brand" : outcome.tone === "partial" ? "text-hivis" : "text-red-300";
+  if (look === "new") {
+    return (
+      <section
+        className="space-y-4"
+        data-testid="quote-import-done"
+        data-tone={outcome.tone}
+        role={outcome.tone === "bad" ? "alert" : "status"}
+      >
+        <Callout tone={outcome.tone === "partial" ? "warn" : outcome.tone} title={outcome.title}>
+          <p>{outcome.detail}</p>
+          {outcome.tone !== "bad" ? (
+            <p className="mt-1">
+              These prices are marked as scanned estimates — confirm them with the supplier before relying on them.
+            </p>
+          ) : null}
+          {merged.length > 0 ? (
+            <p className="mt-1" data-testid="quote-import-done-merged">
+              Saved once each (they were on more than one line): {merged.map((m) => `“${m.name}”`).join(", ")}.
+            </p>
+          ) : null}
+        </Callout>
+        <div className="space-y-2">
+          {outcome.tone === "bad" ? (
+            <Button fullWidth onClick={onBack} data-testid="quote-import-done-back">
+              Back to the lines
+            </Button>
+          ) : (
+            <ButtonLink href="/app/materials" fullWidth>
+              Back to your prices
+            </ButtonLink>
+          )}
+          <Button variant="secondary" fullWidth icon={<Camera weight="bold" />} onClick={onScanAnother}>
+            Scan another
+          </Button>
+        </div>
+      </section>
+    );
+  }
   return (
     <section
       className="t2q-card-pro mt-6 p-5 sm:p-6"

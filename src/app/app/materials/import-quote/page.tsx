@@ -6,8 +6,10 @@ import { createClient } from "@/lib/supabase/server";
 import { hasAiConsent } from "@/lib/ai-consent";
 import { isNativeShellRequest } from "@/lib/native-shell";
 import { NZ_DEFAULTS, resolveTaxLabel, resolveTaxRate } from "@/lib/quote-defaults";
+import { isNewLookOn } from "@/lib/ui/newLook";
 import { AppHeader } from "../../_components/AppHeader";
 import { QuoteImportClient } from "./_components/QuoteImportClient";
+import { ScanQuoteScreen } from "./_newlook/ScanQuoteScreen";
 
 export const metadata: Metadata = {
   title: "Scan supplier quote",
@@ -20,13 +22,14 @@ export default async function ImportQuotePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: profile }, nativeShell] = await Promise.all([
+  const [{ data: profile }, nativeShell, newLook] = await Promise.all([
     supabase
       .from("profiles")
       .select("currency, tax_rate, tax_label, country")
       .eq("id", user.id)
       .maybeSingle(),
     isNativeShellRequest(),
+    isNewLookOn(),
   ]);
   // App Store 5.1.2(i): in the iPhone app the scanner asks for AI consent
   // before the first read (the route enforces it regardless). Web: never.
@@ -36,6 +39,12 @@ export default async function ImportQuotePage() {
   // NZ's "GST" 15 %). Stored as a percentage; the client works in fractions.
   const taxRate = resolveTaxRate(profile?.tax_rate, profile?.country, profile?.currency) / 100;
   const taxLabel = resolveTaxLabel(profile?.tax_label, profile?.country, profile?.currency);
+
+  if (newLook) {
+    return (
+      <ScanQuoteScreen currency={currency} taxRate={taxRate} taxLabel={taxLabel} needsAiConsent={needsAiConsent} />
+    );
+  }
 
   return (
     <div className="min-h-screen text-white">

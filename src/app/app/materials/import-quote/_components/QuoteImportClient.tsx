@@ -78,13 +78,21 @@ type ReadPage = { source: number; page: ExtractResponse; url: string };
 type FailedPage = { source: number; name: string; error: string };
 
 /** A usable price: above zero, or negative on a printed discount line. */
-function validRowPrice(r: ReviewRow): boolean {
+export function validRowPrice(r: ReviewRow): boolean {
   if (r.price.trim() === "") return false;
   const p = Number(r.price);
   return Number.isFinite(p) && (p > 0 || (r.credit && p < 0));
 }
 
-export function QuoteImportClient({ currency, taxRate = 0.15, taxLabel = "GST", needsAiConsent = false }: { currency: string; /** Fraction, e.g. 0.15. The tradie's configured rate, not a fixed GST. */ taxRate?: number; /** The tradie's own tax label ("GST", "VAT", "Tax"). */ taxLabel?: string; /** iPhone app with no AI consent on record: ask before the first read. */ needsAiConsent?: boolean }) {
+export type QuoteImportProps = { currency: string; /** Fraction, e.g. 0.15. The tradie's configured rate, not a fixed GST. */ taxRate?: number; /** The tradie's own tax label ("GST", "VAT", "Tax"). */ taxLabel?: string; /** iPhone app with no AI consent on record: ask before the first read. */ needsAiConsent?: boolean };
+
+/**
+ * The scan itself, shared by both looks: QuoteImportClient below draws it in
+ * the old look, ../_newlook/ScanQuote.tsx in the new one. Only the markup
+ * differs, so the multi-page read, the retries, the totals check and the
+ * saves behave the same in either.
+ */
+export function useQuoteImport({ currency, taxRate = 0.15, needsAiConsent = false }: QuoteImportProps) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const libraryRef = useRef<HTMLInputElement>(null);
@@ -661,6 +669,38 @@ export function QuoteImportClient({ currency, taxRate = 0.15, taxLabel = "GST", 
     clearPhotos();
     setPhase("idle");
   }
+
+  return {
+    phase, setPhase, result, setResult, startOver, error,
+    // Picking the photos and PDFs
+    fileRef, libraryRef, onFileChosen, pickFile, pickLibrary, clearPhotos, removePhoto, previews, pickedNames, fileName,
+    // Reading them
+    scan, scanAbort, scanProgress, uploadPercent, failedPages, retryPage, retrying, consentOpen, onConsentGranted,
+    // The review
+    rows, patchRow, removeRow, applySupplierValue, review, bulk, setBulk, applyBulk, history, undoRows,
+    supplier, setSupplier, gstInclusive, setGstInclusive, gstDetected, notes, extraction,
+    scanViews, zoomOpen, setZoomOpen, zoomIndex, setZoomIndex,
+    // The totals check, and what can be saved
+    srcSubtotal, srcGst, srcTotal, srcDiscount, srcFreight, srcAdjustments, validation, lineCheckById,
+    acknowledged, setAcknowledged, blocked, includable, createable, libraryMerges, save, createQuote,
+  };
+}
+
+export type QuoteImport = ReturnType<typeof useQuoteImport>;
+
+/** The scan in the old look (the dev-upgrade harness renders it too). */
+export function QuoteImportClient(props: QuoteImportProps) {
+  const { currency, taxLabel = "GST" } = props;
+  const {
+    phase, setPhase, result, setResult, startOver, error,
+    fileRef, libraryRef, onFileChosen, pickFile, pickLibrary, clearPhotos, removePhoto, previews, pickedNames, fileName,
+    scan, scanAbort, scanProgress, uploadPercent, failedPages, retryPage, retrying, consentOpen, onConsentGranted,
+    rows, patchRow, removeRow, applySupplierValue, review, bulk, setBulk, applyBulk, history, undoRows,
+    supplier, setSupplier, gstInclusive, setGstInclusive, gstDetected, notes, extraction,
+    scanViews, zoomOpen, setZoomOpen, zoomIndex, setZoomIndex,
+    srcSubtotal, srcGst, srcTotal, srcDiscount, srcFreight, srcAdjustments, validation, lineCheckById,
+    acknowledged, setAcknowledged, blocked, includable, createable, libraryMerges, save, createQuote,
+  } = useQuoteImport(props);
 
   // ── Done state ──────────────────────────────────────────────────────
   if (phase === "done" && result) {
