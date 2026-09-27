@@ -6,9 +6,18 @@ import { DataTexture, SRGBColorSpace, TextureLoader, VideoTexture, type Texture 
 export type ClipId = string;
 export type ClipWidth = 600 | 420;
 
-export const clipSrc = (id: ClipId, width: ClipWidth) => `/jobsite/screens/${id}-${width}.mp4`;
-export const firstFrameSrc = (id: ClipId) => `/jobsite/screens/${id}-first.webp`;
-export const lastFrameSrc = (id: ClipId) => `/jobsite/screens/${id}.webp`;
+/**
+ * Bumped when a clip is re-rendered under the same name. The files are
+ * cached for a day (then a week stale-while-revalidate), so without a new
+ * address a returning visitor would keep the old one. request: 2 is the van
+ * scan (27 Sep 2026).
+ */
+export const CLIP_VERSION: Readonly<Record<ClipId, number>> = { request: 2 };
+const version = (id: ClipId) => (CLIP_VERSION[id] ? `?v=${CLIP_VERSION[id]}` : "");
+
+export const clipSrc = (id: ClipId, width: ClipWidth) => `/jobsite/screens/${id}-${width}.mp4${version(id)}`;
+export const firstFrameSrc = (id: ClipId) => `/jobsite/screens/${id}-first.webp${version(id)}`;
+export const lastFrameSrc = (id: ClipId) => `/jobsite/screens/${id}.webp${version(id)}`;
 
 type Clip = {
   video: HTMLVideoElement;
