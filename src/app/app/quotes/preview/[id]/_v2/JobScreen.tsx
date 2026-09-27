@@ -15,14 +15,16 @@ import { StatusRail } from "@/components/ui/status-rail";
 import type { Tone } from "@/components/ui/styles";
 import { ToastProvider, useToast } from "@/components/ui/toast";
 import { ScanBarcodeButton } from "@/app/app/materials/_components/ScanBarcodeButton";
+import type { ConfirmAndRecalcResult, DimensionEdit } from "@/lib/dimensionConfirmation";
 import { formatShortDayDate } from "@/lib/format-date";
 import { QUOTE_LOCKED_MESSAGE } from "@/lib/lifecycle/lock";
 import { canTransition } from "@/lib/lifecycle/stages";
 import { scannedMaterialLine } from "@/lib/materials/barcodeLine";
-import type { QuoteClient, QuoteLineItem, QuoteStatus } from "@/lib/quote-types";
+import type { DimensionConfirmation, QuoteClient, QuoteLineItem, QuoteStatus } from "@/lib/quote-types";
 import { QuoteVideoCard } from "../_components/QuoteVideoCard";
 import {
   acceptQuote,
+  confirmDimensions,
   declineQuote,
   markComplete,
   markInProgress,
@@ -50,8 +52,9 @@ import { MoreToolsSheet } from "./sheets/MoreToolsSheet";
 import { PriceSheet } from "./sheets/PriceSheet";
 import { ReminderSheet } from "./sheets/ReminderSheet";
 import { SendSheet } from "./sheets/SendSheet";
-import { detailedEditorHref } from "./sheets/sender-parts";
+import { SizesSheet } from "./sheets/SizesSheet";
 import { AmountLine, BookSheet, ConfirmSheet, type StepResult } from "./sheets/StepSheets";
+import { sizesErrorMessage, sizesSavedMessage, withSizes } from "./sizes";
 import type { JobScreenProps } from "./types";
 
 type Sheet =
@@ -69,6 +72,7 @@ type Sheet =
   | { kind: "line"; index: number }
   | { kind: "new-line" }
   | { kind: "client" }
+  | { kind: "sizes" }
   | { kind: "more" };
 
 type SaveOutcome = { ok: true } | { error: string };
@@ -142,18 +146,20 @@ function JobScreenInner(props: JobScreenProps) {
 
   const [lines, setLines] = useState<QuoteLineItem[]>(() => props.data.line_items);
   const [client, setClient] = useState<QuoteClient>(() => migrateLegacyContact(props.data.client));
+  const [sizes, setSizes] = useState<DimensionConfirmation | null>(() => props.data.dimension_confirmation ?? null);
   const [saving, setSaving] = useState(false);
   const [sheet, setSheet] = useState<Sheet | null>(null);
 
   // A fresh server render (after a step, a refresh, or a change made from
-  // More tools such as a compliance answer) brings the stored lines: adopt
-  // them, except while one of our own saves is on its way.
+  // More tools such as a compliance answer) brings the stored lines and
+  // drawing sizes: adopt them, except while one of our own saves is on its way.
   const [syncedData, setSyncedData] = useState(props.data);
   if (props.data !== syncedData) {
     setSyncedData(props.data);
     if (!saving) {
       setLines(props.data.line_items);
       setClient(migrateLegacyContact(props.data.client));
+      setSizes(props.data.dimension_confirmation ?? null);
     }
   }
 
@@ -176,7 +182,8 @@ function JobScreenInner(props: JobScreenProps) {
     }, REFRESH_AFTER_SAVE_MS);
   }
 
-  const current = withLines(props.data, lines, client);
+  const data = withSizes(props.data, sizes);
+  const current = withLines(data, lines, client);
   const first = clientFirstName(client.name);
   const who = first ?? "your client";
   const view = jobView({
@@ -206,7 +213,7 @@ function JobScreenInner(props: JobScreenProps) {
     setClient(nextClient);
     let result: Awaited<ReturnType<typeof saveQuoteChanges>>;
     try {
-      result = await saveQuoteChanges(quoteId, withLines(props.data, nextLines, nextClient), saveOptionsFor(learn));
+      result = await saveQuoteChanges(quoteId, withLines(data, nextLines, nextClient), saveOptionsFor(learn));
     } catch {
       result = { error: "network" };
     }
@@ -224,6 +231,41 @@ function JobScreenInner(props: JobScreenProps) {
   /** The classic send flow saves the editor first, so the routes see exactly this. */
   async function saveFirst(): Promise<SaveOutcome> {
     return commit(lines, client);
+  }
+
+  /**
+   * Confirm the drawing's sizes through the classic confirmDimensions action,
+   * which works the materials out again exactly as the sheet's preview did
+   * (optimistic like commit, rolled back on failure). The action refreshes
+   * the page in its own answer, so no refresh is scheduled.
+   */
+  async function confirmSizes(
+    edits: DimensionEdit[],
+    preview: ConfirmAndRecalcResult | null,
+  ): Promise<{ ok: true; changed: boolean } | { error: string }> {
+    const before = { lines, sizes };
+    cancelRefresh();
+    setSaving(true);
+    if (preview) {
+      setLines(preview.line_items);
+      setSizes(preview.dimension_confirmation);
+    }
+    let result: Awaited<ReturnType<typeof confirmDimensions>>;
+    try {
+      result = await confirmDimensions(quoteId, current, edits);
+    } catch {
+      result = { error: "network" };
+    }
+    setSaving(false);
+    if ("error" in result) {
+      setLines(before.lines);
+      setSizes(before.sizes);
+      if (result.error === QUOTE_LOCKED_MESSAGE) router.refresh();
+      return { error: sizesErrorMessage(result.error) };
+    }
+    setLines(result.lineItems);
+    setSizes(result.dimensionConfirmation);
+    return { ok: true, changed: result.changed };
   }
 
   function close() {
@@ -383,9 +425,9 @@ function JobScreenInner(props: JobScreenProps) {
             tone="warn"
             title="Check the sizes from your drawing"
             action={
-              <ButtonLink href={detailedEditorHref(quoteId)} variant="secondary" fullWidth>
+              <Button variant="secondary" fullWidth data-testid="job-check-sizes" onClick={() => setSheet({ kind: "sizes" })}>
                 Check the sizes
-              </ButtonLink>
+              </Button>
             }
           >
             We read some sizes off your drawing. Confirm them before the quote goes.
@@ -418,6 +460,7 @@ function JobScreenInner(props: JobScreenProps) {
                 Add a line
               </Button>
               <ScanBarcodeButton
+                look="new"
                 mode="quote"
                 currency={currency}
                 library={props.library}
@@ -674,6 +717,24 @@ function JobScreenInner(props: JobScreenProps) {
             if ("ok" in result) {
               setSheet(null);
               toast.show("Line added");
+            }
+            return result;
+          }}
+          onClose={close}
+        />
+      ) : null}
+
+      {/* Mounted on the confirmation object, not on sizes still to check: the
+          sizes turn confirmed the moment Save is tapped, and a failed save
+          must come back to this sheet with its error. */}
+      {sheet?.kind === "sizes" && current.dimension_confirmation ? (
+        <SizesSheet
+          data={current}
+          onConfirm={async (edits, preview) => {
+            const result = await confirmSizes(edits, preview);
+            if ("ok" in result) {
+              setSheet(null);
+              toast.show(sizesSavedMessage(result.changed));
             }
             return result;
           }}

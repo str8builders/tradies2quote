@@ -34,10 +34,14 @@ import type {
 } from "@/lib/quote-types";
 import { applyLineEdit } from "@/lib/t2qcalLineEdit";
 import { isQuoteLocked } from "@/lib/lifecycle/lock";
+import type { DimensionEdit } from "@/lib/dimensionConfirmation";
 import {
-  confirmAndRecalc,
-  type DimensionEdit,
-} from "@/lib/dimensionConfirmation";
+  dimensionDraft,
+  dimensionEdits,
+  invalidDimensions,
+  previewDimensionConfirmation,
+  recalculatedQuantities,
+} from "@/lib/dimensionConfirmationForm";
 import { matchToLibrary } from "@/lib/materials";
 import { isUnpricedLine } from "@/lib/quote-validation";
 import { convertUnitPrice } from "@/lib/units";
@@ -260,30 +264,23 @@ export function QuoteEditor({
   const [dimConfirm, setDimConfirm] = useState<DimensionConfirmation | null>(
     initialData.dimension_confirmation ?? null,
   );
+  // The draft, the check and the preview are shared with the new job page's
+  // sizes sheet (lib/dimensionConfirmationForm), so both behave the same.
   const [dimDraft, setDimDraft] = useState<Record<string, string>>(() =>
-    Object.fromEntries(
-      (initialData.dimension_confirmation?.dimensions ?? []).map((d) => [
-        d.key,
-        String(d.value),
-      ]),
-    ),
+    dimensionDraft(initialData.dimension_confirmation),
   );
   const [dimError, setDimError] = useState<string>("");
 
-  const dimEdits: DimensionEdit[] = (dimConfirm?.dimensions ?? []).map((d) => ({
-    key: d.key,
-    value: Number(dimDraft[d.key]),
-  }));
+  const dimEdits: DimensionEdit[] = dimensionEdits(dimConfirm, dimDraft);
 
   // Live, deterministic preview of the quantities a correction would produce
   // — the SAME pure recompute the server runs on confirm. Shown on the same
   // screen as the dimensions so the tradie sees the impact before confirming.
   const dimPreview = useMemo(() => {
     if (!dimConfirm) return null;
-    return confirmAndRecalc(
+    return previewDimensionConfirmation(
       { ...initialData, line_items: items, dimension_confirmation: dimConfirm },
       dimEdits,
-      { confirmedBy: "", confirmedAt: "" },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dimConfirm, items, dimDraft, initialData]);
@@ -297,12 +294,10 @@ export function QuoteEditor({
   function handleConfirmDimensions() {
     if (!dimConfirm) return;
     // Validate the draft values before sending.
-    for (const d of dimConfirm.dimensions) {
-      const v = Number(dimDraft[d.key]);
-      if (!Number.isFinite(v) || v <= 0) {
-        setDimError(`${d.label} must be a positive number.`);
-        return;
-      }
+    const invalid = invalidDimensions(dimConfirm, dimDraft)[0];
+    if (invalid) {
+      setDimError(`${invalid.label} must be a positive number.`);
+      return;
     }
     setDimError("");
     setStatus("saving");
@@ -320,14 +315,7 @@ export function QuoteEditor({
       }
       setItems(result.lineItems);
       setDimConfirm(result.dimensionConfirmation);
-      setDimDraft(
-        Object.fromEntries(
-          result.dimensionConfirmation.dimensions.map((d) => [
-            d.key,
-            String(d.value),
-          ]),
-        ),
-      );
+      setDimDraft(dimensionDraft(result.dimensionConfirmation));
       setStatus("saved");
       setTimeout(() => setStatus("idle"), 2500);
     });
@@ -1119,19 +1107,8 @@ export function QuoteEditor({
                       : "Resulting quantities"}
                   </p>
                   <ul className="mt-2 space-y-1">
-                    {dimPreview.line_items
-                      .filter((i) => i.is_calculated_takeoff)
-                      .map((i, n) => {
-                        const before = items.find(
-                          (x) =>
-                            x.is_calculated_takeoff &&
-                            (x.price_match_key ?? x.description) ===
-                              (i.price_match_key ?? i.description),
-                        );
-                        const changed =
-                          dimPreview.changed &&
-                          before != null &&
-                          Math.abs((before.quantity ?? 0) - i.quantity) > 1e-9;
+                    {recalculatedQuantities(dimPreview, items).map(
+                      ({ line: i, before, changed }, n) => {
                         return (
                           <li
                             key={n}
