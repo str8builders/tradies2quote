@@ -21,7 +21,7 @@ import { cx } from "@/components/ui/cx";
 import { IconTile } from "@/components/ui/icon-tile";
 import { SectionTitle } from "@/components/ui/section-title";
 import { TAP } from "@/components/ui/styles";
-import { useToast } from "@/components/ui/toast";
+import { ToastProvider, useToast } from "@/components/ui/toast";
 import type { IconTone } from "@/components/ui/styles";
 import { enableQuoteRequestLink } from "../../settings/request-link-actions";
 import { SETTINGS_PATHS } from "../../settings/_newlook/hub";
@@ -112,21 +112,7 @@ export function QrGuide() {
   );
 }
 
-/**
- * Your QR code (new look). With the request link on: the code on a white
- * plate (a QR code scans only dark on light), the link, the print options
- * and the guide. In the iPhone app a web page can't print or download, so
- * the code goes to the share sheet instead (Print, Save Image, AirDrop).
- * With the link off: turn it on (it's made from the business name).
- */
-export function QrCodeView({
-  initialSlug,
-  appUrl,
-  hasBusinessName,
-  hasLogo,
-  inApp,
-  qrSrc,
-}: {
+type QrCodeViewProps = {
   initialSlug: string | null;
   appUrl: string;
   hasBusinessName: boolean;
@@ -134,7 +120,34 @@ export function QrCodeView({
   inApp: boolean;
   /** The code's image; the signed-in route unless given (the local preview page passes its own). */
   qrSrc?: string;
-}) {
+};
+
+/**
+ * Your QR code (new look). With the request link on: the code on a white
+ * plate (a QR code scans only dark on light), the link, the print options
+ * and the guide. In the iPhone app a web page can't print or download, so
+ * the code goes to the share sheet instead (Print, Save Image, AirDrop).
+ * With the link off: turn it on (it's made from the business name).
+ *
+ * Brings its own toasts (Copy link, turning the link on, the share sheet),
+ * as the other new-look screens do: the /app shell has no ToastProvider.
+ */
+export function QrCodeView(props: QrCodeViewProps) {
+  return (
+    <ToastProvider>
+      <QrCodeBody {...props} />
+    </ToastProvider>
+  );
+}
+
+function QrCodeBody({
+  initialSlug,
+  appUrl,
+  hasBusinessName,
+  hasLogo,
+  inApp,
+  qrSrc,
+}: QrCodeViewProps) {
   const toast = useToast();
   const [slug, setSlug] = useState<string | null>(initialSlug);
   const [pending, startTransition] = useTransition();
