@@ -2,9 +2,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { safeNextPath } from "@/lib/safe-redirect";
 import { WELCOME_SEEN_COOKIE } from "@/lib/welcome-cookie";
+import { publicOrigin } from "@/lib/public-origin";
 
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = request.nextUrl;
+  const { searchParams } = request.nextUrl;
+  // Behind Caddy, request.url is the server's own address (localhost:3001);
+  // every redirect from an email link must land on the public site.
+  const origin = publicOrigin(request);
   const code = searchParams.get("code");
   // `next` is attacker-controllable via the query string — only allow
   // same-origin paths, never a full / protocol-relative URL.

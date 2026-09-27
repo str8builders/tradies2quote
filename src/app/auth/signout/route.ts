@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { publicUrl } from "@/lib/public-origin";
 
 /**
  * Wave 13.2 — Sign-out route handler.
@@ -42,7 +43,8 @@ export async function POST(req: NextRequest) {
   // 2. Build the redirect response and explicitly expire every sb-*
   //    cookie on it. Setting maxAge: 0 + matching path forces the
   //    browser to drop the cookie immediately.
-  const url = new URL("/login", req.url);
+  // Behind Caddy, req.url is the server's own address (localhost:3001).
+  const url = publicUrl("/login", req);
   const response = NextResponse.redirect(url, 303);
 
   const cookieStore = await cookies();
@@ -72,7 +74,7 @@ export async function GET(req: NextRequest) {
   // still signs out gracefully.
   const site = req.headers.get("sec-fetch-site");
   if (site && site !== "same-origin" && site !== "none") {
-    return NextResponse.redirect(new URL("/login", req.url), 303);
+    return NextResponse.redirect(publicUrl("/login", req), 303);
   }
   return POST(req);
 }
