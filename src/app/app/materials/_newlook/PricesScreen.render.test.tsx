@@ -24,12 +24,13 @@ vi.mock("next/headers", () => ({
 }));
 // The real button lazy-loads the camera sheet; its first render is only the button.
 vi.mock("../_components/ScanBarcodeButton", () => ({
-  ScanBarcodeButton: (props: { mode: string; currency: string; library?: unknown[]; className?: string }) =>
+  ScanBarcodeButton: (props: { look?: string; mode: string; currency: string; library?: unknown[]; className?: string }) =>
     createElement(
       "button",
       {
         type: "button",
         "data-testid": "scan-barcode-button",
+        "data-look": props.look ?? "classic",
         "data-mode": props.mode,
         "data-currency": props.currency,
         "data-library": String(props.library?.length ?? 0),
@@ -99,6 +100,8 @@ describe("Your prices", () => {
     expect(html).toContain(">Add a price<");
     const scan = tagWith(html, 'data-testid="scan-barcode-button"');
     expect(scan).toContain('data-mode="library"');
+    // The scanner sheet opens in the new look too (not the old dark sheet).
+    expect(scan).toContain('data-look="new"');
     expect(scan).toContain('data-library="2"');
     expect(scan).toContain("min-h-12");
     expect(html).toContain('href="/app/materials/import-quote"');

@@ -18,9 +18,13 @@ import type { BarcodeConflict, BarcodeMaterial } from "../barcode-actions";
 
 // The scanner's screens. Each one is a plain function of its props — the
 // camera, decoding and server calls live in BarcodeScanSheet — so every
-// screen can be rendered on its own in tests.
+// screen can be rendered on its own in tests. BarcodeScanViewsV2 draws the
+// same screens in the new look, with the words and checks exported here.
 
 export type ScanMode = "library" | "quote";
+
+/** classic: this file's screens in the old sheet. new: the kit's BottomSheet and BarcodeScanViewsV2. */
+export type ScanLook = "classic" | "new";
 
 /**
  * starting/live: the camera is coming up or reading. paused: stopped while the
@@ -49,6 +53,22 @@ export type NewProductValues = {
   priceIncludesGst: boolean;
 };
 
+export const BLANK_NEW_PRODUCT: NewProductValues = { name: "", unit: "each", price: "", priceIncludesGst: false };
+
+/** Why the new product can't be saved yet, or null when it can. */
+export function newProductProblem(values: NewProductValues): string | null {
+  const price = Number(values.price.replace(/[$,\s]/g, ""));
+  if (!values.name.trim()) return "Give it a name so you can find it next time.";
+  if (!Number.isFinite(price) || price <= 0) return "Enter a price above $0.";
+  return null;
+}
+
+/** The first eight library items whose name holds the search words. */
+export function libraryMatches(library: readonly LibraryPick[], query: string): readonly LibraryPick[] {
+  const q = query.trim().toLowerCase();
+  return (q ? library.filter((m) => m.name.toLowerCase().includes(q)) : library).slice(0, 8);
+}
+
 // `!` because the app shell (premium.css / redesign.css) restyles these
 // buttons with more specific rules (46px tall, 13–14px text): the scanner's
 // primary actions stay 56px and every button 48px+ with 16px words.
@@ -71,7 +91,7 @@ function StepHeading({ children }: { children: ReactNode }) {
   );
 }
 
-function priceLabel(material: Pick<BarcodeMaterial, "unit" | "default_unit_price">, currency: string) {
+export function priceLabel(material: Pick<BarcodeMaterial, "unit" | "default_unit_price">, currency: string) {
   if (material.default_unit_price === null || !(material.default_unit_price > 0)) {
     return "No price saved yet";
   }
@@ -98,7 +118,7 @@ function ErrorNote({ children }: { children: ReactNode }) {
   );
 }
 
-const CAMERA_PROBLEM: Record<Exclude<CameraStatus, "starting" | "live" | "paused">, string> = {
+export const CAMERA_PROBLEM: Record<Exclude<CameraStatus, "starting" | "live" | "paused">, string> = {
   denied:
     "Camera access is turned off for Tradies2Quote — allow the camera in your phone's settings for this app or browser, then tap Try again.",
   busy: "Another app is using the camera. Close it, then tap Try again.",
@@ -106,6 +126,13 @@ const CAMERA_PROBLEM: Record<Exclude<CameraStatus, "starting" | "live" | "paused
   error: "The camera didn't start. Tap Try again, or take a photo of the barcode instead.",
   reader: "The scanner didn't load. Check your connection and tap Try again, or type the number instead.",
 };
+
+/** The line under the camera while it's up (starting, live or paused). */
+export function cameraMessage(status: CameraStatus, hint: string | null): string {
+  if (status === "starting") return "Starting the camera…";
+  if (status === "live") return hint ?? "Point the camera at the barcode. Hold still — it reads by itself.";
+  return "Camera paused.";
+}
 
 export function CameraStep({
   status,
@@ -126,12 +153,7 @@ export function CameraStep({
 }) {
   const showVideo = status === "starting" || status === "live";
   const problem = status === "starting" || status === "live" || status === "paused" ? null : CAMERA_PROBLEM[status];
-  const message =
-    status === "starting"
-      ? "Starting the camera…"
-      : status === "live"
-        ? (hint ?? "Point the camera at the barcode. Hold still — it reads by itself.")
-        : "Camera paused.";
+  const message = cameraMessage(status, hint);
 
   return (
     <div data-testid="barcode-camera-step" data-camera={status}>
@@ -354,8 +376,7 @@ function LibraryPicker({
   onBack: () => void;
 }) {
   const [query, setQuery] = useState("");
-  const q = query.trim().toLowerCase();
-  const matches = (q ? library.filter((m) => m.name.toLowerCase().includes(q)) : library).slice(0, 8);
+  const matches = libraryMatches(library, query);
   return (
     <div data-testid="barcode-library-picker">
       <p className="text-sm text-ink-300">Pick the item and we&apos;ll save this barcode on it.</p>
@@ -424,22 +445,15 @@ export function NewProductStep({
   onAttach: (item: { id: string; name: string }) => void;
   onScanAnother: () => void;
 }) {
-  const [values, setValues] = useState<NewProductValues>({
-    name: "",
-    unit: "each",
-    price: "",
-    priceIncludesGst: false,
-  });
+  const [values, setValues] = useState<NewProductValues>(BLANK_NEW_PRODUCT);
   const [picking, setPicking] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const shown = problem ?? error;
 
   function submit() {
-    const price = Number(values.price.replace(/[$,\s]/g, ""));
-    if (!values.name.trim()) return setProblem("Give it a name so you can find it next time.");
-    if (!Number.isFinite(price) || price <= 0) return setProblem("Enter a price above $0.");
-    setProblem(null);
-    onSave(values);
+    const found = newProductProblem(values);
+    setProblem(found);
+    if (!found) onSave(values);
   }
 
   return (

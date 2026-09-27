@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Barcode, X } from "@phosphor-icons/react";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { normalizeBarcode, pickScannedCode } from "@/lib/materials/barcode";
 import type { DecodedBarcode, Scanner } from "@/lib/materials/barcodeReader";
@@ -26,11 +27,13 @@ import {
   type CameraStatus,
   type LibraryPick,
   type NewProductValues,
+  type ScanLook,
   type ScanMode,
 } from "./BarcodeScanViews";
+import * as NewLookViews from "./BarcodeScanViewsV2";
 
 /**
- * The barcode scanner, as a bottom sheet (a centred dialog on wider screens).
+ * The barcode scanner, as a bottom sheet (classic: a centred dialog on wider screens).
  * Loaded on demand by ScanBarcodeButton; the decoder itself is loaded with a
  * dynamic import once the sheet opens (src/lib/materials/barcodeReader.ts).
  *
@@ -39,6 +42,11 @@ import {
  * A photo of the barcode and typing the number are always available, and are
  * what's left when the camera is blocked or missing. Every camera track is
  * stopped on close, on unmount, when the page is hidden and after a read.
+ *
+ * look="new" runs the same flow in the kit's <BottomSheet> with the new-look
+ * screens (BarcodeScanViewsV2). The kit sheet is a modal <dialog> in the top
+ * layer, so it clears the new shell's tab bar, and it brings its own Escape,
+ * focus trap, dimmed-page tap and scroll lock.
  */
 export type BarcodeScanSheetProps = {
   mode: ScanMode;
@@ -48,7 +56,14 @@ export type BarcodeScanSheetProps = {
   /** Quote editor: append the item as a line (only offered when editable). */
   onAddToQuote?: (material: BarcodeMaterial) => void;
   onClose: () => void;
+  look?: ScanLook;
 };
+
+const CLASSIC_VIEWS = { BusyStep, CameraStep, ErrorStep, FoundStep, NewProductStep, SavedStep, TypeNumberStep };
+/** The same screens, taking the same props, in each look. */
+const VIEWS: Record<ScanLook, typeof CLASSIC_VIEWS> = { classic: CLASSIC_VIEWS, new: NewLookViews };
+
+const CLOSE_LABEL = "Close scanner";
 
 type NewStep = {
   step: "new";
@@ -120,14 +135,24 @@ type Session = {
   lastLookup: { code: string; format: string | null } | null;
 };
 
-export function BarcodeScanSheet({ mode, currency, library = [], onAddToQuote, onClose }: BarcodeScanSheetProps) {
+export function BarcodeScanSheet({
+  mode,
+  currency,
+  library = [],
+  onAddToQuote,
+  onClose,
+  look = "classic",
+}: BarcodeScanSheetProps) {
   const router = useRouter();
   const titleId = useId();
   const [phase, setPhase] = useState<Phase>({ step: "camera" });
   const [camera, setCamera] = useState<CameraStatus>(() => (canUseCamera() ? "starting" : "unavailable"));
   const [hint, setHint] = useState<string | null>(null);
 
+  /** The classic panel. The new look leaves it empty: the kit sheet handles the keyboard. */
   const dialogRef = useRef<HTMLDivElement>(null);
+  /** New look: the content inside the kit sheet's <dialog>. */
+  const contentRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const viewRef = useRef<HTMLDivElement>(null);
   const photoRef = useRef<HTMLInputElement>(null);
@@ -146,7 +171,8 @@ export function BarcodeScanSheet({ mode, currency, library = [], onAddToQuote, o
     closeRef.current = onClose;
   }, [onClose]);
 
-  useBodyScrollLock(true);
+  // The kit sheet locks the page itself.
+  useBodyScrollLock(look === "classic");
 
   const getScanner = useCallback((): Promise<Scanner> => {
     const s = session.current;
@@ -363,13 +389,15 @@ export function BarcodeScanSheet({ mode, currency, library = [], onAddToQuote, o
 
   // When a screen replaces the button that had focus, put focus on the new
   // screen's heading (or Close) so keyboard and screen-reader users follow.
+  // The kit sheet's Close has no data-close; it is found by its label.
   useEffect(() => {
-    const dialog = dialogRef.current;
+    const dialog = dialogRef.current ?? contentRef.current?.closest("dialog");
     if (!dialog) return;
     const active = document.activeElement;
     if (active && active !== document.body && dialog.contains(active)) return;
     const target =
-      dialog.querySelector<HTMLElement>("[data-step-heading]") ?? dialog.querySelector<HTMLElement>("[data-close]");
+      dialog.querySelector<HTMLElement>("[data-step-heading]") ??
+      dialog.querySelector<HTMLElement>(`[data-close], button[aria-label="${CLOSE_LABEL}"]`);
     target?.focus({ preventScroll: true });
   }, [phase.step]);
 
@@ -479,11 +507,12 @@ export function BarcodeScanSheet({ mode, currency, library = [], onAddToQuote, o
     void save(phase, { materialId: item.id });
   }
 
+  const Views = VIEWS[look];
   let body;
   switch (phase.step) {
     case "camera":
       body = (
-        <CameraStep
+        <Views.CameraStep
           status={camera}
           hint={hint}
           videoRef={videoRef}
@@ -495,14 +524,14 @@ export function BarcodeScanSheet({ mode, currency, library = [], onAddToQuote, o
       );
       break;
     case "type":
-      body = <TypeNumberStep error={phase.error} onSubmit={submitNumber} onUseCamera={startCamera} />;
+      body = <Views.TypeNumberStep error={phase.error} onSubmit={submitNumber} onUseCamera={startCamera} />;
       break;
     case "busy":
-      body = <BusyStep label={phase.label} />;
+      body = <Views.BusyStep label={phase.label} />;
       break;
     case "found":
       body = (
-        <FoundStep
+        <Views.FoundStep
           mode={mode}
           material={phase.material}
           code={phase.code}
@@ -517,7 +546,7 @@ export function BarcodeScanSheet({ mode, currency, library = [], onAddToQuote, o
       break;
     case "new":
       body = (
-        <NewProductStep
+        <Views.NewProductStep
           mode={mode}
           code={phase.code}
           currency={currency}
@@ -533,7 +562,7 @@ export function BarcodeScanSheet({ mode, currency, library = [], onAddToQuote, o
       break;
     case "saved":
       body = (
-        <SavedStep
+        <Views.SavedStep
           mode={mode}
           material={phase.material}
           currency={currency}
@@ -547,7 +576,7 @@ export function BarcodeScanSheet({ mode, currency, library = [], onAddToQuote, o
       break;
     case "error":
       body = (
-        <ErrorStep
+        <Views.ErrorStep
           message={phase.message}
           retryLabel={phase.retry === "photo" ? "Take another photo" : "Try again"}
           onRetry={retry}
@@ -555,6 +584,33 @@ export function BarcodeScanSheet({ mode, currency, library = [], onAddToQuote, o
         />
       );
       break;
+  }
+
+  // Inside the sheet in both looks: behind the new look's modal <dialog> the
+  // page is inert, and the photo picker must open from a tap in the sheet.
+  const photoInput = (
+    <input
+      ref={photoRef}
+      type="file"
+      accept="image/*"
+      capture="environment"
+      tabIndex={-1}
+      aria-hidden="true"
+      className="sr-only"
+      onChange={readPhoto}
+      data-testid="barcode-photo-input"
+    />
+  );
+
+  if (look === "new") {
+    return (
+      <BottomSheet open onClose={onClose} title="Scan barcode" closeLabel={CLOSE_LABEL}>
+        <div ref={contentRef} data-testid="barcode-scan-sheet">
+          {body}
+          {photoInput}
+        </div>
+      </BottomSheet>
+    );
   }
 
   return (
@@ -580,7 +636,7 @@ export function BarcodeScanSheet({ mode, currency, library = [], onAddToQuote, o
             type="button"
             data-close
             onClick={onClose}
-            aria-label="Close scanner"
+            aria-label={CLOSE_LABEL}
             className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-white/10 text-ink-300 hover:border-brand hover:text-brand"
           >
             <X size={20} weight="bold" aria-hidden="true" />
@@ -589,17 +645,7 @@ export function BarcodeScanSheet({ mode, currency, library = [], onAddToQuote, o
         <div className="flex-1 overflow-y-auto overscroll-contain px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           {body}
         </div>
-        <input
-          ref={photoRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          tabIndex={-1}
-          aria-hidden="true"
-          className="sr-only"
-          onChange={readPhoto}
-          data-testid="barcode-photo-input"
-        />
+        {photoInput}
       </div>
     </div>
   );

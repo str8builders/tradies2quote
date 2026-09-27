@@ -144,6 +144,7 @@ export async function PricesBody({ userId }: { userId: string }) {
         <div className="grid grid-cols-2 gap-2">
           {/* Found: opens the item. New: saved to your prices with its code. */}
           <ScanBarcodeButton
+            look="new"
             mode="library"
             currency={currency}
             library={materials}
