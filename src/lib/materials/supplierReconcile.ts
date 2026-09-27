@@ -140,7 +140,39 @@ export function supplierSnapPrice(
 }
 
 /**
- * A line with the supplier's value: exactly what the classic editor's
+ * Their quantity, when this line's was changed since the scan and it is still
+ * in their unit: putting it back (at their price) is the honest fix. Snapping
+ * the price instead would hit their total with a nonsense rate — 99 lengths
+ * at $1.74 to make their 12 × $14.35. Null when the quantity is theirs (then
+ * the price is what moved), or theirs is unknown or in another unit.
+ */
+export function supplierQuantityBack(
+  line: Pick<QuoteLineItem, "quantity" | "unit" | "source_quantity" | "source_unit" | "source_line_total">,
+): number | null {
+  const theirs = Number(line.source_quantity);
+  if (line.source_line_total == null || !Number.isFinite(theirs) || theirs <= 0) return null;
+  const unit = (line.unit ?? "").trim().toLowerCase();
+  const theirUnit = (line.source_unit ?? "each").trim().toLowerCase();
+  if (unit !== theirUnit) return null;
+  return Math.abs(theirs - (Number(line.quantity) || 0)) > 1e-9 ? theirs : null;
+}
+
+/**
+ * A line with the supplier's value: their quantity put back when that is what
+ * moved (supplierQuantityBack), otherwise their total at this quantity
+ * (supplierSnapPrice) — the classic editor's snap.
+ */
+export function withSupplierValue(line: QuoteLineItem): QuoteLineItem {
+  const theirs = supplierQuantityBack(line);
+  if (theirs === null) return withSupplierPrice(line);
+  const price = preciseUnitPrice(line.source_line_total! / theirs);
+  const next = applyLineEdit(line, { quantity: theirs, unit_price: price });
+  next.line_total = round2(theirs * price);
+  return next;
+}
+
+/**
+ * A line with the supplier's price: exactly what the classic editor's
  * updateItem does with that unit price (the shared trust rule, then a cents
  * line total). A line with nothing to snap comes back as it is.
  */
@@ -184,6 +216,8 @@ export interface SupplierLineCheck {
   mismatch: boolean;
   /** For a mismatch, the exact unit price that fixes it; null when it can't be worked out (no quantity). */
   snapPrice: number | null;
+  /** For a mismatch whose quantity moved (still in their unit): their quantity, which the fix puts back. */
+  quantityBack: number | null;
 }
 
 export interface SupplierSubtotalCheck {
@@ -224,7 +258,17 @@ function lineChecks(items: readonly QuoteLineItem[]): SupplierLineCheck[] {
     const liveTotal = liveLineTotal(line);
     const supplierTotal = line.source_line_total ?? null;
     const mismatch = supplierTotal != null && Math.abs(liveTotal - supplierTotal) > SUPPLIER_TOLERANCE;
-    return [{ index, line, supplierTotal, liveTotal, mismatch, snapPrice: mismatch ? supplierSnapPrice(line) : null }];
+    return [
+      {
+        index,
+        line,
+        supplierTotal,
+        liveTotal,
+        mismatch,
+        snapPrice: mismatch ? supplierSnapPrice(line) : null,
+        quantityBack: mismatch ? supplierQuantityBack(line) : null,
+      },
+    ];
   });
 }
 
@@ -415,7 +459,7 @@ export function supplierCheck(
     printed: { subtotal: source?.subtotal ?? null, total: source?.total ?? null },
     rows,
     mismatched,
-    fixable: mismatched.filter((r) => r.snapPrice !== null),
+    fixable: mismatched.filter(canFix),
     subtotal,
     gap: subtotal?.mismatch ? supplierGap(data, items, rows, subtotal, scanned) : null,
     others: items.flatMap((line, index) => (isSupplierLine(line) ? [] : [{ index, line }])),
@@ -437,10 +481,26 @@ export function withSupplierValues(
   const only = indexes ? new Set(indexes) : null;
   const fix = new Set(
     lineChecks(lines)
-      .filter((c) => c.mismatch && c.snapPrice !== null && (!only || only.has(c.index)))
+      .filter((c) => c.mismatch && canFix(c) && (!only || only.has(c.index)))
       .map((c) => c.index),
   );
-  return lines.map((line, index) => (fix.has(index) ? withSupplierPrice(line) : line));
+  return lines.map((line, index) => (fix.has(index) ? withSupplierValue(line) : line));
+}
+
+/** The supplier's value can fix it: their quantity goes back, or a price makes their total. */
+function canFix(check: SupplierLineCheck): boolean {
+  return check.quantityBack !== null || check.snapPrice !== null;
+}
+
+/**
+ * The other way to fix a line whose quantity moved: keep the tradie's
+ * quantity and snap the price to the supplier's total (the classic editor's
+ * only fix). Offered beside "put back their quantity", never instead of it.
+ */
+export function withSupplierPriceAt(lines: readonly QuoteLineItem[], index: number): QuoteLineItem[] {
+  const check = lineChecks(lines).find((c) => c.index === index);
+  if (!check?.mismatch || check.snapPrice === null) return [...lines];
+  return lines.map((line, i) => (i === index ? withSupplierPrice(line) : line));
 }
 
 /** The lines with one of theirs taken off since the scan put back where it was, supplier source and all. */

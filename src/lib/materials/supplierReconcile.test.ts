@@ -11,10 +11,12 @@ import {
   reconciliationMismatches,
   supplierCheck,
   supplierMismatches,
+  supplierQuantityBack,
   supplierReconciliation,
   supplierSnapPrice,
   withLineBack,
   withSupplierPrice,
+  withSupplierPriceAt,
   withSupplierValues,
 } from "./supplierReconcile";
 
@@ -357,8 +359,13 @@ describe("new-look checks agree with the send gate", () => {
     const all = relined(data, withSupplierValues(data.line_items));
     expect(gate(all).reasons).toEqual([]);
     expect(supplierCheck(all)!.fixed).toBe(true);
-    // The changed quantity stays; its price makes the supplier's total.
-    expect(all.line_items[1]).toMatchObject({ quantity: 18, unit_price: 32.11111111, line_total: 578 });
+    // Their quantity goes back, at their price (not 18 at a made-up $32.11).
+    expect(all.line_items[1]).toMatchObject({ quantity: 20, unit_price: 28.9, line_total: 578 });
+    // Or the tradie keeps 18 and the price makes the supplier's total (the classic snap).
+    const kept = relined(data, withSupplierPriceAt(data.line_items, 1));
+    expect(kept.line_items[1]).toMatchObject({ quantity: 18, unit_price: 32.11111111, line_total: 578 });
+    expect(supplierMismatches(kept).lines.map((l) => l.index)).toEqual([0, 3]);
+    expectAgreement(kept);
   });
 
   it("a GST-inclusive line snaps back to its ex-GST supplier total", () => {
@@ -382,13 +389,24 @@ describe("new-look checks agree with the send gate", () => {
     expect(gate(fixed).reasons).toEqual([]);
   });
 
-  it("a quantity taken to 0 can't be snapped: still flagged, still blocked, left alone", () => {
+  it("a quantity taken to 0 can't be snapped, but their quantity goes back", () => {
     const data = edit(itm(), 2, { quantity: 0 });
     const check = supplierCheck(data)!;
     expect(check.mismatched.map((r) => r.index)).toEqual([2]);
+    expect(check.fixable.map((r) => r.index)).toEqual([2]);
+    expect(check.fixed).toBe(false);
+    expectAgreement(data);
+    const fixed = relined(data, withSupplierValues(data.line_items));
+    expect(fixed.line_items[2]).toMatchObject({ quantity: 2, unit_price: 12.5, line_total: 25 });
+    expect(gate(fixed).reasons).toEqual([]);
+  });
+
+  it("a quantity taken to 0 with no known quantity of theirs: still flagged, still blocked, left alone", () => {
+    const data = edit(itm(), 2, { quantity: 0, source_quantity: null });
+    const check = supplierCheck(data)!;
     expect(check.fixable).toEqual([]);
     expect(withSupplierValues(data.line_items)).toEqual(data.line_items);
-    expect(check.fixed).toBe(false);
+    expect(withSupplierPriceAt(data.line_items, 2)).toEqual(data.line_items);
     expectAgreement(data);
   });
 
@@ -635,5 +653,37 @@ describe("agreement holds under any mix of edits", () => {
     }
     // Every kind of outcome came up.
     expect(Math.min(seen.linesOff, seen.subtotalOff, seen.matching, seen.putBack)).toBeGreaterThan(30);
+  });
+});
+
+/* ── A quantity changed since the scan ─────────────────────────────────── */
+
+describe("a quantity changed since the scan", () => {
+  it("puts their quantity back at their price, not a nonsense rate, and the gate lets it through", () => {
+    const data = edit(itm(), 0, { quantity: 99 });
+    expect(supplierQuantityBack(data.line_items[0])).toBe(12);
+    const fixed = relined(data, withSupplierValues(data.line_items));
+    expect(fixed.line_items[0]).toMatchObject({ quantity: 12, unit_price: 14.35, line_total: 172.2 });
+    expect(gate(fixed).reasons).toEqual([]);
+    expectAgreement(fixed);
+  });
+
+  it("the price moved, not the quantity: the classic snap, as before", () => {
+    const data = edit(itm(), 0, { unit_price: 15.5 });
+    expect(supplierQuantityBack(data.line_items[0])).toBeNull();
+    expect(relined(data, withSupplierValues(data.line_items)).line_items[0]).toMatchObject({ quantity: 12, unit_price: 14.35 });
+  });
+
+  it("in another unit than theirs, or theirs unknown: no put-back (the quantities don't compare)", () => {
+    const line = itm().line_items[0];
+    expect(supplierQuantityBack({ ...line, quantity: 99, unit: "m" })).toBeNull();
+    expect(supplierQuantityBack({ ...line, quantity: 99, source_quantity: null })).toBeNull();
+  });
+
+  it("a line with no quantity left can still be fixed by putting theirs back", () => {
+    const data = edit(itm(), 0, { quantity: 0 });
+    const check = supplierCheck(data)!;
+    expect(check.fixable.map((r) => r.index)).toContain(0);
+    expect(relined(data, withSupplierValues(data.line_items)).line_items[0]).toMatchObject({ quantity: 12, line_total: 172.2 });
   });
 });

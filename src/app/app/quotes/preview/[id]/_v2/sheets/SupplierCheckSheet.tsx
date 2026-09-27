@@ -13,6 +13,7 @@ import {
   liveLineTotal,
   supplierCheck,
   withLineBack,
+  withSupplierPriceAt,
   withSupplierValues,
   type RemovedSupplierLine,
   type SupplierGap,
@@ -116,6 +117,7 @@ function MismatchRow({
   button,
   busy,
   onUse,
+  onKeepQuantity,
 }: {
   row: SupplierLineCheck;
   currency: string;
@@ -124,8 +126,10 @@ function MismatchRow({
   button: boolean;
   busy: SupplierBusy;
   onUse: () => void;
+  /** Keep the tradie's quantity and change the price instead (only when their quantity could go back). */
+  onKeepQuantity: () => void;
 }) {
-  const { line, snapPrice } = row;
+  const { line, snapPrice, quantityBack } = row;
   const theirs = Number(line.source_quantity);
   const quantityMoved = Number.isFinite(theirs) && theirs > 0 && Math.abs(theirs - (Number(line.quantity) || 0)) > 1e-9;
   const unit = (line.source_unit ?? line.unit ?? "").trim();
@@ -155,7 +159,13 @@ function MismatchRow({
           {unit ? ` ${unit}` : ""}.
         </p>
       ) : null}
-      {locked ? null : snapPrice !== null ? (
+      {locked ? null : quantityBack !== null ? (
+        <p className="text-ui-sm text-ui-muted">
+          The supplier&apos;s value: their {formatQuantity(quantityBack)}
+          {unit ? ` ${unit}` : ""} × {formatUnitPrice((row.supplierTotal ?? 0) / quantityBack, currency)} ={" "}
+          {formatCurrency(row.supplierTotal ?? 0, currency)}.
+        </p>
+      ) : snapPrice !== null ? (
         <p className="text-ui-sm text-ui-muted">
           The supplier&apos;s value: {quantityText(line)} × {formatUnitPrice(snapPrice, currency)} ={" "}
           {formatCurrency(row.supplierTotal ?? 0, currency)}.
@@ -165,7 +175,7 @@ function MismatchRow({
           It has no quantity, so no price can make it match. Change its quantity first.
         </p>
       )}
-      {!locked && button && snapPrice !== null ? (
+      {!locked && button && (quantityBack !== null || snapPrice !== null) ? (
         <Button
           variant="secondary"
           fullWidth
@@ -176,7 +186,20 @@ function MismatchRow({
           disabled={busy !== null}
           onClick={onUse}
         >
-          Use the supplier&apos;s value
+          {quantityBack !== null
+            ? `Put back their ${formatQuantity(quantityBack)}${unit ? ` ${unit}` : ""}`
+            : "Use the supplier's value"}
+        </Button>
+      ) : null}
+      {!locked && quantityBack !== null && snapPrice !== null ? (
+        <Button
+          variant="ghost"
+          fullWidth
+          data-testid="supplier-keep-quantity"
+          disabled={busy !== null}
+          onClick={onKeepQuantity}
+        >
+          Keep {quantityText(line)}, change the price
         </Button>
       ) : null}
     </li>
@@ -298,6 +321,8 @@ export interface SupplierCheckSheetViewProps {
   error: string | null;
   onUseAll: () => void;
   onUseLine: (index: number) => void;
+  /** Keep a changed quantity and snap its price instead of putting theirs back. */
+  onKeepQuantity: (index: number) => void;
   onPutBack: (removed: RemovedSupplierLine) => void;
   onClose: () => void;
 }
@@ -317,6 +342,7 @@ export function SupplierCheckSheetView({
   error,
   onUseAll,
   onUseLine,
+  onKeepQuantity,
   onPutBack,
   onClose,
 }: SupplierCheckSheetViewProps) {
@@ -337,7 +363,7 @@ export function SupplierCheckSheetView({
         disabled={busy !== null}
         onClick={onUseAll}
       >
-        {fixable > 1 ? "Use the supplier's values for all" : "Use the supplier's value"}
+        {fixable > 1 ? "Use the supplier's values for all" : singleFixLabel(check!.fixable[0])}
       </Button>
     );
   } else if (!check || check.fixed || locked) {
@@ -394,6 +420,7 @@ export function SupplierCheckSheetView({
                         button={fixable > 1}
                         busy={busy}
                         onUse={() => onUseLine(row.index)}
+                        onKeepQuantity={() => onKeepQuantity(row.index)}
                       />
                     ))}
                   </ul>
@@ -504,8 +531,16 @@ export function SupplierCheckSheet({ data, onApply, onClose, locked = false, imp
       error={error}
       onUseAll={() => apply(withSupplierValues(data.line_items), { kind: "all" })}
       onUseLine={(index) => apply(withSupplierValues(data.line_items, [index]), { kind: "line", index })}
+      onKeepQuantity={(index) => apply(withSupplierPriceAt(data.line_items, index), { kind: "line", index })}
       onPutBack={(removed) => apply(withLineBack(data.line_items, removed), { kind: "back", from: removed.from })}
       onClose={onClose}
     />
   );
+}
+
+/** The one fix's button: their quantity back when that's what moved, else their value. */
+function singleFixLabel(row: SupplierLineCheck): string {
+  if (row.quantityBack === null) return "Use the supplier's value";
+  const unit = (row.line.source_unit ?? row.line.unit ?? "").trim();
+  return `Put back their ${formatQuantity(row.quantityBack)}${unit ? ` ${unit}` : ""}`;
 }

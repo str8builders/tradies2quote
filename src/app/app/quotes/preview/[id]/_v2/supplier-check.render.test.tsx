@@ -83,6 +83,7 @@ const view = (data: QuoteData, patch: Partial<SupplierCheckSheetViewProps> = {})
       error: null,
       onUseAll: noop,
       onUseLine: noop,
+      onKeepQuantity: noop,
       onPutBack: noop,
       onClose: noop,
       ...patch,
@@ -183,9 +184,13 @@ describe("supplier check: several lines off", () => {
     expect(words(footer(out))).toContain("Use the supplier's values for all");
   });
 
-  it("a changed quantity is pointed out; the supplier's value keeps it and fixes the price", () => {
+  it("a changed quantity is pointed out: their quantity goes back at their price, or keep it and change the price", () => {
     expect(words(out)).toContain("Their quote had 20 sheet.");
-    expect(words(out)).toContain("The supplier's value: 18 sheet × $32.11111111 = $578.00.");
+    expect(words(out)).toContain("The supplier's value: their 20 sheet × $28.90 = $578.00.");
+    expect(words(out)).toContain("Put back their 20 sheet");
+    expect(words(out)).toContain("Keep 18 sheet, change the price");
+    // Only the line whose quantity moved offers to keep it.
+    expect(count(out, 'data-testid="supplier-keep-quantity"')).toBe(1);
     expect(words(out)).not.toContain("Their quote had 12");
   });
 
@@ -193,12 +198,18 @@ describe("supplier check: several lines off", () => {
     expect(markupRuleBreaks(out)).toEqual([]);
   });
 
-  it("a line with no quantity says what to do instead, and has no button", () => {
+  it("a line taken to no quantity gets theirs back", () => {
     const zero = view(edit(data, 2, { quantity: 0 }));
     expect(words(zero)).toContain("4 lines don't match");
-    expect(words(zero)).toContain("It has no quantity, so no price can make it match. Change its quantity first.");
-    expect(count(zero, 'data-testid="supplier-use-line"')).toBe(3);
+    expect(words(zero)).toContain("Put back their 2 box");
+    expect(count(zero, 'data-testid="supplier-use-line"')).toBe(4);
     expect(markupRuleBreaks(zero)).toEqual([]);
+  });
+
+  it("no quantity and no known quantity of theirs: says what to do instead, and has no button", () => {
+    const lost = view(edit(data, 2, { quantity: 0, source_quantity: null }));
+    expect(words(lost)).toContain("It has no quantity, so no price can make it match. Change its quantity first.");
+    expect(count(lost, 'data-testid="supplier-use-line"')).toBe(3);
   });
 });
 
@@ -365,5 +376,14 @@ describe("supplier check: the fix is the job page's own line edit", () => {
     expect(supplierCheckTitle(supplierMismatches(relined(base, base.line_items.slice(1))))).toBe(
       "The lines don't add up to the supplier's subtotal",
     );
+  });
+});
+
+describe("supplier check: a quantity changed since the scan", () => {
+  it("says what their quantity was and offers to put it back, not a made-up price", () => {
+    const out = view(edit(itm(), 0, { quantity: 99 }));
+    expect(out).toContain("Put back their 12 length");
+    expect(out).not.toContain("1.739");
+    expect(markupRuleBreaks(out)).toEqual([]);
   });
 });
