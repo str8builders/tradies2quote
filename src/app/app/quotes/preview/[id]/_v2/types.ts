@@ -1,11 +1,21 @@
 import type { ComponentProps, ReactNode } from "react";
 import type { ScanBarcodeButton } from "@/app/app/materials/_components/ScanBarcodeButton";
-import type { QuoteData } from "@/lib/quote-types";
+import type { LibraryMaterial, QuoteData, QuoteLineItem } from "@/lib/quote-types";
 import type { QuoteVideoStatus } from "@/lib/quote-video/status";
 import type { JobInvoiceState, JobViewInput } from "./job-view";
 
 /** A library item the barcode scanner can add (ScanBarcodeButton's own prop type). */
 export type LibraryPick = NonNullable<ComponentProps<typeof ScanBarcodeButton>["library"]>[number];
+
+/**
+ * A library item a line is matched to (line.library_id), with what the
+ * classic editor shows about it: whether its saved price is itself a T2Q
+ * estimate, the supplier and their product page (http/https only).
+ */
+export type LineLibraryItem = Pick<
+  LibraryMaterial,
+  "id" | "name" | "default_unit_price" | "supplier" | "supplier_url" | "is_ai_estimated"
+>;
 
 /** An invoice as the job page shows it (server-computed dates, no clock on the phone). */
 export interface JobInvoice extends JobInvoiceState {
@@ -55,6 +65,16 @@ export interface JobScreenProps {
   /** The follow-up message to send now (sent / viewed quotes). */
   reminder: { label: string; body: string } | null;
   library: LibraryPick[];
+  /** The library items the lines are matched to, for where each price came from. */
+  libraryMatches?: LineLibraryItem[];
+  /**
+   * A quote made from a supplier's quote: its lines as scanned in
+   * (quotes.ai_snapshot), so the supplier check can name a line taken off
+   * since. Null otherwise.
+   */
+  supplierImported?: QuoteLineItem[] | null;
+  /** The iPhone app with no AI consent on record: ask before the first plan photo goes (App Store 5.1.2(i)). */
+  needsAiConsent?: boolean;
   video: { status: QuoteVideoStatus; version: number; shareText?: string } | null;
   dayNotes: DayNote[];
   serverTools: ServerTool[];

@@ -12,7 +12,7 @@ import { reminderText } from "../contact";
 import { textableNumber, type SendChannel } from "../send-flow";
 import { CopyButton } from "./clipboard";
 import { useCanText } from "./SendSheet";
-import { DeviceHandoff, OpenMessagesLink, SenderNotice, type FixActions } from "./sender-parts";
+import { DeviceHandoff, OpenMessagesLink, SenderNotice, type FixActions, type SendFixes } from "./sender-parts";
 import { useQuoteSender } from "./use-quote-sender";
 
 export interface ReminderSheetProps {
@@ -28,6 +28,8 @@ export interface ReminderSheetProps {
   onClose: () => void;
   onFixClient: () => void;
   onFixLines?: () => void;
+  /** The job page's other fixes, each there only when that problem is on the quote. */
+  fixes?: SendFixes;
 }
 
 /**
@@ -45,7 +47,7 @@ export function ReminderSheet(props: ReminderSheetProps) {
   const message = reminder ? reminderText(reminder.body, publicLink) : null;
   const phone = textableNumber(data.client?.phone);
   const hasEmail = !!(data.client?.email ?? "").trim();
-  const actions: FixActions = { quoteId, onFixClient: props.onFixClient, onFixLines: props.onFixLines };
+  const actions: FixActions = { ...props.fixes, onFixClient: props.onFixClient, onFixLines: props.onFixLines };
   const busy = sender.state.phase === "busy";
 
   if (sender.state.phase === "device") {

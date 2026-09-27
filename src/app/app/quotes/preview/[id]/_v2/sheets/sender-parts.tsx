@@ -10,11 +10,6 @@ import { buildSmsHref } from "@/lib/smsDeepLink";
 import { plainReason, type SendFix } from "../send-flow";
 import type { SenderState } from "./use-quote-sender";
 
-/** Where the tradie fixes things the new page can't: the classic editor. */
-export function detailedEditorHref(quoteId: string): string {
-  return `/app/quotes/preview/${quoteId}?view=classic`;
-}
-
 export function ReasonList({ reasons }: { reasons: readonly string[] }) {
   if (reasons.length === 0) return null;
   return (
@@ -26,11 +21,28 @@ export function ReasonList({ reasons }: { reasons: readonly string[] }) {
   );
 }
 
-export interface FixActions {
+/**
+ * The job page's fixes for what stops a quote going. Each one is there only
+ * when that problem is on the quote, so the send screen offers exactly the
+ * buttons that help.
+ */
+export interface SendFixes {
+  /** No line needs a check (no lines, or a $0 total): add a line, or price the ones there. */
+  onAddLines?: { label: string; onClick: () => void };
+  /** Confirm the sizes read off the drawing. */
+  onFixSizes?: () => void;
+  /** Check the lines against the supplier's quote they came from. */
+  onFixSupplier?: () => void;
+  /** Work the materials out again from the wall's measurements (a failed quantity check). */
+  onFixMeasurements?: () => void;
+  /** Nothing above applies: back to the job to change the lines named. */
+  onBackToJob?: () => void;
+}
+
+export interface FixActions extends SendFixes {
   onFixClient: () => void;
   /** Open the first line that needs a check, if there is one. */
   onFixLines?: () => void;
-  quoteId: string;
 }
 
 /** The button that fixes a send problem, in plain words. */
@@ -50,17 +62,47 @@ export function FixButton({ fix, actions }: { fix: SendFix; actions: FixActions 
     );
   }
   if (fix === "lines") {
-    return actions.onFixLines ? (
-      <Button variant="secondary" fullWidth onClick={actions.onFixLines}>
-        Show me the lines
-      </Button>
-    ) : (
-      <ButtonLink href={detailedEditorHref(actions.quoteId)} variant="secondary" fullWidth>
-        Open the detailed editor
-      </ButtonLink>
-    );
+    if (actions.onFixLines) {
+      return (
+        <Button variant="secondary" fullWidth onClick={actions.onFixLines}>
+          Show me the lines
+        </Button>
+      );
+    }
+    if (actions.onAddLines) {
+      return (
+        <Button variant="secondary" fullWidth onClick={actions.onAddLines.onClick}>
+          {actions.onAddLines.label}
+        </Button>
+      );
+    }
   }
   return null;
+}
+
+type BlockedFix = { key: string; label: string; onClick: () => void };
+
+/**
+ * The buttons under "Fix these before it can go": one for each problem on
+ * the quote, in the order the tradie would fix them; "Back to the job" only
+ * when none of them applies.
+ */
+export function blockedFixes(actions: FixActions): BlockedFix[] {
+  const fixes: Array<BlockedFix | null> = [
+    actions.onFixLines ? { key: "lines", label: "Show me the lines", onClick: actions.onFixLines } : null,
+    actions.onFixSizes ? { key: "sizes", label: "Check the sizes", onClick: actions.onFixSizes } : null,
+    actions.onFixSupplier
+      ? { key: "supplier", label: "Check against the supplier's quote", onClick: actions.onFixSupplier }
+      : null,
+    actions.onFixMeasurements
+      ? { key: "measurements", label: "Change the measurements", onClick: actions.onFixMeasurements }
+      : null,
+  ];
+  const found = fixes.filter((fix): fix is BlockedFix => fix !== null);
+  if (found.length === 0 && actions.onBackToJob) {
+    return [{ key: "job", label: "Back to the job", onClick: actions.onBackToJob }];
+  }
+  return found;
 }
 
 /** What the send routes said: confirm first, can't go yet, or an error. */
@@ -90,21 +132,21 @@ export function SenderNotice({
     );
   }
   if (state.phase === "blocked") {
+    const fixes = blockedFixes(actions);
     return (
       <Callout
         tone="bad"
         title="Fix these before it can go"
         action={
-          <div className="grid gap-2">
-            {actions.onFixLines ? (
-              <Button variant="secondary" fullWidth onClick={actions.onFixLines}>
-                Show me the lines
-              </Button>
-            ) : null}
-            <ButtonLink href={detailedEditorHref(actions.quoteId)} variant="secondary" fullWidth>
-              Open the detailed editor
-            </ButtonLink>
-          </div>
+          fixes.length > 0 ? (
+            <div className="grid gap-2">
+              {fixes.map((fix) => (
+                <Button key={fix.key} variant="secondary" fullWidth data-fix={fix.key} onClick={fix.onClick}>
+                  {fix.label}
+                </Button>
+              ))}
+            </div>
+          ) : undefined
         }
       >
         <ReasonList reasons={state.reasons} />

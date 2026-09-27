@@ -1,11 +1,14 @@
 import { redirect } from "next/navigation";
 import { runFollowupAgent } from "@/lib/agents/followup";
 import { runInvoiceAgent } from "@/lib/agents/invoice";
+import { hasAiConsent } from "@/lib/ai-consent";
 import { parseVerificationReport } from "@/lib/agents/verify/report";
 import { logAgentEvent } from "@/lib/agent-monitor/logger";
 import { businessNameForDocuments } from "@/lib/business-name";
 import type { ComplianceLineItem, ComplianceReview } from "@/lib/compliance";
 import { isQuoteLocked } from "@/lib/lifecycle/lock";
+import { isSupplierLine } from "@/lib/materials/supplierReconcile";
+import { isNativeShellRequest } from "@/lib/native-shell";
 import { quoteNumber } from "@/lib/quote-defaults";
 import { classifyPublicQuote } from "@/lib/quote-public-view";
 import type { QuoteData, QuoteStatus } from "@/lib/quote-types";
@@ -27,6 +30,7 @@ import { TranscriptPanel, type TranscriptPanelData } from "../_components/Transc
 import { bookedDateKey, bookedDayLabel, invoiceState, isPastExpiry, shortDate } from "./dates";
 import { GeneratingScreen } from "./GeneratingScreen";
 import { JobScreen } from "./JobScreen";
+import { matchedLibrary } from "./line-sources";
 import { logJobPageTelemetry } from "./page-telemetry";
 import type { DayNote, JobInvoice, ServerTool } from "./types";
 
@@ -82,7 +86,8 @@ export async function JobPageV2({ id }: { id: string }) {
     });
   }
 
-  const [{ data: profile }, { data: invoiceRow }, { data: libraryRows }] = await Promise.all([
+  const fromSupplier = !!quoteData.supplier_source || quoteData.line_items.some(isSupplierLine);
+  const [{ data: profile }, { data: invoiceRow }, { data: libraryRows }, nativeShell, snapshotRow] = await Promise.all([
     supabase.from("profiles").select("business_name, email, phone, address").eq("id", user.id).maybeSingle(),
     supabase
       .from("invoices")
@@ -91,8 +96,29 @@ export async function JobPageV2({ id }: { id: string }) {
       .is("deleted_at", null)
       .neq("status", "cancelled")
       .maybeSingle(),
-    supabase.from("materials").select("id, name, unit, default_unit_price").eq("user_id", user.id),
+    // supplier, supplier_url and is_ai_estimated are for the lines matched to
+    // the library (where each price came from), like the classic page loads.
+    supabase
+      .from("materials")
+      .select("id, name, unit, default_unit_price, supplier, supplier_url, is_ai_estimated")
+      .eq("user_id", user.id),
+    isNativeShellRequest(),
+    // A quote made from a supplier's quote: the lines as scanned in, so the
+    // supplier check can name one taken off since. Only loaded for those.
+    fromSupplier
+      ? supabase
+          .from("quotes")
+          .select("ai_snapshot")
+          .eq("id", id)
+          .maybeSingle()
+          .then((r) => r.data)
+      : Promise.resolve(null),
   ]);
+
+  // The iPhone app asks for AI consent before a plan photo goes (App Store 5.1.2(i)).
+  const needsAiConsent = nativeShell && !(await hasAiConsent(supabase, user.id));
+  const snapshotLines = (snapshotRow?.ai_snapshot as QuoteData | null | undefined)?.line_items;
+  const supplierImported = Array.isArray(snapshotLines) ? snapshotLines : null;
 
   // Worked out once, here, so the phone never renders a different day.
   const now = new Date();
@@ -302,6 +328,9 @@ export async function JobPageV2({ id }: { id: string }) {
         unit: r.unit,
         default_unit_price: r.default_unit_price !== null ? Number(r.default_unit_price) : null,
       }))}
+      libraryMatches={matchedLibrary(libraryRows ?? [], quoteData.line_items)}
+      supplierImported={supplierImported}
+      needsAiConsent={needsAiConsent}
       video={
         video?.ok
           ? {

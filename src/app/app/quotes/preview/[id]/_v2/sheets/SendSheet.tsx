@@ -12,7 +12,14 @@ import type { QuoteData } from "@/lib/quote-types";
 import { deviceCanSendSms } from "@/lib/smsDeepLink";
 import { channelAddress, checkSend, preferredChannel, type SendChannel, type SendCheck } from "../send-flow";
 import { CopyButton } from "./clipboard";
-import { DeviceHandoff, FixButton, OpenMessagesLink, SenderNotice, type FixActions } from "./sender-parts";
+import {
+  DeviceHandoff,
+  FixButton,
+  OpenMessagesLink,
+  SenderNotice,
+  type FixActions,
+  type SendFixes,
+} from "./sender-parts";
 import { useQuoteSender, type SenderState } from "./use-quote-sender";
 
 const noSubscription = () => () => {};
@@ -131,6 +138,8 @@ export interface SendSheetProps {
   onClose: () => void;
   onFixClient: () => void;
   onFixLines?: () => void;
+  /** The job page's other fixes, each there only when that problem is on the quote. */
+  fixes?: SendFixes;
 }
 
 /**
@@ -173,7 +182,7 @@ export function SendSheet(props: SendSheetProps) {
   const needsAck = shown?.phase === "confirm";
   const blocked = shown?.phase === "blocked" || !hasBusinessName;
   const busy = sender.state.phase === "busy";
-  const actions: FixActions = { quoteId, onFixClient: props.onFixClient, onFixLines: props.onFixLines };
+  const actions: FixActions = { ...props.fixes, onFixClient: props.onFixClient, onFixLines: props.onFixLines };
   const who = firstName ?? "your client";
 
   if (sent) {

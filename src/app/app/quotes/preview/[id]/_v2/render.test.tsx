@@ -319,11 +319,12 @@ describe("send sheet gating (the classic send gate, before the tap)", () => {
     expect(out).toContain("Send anyway by email");
   });
 
-  it("hard blocks can't be sent, and point at the fix", () => {
+  it("hard blocks can't be sent, and point at the fix on the job page (never the old editor)", () => {
     const out = send({ data: quote([{ ...DECKING, quantity_source: "ai", quantity_confirmed: false }]), onFixLines: noop });
     expect(out).toContain("Fix these before it can go");
     expect(out).toContain("Show me the lines");
-    expect(out).toContain("Open the detailed editor");
+    expect(out).not.toContain("detailed editor");
+    expect(out).not.toContain("view=classic");
     expect(primary(out)).toContain("disabled");
   });
 

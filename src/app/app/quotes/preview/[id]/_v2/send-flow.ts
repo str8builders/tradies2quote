@@ -203,7 +203,7 @@ const REASONS: Array<[RegExp, (n: number, list: string) => string]> = [
   ],
   [
     /^(\d+) line\(s\) no longer match the supplier quote: (.+?)\. Snap to the supplier value or correct the price\.$/,
-    (n, list) => `${list} no longer ${n === 1 ? "matches" : "match"} the supplier's quote. Fix it in the detailed editor.`,
+    (n, list) => `${list} no longer ${n === 1 ? "matches" : "match"} the supplier's quote.`,
   ],
 ];
 

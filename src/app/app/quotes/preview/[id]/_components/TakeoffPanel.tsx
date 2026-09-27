@@ -16,7 +16,8 @@ type Props = {
   isAccepted?: boolean;
 };
 
-type FormState = {
+/** The measurements as typed: the number boxes stay strings until worked out. */
+export type TakeoffForm = {
   wallLengthM: string;
   wallHeightM: string;
   studSpacingMm: 400 | 600;
@@ -29,7 +30,8 @@ type FormState = {
   wastePercent: string;
 };
 
-function buildInitialState(initial?: TakeoffInputsSnapshot): FormState {
+/** The form as it opens: the stored inputs, else the calculator's defaults. */
+export function initialTakeoffForm(initial?: TakeoffInputsSnapshot): TakeoffForm {
   return {
     wallLengthM:
       initial?.wallLengthM !== undefined ? String(initial.wallLengthM) : "",
@@ -53,7 +55,7 @@ function toNumber(v: string, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-function summariseAssumptions(state: FormState): string {
+function summariseAssumptions(state: TakeoffForm): string {
   const parts: string[] = [];
   if (state.wallLengthM)
     parts.push(`${state.wallLengthM}m × ${state.wallHeightM}m`);
@@ -69,41 +71,66 @@ function summariseAssumptions(state: FormState): string {
   return parts.join(" · ");
 }
 
-export function TakeoffPanel({ onRecalculate, initialInputs, isAccepted }: Props) {
-  const [form, setForm] = useState<FormState>(() =>
-    buildInitialState(initialInputs),
+/**
+ * The calculator input the typed measurements make. The fallbacks apply only
+ * to text that isn't a number: an empty box is Number("") = 0, so an empty
+ * height or waste box sends 0, not the default (as Recalculate always has).
+ */
+export function takeoffFormInput(form: TakeoffForm): MaterialTakeoffInput {
+  return {
+    wallLengthM: toNumber(form.wallLengthM, 0),
+    wallHeightM: toNumber(form.wallHeightM, DEFAULTS.wallHeightM),
+    studSpacingMm: form.studSpacingMm,
+    numberOfDoors: toNumber(form.numberOfDoors, 0),
+    numberOfWindows: toNumber(form.numberOfWindows, 0),
+    gibSides: form.gibSides,
+    includeInsulation: form.includeInsulation,
+    includeSkirting: form.includeSkirting,
+    includeArchitraves: form.includeArchitraves,
+    wastePercent: toNumber(form.wastePercent, DEFAULTS.wastePercent),
+  };
+}
+
+/**
+ * The measurements form: the typed sizes and choices, the calculator input
+ * they make and the one-line summary. Both looks run on it (<TakeoffPanel>
+ * below and the new job page's <MeasurementsSheet>), so they open on the same
+ * stored inputs and work the materials out from the same numbers.
+ */
+export function useTakeoffForm(initialInputs?: TakeoffInputsSnapshot) {
+  const [form, setForm] = useState<TakeoffForm>(() =>
+    initialTakeoffForm(initialInputs),
   );
+  const summary = useMemo(() => summariseAssumptions(form), [form]);
+  const input = useMemo(() => takeoffFormInput(form), [form]);
+
+  function update<K extends keyof TakeoffForm>(key: K, value: TakeoffForm[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  return {
+    form,
+    update,
+    summary,
+    input,
+    /** A wall length above 0: the classic Recalculate's gate. */
+    ready: toNumber(form.wallLengthM, 0) > 0,
+  };
+}
+
+export function TakeoffPanel({ onRecalculate, initialInputs, isAccepted }: Props) {
+  const { form, update, summary, input, ready } = useTakeoffForm(initialInputs);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [lastSummary, setLastSummary] = useState<
     MaterialTakeoffResult["summary"] | null
   >(null);
 
-  const summary = useMemo(() => summariseAssumptions(form), [form]);
-
-  function update<K extends keyof FormState>(key: K, value: FormState[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  }
-
   function handleRecalculate() {
-    const input: MaterialTakeoffInput = {
-      wallLengthM: toNumber(form.wallLengthM, 0),
-      wallHeightM: toNumber(form.wallHeightM, DEFAULTS.wallHeightM),
-      studSpacingMm: form.studSpacingMm,
-      numberOfDoors: toNumber(form.numberOfDoors, 0),
-      numberOfWindows: toNumber(form.numberOfWindows, 0),
-      gibSides: form.gibSides,
-      includeInsulation: form.includeInsulation,
-      includeSkirting: form.includeSkirting,
-      includeArchitraves: form.includeArchitraves,
-      wastePercent: toNumber(form.wastePercent, DEFAULTS.wastePercent),
-    };
     const result = calculateMaterialTakeoff(input);
     setWarnings(result.warnings);
     setLastSummary(result.summary);
     onRecalculate(result);
   }
-
-  const ready = toNumber(form.wallLengthM, 0) > 0;
 
   return (
     <section data-testid="takeoff-panel" className="t2q-card-pro">

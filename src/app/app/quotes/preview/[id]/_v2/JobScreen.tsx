@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle, DotsThreeOutline, Plus, Toolbox } from "@phosphor-icons/react/dist/ssr";
+import { Camera, CheckCircle, DotsThreeOutline, Plus, Ruler, Toolbox } from "@phosphor-icons/react/dist/ssr";
 import { BottomActionBar } from "@/components/ui/bottom-action-bar";
 import { Button, ButtonLink, buttonClasses } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
@@ -20,7 +20,9 @@ import { formatShortDayDate } from "@/lib/format-date";
 import { QUOTE_LOCKED_MESSAGE } from "@/lib/lifecycle/lock";
 import { canTransition } from "@/lib/lifecycle/stages";
 import { scannedMaterialLine } from "@/lib/materials/barcodeLine";
-import type { DimensionConfirmation, QuoteClient, QuoteLineItem, QuoteStatus } from "@/lib/quote-types";
+import { isSupplierLine, supplierMismatches } from "@/lib/materials/supplierReconcile";
+import type { DimensionConfirmation, QuoteClient, QuoteData, QuoteLineItem, QuoteStatus } from "@/lib/quote-types";
+import { libraryMaterials } from "@/lib/takeoffLines";
 import { QuoteVideoCard } from "../_components/QuoteVideoCard";
 import {
   acceptQuote,
@@ -45,14 +47,20 @@ import { QuoteVideoCardV2View } from "./parts/QuoteVideoCardV2View";
 import { TotalCard } from "./parts/TotalCard";
 import { applyPrice, priceSessionMessage, saveOptionsFor } from "./price-steps";
 import { draftBlocker, sentMessage, type SendChannel } from "./send-flow";
+import { AddFromPlanSheet, planAddedMessage } from "./sheets/AddFromPlanSheet";
 import { ClientSheet } from "./sheets/ClientSheet";
 import { InvoiceSheet, sendInvoiceEmail } from "./sheets/InvoiceSheet";
 import { LineSheet } from "./sheets/LineSheet";
+import { MeasurementsSheet } from "./sheets/MeasurementsSheet";
 import { MoreToolsSheet } from "./sheets/MoreToolsSheet";
 import { PriceSheet } from "./sheets/PriceSheet";
 import { ReminderSheet } from "./sheets/ReminderSheet";
 import { SendSheet } from "./sheets/SendSheet";
+import type { SendFixes } from "./sheets/sender-parts";
 import { SizesSheet } from "./sheets/SizesSheet";
+import { SupplierCheckSheet, supplierCheckTitle } from "./sheets/SupplierCheckSheet";
+import { TermsSheet } from "./sheets/TermsSheet";
+import { TermsCard } from "./parts/TermsCard";
 import { AmountLine, BookSheet, ConfirmSheet, type StepResult } from "./sheets/StepSheets";
 import { sizesErrorMessage, sizesSavedMessage, withSizes } from "./sizes";
 import type { JobScreenProps } from "./types";
@@ -73,9 +81,18 @@ type Sheet =
   | { kind: "new-line" }
   | { kind: "client" }
   | { kind: "sizes" }
+  | { kind: "terms" }
+  | { kind: "supplier" }
+  | { kind: "measurements" }
+  | { kind: "plan-photo" }
   | { kind: "more" };
 
 type SaveOutcome = { ok: true } | { error: string };
+
+/** The quote with the fields the page has changed since it loaded (same object when none). */
+function withEdits(data: QuoteData, edits: Partial<QuoteData>): QuoteData {
+  return Object.keys(edits).length === 0 ? data : { ...data, ...edits };
+}
 
 /** Wait after the last save before refreshing the server parts (tools, video, version). */
 const REFRESH_AFTER_SAVE_MS = 1500;
@@ -147,6 +164,9 @@ function JobScreenInner(props: JobScreenProps) {
   const [lines, setLines] = useState<QuoteLineItem[]>(() => props.data.line_items);
   const [client, setClient] = useState<QuoteClient>(() => migrateLegacyContact(props.data.client));
   const [sizes, setSizes] = useState<DimensionConfirmation | null>(() => props.data.dimension_confirmation ?? null);
+  // Other quote fields a sheet has changed (terms, notes, measurements): held
+  // like the lines, so a save before the refresh can't put the old ones back.
+  const [edits, setEdits] = useState<Partial<QuoteData>>({});
   const [saving, setSaving] = useState(false);
   const [sheet, setSheet] = useState<Sheet | null>(null);
 
@@ -160,6 +180,7 @@ function JobScreenInner(props: JobScreenProps) {
       setLines(props.data.line_items);
       setClient(migrateLegacyContact(props.data.client));
       setSizes(props.data.dimension_confirmation ?? null);
+      setEdits({});
     }
   }
 
@@ -182,7 +203,7 @@ function JobScreenInner(props: JobScreenProps) {
     }, REFRESH_AFTER_SAVE_MS);
   }
 
-  const data = withSizes(props.data, sizes);
+  const data = withEdits(withSizes(props.data, sizes), edits);
   const current = withLines(data, lines, client);
   const first = clientFirstName(client.name);
   const who = first ?? "your client";
@@ -202,6 +223,14 @@ function JobScreenInner(props: JobScreenProps) {
   const checks = checkIndexes(current.line_items);
   const dims = current.dimension_confirmation;
   const sizesToCheck = !!dims?.required && (dims.dimensions ?? []).some((d) => !d.confirmed);
+  // A quote made from a supplier's quote must still match it to be sent.
+  const supplierOff = supplierMismatches(current);
+  const supplierTitle = supplierCheckTitle(supplierOff);
+  const fromSupplier = !!current.supplier_source || current.line_items.some(isSupplierLine);
+  // A wall worked out from measurements: they can be changed here, and a
+  // failed quantity check re-run on the new lines.
+  const wallTakeoff = !!current.takeoff_inputs;
+  const checkFailed = current.takeoff_evaluation?.status === "fail";
   const canDecline = (["draft", "sent", "viewed"] as string[]).includes(status) && canTransition(status as QuoteStatus, "declined");
 
   /** Save lines and client through the classic save action (optimistic, rolled back on failure). */
@@ -221,6 +250,38 @@ function JobScreenInner(props: JobScreenProps) {
     if ("error" in result) {
       setLines(before.lines);
       setClient(before.client);
+      if (result.error === QUOTE_LOCKED_MESSAGE) router.refresh();
+      return { error: saveErrorMessage(result.error, QUOTE_LOCKED_MESSAGE) };
+    }
+    scheduleRefresh();
+    return { ok: true };
+  }
+
+  /**
+   * Save other quote fields (terms, notes, measurements), with lines if the
+   * patch has them: optimistic like commit, rolled back on failure. Prices
+   * typed elsewhere teach the library; these changes don't.
+   */
+  async function commitData(patch: Partial<QuoteData>): Promise<SaveOutcome> {
+    const { line_items: patchLines, ...rest } = patch;
+    const before = { lines, edits };
+    const nextLines = patchLines ?? lines;
+    const nextEdits = { ...edits, ...rest };
+    cancelRefresh();
+    setSaving(true);
+    setLines(nextLines);
+    setEdits(nextEdits);
+    let result: Awaited<ReturnType<typeof saveQuoteChanges>>;
+    try {
+      const next = withEdits(withSizes(props.data, sizes), nextEdits);
+      result = await saveQuoteChanges(quoteId, withLines(next, nextLines, client), saveOptionsFor(false));
+    } catch {
+      result = { error: "network" };
+    }
+    setSaving(false);
+    if ("error" in result) {
+      setLines(before.lines);
+      setEdits(before.edits);
       if (result.error === QUOTE_LOCKED_MESSAGE) router.refresh();
       return { error: saveErrorMessage(result.error, QUOTE_LOCKED_MESSAGE) };
     }
@@ -298,6 +359,17 @@ function JobScreenInner(props: JobScreenProps) {
 
   const fixLines = checks.length > 0 ? () => setSheet({ kind: "line", index: checks[0] }) : undefined;
   const openClient = () => setSheet({ kind: "client" });
+  // The send screen's fixes, each only when that problem is on the quote.
+  const sendFixes: SendFixes = {
+    onAddLines:
+      unpriced.length > 0
+        ? { label: unpriced.length === 1 ? "Price the line" : "Price the lines", onClick: () => setSheet({ kind: "price" }) }
+        : { label: "Add a line", onClick: () => setSheet({ kind: "new-line" }) },
+    onFixSizes: sizesToCheck ? () => setSheet({ kind: "sizes" }) : undefined,
+    onFixSupplier: supplierOff.count > 0 ? () => setSheet({ kind: "supplier" }) : undefined,
+    onFixMeasurements: checkFailed && wallTakeoff ? () => setSheet({ kind: "measurements" }) : undefined,
+    onBackToJob: close,
+  };
 
   function mainButton() {
     switch (view.next.kind) {
@@ -434,6 +506,25 @@ function JobScreenInner(props: JobScreenProps) {
           </Callout>
         ) : null}
 
+        {!locked && supplierTitle ? (
+          <Callout
+            tone="warn"
+            title={supplierTitle}
+            action={
+              <Button
+                variant="secondary"
+                fullWidth
+                data-testid="job-check-supplier"
+                onClick={() => setSheet({ kind: "supplier" })}
+              >
+                Check against their quote
+              </Button>
+            }
+          >
+            It can&apos;t be sent until it matches the supplier&apos;s quote you scanned.
+          </Callout>
+        ) : null}
+
         <section aria-labelledby="job-lines" className="space-y-3">
           <SectionTitle
             id="job-lines"
@@ -447,6 +538,7 @@ function JobScreenInner(props: JobScreenProps) {
             <LineList
               lines={current.line_items}
               currency={currency}
+              libraryMatches={props.libraryMatches}
               onOpen={locked ? undefined : (index) => setSheet({ kind: "line", index })}
             />
           ) : (
@@ -472,11 +564,34 @@ function JobScreenInner(props: JobScreenProps) {
                   });
                 }}
               />
+              <Button
+                variant="secondary"
+                fullWidth
+                icon={<Camera weight="bold" />}
+                data-testid="job-plan-photo-open"
+                className={wallTakeoff ? undefined : "sm:col-span-2"}
+                onClick={() => setSheet({ kind: "plan-photo" })}
+              >
+                Add from a plan photo
+              </Button>
+              {wallTakeoff ? (
+                <Button
+                  variant="secondary"
+                  fullWidth
+                  icon={<Ruler weight="bold" />}
+                  data-testid="job-measurements-open"
+                  onClick={() => setSheet({ kind: "measurements" })}
+                >
+                  Change the measurements
+                </Button>
+              ) : null}
             </div>
           ) : null}
         </section>
 
         <ClientCard client={client} onEdit={locked ? undefined : openClient} />
+
+        <TermsCard terms={current.terms} locked={locked} onOpen={() => setSheet({ kind: "terms" })} />
 
         {status === "completed" || invoice ? (
           <InvoiceCard invoice={invoice} quoteTotal={current.total} currency={currency} />
@@ -528,6 +643,7 @@ function JobScreenInner(props: JobScreenProps) {
           onClose={close}
           onFixClient={openClient}
           onFixLines={fixLines}
+          fixes={sendFixes}
         />
       ) : null}
 
@@ -548,6 +664,7 @@ function JobScreenInner(props: JobScreenProps) {
           onClose={close}
           onFixClient={openClient}
           onFixLines={fixLines}
+          fixes={sendFixes}
         />
       ) : null}
 
@@ -617,6 +734,10 @@ function JobScreenInner(props: JobScreenProps) {
           currency={currency}
           blockers={props.invoiceBlockers}
           onSent={onInvoiceSent}
+          onSentByHand={() => {
+            setSheet(null);
+            toast.show("Marked as sent");
+          }}
           onClose={close}
         />
       ) : null}
@@ -742,6 +863,68 @@ function JobScreenInner(props: JobScreenProps) {
         />
       ) : null}
 
+      {sheet?.kind === "terms" ? (
+        <TermsSheet
+          terms={current.terms ?? ""}
+          locked={locked}
+          onSave={async (terms) => {
+            const result = await commitData({ terms });
+            if ("ok" in result) {
+              setSheet(null);
+              toast.show("Terms saved");
+            }
+            return result;
+          }}
+          onClose={close}
+        />
+      ) : null}
+
+      {sheet?.kind === "supplier" ? (
+        <SupplierCheckSheet
+          data={current}
+          imported={props.supplierImported ?? null}
+          locked={locked}
+          onApply={(next) => commitData({ line_items: next })}
+          onClose={close}
+        />
+      ) : null}
+
+      {sheet?.kind === "measurements" ? (
+        <MeasurementsSheet
+          data={current}
+          library={props.library}
+          locked={locked}
+          onApply={async (patch) => {
+            const result = await commitData(patch);
+            if ("ok" in result) {
+              setSheet(null);
+              toast.show("Materials worked out again");
+            }
+            return result;
+          }}
+          onClose={close}
+        />
+      ) : null}
+
+      {sheet?.kind === "plan-photo" ? (
+        <AddFromPlanSheet
+          data={current}
+          library={libraryMaterials(props.library)}
+          locked={locked}
+          needsAiConsent={props.needsAiConsent}
+          onApply={async (patch) => {
+            const before = { line_items: current.line_items, notes: current.notes };
+            const result = await commitData(patch);
+            if ("ok" in result) {
+              setSheet(null);
+              toast.show(planAddedMessage(before, patch));
+            }
+            return result;
+          }}
+          onClose={close}
+        />
+      ) : null}
+
       {sheet?.kind === "client" ? (
         <ClientSheet
           client={client}
@@ -769,6 +952,8 @@ function JobScreenInner(props: JobScreenProps) {
           dayNotes={props.dayNotes}
           serverTools={props.serverTools}
           onDecline={canDecline ? () => setSheet({ kind: "decline" }) : undefined}
+          onMeasurements={locked ? undefined : () => setSheet({ kind: "measurements" })}
+          onSupplierCheck={fromSupplier ? () => setSheet({ kind: "supplier" }) : undefined}
           onClose={close}
         />
       ) : null}

@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { captureError } from "@/lib/observability";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { adminClient } from "@/lib/supabase/admin";
+import { dueDateForSend } from "@/lib/invoice-due-date";
 import {
   clampMarkupPct,
   clampTaxRate,
@@ -840,4 +842,91 @@ export async function markInvoicePaid(
   });
 
   return { ok: true, invoice_id: data.id, paid_at: paidAt };
+}
+
+/* -------------------------------------------------------------------------
+ * markInvoiceSentByHand — the tradie sent the invoice themselves (a text, a
+ * printout, their own email). The same bookkeeping as the email send
+ * (api/invoices/[id]/send) without the PDF or the email: status "sent",
+ * sent_at now, the payment term restarted from today on a first send
+ * (dueDateForSend), and an invoice_sent event marked as sent by hand. Only a
+ * draft flips; one already sent is left as it is.
+ * ------------------------------------------------------------------------- */
+
+export type MarkSentResult =
+  | { ok: true; invoice_id: string; sent_at: string; due_date: string | null }
+  | { error: string };
+
+export async function markInvoiceSentByHand(invoiceId: string): Promise<MarkSentResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: invoice, error: readError } = await supabase
+    .from("invoices")
+    .select("id, quote_id, invoice_number, status, due_date, created_at, sent_at")
+    .eq("id", invoiceId)
+    .eq("user_id", user.id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (readError) {
+    console.error("markInvoiceSentByHand read failed", readError);
+    captureError(readError, { route: "action:markInvoiceSentByHand" });
+    return { error: "Could not mark the invoice sent." };
+  }
+  if (!invoice || invoice.status === "cancelled") return { error: "Invoice not found, or it's cancelled." };
+  if (invoice.status !== "draft") {
+    // Already sent (or paid): nothing to record, and the dates stay as given.
+    return { ok: true, invoice_id: invoice.id, sent_at: invoice.sent_at ?? "", due_date: invoice.due_date };
+  }
+
+  const now = new Date();
+  const dueDate = dueDateForSend(invoice, now);
+  const { data, error } = await supabase
+    .from("invoices")
+    .update({ status: "sent", sent_at: now.toISOString(), ...(dueDate ? { due_date: dueDate } : {}) })
+    .eq("id", invoiceId)
+    .eq("user_id", user.id)
+    .is("deleted_at", null)
+    .eq("status", "draft")
+    .select("id, quote_id")
+    .maybeSingle();
+  if (error) {
+    console.error("markInvoiceSentByHand failed", error);
+    captureError(error, { route: "action:markInvoiceSentByHand" });
+    return { error: "Could not mark the invoice sent." };
+  }
+  if (!data) return { error: "Invoice not found, or it's no longer a draft." };
+
+  // Same audit trail as an emailed invoice (best-effort, as there).
+  if (data.quote_id) {
+    const { error: eventError } = await adminClient()
+      .from("quote_events")
+      .insert({
+        quote_id: data.quote_id,
+        type: "invoice_sent",
+        metadata: { by_hand: true, invoice_id: data.id, invoice_number: invoice.invoice_number },
+      });
+    if (eventError) {
+      captureError(new Error(`invoice_sent event insert failed: ${eventError.message}`), {
+        route: "action:markInvoiceSentByHand",
+      });
+    }
+  }
+
+  revalidatePath(`/app/quotes/preview/${data.quote_id}`);
+  revalidatePath("/app/invoices");
+  revalidatePath("/app");
+
+  logAgentEvent({
+    agentName: "Invoice Agent",
+    quoteId: data.quote_id,
+    stepName: "mark_sent_by_hand",
+    status: "complete",
+    message: "Invoice marked as sent by hand",
+  });
+
+  return { ok: true, invoice_id: data.id, sent_at: now.toISOString(), due_date: dueDate };
 }

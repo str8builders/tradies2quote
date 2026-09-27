@@ -1,10 +1,13 @@
+import { ArrowSquareOut } from "@phosphor-icons/react/dist/ssr";
 import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
 import { Money } from "@/components/ui/money";
 import { StatusPill } from "@/components/ui/status-pill";
 import { formatCurrency } from "@/lib/quote-defaults";
 import type { QuoteLineItem } from "@/lib/quote-types";
+import { lineProvenance, type LineProvenance } from "../line-sources";
 import { groupLines, lineMarker, quantityText } from "../lines";
+import type { LineLibraryItem } from "../types";
 
 function Detail({ line, currency }: { line: QuoteLineItem; currency: string }) {
   const price = Number(line.unit_price) || 0;
@@ -24,21 +27,56 @@ function Trailing({ line, currency }: { line: QuoteLineItem; currency: string })
 }
 
 /**
+ * Where the line's numbers came from, under its row: the pills in words and
+ * the supplier's page. Outside the row's button, so the link is its own tap.
+ */
+function Provenance({ provenance }: { provenance: LineProvenance }) {
+  const { sources, link } = provenance;
+  return (
+    <div className="-mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pb-3" data-testid="job-line-source">
+      {sources.map((source) => (
+        <StatusPill key={source.kind} tone={source.tone}>
+          {source.words}
+        </StatusPill>
+      ))}
+      {link ? (
+        <a
+          href={link.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          data-testid="job-line-supplier"
+          className="ui-focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-ui-md text-ui-sm font-semibold text-ui-brand-text underline-offset-2 hover:underline"
+        >
+          <ArrowSquareOut aria-hidden="true" weight="bold" className="shrink-0 text-[1.15em]" />
+          {link.words}
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
+/**
  * What's in the job: plain line cards grouped Labour, Materials, Other. Each
  * shows what it is, how many, and the amount, or one plain marker when it
- * needs the tradie. Tapping opens the edit sheet unless the quote is locked.
+ * needs the tradie; a material line also says where its numbers came from
+ * (the classic editor's badges, as pills) with its supplier's page. Tapping
+ * opens the edit sheet unless the quote is locked.
  */
 export function LineList({
   lines,
   currency,
+  libraryMatches = [],
   onOpen,
 }: {
   lines: readonly QuoteLineItem[];
   currency: string;
+  /** The library items the lines are matched to (supplier, product page, estimated or not). */
+  libraryMatches?: readonly LineLibraryItem[];
   /** Omit for a locked, read-only quote. */
   onOpen?: (index: number) => void;
 }) {
   const groups = groupLines(lines);
+  const library = new Map(libraryMatches.map((item) => [item.id, item]));
   return (
     <div className="space-y-5">
       {groups.map((group) => (
@@ -51,16 +89,25 @@ export function LineList({
           </div>
           <Card padding="none">
             <ul className="divide-y divide-ui-line">
-              {group.rows.map(({ line, index }) => (
-                <li key={index} data-line-index={index}>
-                  <ListRow
-                    title={line.description?.trim() || "Untitled line"}
-                    subtitle={<Detail line={line} currency={currency} />}
-                    trailing={<Trailing line={line} currency={currency} />}
-                    onClick={onOpen ? () => onOpen(index) : undefined}
-                  />
-                </li>
-              ))}
+              {group.rows.map(({ line, index }) => {
+                const provenance = lineProvenance(line, line.library_id ? library.get(line.library_id) : null);
+                const shown = provenance.sources.length > 0 || provenance.link !== null;
+                return (
+                  <li
+                    key={index}
+                    data-line-index={index}
+                    data-source={provenance.sources.map((source) => source.kind).join(" ") || undefined}
+                  >
+                    <ListRow
+                      title={line.description?.trim() || "Untitled line"}
+                      subtitle={<Detail line={line} currency={currency} />}
+                      trailing={<Trailing line={line} currency={currency} />}
+                      onClick={onOpen ? () => onOpen(index) : undefined}
+                    />
+                    {shown ? <Provenance provenance={provenance} /> : null}
+                  </li>
+                );
+              })}
             </ul>
           </Card>
         </section>

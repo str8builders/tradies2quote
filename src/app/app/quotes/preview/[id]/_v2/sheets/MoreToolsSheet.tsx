@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowSquareOut, FileText, LinkSimple, PencilSimpleLine, XCircle } from "@phosphor-icons/react/dist/ssr";
+import { ArrowSquareOut, FileText, LinkSimple, Receipt, Ruler, XCircle } from "@phosphor-icons/react/dist/ssr";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button, ButtonLink, buttonClasses } from "@/components/ui/button";
 import { SavePdfButton } from "@/app/app/_components/SavePdfButton";
@@ -14,7 +14,6 @@ import { DayNotes } from "../parts/DayNotes";
 import { ToolSection } from "../parts/ToolSection";
 import type { DayNote, ServerTool } from "../types";
 import { CopyButton } from "./clipboard";
-import { detailedEditorHref } from "./sender-parts";
 
 /** Lines with a worked-out quantity to show (formula or calculator record). */
 export function linesWithWorking(lines: readonly QuoteLineItem[]): QuoteLineItem[] {
@@ -34,6 +33,10 @@ export interface MoreToolsSheetProps {
   serverTools: ServerTool[];
   /** "They said no" is offered while the owner may still decline. */
   onDecline?: () => void;
+  /** Work the materials out again from the wall's measurements (not once the quote is locked). */
+  onMeasurements?: () => void;
+  /** A quote made from a supplier's quote: check it against theirs. */
+  onSupplierCheck?: () => void;
   onClose: () => void;
 }
 
@@ -137,12 +140,28 @@ export function MoreToolsSheet(props: MoreToolsSheetProps) {
         ) : null}
 
         <div className="grid gap-2 pt-2">
-          <ButtonLink href={detailedEditorHref(quoteId)} variant="secondary" fullWidth icon={<PencilSimpleLine weight="bold" />}>
-            Open the detailed editor
-          </ButtonLink>
-          <p className="text-ui-sm text-ui-muted">
-            Terms, markup, measurements, drawing sizes and supplier checks, in the older layout.
-          </p>
+          {props.onMeasurements ? (
+            <Button
+              variant="secondary"
+              fullWidth
+              icon={<Ruler weight="bold" />}
+              data-testid="more-measurements"
+              onClick={props.onMeasurements}
+            >
+              Change the measurements
+            </Button>
+          ) : null}
+          {props.onSupplierCheck ? (
+            <Button
+              variant="secondary"
+              fullWidth
+              icon={<Receipt weight="bold" />}
+              data-testid="more-supplier-check"
+              onClick={props.onSupplierCheck}
+            >
+              Check against the supplier&apos;s quote
+            </Button>
+          ) : null}
           {props.onDecline ? (
             <Button variant="ghost" fullWidth icon={<XCircle weight="bold" />} onClick={props.onDecline}>
               They said no
