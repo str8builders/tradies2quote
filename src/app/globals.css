@@ -2328,6 +2328,8 @@ body:has([data-shell="app"]) {
   background-color: #111110;
   color: #f5f4f0;
   border-radius: 1rem;
+  /* The shell follows outdoor's light scheme; this dark panel doesn't. */
+  color-scheme: dark;
 }
 
 /* SPINNERS KEEP TURNING — under Reduce Motion, and when the site's motion

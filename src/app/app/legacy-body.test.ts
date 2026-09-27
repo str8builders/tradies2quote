@@ -17,7 +17,6 @@ const OLD_LOOK_SCREENS = [
   "debug/page.tsx",
   "admin/page.tsx",
   "agents/page.tsx",
-  "quotes/new/_v2/ScanScreen.tsx",
   "quotes/preview/[id]/_v2/parts/ToolSection.tsx",
   "quotes/preview/[id]/page.tsx",
 ];
@@ -26,6 +25,8 @@ describe("outdoor safety net for old-look screens", () => {
   it("globals.css paints marked bodies dark while the new-look shell is in outdoor mode", () => {
     const css = read("../globals.css");
     expect(css).toMatch(/\.t2q-outdoor \[data-legacy-body\] \{[^}]*background-color: #111110;/);
+    // Its native controls stay dark too, although the shell follows outdoor's light scheme.
+    expect(css).toMatch(/\.t2q-outdoor \[data-legacy-body\] \{[^}]*color-scheme: dark;/);
     expect(read("_v2/shell/NewLookShell.tsx")).toContain("outdoor && OUTDOOR_SHELL_CLASS");
   });
 

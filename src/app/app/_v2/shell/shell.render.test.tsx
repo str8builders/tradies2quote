@@ -181,6 +181,11 @@ describe("NewLookShell", () => {
     expect(openTag(out, 'data-shell="app"')).toContain('data-contrast="outdoor"');
   });
 
+  it("the phone's own controls follow outdoor mode (not dark tick boxes on white)", () => {
+    const canvas = openTag(html(<NewLookShell outdoor={false}>page</NewLookShell>), 'data-shell="app"');
+    expect(canvas).toContain("[color-scheme:var(--ui-color-scheme)]");
+  });
+
   it("no welcome video, tour, side tape or old menu", () => {
     const out = html(<NewLookShell outdoor={false}>page</NewLookShell>);
     for (const old of ["app-splash", "side-measure-tape", "app-bottom-nav", "app-account-avatar", "t2q-bottomnav"]) {

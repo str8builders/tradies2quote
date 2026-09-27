@@ -68,6 +68,9 @@ export function NewLookShell({
         data-contrast={contrastAttributeValue(outdoor)}
         className={cx(
           "studio-app t2q-app-canvas min-h-dvh w-full max-w-full overflow-x-clip bg-ui-bg!",
+          // The phone's own controls (tick boxes, date and dropdown pickers)
+          // follow outdoor mode too; html is always color-scheme: dark.
+          "[color-scheme:var(--ui-color-scheme)]",
           SETTLE_KIT_MOTION,
           // Old-look screens keep a dark panel on outdoor's white (globals.css).
           outdoor && OUTDOOR_SHELL_CLASS,
