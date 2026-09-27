@@ -92,7 +92,12 @@
   /* Looping "still loading" pulse (skeletons). Not a transition; it stops
      under reduced motion like everything else. */
   --animate-ui-pulse: ui-pulse 1.6s ease-in-out infinite;
-
+  /* Loading spinners under reduced motion: they keep turning, slower, as
+     iOS's own do. A stopped spinner reads as a frozen app. Not a ui- name on
+     purpose: the shell settles every animate-ui-* when motion is paused
+     (NewLookShell), and a spinner must not settle. Keyframes: SPINNERS KEEP
+     TURNING, below. */
+  --animate-spin-calm: spin-calm 1.6s linear infinite;
   @keyframes ui-sheet-in {
     from { transform: translateY(100%); }
     to { transform: translateY(0); }
@@ -2323,6 +2328,27 @@ body:has([data-shell="app"]) {
   background-color: #111110;
   color: #f5f4f0;
   border-radius: 1rem;
+}
+
+/* SPINNERS KEEP TURNING — under Reduce Motion, and when the site's motion
+   is paused (LiveWallpaper sets html[data-motion="paused"] for the OS
+   setting as well as the footer toggle). redesign.css stops every animation
+   in the app, the sign-in pages and the public pages for both, unlayered
+   and !important, so every loading spinner froze and the app looked stuck
+   ("Writing your quote"). A spinner is feedback, not decoration: it keeps
+   turning, slower, as iOS's own do. These win on specificity (same origin
+   and importance). The keyframes live here, outside @theme, so they're
+   emitted whatever the utilities use. */
+@keyframes spin-calm {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.studio-app, .studio-public, .studio-site) :is(.animate-spin, [class~="motion-safe:animate-spin"]) {
+    animation: spin-calm 1.6s linear infinite !important;
+  }
+}
+[data-motion="paused"] :is(.studio-app, .studio-public, .studio-site) :is(.animate-spin, [class~="motion-safe:animate-spin"]) {
+  animation-play-state: running !important;
 }
 
 /* MOBILE SHELL CONTRACT — owner: APP PAGE PAINT.

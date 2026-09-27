@@ -60,8 +60,10 @@ describe("phase 2 screens follow the design rules", () => {
     expect(code).not.toMatch(/\btransition(?:-all|-colors|-shadow)?(?=["'`\s])/);
     // `[class*='animate-ui-']` is a selector (the shell turning kit animations
     // off when motion is paused), not an animation.
-    const animations = code.match(/(?<!\[class\*=')\banimate-(?!none\b)[\w-]+/g) ?? [];
-    const animationsOff = code.match(/motion-reduce:animate-none/g) ?? [];
+    // Loading spinners pair with motion-reduce:animate-spin-calm instead:
+    // they keep turning, slower, because a stopped spinner reads as frozen.
+    const animations = code.match(/(?<!\[class\*=')(?<!motion-reduce:)\banimate-(?!none\b)[\w-]+/g) ?? [];
+    const animationsOff = code.match(/motion-reduce:animate-(?:none|spin-calm)\b/g) ?? [];
     expect(animationsOff.length).toBeGreaterThanOrEqual(animations.length);
     const transitions = code.match(/\btransition-(?:transform|opacity)\b/g) ?? [];
     const transitionsOff = code.match(/motion-reduce:transition-none/g) ?? [];

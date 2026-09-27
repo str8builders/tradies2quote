@@ -132,7 +132,7 @@ export function TalkView({
               className={cx("inline-flex", inviting ? "animate-ui-breathe motion-reduce:animate-none" : undefined)}
             >
               {busy ? (
-                <SpinnerGap weight="bold" className="animate-spin motion-reduce:animate-none" />
+                <SpinnerGap weight="bold" className="animate-spin motion-reduce:animate-spin-calm" />
               ) : phase === "paused" ? (
                 <Pause weight="fill" />
               ) : (

@@ -76,7 +76,7 @@ describe("the new look's generating panel", () => {
   it("writing: a spinner that stops for reduced motion, the words live, the clock not", () => {
     const out = view({ elapsedS: 75 });
     expect(out).toContain("Writing your quote…");
-    expect(tag(out, "animate-spin")).toContain("motion-reduce:animate-none");
+    expect(tag(out, "animate-spin")).toContain("motion-reduce:animate-spin-calm");
     expect(tag(out, "Still working.")).toContain('aria-live="polite"');
     expect(out).toContain("1:15 elapsed");
     expect(tag(out, "1:15 elapsed")).not.toContain("aria-live");

@@ -31,7 +31,7 @@ export default function NewQuoteLoading() {
             <SpinnerGap
               aria-hidden="true"
               weight="bold"
-              className="shrink-0 animate-spin text-[1.25rem] text-ui-brand-text motion-reduce:animate-none"
+              className="shrink-0 animate-spin text-[1.25rem] text-ui-brand-text motion-reduce:animate-spin-calm"
             />
             Checking your account and warming up the recorder.
           </p>

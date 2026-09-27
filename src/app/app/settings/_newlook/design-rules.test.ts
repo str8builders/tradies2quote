@@ -73,8 +73,9 @@ describe("phase-5 new-look screens follow the design rules", () => {
 
   it.each(files)("$path: motion is transform/opacity only and stops for reduced motion", ({ code }) => {
     expect(code).not.toMatch(/\btransition(?:-all|-colors|-shadow)?(?=["'`\s])/);
-    const animations = code.match(/\banimate-(?!none\b)[\w-]+/g) ?? [];
-    const animationsOff = code.match(/motion-reduce:animate-none/g) ?? [];
+    // Spinners may pair with the calm spin instead (see app/_v2/design-rules.test.ts).
+    const animations = code.match(/(?<!motion-reduce:)\banimate-(?!none\b)[\w-]+/g) ?? [];
+    const animationsOff = code.match(/motion-reduce:animate-(?:none|spin-calm)\b/g) ?? [];
     expect(animationsOff.length).toBeGreaterThanOrEqual(animations.length);
     const transitions = code.match(/\btransition-(?:transform|opacity)\b/g) ?? [];
     const transitionsOff = code.match(/motion-reduce:transition-none/g) ?? [];

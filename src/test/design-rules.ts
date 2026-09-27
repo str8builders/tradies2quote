@@ -18,8 +18,9 @@ const TINY_TEXT = /\btext-(?:xs|sm|base|lg|xl|[2-9]xl)\b|\btext-\[\d+(?:\.\d+)?p
 const CODE_STYLE = /\buppercase\b|tracking-\[0\.\d+em\]|\bfont-mono\b/;
 const WIDE_TRANSITION = /\btransition(?:-all|-colors|-shadow)?(?=["'`\s]|$)/;
 /** `[class*='animate-ui-']` is a selector (the shell pausing kit motion), not an animation. */
-const ANIMATION = /(?<!\[class\*=')\banimate-(?!none\b)[\w-]+/;
-const ANIMATION_OFF = /motion-reduce:animate-none/;
+const ANIMATION = /(?<!\[class\*=')(?<!motion-reduce:)\banimate-(?!none\b)[\w-]+/;
+/** Off, or for loading spinners the calm spin (they keep turning, slower). */
+const ANIMATION_OFF = /motion-reduce:animate-(?:none|spin-calm)\b/;
 const MOVE_TRANSITION = /\btransition-(?:transform|opacity)\b/;
 const TRANSITION_OFF = /motion-reduce:transition-none/;
 const EMOJI = /\p{Extended_Pictographic}/u;

@@ -56,7 +56,7 @@ export function QuoteVideoCardV2View(props: QuoteVideoCardViewProps) {
             <SpinnerGap
               aria-hidden="true"
               weight="bold"
-              className="mt-0.5 shrink-0 animate-spin text-[1.75rem] text-ui-brand-text motion-reduce:animate-none"
+              className="mt-0.5 shrink-0 animate-spin text-[1.75rem] text-ui-brand-text motion-reduce:animate-spin-calm"
             />
             <div>
               <p className="font-semibold">Making your video… usually under a minute.</p>

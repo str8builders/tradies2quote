@@ -86,7 +86,7 @@ function Inner({
         <SpinnerGap
           aria-hidden="true"
           weight="bold"
-          className="shrink-0 animate-spin text-[1.15em] motion-reduce:animate-none"
+          className="shrink-0 animate-spin text-[1.15em] motion-reduce:animate-spin-calm"
         />
       ) : icon ? (
         <span aria-hidden="true" className="inline-flex shrink-0 text-[1.15em]">

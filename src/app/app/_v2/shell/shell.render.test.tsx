@@ -121,7 +121,7 @@ describe("AppContent: the content column", () => {
       expect(out).toContain('data-testid="legacy-list-redirect"');
       expect(out).toContain('role="status"');
       expect(linkTo(out, "/app/jobs")).not.toBe("");
-      expect(out).toContain("motion-reduce:animate-none");
+      expect(out).toContain("motion-reduce:animate-spin-calm");
     }
   });
 });

@@ -63,7 +63,8 @@ describe("Button", () => {
     expect(out).toContain('aria-busy="true"');
     expect(out).toContain("disabled");
     expect(out).toMatch(/<svg[^>]*aria-hidden="true"[^>]*animate-spin/);
-    expect(out).toContain("motion-reduce:animate-none");
+    // Keeps turning (slower) under reduced motion: a stopped spinner looks frozen.
+    expect(out).toContain("motion-reduce:animate-spin-calm");
     expect(out).toContain(">Saving…</span>");
     // Loading keeps the variant's colours (it is not greyed out like disabled).
     expect(out).toContain("bg-ui-brand");

@@ -89,7 +89,7 @@ export function GeneratingPanelView({
         <SpinnerGap
           aria-hidden="true"
           weight="bold"
-          className="animate-spin text-[2.75rem] text-ui-brand-text motion-reduce:animate-none"
+          className="animate-spin text-[2.75rem] text-ui-brand-text motion-reduce:animate-spin-calm"
         />
       )}
       <h2 className="ui-title mt-4 text-ui-xl text-ui-text">

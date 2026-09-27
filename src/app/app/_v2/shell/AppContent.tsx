@@ -20,7 +20,7 @@ function LegacyListNotice() {
       <SpinnerGap
         aria-hidden="true"
         weight="bold"
-        className="animate-spin text-[2rem] text-ui-brand-text motion-reduce:animate-none"
+        className="animate-spin text-[2rem] text-ui-brand-text motion-reduce:animate-spin-calm"
       />
       <p className="text-ui-base text-ui-muted">Quotes and invoices live in Jobs now. Opening it…</p>
       <ButtonLink href={JOBS_PATH} variant="ghost">
