@@ -255,6 +255,7 @@ export async function JobPageV2({ id }: { id: string }) {
       subtitle: "The job as you described it",
       content: (
         <TranscriptPanel
+          look="new"
           quoteId={quote.id}
           transcript={transcript}
           status={status}

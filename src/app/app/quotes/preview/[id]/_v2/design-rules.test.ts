@@ -1,8 +1,9 @@
 // The redesign's rules, checked in the source of every new job page file (the
 // same checks the kit runs on itself in src/components/ui/design-rules.test.ts)
 // so a later edit can't quietly bring back tiny text, "//" labels, raw colours
-// or motion that ignores reduced-motion settings. The classic panels shown in
-// "More tools" are reused as they are and are not part of this folder.
+// or motion that ignores reduced-motion settings. The tools shown in "More
+// tools" live outside this folder and draw their own new-look variants
+// (look="new"), each checked by its own render test.
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";

@@ -17,7 +17,6 @@ const OLD_LOOK_SCREENS = [
   "debug/page.tsx",
   "admin/page.tsx",
   "agents/page.tsx",
-  "quotes/preview/[id]/_v2/parts/ToolSection.tsx",
   "quotes/preview/[id]/page.tsx",
 ];
 

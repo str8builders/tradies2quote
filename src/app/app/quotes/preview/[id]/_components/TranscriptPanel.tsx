@@ -16,6 +16,7 @@ import type {
 } from "@/lib/transcriptCleanup";
 import type { QuoteStatus } from "@/lib/quote-types";
 import { isQuoteLocked } from "@/lib/lifecycle/lock";
+import * as NewLookViews from "./TranscriptPanelV2";
 
 /**
  * ChatGPT-style transcript panel — sits above the quote editor on the
@@ -31,6 +32,9 @@ import { isQuoteLocked } from "@/lib/lifecycle/lock";
  * by anything under `src/app/quote/[token]/`. The transcript object
  * comes from `quote_data.transcript`, which the `get_quote_by_token`
  * RPC does not project.
+ *
+ * look="new" draws the same cards with the kit and ui- tokens
+ * (TranscriptPanelV2), for the new job page's More tools.
  */
 
 export type TranscriptPanelData = {
@@ -50,6 +54,7 @@ type Props = {
   status?: QuoteStatus;
   /** Current line count, quoted in the regenerate confirmation. */
   lineCount?: number;
+  look?: "classic" | "new";
 };
 
 /** The confirmation shown before regenerating wipes the current lines. */
@@ -66,6 +71,7 @@ export function TranscriptPanel({
   transcript,
   status = "draft",
   lineCount,
+  look = "classic",
 }: Props) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -145,40 +151,18 @@ export function TranscriptPanel({
     }
   };
 
-  return (
-    <section
-      data-testid="transcript-panel"
-      className="space-y-3 rounded-sm border border-ink-700 bg-ink-800/40 p-4"
-    >
-      <div className="flex items-center justify-between gap-2">
-        <p className="t2q-section-label-pro">{"// transcript"}</p>
-        {transcript.fallback === "summary_failed" && (
-          // Wave 19.5 — bumped from a muted ink-400 corner badge to a
-          // hivis warning pill so silent AI failures actually announce
-          // themselves. Founder-facing observability: if you ever see
-          // this pill on a real quote, the Anthropic call didn't fire
-          // and the quote was built by the deterministic regex pass
-          // alone. Pair this with the matching `[transcript] fallback`
-          // line in /api/quotes/generate/route.ts → Vercel runtime logs.
-          <span
-            data-testid="transcript-ai-fallback-pill"
-            className="inline-flex items-center gap-1.5 rounded-sm border border-hivis/40 bg-hivis/10 px-2 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-hivis"
-          >
-            <WarningCircle size={12} weight="fill" />
-            T2Q skipped · rules only
-          </span>
-        )}
-      </div>
-
+  const Views = VIEWS[look];
+  const cards = (
+    <>
       {/* Card 1 — raw */}
-      <RawCard
+      <Views.RawCard
         text={transcript.raw}
         onCopy={() => onCopy("raw")}
         copied={copied === "raw"}
       />
 
       {/* Card 2 — cleaned (editable) */}
-      <CleanedCard
+      <Views.CleanedCard
         text={editing ? editedText : transcript.cleaned}
         editing={editing}
         pending={pending}
@@ -208,16 +192,53 @@ export function TranscriptPanel({
 
       {/* Card 3 — AI understood (summary) */}
       {transcript.summary && (
-        <SummaryCard summary={transcript.summary} confidence={transcript.confidence} />
+        <Views.SummaryCard summary={transcript.summary} confidence={transcript.confidence} />
       )}
 
       {/* Inline corrections + clarifications */}
       {transcript.corrections.length > 0 && (
-        <CorrectionsList corrections={transcript.corrections} />
+        <Views.CorrectionsList corrections={transcript.corrections} />
       )}
       {transcript.clarification_questions.length > 0 && (
-        <ClarificationsList items={transcript.clarification_questions} />
+        <Views.ClarificationsList items={transcript.clarification_questions} />
       )}
+    </>
+  );
+
+  if (look === "new") {
+    return (
+      <NewLookViews.TranscriptFrame fallback={transcript.fallback === "summary_failed"} error={error}>
+        {cards}
+      </NewLookViews.TranscriptFrame>
+    );
+  }
+
+  return (
+    <section
+      data-testid="transcript-panel"
+      className="space-y-3 rounded-sm border border-ink-700 bg-ink-800/40 p-4"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <p className="t2q-section-label-pro">{"// transcript"}</p>
+        {transcript.fallback === "summary_failed" && (
+          // Wave 19.5 — bumped from a muted ink-400 corner badge to a
+          // hivis warning pill so silent AI failures actually announce
+          // themselves. Founder-facing observability: if you ever see
+          // this pill on a real quote, the Anthropic call didn't fire
+          // and the quote was built by the deterministic regex pass
+          // alone. Pair this with the matching `[transcript] fallback`
+          // line in /api/quotes/generate/route.ts → Vercel runtime logs.
+          <span
+            data-testid="transcript-ai-fallback-pill"
+            className="inline-flex items-center gap-1.5 rounded-sm border border-hivis/40 bg-hivis/10 px-2 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-hivis"
+          >
+            <WarningCircle size={12} weight="fill" />
+            T2Q skipped · rules only
+          </span>
+        )}
+      </div>
+
+      {cards}
 
       {error && (
         <p className="rounded-sm border border-red-500/40 bg-red-500/10 p-2 text-xs text-red-300">
@@ -227,6 +248,13 @@ export function TranscriptPanel({
     </section>
   );
 }
+
+/** The classic cards; the new look's (TranscriptPanelV2) take the same props. */
+const CLASSIC_VIEWS = { RawCard, CleanedCard, SummaryCard, CorrectionsList, ClarificationsList };
+const VIEWS: Record<"classic" | "new", Pick<typeof NewLookViews, keyof typeof CLASSIC_VIEWS>> = {
+  classic: CLASSIC_VIEWS,
+  new: NewLookViews,
+};
 
 // ---------------------------------------------------------------------------
 

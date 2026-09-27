@@ -6,9 +6,14 @@ import {
   CircleNotch,
   DownloadSimple,
 } from "@phosphor-icons/react";
+import { Button, ButtonLink } from "@/components/ui/button";
+import { Callout } from "@/components/ui/callout";
+import { cx } from "@/components/ui/cx";
 import { isNativeIOSApp } from "@/lib/native-app";
 import { BusinessSettingsLink } from "./BusinessSettingsLink";
 import { BUSINESS_NAME_REQUIRED } from "@/lib/business-name";
+
+type SaveState = "idle" | "working" | "done" | "error";
 
 type Props = {
   /** A route that returns an `application/pdf` body (e.g. the owner PDF routes). */
@@ -16,8 +21,10 @@ type Props = {
   /** Fallback filename if the route doesn't send a Content-Disposition name. */
   filename: string;
   label?: string;
-  /** Override the default ghost-chip styling. */
+  /** Classic: override the default ghost-chip styling. New look: layout only. */
   className?: string;
+  /** "new": the kit's secondary button, full width, with any problem in a callout (ui- tokens, outdoor mode). */
+  look?: "classic" | "new";
 };
 
 /**
@@ -30,8 +37,8 @@ type Props = {
  * route's Content-Disposition header when present (so it reads e.g.
  * "INV-1042.pdf"), otherwise the `filename` prop.
  */
-export function SavePdfButton({ url, filename, label = "Save PDF", className }: Props) {
-  const [state, setState] = useState<"idle" | "working" | "done" | "error">(
+export function SavePdfButton({ url, filename, label = "Save PDF", className, look = "classic" }: Props) {
+  const [state, setState] = useState<SaveState>(
     "idle",
   );
   const [errorMessage, setErrorMessage] = useState("");
@@ -136,6 +143,19 @@ export function SavePdfButton({ url, filename, label = "Save PDF", className }: 
           ? "Try again"
           : label;
 
+  if (look === "new") {
+    return (
+      <SavePdfButtonV2View
+        state={state}
+        text={text}
+        errorMessage={errorMessage}
+        needsBusinessName={needsBusinessName}
+        onSave={onSave}
+        className={className}
+      />
+    );
+  }
+
   return (
     <>
     <button
@@ -159,5 +179,56 @@ export function SavePdfButton({ url, filename, label = "Save PDF", className }: 
     </button>
     {state === "error" && <span role="alert" className="text-sm text-red-400">{errorMessage}{needsBusinessName && <BusinessSettingsLink />}</span>}
     </>
+  );
+}
+
+/**
+ * The new look's button for a given state (no browser work here): the kit's
+ * secondary button, spinning while the PDF is made, and a problem in a
+ * callout with the fix right there, as the job page's PDF screen does.
+ */
+export function SavePdfButtonV2View({
+  state,
+  text,
+  errorMessage,
+  needsBusinessName,
+  onSave,
+  className,
+}: {
+  state: SaveState;
+  text: string;
+  errorMessage: string;
+  needsBusinessName: boolean;
+  onSave: () => void;
+  className?: string;
+}) {
+  return (
+    <div className={cx("space-y-2", className)}>
+      <Button
+        variant="secondary"
+        fullWidth
+        loading={state === "working"}
+        icon={state === "done" ? <CheckCircle weight="bold" /> : <DownloadSimple weight="bold" />}
+        onClick={onSave}
+        data-testid="save-pdf-button"
+      >
+        {text}
+      </Button>
+      {state === "error" ? (
+        <div role="alert">
+          <Callout
+            tone={needsBusinessName ? "warn" : "bad"}
+            title={errorMessage}
+            action={
+              needsBusinessName ? (
+                <ButtonLink href={BUSINESS_NAME_REQUIRED.settings_url} variant="secondary">
+                  Open Settings
+                </ButtonLink>
+              ) : undefined
+            }
+          />
+        </div>
+      ) : null}
+    </div>
   );
 }

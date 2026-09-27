@@ -39,8 +39,8 @@ export interface MoreToolsSheetProps {
 
 /**
  * Everything that isn't the next step, one tap away: the client's link, the
- * PDF, photos, notes, and the classic page's review tools and panels, reused
- * as they are.
+ * PDF, photos, notes, and the classic page's review tools and panels. The job
+ * tools shared with the classic editor are drawn in the new look (look="new").
  */
 export function MoreToolsSheet(props: MoreToolsSheetProps) {
   const { quoteId, publicLink, lines } = props;
@@ -74,7 +74,7 @@ export function MoreToolsSheet(props: MoreToolsSheetProps) {
               url={`/api/quotes/${quoteId}/pdf`}
               filename={`quote-${quoteId}.pdf`}
               label="Download the PDF"
-              className={buttonClasses({ variant: "secondary", fullWidth: true })}
+              look="new"
             />
             {props.hasPdf ? (
               <ButtonLink href={`/app/quotes/preview/${quoteId}/pdf`} variant="ghost" fullWidth icon={<FileText weight="bold" />}>
@@ -85,12 +85,12 @@ export function MoreToolsSheet(props: MoreToolsSheetProps) {
         </ToolSection>
 
         <ToolSection id="photos" title="Photos" subtitle="Photos of the site for this job">
-          <QuotePhotos quoteId={quoteId} />
+          <QuotePhotos quoteId={quoteId} look="new" />
         </ToolSection>
 
         {hasMaterials ? (
           <ToolSection id="materials-list" title="Materials list" subtitle="Quantities only, for the merchant">
-            <MaterialsListButton items={lines} jobSummary={props.jobSummary} />
+            <MaterialsListButton items={lines} jobSummary={props.jobSummary} look="new" />
           </ToolSection>
         ) : null}
 
@@ -118,7 +118,7 @@ export function MoreToolsSheet(props: MoreToolsSheetProps) {
 
         {lines.length > 0 ? (
           <ToolSection id="csi" title="Trade groups" subtitle="The same lines grouped by trade">
-            <CsiGroupedView items={lines} />
+            <CsiGroupedView items={lines} look="new" />
           </ToolSection>
         ) : null}
 
@@ -129,7 +129,7 @@ export function MoreToolsSheet(props: MoreToolsSheetProps) {
                 <li key={`${i}-${line.description}`} className="space-y-2">
                   <p className="font-semibold">{line.description || "Untitled line"}</p>
                   {explainFormula(line.formula) ? <p className="text-ui-muted">{explainFormula(line.formula)}</p> : null}
-                  <T2QCALWorking line={line} />
+                  <T2QCALWorking line={line} look="new" />
                 </li>
               ))}
             </ul>

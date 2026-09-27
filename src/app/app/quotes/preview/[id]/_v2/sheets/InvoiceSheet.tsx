@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
-import { Button, buttonClasses } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
 import { SavePdfButton } from "@/app/app/_components/SavePdfButton";
 import { DEFAULT_INVOICE_TERM_DAYS } from "@/lib/invoice-due-date";
@@ -118,7 +118,7 @@ export function InvoiceSheet({
             url={`/api/invoices/${invoiceId}/pdf`}
             filename={`${invoice?.number ?? "invoice"}.pdf`}
             label="Download the invoice PDF"
-            className={buttonClasses({ variant: "secondary", fullWidth: true })}
+            look="new"
           />
         </div>
       </BottomSheet>

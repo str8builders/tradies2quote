@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CheckCircle, ClipboardText } from "@phosphor-icons/react";
+import { Button } from "@/components/ui/button";
 import { isNativeIOSApp } from "@/lib/native-app";
 import type { QuoteLineItem } from "@/lib/quote-types";
 import { formatQuantity } from "@/lib/quantity-display";
@@ -10,6 +11,8 @@ type Props = {
   items: QuoteLineItem[];
   /** One-line job description for the list header, when present. */
   jobSummary?: string | null;
+  /** "new": the kit's secondary button, full width (ui- tokens, outdoor mode). */
+  look?: "classic" | "new";
 };
 
 /**
@@ -41,7 +44,7 @@ export function buildMaterialsListText(
  * never loads on the web). Web: native share sheet when available, else
  * clipboard. Mirrors SavePdfButton's tiered approach.
  */
-export function MaterialsListButton({ items, jobSummary }: Props) {
+export function MaterialsListButton({ items, jobSummary, look = "classic" }: Props) {
   const [state, setState] = useState<"idle" | "done">("idle");
 
   const materialCount = items.filter((it) => it.type !== "labour").length;
@@ -81,6 +84,20 @@ export function MaterialsListButton({ items, jobSummary }: Props) {
     } catch (e) {
       console.error("MaterialsListButton failed", e);
     }
+  }
+
+  if (look === "new") {
+    return (
+      <Button
+        variant="secondary"
+        fullWidth
+        icon={state === "done" ? <CheckCircle weight="bold" /> : <ClipboardText weight="bold" />}
+        onClick={onShare}
+        data-testid="materials-list-button"
+      >
+        {state === "done" ? "Copied" : "Copy materials list"}
+      </Button>
+    );
   }
 
   return (

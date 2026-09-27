@@ -44,8 +44,7 @@ export function ToolSection({
           className="shrink-0 text-[1.25rem] text-ui-faint transition-transform duration-ui-fast ease-ui-out group-open:rotate-180 motion-reduce:transition-none"
         />
       </summary>
-      {/* The tools inside are still the old look: a dark panel in outdoor mode (globals.css safety net). */}
-      <div data-legacy-body="" className="border-t border-ui-line px-4 pt-3 pb-4">
+      <div className="border-t border-ui-line px-4 pt-3 pb-4">
         {children}
       </div>
     </details>

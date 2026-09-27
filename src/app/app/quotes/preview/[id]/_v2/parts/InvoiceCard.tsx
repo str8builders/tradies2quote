@@ -1,6 +1,5 @@
 "use client";
 
-import { buttonClasses } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Money } from "@/components/ui/money";
 import { SectionTitle } from "@/components/ui/section-title";
@@ -60,7 +59,7 @@ export function InvoiceCard({
               url={`/api/invoices/${invoice.id}/pdf`}
               filename={`${invoice.number}.pdf`}
               label="Download the invoice PDF"
-              className={buttonClasses({ variant: "secondary", fullWidth: true })}
+              look="new"
             />
           </div>
         </Card>
