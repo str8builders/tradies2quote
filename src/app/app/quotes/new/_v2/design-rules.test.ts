@@ -38,6 +38,7 @@ describe("new-look new quote follows the design rules", () => {
       "ReviewScreen.tsx",
       "TypeScreen.tsx",
       "ScanScreen.tsx",
+      "PlanReader.tsx",
       "QuestionScreen.tsx",
       "MicLevelBars.tsx",
       "parts.tsx",

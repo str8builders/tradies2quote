@@ -44,9 +44,11 @@ interface FloorPlanSvgProps {
   jobType: JobType;
   /** Optional title rendered above the schematic. */
   title?: string;
+  /** "new": the new look's plan reader, which spells out what the classic labels draw as symbols. */
+  look?: "classic" | "new";
 }
 
-export function FloorPlanSvg({ plan, jobType, title }: FloorPlanSvgProps) {
+export function FloorPlanSvg({ plan, jobType, title, look = "classic" }: FloorPlanSvgProps) {
   // Fence is a special case — only length matters, render a horizontal line.
   if (plan.shape === "line" || jobType === "Fence") {
     return <FenceSvg plan={plan} title={title} />;
@@ -54,17 +56,19 @@ export function FloorPlanSvg({ plan, jobType, title }: FloorPlanSvgProps) {
   if (plan.shape === "other") {
     return null;
   }
-  return <RectPlanSvg plan={plan} jobType={jobType} title={title} />;
+  return <RectPlanSvg plan={plan} jobType={jobType} title={title} look={look} />;
 }
 
 function RectPlanSvg({
   plan,
   jobType,
   title,
+  look,
 }: {
   plan: ScannedPlan;
   jobType: JobType;
   title?: string;
+  look: "classic" | "new";
 }) {
   const scale = fitScale(plan.width_m, plan.length_m);
   const wPx = plan.width_m * scale;
@@ -158,6 +162,7 @@ function RectPlanSvg({
           y={y}
           wPx={wPx}
           lPx={lPx}
+          look={look}
         />
       </g>
     </svg>
@@ -170,6 +175,7 @@ function PlanAnnotations({
   x,
   y,
   lPx,
+  look,
 }: {
   plan: ScannedPlan;
   jobType: JobType;
@@ -177,6 +183,7 @@ function PlanAnnotations({
   y: number;
   wPx: number;
   lPx: number;
+  look: "classic" | "new";
 }) {
   const lines: string[] = [];
   if (plan.post_count && plan.post_count > 0) {
@@ -192,7 +199,11 @@ function PlanAnnotations({
     lines.push(`${fmtM(plan.height_m)} ${jobType === "Deck" ? "above ground" : "high"}`);
   }
   if (jobType === "Deck" && plan.joist_orientation) {
-    lines.push(`joists ↔ ${plan.joist_orientation}`);
+    // ↔ is an emoji character (iOS can draw it in colour), so the new look
+    // says it: joists run parallel to that edge. Short enough for the box.
+    lines.push(
+      look === "new" ? `joists along ${plan.joist_orientation}` : `joists ↔ ${plan.joist_orientation}`,
+    );
   }
   if (lines.length === 0) return null;
 

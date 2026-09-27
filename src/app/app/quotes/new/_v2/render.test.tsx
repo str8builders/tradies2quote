@@ -9,9 +9,9 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 vi.mock("../actions", () => ({ createDraftQuote: async () => undefined }));
 vi.mock("../ai-consent-actions", () => ({ recordAiConsentAction: async () => ({ ok: true }) }));
-// The plan reader is reused as it is; a stand-in shows what it was given.
-vi.mock("../_components/ScanPanel", () => ({
-  ScanPanel: ({ transcript }: { transcript: string }) =>
+// The plan reader has its own tests (PlanReader.render.test.tsx); a stand-in shows what it was given.
+vi.mock("./PlanReader", () => ({
+  PlanReader: ({ transcript }: { transcript: string }) =>
     createElement("section", { "data-testid": "scan-panel", "data-transcript": transcript }),
 }));
 
@@ -298,10 +298,11 @@ describe("ScanScreen", () => {
       />,
     );
 
-  it("wraps the current plan reader, labelled by the screen's heading", () => {
+  it("holds the new-look plan reader, labelled by the screen's heading, with no old-look safety net", () => {
     const out = scan("");
     expect(tag(out, 'id="tab-scan"')).toMatch(/^<h2/);
     expect(out).toContain('data-testid="scan-panel" data-transcript=""');
+    expect(out).not.toContain("data-legacy-body");
     expect(tag(out, 'data-testid="write-quote"')).toContain("disabled");
     expect(out).toContain("Take or upload a photo of the plan first.");
   });

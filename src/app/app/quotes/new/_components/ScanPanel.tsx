@@ -30,7 +30,7 @@ import {
 import { METRES_BANDS, type MetresKind } from "@/lib/takeoff/plausibility";
 import { inIPhoneApp, trialEndedMessage } from "@/lib/trial-ended";
 
-type ScanState =
+export type ScanState =
   | "idle"
   | "converting"
   | "uploading"
@@ -39,7 +39,7 @@ type ScanState =
   | "wrong-doc"
   | "error";
 
-const JOB_TYPES = ["Deck", "Fence", "Framing", "Concrete", "Roofing", "Other"] as const;
+export const JOB_TYPES = ["Deck", "Fence", "Framing", "Concrete", "Roofing", "Other"] as const;
 export type JobType = (typeof JOB_TYPES)[number];
 
 /**
@@ -53,9 +53,9 @@ export const SCAN_SLOW_NOTICE_MS = 30_000;
 export const SCAN_SLOW_NOTICE =
   "Still reading the drawing — large plans can take a couple of minutes.";
 
-const TIMBER_LENGTH_DEFAULT = 6;
-const TIMBER_LENGTH_MIN = 2.4;
-const TIMBER_LENGTH_MAX = 7.2;
+export const TIMBER_LENGTH_DEFAULT = 6;
+export const TIMBER_LENGTH_MIN = 2.4;
+export const TIMBER_LENGTH_MAX = 7.2;
 
 export interface ScanResult {
   buildType: string;
@@ -667,13 +667,12 @@ export function scanErrorMessage(status: number, body: unknown, inApp: boolean =
   return `Scan failed (${status}). Please try again.`;
 }
 
-export function ScanPanel({
-  transcript,
-  setTranscript,
-}: {
-  transcript: string;
-  setTranscript: (s: string) => void;
-}) {
+/**
+ * The plan reader's state and steps: the photo in, the sizes checked, the
+ * takeoff out. Both looks run on it (<ScanPanel> below and the new look's
+ * <PlanReader>), so they read, retry and hand over the words exactly alike.
+ */
+export function useScanPanel(setTranscript: (s: string) => void) {
   const [state, setState] = useState<ScanState>("idle");
   const [error, setError] = useState<string>("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -895,14 +894,43 @@ export function ScanPanel({
   // reads the structure type off the drawing regardless.
   const canScan = state !== "uploading" && state !== "converting";
 
+  return {
+    state,
+    setState,
+    error,
+    previewUrl,
+    hint,
+    setHint,
+    jobType,
+    setJobType,
+    timberLengthInput,
+    setTimberLengthInput,
+    scanResult,
+    editedDimensions,
+    setEditedDimensions,
+    scanComplete,
+    scanSlow,
+    fileInputRef,
+    cameraInputRef,
+    onFileChange,
+    generateMaterials,
+    rescan,
+    backToSetup,
+    fullReset,
+    canScan,
+  };
+}
+
+export type ScanPanelModel = ReturnType<typeof useScanPanel>;
+
+/** The two hidden pickers behind "Upload image" and "Take photo", in both looks. */
+export function ScanFileInputs({
+  fileInputRef,
+  cameraInputRef,
+  onFileChange,
+}: Pick<ScanPanelModel, "fileInputRef" | "cameraInputRef" | "onFileChange">) {
   return (
-    <section
-      id="panel-scan"
-      role="tabpanel"
-      aria-labelledby="tab-scan"
-      data-testid="panel-scan"
-      className="t2q-card-pro p-6 sm:p-8"
-    >
+    <>
       <input
         ref={fileInputRef}
         type="file"
@@ -919,6 +947,57 @@ export function ScanPanel({
         className="hidden"
         data-testid="scan-camera-input"
         onChange={onFileChange}
+      />
+    </>
+  );
+}
+
+/** The plan reader in the current look (the old-look new-quote page's Scan tab). */
+export function ScanPanel({
+  transcript,
+  setTranscript,
+}: {
+  transcript: string;
+  setTranscript: (s: string) => void;
+}) {
+  const {
+    state,
+    setState,
+    error,
+    previewUrl,
+    hint,
+    setHint,
+    jobType,
+    setJobType,
+    timberLengthInput,
+    setTimberLengthInput,
+    scanResult,
+    editedDimensions,
+    setEditedDimensions,
+    scanComplete,
+    scanSlow,
+    fileInputRef,
+    cameraInputRef,
+    onFileChange,
+    generateMaterials,
+    rescan,
+    backToSetup,
+    fullReset,
+    canScan,
+  } = useScanPanel(setTranscript);
+
+  return (
+    <section
+      id="panel-scan"
+      role="tabpanel"
+      aria-labelledby="tab-scan"
+      data-testid="panel-scan"
+      className="t2q-card-pro p-6 sm:p-8"
+    >
+      <ScanFileInputs
+        fileInputRef={fileInputRef}
+        cameraInputRef={cameraInputRef}
+        onFileChange={onFileChange}
       />
 
       {state === "wrong-doc" && scanResult ? (
