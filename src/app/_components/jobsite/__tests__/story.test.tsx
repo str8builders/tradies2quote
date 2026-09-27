@@ -76,7 +76,10 @@ describe("the job-site story is complete as plain HTML (search, screen readers, 
     expect(text).toContain("as a sticker for the van");
     expect(text).not.toMatch(/barcode|quote video|15-second video/i);
     // The T2QCAL hand-off makes a draft (the tradie reviews it), with the working attached.
-    expect(text).toContain("turns the result into a draft quote, with your working attached");
+    expect(text).toContain("puts the order quantities into a Tradies2Quote draft, with your working attached");
+    // The phone plays the iPhone app, which isn't on the App Store yet: the page says so.
+    expect(text).toContain(T2QCAL_STOP.availability);
+    expect(text).not.toMatch(/download (it )?on the app store|get it on the app store/i);
     // Features that are off, or only in the unreleased iPhone app (automatic
     // clock-in, travel km from the background route), aren't offered as live.
     const live = [...FEATURES.map((f) => `${f.bold} ${f.body}`), T2QCAL_STOP.body, ...T2QCAL_STOP.inside].join(" ");

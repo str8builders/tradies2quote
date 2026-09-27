@@ -254,9 +254,12 @@ export function HouseWalk({ nativeShell }: { nativeShell: boolean }) {
                 ))}
               </ul>
               {nativeShell ? null : (
-                <Link href="/t2qcal" className="house-link">
-                  Open T2QCAL <ArrowUpRight size={16} weight="bold" aria-hidden="true" />
-                </Link>
+                <>
+                  <p className="house-note">{T2QCAL_STOP.availability}</p>
+                  <Link href="/t2qcal" className="house-link">
+                    {T2QCAL_STOP.link} <ArrowUpRight size={16} weight="bold" aria-hidden="true" />
+                  </Link>
+                </>
               )}
             </div>
             <PhoneFigure clip={T2QCAL_STOP.id} alt={T2QCAL_STOP.screenAlt} />

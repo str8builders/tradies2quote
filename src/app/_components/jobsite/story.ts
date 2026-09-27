@@ -161,7 +161,7 @@ export const T2QCAL_STOP = {
   word: "T2QCAL",
   eyebrow: "Free calculator app · works with Tradies2Quote",
   bold: "Work it out. Send it to the quote.",
-  body: "95 construction calculators that draw the job as you type: decks, stairs, roofs, concrete, framing and more. When the numbers are right, Use in Tradies2Quote turns the result into a draft quote, with your working attached.",
+  body: "95 construction calculators that draw the job as you type: decks, stairs, roofs, concrete, framing and more. When the numbers are right, Send to a quote puts the order quantities into a Tradies2Quote draft, with your working attached.",
   inside: [
     "95 calculators in 10 groups",
     "Measure: level, heights, photo measure, 3D room scan",
@@ -169,7 +169,10 @@ export const T2QCAL_STOP = {
     "NZ standards and guides, a tap away",
     "Free to use, no sign-up to calculate",
   ],
-  screenAlt: "T2QCAL working out a deck and drawing it, then Use in Tradies2Quote making a draft quote with the working attached",
+  screenAlt: "The T2QCAL iPhone app laying out a 6 by 4 metre deck: 28 boards and 184.8 metres to order, then Send to a quote making a Tradies2Quote draft with the working attached",
+  /** The phone plays the iPhone app, which isn't on the App Store yet: say so, and where it works today. */
+  availability: "The iPhone app is on its way to the App Store. T2QCAL works in your browser today.",
+  link: "Try T2QCAL in your browser",
 } as const;
 
 export const FINISHED = {

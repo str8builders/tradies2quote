@@ -211,6 +211,7 @@
   border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.24); color: #fff; font-weight: 700; font-size: 15px; text-decoration: none;
 }
 .house-link:hover, .house-link:focus-visible { border-color: var(--js-accent); color: var(--js-accent); }
+.house-note { margin: 18px 0 0; max-width: 34rem; font-size: 0.95rem; line-height: 1.45; color: var(--js-muted); }
 /* On phones the list would crowd the phone; the paragraph says the same. */
 @media (max-width: 899px) { .house-inside { display: none; } }
 
