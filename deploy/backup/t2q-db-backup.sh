@@ -25,7 +25,9 @@ mkdir -p "$DIR"
 dump="$DIR/t2q-db-$STAMP.dump"
 files="$DIR/t2q-storage-$STAMP.tar.gz"
 
-docker exec "$DB_CONTAINER" pg_dump -U postgres -d postgres --format=custom --no-owner --no-privileges > "$dump.partial"
+# Owners and grants are kept: a restore without them loses every table and
+# function permission the app relies on (the API roles would see nothing).
+docker exec "$DB_CONTAINER" pg_dump -U postgres -d postgres --format=custom > "$dump.partial"
 mv "$dump.partial" "$dump"
 
 # Read the dump back; it must list the core tables.
