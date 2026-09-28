@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { AppStoreBadge } from "../_components/AppStoreBadge";
+import { appStoreId } from "@/lib/app-store";
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -34,6 +36,7 @@ export default async function InstallPage() {
   // walks through Android and add-to-Home-Screen steps (App Store 2.3.10):
   // withheld on the server, the same way /calculator is.
   if (nativeShell) redirect("/app");
+  const onAppStore = appStoreId() !== null;
   return (
     <div className="studio-public studio-install-page min-h-screen text-white">
       {/* Slim brand bar */}
@@ -75,15 +78,21 @@ export default async function InstallPage() {
               className="rounded-xl"
             />
           </span>
-          <div className="t2q-section-label mb-3">{"// add to home screen"}</div>
+          <div className="t2q-section-label mb-3">{onAppStore ? "// get the app" : "// add to home screen"}</div>
           <h1 className="font-display text-3xl uppercase leading-[1.05] tracking-tight sm:text-4xl">
             Put quoting on your{" "}
-            <span className="text-brand">home screen.</span>
+            <span className="text-brand">{onAppStore ? "phone." : "home screen."}</span>
           </h1>
           <p className="mt-3 max-w-md text-ink-300">
-            No app store, no download wait. A few taps and Tradies2Quote opens
-            like a real app — fullscreen, right there on your home screen.
+            {onAppStore
+              ? "On iPhone, get the app from the App Store. On Android, or to skip the download, add it to your home screen in a few taps."
+              : "No app store, no download wait. A few taps and Tradies2Quote opens like a real app — fullscreen, right there on your home screen."}
           </p>
+          {onAppStore ? (
+            <div className="mt-6" data-testid="install-app-store">
+              <AppStoreBadge height={52} />
+            </div>
+          ) : null}
         </div>
 
         <InstallGuide />

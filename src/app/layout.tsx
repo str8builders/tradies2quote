@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { SITE_OPEN_GRAPH } from "@/lib/site-open-graph";
+import { appStoreId } from "@/lib/app-store";
 import {
   Archivo_Black,
   IBM_Plex_Sans,
@@ -165,6 +166,8 @@ export const metadata: Metadata = {
   // address detection is one of those (it wraps matched text in extra
   // markup). Turning all four off removes that specific cause of a React
   // #418 hydration-mismatch report.
+  // Safari on iPhone offers the App Store app in a banner, once it's published.
+  ...(appStoreId() ? { itunes: { appId: appStoreId() as string } } : {}),
   formatDetection: {
     telephone: false,
     date: false,

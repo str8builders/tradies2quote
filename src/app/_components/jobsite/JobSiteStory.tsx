@@ -6,6 +6,7 @@ import { LEGAL } from "@/lib/legal";
 import { getPlanPriceId, isStripeConfigured } from "@/lib/stripe-client";
 import { FAQS } from "../landing/FAQ";
 import { Footer } from "../landing/Footer";
+import { AppStoreBadge } from "../AppStoreBadge";
 import { Logo } from "../landing/Logo";
 import { WorkflowExample } from "../landing/WorkflowExample";
 import { faqPageLd, softwareApplicationLd } from "../landing/structured-data";
@@ -215,6 +216,7 @@ export function JobSiteStory({ nativeShell }: { nativeShell: boolean }) {
 
             <div className="jobsite-closing">
               <StartButton />
+              {nativeShell ? null : <AppStoreBadge className="jobsite-appstore" />}
               <p className="jobsite-help">
                 {HELP_LINE} <a href={`mailto:${LEGAL.supportEmail}`}>{LEGAL.supportEmail}</a>
               </p>

@@ -3,6 +3,7 @@ import { LEGAL } from "@/lib/legal";
 import { Logo } from "./Logo";
 import { MotionToggle } from "../wallpaper/MotionToggle";
 import { CookieSettingsButton } from "../CookieConsent";
+import { AppStoreBadge } from "../AppStoreBadge";
 
 export function Footer({
   // 3.1.3(f) — set server-side (see src/lib/native-shell.ts) inside the iOS
@@ -27,6 +28,8 @@ export function Footer({
             <p className="mt-4 text-ink-300 text-sm max-w-sm">
               Voice in. Quote out. Built in New Zealand by a qualified builder, made for the trades.
             </p>
+            {/* Once the iPhone app is published (never inside the app itself). */}
+            {hidePricingLinks ? null : <AppStoreBadge height={44} className="mt-5" />}
           </div>
           <div>
             <div className="font-mono text-xs uppercase tracking-[0.18em] text-ink-300 mb-3">
