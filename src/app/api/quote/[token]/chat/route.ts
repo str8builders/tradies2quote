@@ -6,6 +6,8 @@ import { storedChatHistoryForAgent } from "@/lib/agents/customer-chat-history";
 import { moderateChatText } from "@/lib/moderation";
 import type { PublicQuotePayload, QuoteData } from "@/lib/quote-types";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
+import { publicQuoteForClient } from "@/lib/quote-client-view";
+import { clientMessagePush, pushInBackground, takeChatPushSlot } from "@/lib/quote-activity-push";
 
 // Same derivation the accept route uses (accept/route.ts:24-30).
 function clientIp(request: NextRequest): string | null {
@@ -48,6 +50,10 @@ function clientIp(request: NextRequest): string | null {
  *
  * The tradie's preview page reads this array to render the chat
  * thread + surface any pending noteToTradie items (Phase 5).
+ *
+ * The tradie gets a push when the client writes (at most one per quote per
+ * 15 minutes, with what they wrote), sent in the background so it never
+ * holds up the reply.
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -125,7 +131,9 @@ export async function POST(
   if (error || !data) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
-  const quote = data as PublicQuotePayload;
+  // Priced for the client: the agent's context never holds the tradie's
+  // markup (src/lib/quote-client-view.ts).
+  const quote = publicQuoteForClient(data as PublicQuotePayload);
 
   // Gate: only chat on live quotes. Drafts shouldn't be chattable
   // (they aren't sent yet), accepted/declined/expired quotes are
@@ -141,7 +149,7 @@ export async function POST(
   // chat history. Admin client because the customer is anonymous.
   const { data: row, error: rowErr } = await admin
     .from("quotes")
-    .select("id, quote_data, chat_disabled")
+    .select("id, user_id, quote_data, chat_disabled")
     .eq("id", quote.id)
     .single();
   if (rowErr || !row) {
@@ -206,6 +214,13 @@ export async function POST(
       },
       { status: 429 },
     );
+  }
+
+  // The client's message will be saved for the tradie either way (answered
+  // or not): buzz them, at most once per quote per 15 minutes.
+  const ownerId = (row as { user_id?: string | null }).user_id;
+  if (ownerId && takeChatPushSlot(quote.id)) {
+    pushInBackground(ownerId, clientMessagePush(quote, message));
   }
 
   // Run the agent. Failure here degrades to a polite fallback so the

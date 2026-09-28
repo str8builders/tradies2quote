@@ -45,7 +45,10 @@ beforeEach(() => {
   mock.upload.mockResolvedValue("owner-fixture/quote.pdf");
   mock.email.mockResolvedValue({ ok: true });
   mock.sms.mockResolvedValue({ ok: true, sid: "fixture" });
-  mock.admin.mockImplementation(() => ({ from: () => ({ update: () => ({ eq: async () => ({ error: null }) }), insert: async () => ({ error: null }) }) }));
+  mock.admin.mockImplementation(() => {
+    const updated = { eq: () => updated, in: () => updated, select: async () => ({ data: [{ id: "12345678-fixture" }], error: null }) };
+    return { from: () => ({ update: () => updated, insert: async () => ({ error: null }) }) };
+  });
 });
 
 describe.each([["send", send], ["sms", sms], ["pdf", pdf]] as const)("%s business identity guard", (route, handle) => {

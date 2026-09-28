@@ -45,7 +45,9 @@ beforeEach(() => {
   db = fakeSupabase(respond);
   state.rpc.mockReset().mockResolvedValue({ data: { ok: true, quote_id: "quote-1" }, error: null });
   state.remove.mockReset().mockResolvedValue({ error: null });
-  state.upload.mockReset().mockResolvedValue("quote-1/signature.png");
+  // Each attempt gets its own file name (quote-storage.uploadSignature).
+  let attempt = 0;
+  state.upload.mockReset().mockImplementation(async () => `quote-1/signature-attempt-${++attempt}.png`);
   state.push.mockReset().mockResolvedValue(undefined);
   state.admin = { from: db.from, rpc: state.rpc, storage: { from: () => ({ remove: state.remove }) } };
 });
@@ -102,8 +104,33 @@ describe("public accept — the customer accepts exactly what they were shown", 
     const res = await accept({ version: 3, total: 172.5 });
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: "quote_changed" });
-    expect(state.remove).toHaveBeenCalledWith(["quote-1/signature.png"]);
+    expect(state.remove).toHaveBeenCalledWith(["quote-1/signature-attempt-1.png"]);
     expect(state.push).not.toHaveBeenCalled();
+  });
+
+  it("two overlapping accepts: the refused one deletes only its own signature, never the accepted one's", async () => {
+    // Both pass the early checks; accept_quote takes the row lock in order.
+    state.rpc
+      .mockResolvedValueOnce({ data: { ok: true, quote_id: "quote-1" }, error: null })
+      .mockResolvedValueOnce({ data: { error: "already_accepted" }, error: null });
+    const [first, second] = await Promise.all([
+      accept({ version: 3, total: 172.5 }),
+      accept({ version: 3, total: 172.5 }),
+    ]);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(409);
+    const stored = state.rpc.mock.calls.map(([, args]) => (args as { p_signature_path: string }).p_signature_path);
+    expect(new Set(stored).size).toBe(2);
+    expect(state.remove).toHaveBeenCalledTimes(1);
+    expect(state.remove).toHaveBeenCalledWith([stored[1]]);
+    expect(state.remove).not.toHaveBeenCalledWith([stored[0]]);
+  });
+
+  it("tells the tradie in the background once accepted", async () => {
+    state.push.mockReturnValue(new Promise(() => {})); // a push that never finishes
+    const res = await accept({ version: 3, total: 172.5 });
+    expect(res.status).toBe(200);
+    expect(state.push).toHaveBeenCalledWith("owner-1", expect.objectContaining({ title: "Quote accepted" }));
   });
 
   it("the public form posts the version and total it rendered", () => {

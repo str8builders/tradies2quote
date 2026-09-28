@@ -7,7 +7,9 @@
  * about the quote they've just received and get instant answers from
  * an AI that knows:
  *
- *   - The exact line items, quantities, unit prices, totals
+ *   - The exact line items, quantities, unit prices, totals — as the
+ *     client sees them: the tradie's markup is private, folded into the
+ *     line prices (src/lib/quote-client-view.ts). The agent never learns it.
  *   - The terms, the deposit policy, the validity window
  *   - The tradie's business name (and where to address messages)
  *   - The job summary + scope
@@ -23,6 +25,7 @@
  */
 import "server-only";
 import type { PublicQuotePayload } from "@/lib/quote-types";
+import { publicQuoteForClient } from "@/lib/quote-client-view";
 import { inventedAmounts, inventedFigureError, moneyAmountsIn, publicQuoteFigures } from "./money-guard";
 import { runStructuredAgent, type ParseResult } from "./runtime";
 
@@ -79,7 +82,8 @@ const SYSTEM_PROMPT = `You are a polite, helpful chat assistant embedded inside 
 The customer is reading the quote and chatting with you. They may ask about line items, terms, timing, alternatives, or just confirm they want to accept.
 
 Your boundaries — these are firm:
-- NEVER agree to a price reduction or discount on behalf of the tradie. If the customer pushes for a cheaper price, explain how the price was built (materials + labour + markup + GST) and offer to flag a scope-change question to the tradie via a "noteToTradie". Never invent a lower number.
+- NEVER agree to a price reduction or discount on behalf of the tradie. If the customer pushes for a cheaper price, explain how the price was built (the materials, the labour and GST, from the lines on the quote) and offer to flag a scope-change question to the tradie via a "noteToTradie". Never invent a lower number.
+- The prices on the quote are the tradie's prices. NEVER discuss the tradie's margin, profit or what they pay their suppliers. If asked, say that's one for the tradie and set a noteToTradie.
 - NEVER quote a new price for changed scope. Tell the customer the tradie will confirm a revised price, and capture the requested change in "noteToTradie".
 - NEVER agree to a start date or timeline. Tell the customer the tradie will confirm dates after acceptance.
 - NEVER claim consent IS required — only that it MAY be required for certain work types. Defer to council.
@@ -157,9 +161,13 @@ export function parseCustomerChat(
   return { ok: true, value: { intent, reply, noteToTradie, confidence } };
 }
 
-/** Format the quote payload + history into the user-turn prompt. */
-function buildUserTurn(input: CustomerChatInput): string {
-  const q = input.quote;
+/**
+ * Format the quote payload + history into the user-turn prompt. The quote is
+ * priced for the client first: the agent sees the same line prices the
+ * client does and never the tradie's markup.
+ */
+export function buildUserTurn(input: CustomerChatInput): string {
+  const q = publicQuoteForClient(input.quote);
   const tradieName = input.tradieBusinessName ?? "the tradie";
 
   const lines = [
@@ -177,7 +185,6 @@ function buildUserTurn(input: CustomerChatInput): string {
     "",
     `Materials subtotal: ${q.currency} ${q.materials_subtotal}`,
     `Labour subtotal: ${q.currency} ${q.labour_subtotal}`,
-    `Markup amount: ${q.currency} ${q.markup_amount}`,
     `${q.tax_label} ${q.tax_rate}%: ${q.currency} ${q.tax_amount}`,
     `Subtotal before tax: ${q.currency} ${q.subtotal_before_tax}`,
     `Total (inc. tax): ${q.currency} ${q.total}`,
@@ -222,10 +229,11 @@ export async function runCustomerChat(
     system: SYSTEM_PROMPT,
     user: buildUserTurn(input),
     tool: CHAT_TOOL,
-    // Dollar figures: the quote's own and the customer's, nothing worked out.
+    // Dollar figures: the quote's own (as the client sees them) and the
+    // customer's, nothing worked out.
     parse: (raw) =>
       parseCustomerChat(raw, [
-        ...publicQuoteFigures(input.quote),
+        ...publicQuoteFigures(publicQuoteForClient(input.quote)),
         ...moneyAmountsIn(input.customerMessage),
         ...input.history.filter((m) => m.role === "customer").flatMap((m) => moneyAmountsIn(m.content)),
       ]),

@@ -6,10 +6,13 @@ import {
   rgb,
   type PDFFont,
 } from "pdf-lib";
-import { formatCurrency, formatIssueDate, quoteNumber, splitDisplaySubtotals, validUntilDate } from "./quote-defaults";
+import { formatCurrency, formatIssueDate, quoteNumber, splitDisplaySubtotals } from "./quote-defaults";
 import type { QuoteData, QuoteLineItem, QuoteProfile } from "./quote-types";
 import { drawPdfLogo, type PdfLogo } from "./pdf-logo";
 import { BUSINESS_NAME_REQUIRED, businessNameForDocuments } from "./business-name";
+import { pdfParagraphs, pdfText } from "./pdf-text";
+import { quoteDataForClient } from "./quote-client-view";
+import { documentValidUntil } from "./quote-expiry";
 
 type GenerateArgs = {
   quoteId: string;
@@ -24,6 +27,12 @@ type GenerateArgs = {
   acceptUrl: string | null;
   /** Optional business logo drawn top-left of the letterhead. */
   logo?: PdfLogo | null;
+  /**
+   * The "Valid until" date: the quote's expires_at (the date its link stops
+   * working) — see quoteValidUntil in quote-expiry.ts. When missing, 30 days
+   * from now: what a send now would set.
+   */
+  validUntil?: string | Date | null;
 };
 
 const ORANGE = rgb(1.0, 0.373, 0.082); // #FF5F15
@@ -36,25 +45,6 @@ const PAGE_H = 841.89;
 const MARGIN_X = 48;
 const TOP = PAGE_H - 48;
 const BOTTOM_MIN = 80;
-
-const ASCII_REPLACEMENTS: Array<[RegExp, string]> = [
-  [/—/g, "-"],
-  [/–/g, "-"],
-  [/[“”]/g, '"'],
-  [/[‘’]/g, "'"],
-  [/→/g, "->"],
-  [/m²/g, "m2"],
-  [/m³/g, "m3"],
-  [/·/g, "-"],
-];
-
-function sanitise(s: string | null | undefined): string {
-  if (!s) return "";
-  let out = s;
-  for (const [re, rep] of ASCII_REPLACEMENTS) out = out.replace(re, rep);
-  // Replace any remaining non-WinAnsi chars with '?'
-  return out.replace(/[^\x20-\x7E]/g, "?");
-}
 
 function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
   const words = text.split(/\s+/).flatMap(word => {
@@ -86,9 +76,12 @@ function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
 }
 
 export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> {
-  const { quoteId, createdAt, quote, profile, acceptUrl, logo } = args;
+  const { quoteId, createdAt, profile, acceptUrl, logo } = args;
   const businessName = businessNameForDocuments(profile.business_name);
   if (!businessName) throw new Error(BUSINESS_NAME_REQUIRED.message);
+  // The PDF is the client's document: the markup is folded into the line
+  // prices, never printed as its own row (quote-client-view.ts).
+  const quote = quoteDataForClient(args.quote);
 
   const pdf = await PDFDocument.create();
   const helv = await pdf.embedFont(StandardFonts.Helvetica);
@@ -121,14 +114,17 @@ export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> 
     const color = opts.color ?? INK;
     const maxWidth = opts.maxWidth ?? PAGE_W - 2 * MARGIN_X;
     const lineHeight = opts.lineHeight ?? size * 1.3;
-    const lines = wrapText(sanitise(text), font, size, maxWidth);
+    // Line breaks the tradie typed (terms, an address) are kept.
+    const lines = pdfParagraphs(text).flatMap((paragraph) =>
+      paragraph ? wrapText(paragraph, font, size, maxWidth) : [""],
+    );
     let cursor = yPos;
     for (const line of lines) {
       if (cursor - lineHeight < BOTTOM_MIN) {
         page = pdf.addPage([PAGE_W, PAGE_H]);
         cursor = TOP;
       }
-      page.drawText(line, { x, y: cursor, size, font, color });
+      if (line) page.drawText(line, { x, y: cursor, size, font, color });
       cursor -= lineHeight;
     }
     return cursor;
@@ -164,7 +160,7 @@ export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> 
     size: 24,
     color: ORANGE,
   });
-  const number = quoteNumber(quoteId, createdAt);
+  const number = pdfText(quoteNumber(quoteId, createdAt));
   page.drawText(number, {
     x: PAGE_W - MARGIN_X - helv.widthOfTextAtSize(number, 11),
     y: TOP - 28,
@@ -172,7 +168,7 @@ export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> 
     size: 11,
     color: INK,
   });
-  const issuedLabel = `Issued ${formatIssueDate(createdAt)}`;
+  const issuedLabel = pdfText(`Issued ${formatIssueDate(createdAt)}`);
   page.drawText(issuedLabel, {
     x: PAGE_W - MARGIN_X - helv.widthOfTextAtSize(issuedLabel, 9),
     y: TOP - 44,
@@ -180,7 +176,8 @@ export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> 
     size: 9,
     color: MUTED,
   });
-  const validUntilLabel = `Valid until ${formatIssueDate(validUntilDate(createdAt, 30))}`;
+  // The same date the client's link stops working (quotes.expires_at).
+  const validUntilLabel = pdfText(`Valid until ${formatIssueDate(documentValidUntil(args.validUntil, new Date()))}`);
   page.drawText(validUntilLabel, {
     x: PAGE_W - MARGIN_X - helv.widthOfTextAtSize(validUntilLabel, 9),
     y: TOP - 56,
@@ -286,10 +283,10 @@ export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> 
 
     for (const it of items) {
       const columns = [
-        { text: sanitise(it.description || ""), x: COL_DESC_X, width: 222, right: false },
-        { text: sanitise(`${formatQuantity(it.quantity, it.unit_price)} ${it.unit ?? ""}`.trim()), x: COL_QTY_X, width: 94, right: false },
-        { text: sanitise(formatUnitPrice(Number(it.unit_price) || 0, quote.currency)), x: COL_PRICE_X, width: 76, right: false },
-        { text: sanitise(formatCurrency(Number(it.line_total) || 0, quote.currency)), x: COL_TOTAL_X, width: 75, right: true },
+        { text: pdfText(it.description || ""), x: COL_DESC_X, width: 222, right: false },
+        { text: pdfText(`${formatQuantity(it.quantity, it.unit_price)} ${it.unit ?? ""}`.trim()), x: COL_QTY_X, width: 94, right: false },
+        { text: pdfText(formatUnitPrice(Number(it.unit_price) || 0, quote.currency)), x: COL_PRICE_X, width: 76, right: false },
+        { text: pdfText(formatCurrency(Number(it.line_total) || 0, quote.currency)), x: COL_TOTAL_X, width: 75, right: true },
       ].map((column, i) => {
         // Keep each numeric token intact. Long rates wrap the unit/currency,
         // and scale down to seven points before moving to a full-width detail.
@@ -346,14 +343,14 @@ export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> 
   drawSection("Other", other);
 
   // ===== Totals =====
-  const totalsHeight = 128 + (other.length > 0 ? 14 : 0);
+  const totalsHeight = 114 + (other.length > 0 ? 14 : 0);
   ensureSpace(totalsHeight + (quote.terms || acceptUrl ? 60 : 0));
   drawRule(y);
   y -= 14;
 
   function drawTotalRow(label: string, value: number, emphasis = false) {
-    const labelText = label.toUpperCase();
-    const valueText = formatCurrency(value, quote.currency);
+    const labelText = pdfText(label.toUpperCase());
+    const valueText = pdfText(formatCurrency(value, quote.currency));
     const font = emphasis ? bold : helv;
     const size = emphasis ? 13 : 10;
     const color = emphasis ? ORANGE : INK;
@@ -365,8 +362,8 @@ export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> 
       size,
       color: emphasis ? INK : MUTED,
     });
-    page.drawText(sanitise(valueText), {
-      x: COL_TOTAL_X - font.widthOfTextAtSize(sanitise(valueText), size),
+    page.drawText(valueText, {
+      x: COL_TOTAL_X - font.widthOfTextAtSize(valueText, size),
       y,
       font,
       size,
@@ -375,16 +372,14 @@ export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> 
     y -= emphasis ? 22 : 14;
   }
 
-  // `materials_subtotal` bundles material + other lines (markup applies to
-  // the bundle). splitDisplaySubtotals (shared with the editor + public
-  // quote) splits it for display so each subtotal ties out to its section
-  // above; otherwise "Materials subtotal" wouldn't equal the visible list.
+  // Each subtotal ties out to its section above (splitDisplaySubtotals,
+  // shared with the public quote). The markup is already in the material and
+  // other prices, so the rows add up to the subtotal with no markup row.
   const displaySplit = splitDisplaySubtotals(quote.line_items);
   drawTotalRow("Materials subtotal", displaySplit.materials);
   if (other.length > 0) {
     drawTotalRow("Other subtotal", displaySplit.other);
   }
-  drawTotalRow(`Markup (${quote.markup_pct}%)`, quote.markup_amount);
   drawTotalRow("Labour subtotal", quote.labour_subtotal);
   drawTotalRow(
     quote.tax_rate > 0 ? `Subtotal (excl. ${quote.tax_label})` : "Subtotal",
@@ -437,7 +432,7 @@ export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> 
   const pages = pdf.getPages();
   for (let i = 0; i < pages.length; i++) {
     const p = pages[i];
-    const footer = sanitise(`${number}  ·  Page ${i + 1} of ${pages.length}`);
+    const footer = pdfText(`${number}  ·  Page ${i + 1} of ${pages.length}`);
     p.drawText(footer, {
       x: MARGIN_X,
       y: 32,

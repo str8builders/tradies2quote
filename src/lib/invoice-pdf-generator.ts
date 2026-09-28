@@ -9,6 +9,8 @@ import {
 import { formatCurrency, formatIssueDate, splitDisplaySubtotals } from "./quote-defaults";
 import type { QuoteData, QuoteLineItem, QuoteProfile } from "./quote-types";
 import { drawPdfLogo, type PdfLogo } from "./pdf-logo";
+import { pdfParagraphs, pdfText } from "./pdf-text";
+import { quoteDataForClient } from "./quote-client-view";
 
 /**
  * Invoice PDF generator. Sibling to `pdf-generator.ts` (quotes) — same
@@ -54,24 +56,6 @@ const MARGIN_X = 48;
 const TOP = PAGE_H - 48;
 const BOTTOM_MIN = 80;
 
-const ASCII_REPLACEMENTS: Array<[RegExp, string]> = [
-  [/—/g, "-"],
-  [/–/g, "-"],
-  [/[“”]/g, '"'],
-  [/[‘’]/g, "'"],
-  [/→/g, "->"],
-  [/m²/g, "m2"],
-  [/m³/g, "m3"],
-  [/·/g, "-"],
-];
-
-function sanitise(s: string | null | undefined): string {
-  if (!s) return "";
-  let out = s;
-  for (const [re, rep] of ASCII_REPLACEMENTS) out = out.replace(re, rep);
-  return out.replace(/[^\x20-\x7E]/g, "?");
-}
-
 function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
   const words = text.split(/\s+/).flatMap(word => {
     const parts: string[] = [];
@@ -106,11 +90,13 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
     invoiceNumber,
     createdAt,
     dueDate,
-    snapshot,
     profile,
     paymentInstructions,
     logo,
   } = args;
+  // The invoice is the client's document: the markup is folded into the line
+  // prices, never printed as its own row (quote-client-view.ts).
+  const snapshot = quoteDataForClient(args.snapshot);
 
   const pdf = await PDFDocument.create();
   const helv = await pdf.embedFont(StandardFonts.Helvetica);
@@ -143,14 +129,17 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
     const color = opts.color ?? INK;
     const maxWidth = opts.maxWidth ?? PAGE_W - 2 * MARGIN_X;
     const lineHeight = opts.lineHeight ?? size * 1.3;
-    const lines = wrapText(sanitise(text), font, size, maxWidth);
+    // Line breaks the tradie typed (payment details, an address) are kept.
+    const lines = pdfParagraphs(text).flatMap((paragraph) =>
+      paragraph ? wrapText(paragraph, font, size, maxWidth) : [""],
+    );
     let cursor = yPos;
     for (const line of lines) {
       if (cursor - lineHeight < BOTTOM_MIN) {
         page = pdf.addPage([PAGE_W, PAGE_H]);
         cursor = TOP;
       }
-      page.drawText(line, { x, y: cursor, size, font, color });
+      if (line) page.drawText(line, { x, y: cursor, size, font, color });
       cursor -= lineHeight;
     }
     return cursor;
@@ -192,14 +181,15 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
     size: 24,
     color: ORANGE,
   });
-  page.drawText(invoiceNumber, {
-    x: PAGE_W - MARGIN_X - helv.widthOfTextAtSize(invoiceNumber, 11),
+  const numberText = pdfText(invoiceNumber);
+  page.drawText(numberText, {
+    x: PAGE_W - MARGIN_X - helv.widthOfTextAtSize(numberText, 11),
     y: TOP - 28,
     font: helv,
     size: 11,
     color: INK,
   });
-  const issuedLabel = `Issued ${formatIssueDate(createdAt)}`;
+  const issuedLabel = pdfText(`Issued ${formatIssueDate(createdAt)}`);
   page.drawText(issuedLabel, {
     x: PAGE_W - MARGIN_X - helv.widthOfTextAtSize(issuedLabel, 9),
     y: TOP - 44,
@@ -208,7 +198,7 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
     color: MUTED,
   });
   // Due date is the headline for an invoice — emphasised in bold INK.
-  const dueLabel = dueDate ? `Due ${formatIssueDate(dueDate)}` : "Due on receipt";
+  const dueLabel = pdfText(dueDate ? `Due ${formatIssueDate(dueDate)}` : "Due on receipt");
   page.drawText(dueLabel, {
     x: PAGE_W - MARGIN_X - bold.widthOfTextAtSize(dueLabel, 10),
     y: TOP - 60,
@@ -314,10 +304,10 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
 
     for (const it of items) {
       const columns = [
-        { text: sanitise(it.description || ""), x: COL_DESC_X, width: 222, right: false },
-        { text: sanitise(`${formatQuantity(it.quantity, it.unit_price)} ${it.unit ?? ""}`.trim()), x: COL_QTY_X, width: 94, right: false },
-        { text: sanitise(formatUnitPrice(Number(it.unit_price) || 0, snapshot.currency)), x: COL_PRICE_X, width: 76, right: false },
-        { text: sanitise(formatCurrency(Number(it.line_total) || 0, snapshot.currency)), x: COL_TOTAL_X, width: 75, right: true },
+        { text: pdfText(it.description || ""), x: COL_DESC_X, width: 222, right: false },
+        { text: pdfText(`${formatQuantity(it.quantity, it.unit_price)} ${it.unit ?? ""}`.trim()), x: COL_QTY_X, width: 94, right: false },
+        { text: pdfText(formatUnitPrice(Number(it.unit_price) || 0, snapshot.currency)), x: COL_PRICE_X, width: 76, right: false },
+        { text: pdfText(formatCurrency(Number(it.line_total) || 0, snapshot.currency)), x: COL_TOTAL_X, width: 75, right: true },
       ].map((column, i) => {
         // Keep each numeric token intact. Long rates wrap the unit/currency,
         // and scale down to seven points before moving to a full-width detail.
@@ -377,17 +367,20 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
   const paymentText = paymentInstructions || (dueDate
     ? `Please pay by ${formatIssueDate(dueDate)}. Use ${invoiceNumber} as the reference.`
     : `Payment is due on receipt. Use ${invoiceNumber} as the reference.`);
-  const paymentHeight = 46 + 13 * wrapText(sanitise(paymentText), helv, 10, PAGE_W - 2 * MARGIN_X).length;
-  // Totals rows (materials, other, markup, labour, subtotal, tax, amount due)
-  // plus ordinary payment instructions stay together on one page.
-  const totalsHeight = 128 + (other.length > 0 ? 14 : 0);
+  const paymentHeight = 46 + 13 * pdfParagraphs(paymentText).reduce(
+    (count, paragraph) => count + Math.max(1, wrapText(paragraph, helv, 10, PAGE_W - 2 * MARGIN_X).length),
+    0,
+  );
+  // Totals rows (materials, other, labour, subtotal, tax, amount due) plus
+  // ordinary payment instructions stay together on one page.
+  const totalsHeight = 114 + (other.length > 0 ? 14 : 0);
   ensureSpace(Math.min(TOP - BOTTOM_MIN, totalsHeight + Math.max(60, paymentHeight)));
   drawRule(y);
   y -= 14;
 
   function drawTotalRow(label: string, value: number, emphasis = false) {
-    const labelText = label.toUpperCase();
-    const valueText = formatCurrency(value, snapshot.currency);
+    const labelText = pdfText(label.toUpperCase());
+    const valueText = pdfText(formatCurrency(value, snapshot.currency));
     const font = emphasis ? bold : helv;
     const size = emphasis ? 13 : 10;
     const color = emphasis ? ORANGE : INK;
@@ -399,8 +392,8 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
       size,
       color: emphasis ? INK : MUTED,
     });
-    page.drawText(sanitise(valueText), {
-      x: COL_TOTAL_X - font.widthOfTextAtSize(sanitise(valueText), size),
+    page.drawText(valueText, {
+      x: COL_TOTAL_X - font.widthOfTextAtSize(valueText, size),
       y,
       font,
       size,
@@ -409,15 +402,14 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
     y -= emphasis ? 22 : 14;
   }
 
-  // Same breakdown as the quote PDF (pdf-generator.ts). The subtotal carries
-  // the materials markup, so without its own row the listed lines never add
-  // up to it and the markup is hidden from the client being billed.
+  // Same breakdown as the quote PDF (pdf-generator.ts). The markup is already
+  // in the material and other prices, so the listed lines add up to the
+  // subtotal with no markup row: the markup is private to the business.
   const displaySplit = splitDisplaySubtotals(snapshot.line_items);
   drawTotalRow("Materials subtotal", displaySplit.materials);
   if (other.length > 0) {
     drawTotalRow("Other subtotal", displaySplit.other);
   }
-  drawTotalRow(`Markup (${Number(snapshot.markup_pct) || 0}%)`, Number(snapshot.markup_amount) || 0);
   drawTotalRow("Labour subtotal", Number(snapshot.labour_subtotal) || 0);
   drawTotalRow(
     snapshot.tax_rate > 0 ? `Subtotal (excl. ${snapshot.tax_label})` : "Subtotal",
@@ -444,7 +436,7 @@ export async function generateInvoicePdf(args: GenerateArgs): Promise<Uint8Array
   const pages = pdf.getPages();
   for (let i = 0; i < pages.length; i++) {
     const p = pages[i];
-    const footer = sanitise(
+    const footer = pdfText(
       `${invoiceNumber}  ·  Page ${i + 1} of ${pages.length}`,
     );
     p.drawText(footer, {

@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowSquareOut, FileText } from "@phosphor-icons/react/dist/ssr";
+import { ArrowSquareOut, EnvelopeSimple, FileText, Phone } from "@phosphor-icons/react/dist/ssr";
+import type { Icon } from "@phosphor-icons/react";
 import {
   formatCurrency,
   formatIssueDate,
@@ -8,9 +9,11 @@ import {
 } from "@/lib/quote-defaults";
 import type { PublicQuotePayload, PublicLineItem } from "@/lib/quote-types";
 import { formatQuantity, formatUnitPrice } from "@/lib/quantity-display";
+import { mailtoHref, telHref } from "./contact-links";
 
 type Props = {
   token: string;
+  /** Priced for the client (publicQuoteForClient): the markup is already in the line prices. */
   quote: PublicQuotePayload;
 };
 
@@ -19,9 +22,9 @@ export function PublicQuoteSummary({ token, quote }: Props) {
   const labour = quote.line_items.filter((it) => it.type === "labour");
   const other = quote.line_items.filter((it) => it.type === "other");
 
-  // `materials_subtotal` bundles material + other (markup applies to the
-  // bundle). splitDisplaySubtotals (shared with the editor + PDF) splits it
-  // for display so each subtotal ties out to its visible section.
+  // Each subtotal ties out to its visible section (splitDisplaySubtotals,
+  // shared with the editor + PDF). The markup is already in the material and
+  // other prices, so these rows add up to the subtotal with no markup row.
   const { materials: materialsOnlySubtotal, other: otherSubtotal } =
     splitDisplaySubtotals(quote.line_items);
 
@@ -36,10 +39,26 @@ export function PublicQuoteSummary({ token, quote }: Props) {
             <h1 className="mt-1 font-display text-2xl uppercase tracking-tight sm:text-3xl">
               {quote.business_name ?? "Your tradie"}
             </h1>
-            <div className="mt-2 space-y-0.5 text-xs text-ink-300">
-              {quote.business_email && <div>{quote.business_email}</div>}
-              {quote.business_phone && <div>{quote.business_phone}</div>}
-            </div>
+            {(quote.business_email || quote.business_phone) && (
+              <div className="mt-1 flex flex-col items-start">
+                {quote.business_email && (
+                  <ContactLink
+                    href={mailtoHref(quote.business_email)}
+                    icon={EnvelopeSimple}
+                    text={quote.business_email}
+                    testId="public-business-email"
+                  />
+                )}
+                {quote.business_phone && (
+                  <ContactLink
+                    href={telHref(quote.business_phone)}
+                    icon={Phone}
+                    text={quote.business_phone}
+                    testId="public-business-phone"
+                  />
+                )}
+              </div>
+            )}
           </div>
           <div className="text-left sm:text-right">
             <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-500">
@@ -107,7 +126,6 @@ export function PublicQuoteSummary({ token, quote }: Props) {
         {other.length > 0 && (
           <Row label="Other subtotal" value={formatCurrency(otherSubtotal, quote.currency)} />
         )}
-        <Row label={`Markup`} value={formatCurrency(quote.markup_amount, quote.currency)} />
         <Row label="Labour subtotal" value={formatCurrency(quote.labour_subtotal, quote.currency)} />
         <Row label={quote.tax_rate > 0 ? `Subtotal (excl. ${quote.tax_label})` : "Subtotal"} value={formatCurrency(quote.subtotal_before_tax, quote.currency)} divider />
         <Row label={`${quote.tax_label} (${quote.tax_rate}%)`} value={formatCurrency(quote.tax_amount, quote.currency)} />
@@ -125,6 +143,47 @@ export function PublicQuoteSummary({ token, quote }: Props) {
         </section>
       )}
     </section>
+  );
+}
+
+/**
+ * The tradie's email or phone as a real mailto:/tel: link (44 px tall to
+ * tap). iOS Safari rewrites plain-text numbers into links before React
+ * hydrates, which broke hydration; a link leaves it nothing to rewrite.
+ */
+function ContactLink({
+  href,
+  icon: IconComponent,
+  text,
+  testId,
+}: {
+  href: string | null;
+  icon: Icon;
+  text: string;
+  testId: string;
+}) {
+  const content = (
+    <>
+      <IconComponent size={16} weight="bold" aria-hidden="true" className="shrink-0" />
+      <span className="break-all">{text}</span>
+    </>
+  );
+  const className = "inline-flex min-h-11 items-center gap-2 text-sm text-ink-300";
+  if (!href) {
+    return (
+      <span data-testid={testId} className={className}>
+        {content}
+      </span>
+    );
+  }
+  return (
+    <a
+      href={href}
+      data-testid={testId}
+      className={`${className} underline decoration-ink-600 underline-offset-4 hover:text-brand`}
+    >
+      {content}
+    </a>
   );
 }
 

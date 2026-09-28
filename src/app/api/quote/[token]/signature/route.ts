@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { consumeFixedWindow, tooManyRequestsResponse } from "@/lib/rate-limit";
 import { requestIp } from "@/lib/request-ip";
-import { downloadSignature } from "@/lib/quote-storage";
+import { downloadSignature, isOwnSignaturePath } from "@/lib/quote-storage";
 import { classifyPublicQuote } from "@/lib/quote-public-view";
 
 export const runtime = "nodejs";
@@ -21,14 +21,19 @@ export async function GET(
   const admin = adminClient();
   const { data: quoteRaw, error } = await admin
     .from("quotes")
-    .select("signature_path, accepted_at, status, expires_at, deleted_at")
+    .select("id, signature_path, accepted_at, status, expires_at, deleted_at")
     .eq("public_token", token)
     .maybeSingle();
   const quote = quoteRaw as
-    | { signature_path: string | null; accepted_at: string | null; status: string; expires_at: string | null; deleted_at: string | null }
+    | { id: string; signature_path: string | null; accepted_at: string | null; status: string; expires_at: string | null; deleted_at: string | null }
     | null;
   if (error || !quote || !quote.signature_path || !quote.accepted_at || quote.deleted_at ||
     classifyPublicQuote(quote, new Date()).kind !== "accepted") {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+  // The row is writable by its owner and this download runs as the service
+  // role: only ever read a file stored for THIS quote.
+  if (!isOwnSignaturePath(quote.id, quote.signature_path)) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 

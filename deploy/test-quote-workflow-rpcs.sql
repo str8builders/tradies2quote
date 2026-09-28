@@ -10,8 +10,12 @@ begin
   end if;
   select user_id, quote_data into owner_id, before_data from public.quotes where id = audit_id;
   if owner_id is null then raise exception 'Missing restored audit fixture'; end if;
+  -- Only append_quote_chat_messages may change chat_history
+  -- (quotes_keep_chat_history); the fixture reset takes the same allowance.
+  perform set_config('t2q.chat_append', 'on', true);
   update public.quotes set status = 'draft', deleted_at = null, chat_disabled = false,
     quote_data = quote_data || '{"chat_history":[]}'::jsonb where id = audit_id;
+  perform set_config('t2q.chat_append', 'off', true);
 
   perform set_config('request.jwt.claim.sub', '', true);
   begin

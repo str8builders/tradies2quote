@@ -4,6 +4,7 @@ import { consumeFixedWindow, tooManyRequestsResponse } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { generateInvoicePdf } from "@/lib/invoice-pdf-generator";
 import { loadLogoForPdf } from "@/lib/pdf-logo";
+import { dueDateForSend } from "@/lib/invoice-due-date";
 import type { InvoiceSnapshot } from "@/lib/types/invoice";
 
 export const runtime = "nodejs";
@@ -18,6 +19,10 @@ type Params = { id: string };
  * snapshot so the tradie can view it or back it up ("Save to Files") at
  * any time — mirrors /api/quotes/[id]/pdf. Read-only: does NOT send the
  * invoice or change its status.
+ *
+ * An invoice not sent yet prints the due date it will get when it goes out
+ * (dueDateForSend: the payment term restarted from today), so a PDF the
+ * tradie sends by hand says the same as the app after "I've sent it".
  */
 export async function GET(
   _request: NextRequest,
@@ -36,7 +41,7 @@ export async function GET(
 
   const { data: invoice } = await supabase
     .from("invoices")
-    .select("id, invoice_number, invoice_data, due_date, created_at")
+    .select("id, invoice_number, invoice_data, due_date, created_at, sent_at")
     .eq("id", id)
     .eq("user_id", user.id)
     .is("deleted_at", null)
@@ -60,7 +65,7 @@ export async function GET(
     bytes = await generateInvoicePdf({
       invoiceNumber: invoice.invoice_number,
       createdAt: invoice.created_at,
-      dueDate: invoice.due_date,
+      dueDate: dueDateForSend(invoice, new Date()),
       snapshot: invoice.invoice_data as InvoiceSnapshot,
       profile: profile ?? { business_name: null },
       paymentInstructions: profile?.payment_instructions ?? null,

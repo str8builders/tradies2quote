@@ -7,7 +7,12 @@ vi.mock('@/lib/supabase/admin', () => ({ adminClient: () => ({ from: (table: str
     ? { data: mock.profile, error: null } : { data: mock.row, error: mock.error } };
   return query;
 } }) }));
-vi.mock('@/lib/quote-storage', () => ({ downloadPdf: mock.download, downloadSignature: mock.download }));
+// Real path rules (which files belong to which quote); only the downloads are faked.
+vi.mock('@/lib/quote-storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/quote-storage')>()),
+  downloadPdf: mock.download,
+  downloadSignature: mock.download,
+}));
 vi.mock('@/lib/pdf-generator', () => ({ generateQuotePdf: mock.render }));
 vi.mock('@/lib/pdf-logo', () => ({ loadLogoForPdf: async () => null }));
 vi.mock('@/lib/observability', () => ({ captureError: vi.fn() }));
@@ -17,7 +22,7 @@ const request = new NextRequest('https://tradies2quote.com/api/quote/audit/pdf')
 const context = () => ({ params: Promise.resolve({ token: 'audit' }) });
 beforeEach(() => {
   vi.clearAllMocks(); mock.error = null;
-  mock.row = { id: 'audit-id', user_id: 'owner-id', status: 'sent', pdf_path: 'private.pdf', signature_path: 'private.png',
+  mock.row = { id: 'audit-id', user_id: 'owner-id', status: 'sent', pdf_path: 'owner-id/audit-id/quote-v2.pdf', signature_path: 'audit-id/signature-attempt.png',
     accepted_at: '2026-01-01T00:00:00Z', created_at: '2026-01-01T00:00:00Z', expires_at: '2099-01-01T00:00:00Z', deleted_at: null,
     version: 1, pdf_version: 1, quote_data: { line_items: [], total: 0 } };
   mock.profile = { business_name: 'Audit Business' };
@@ -87,5 +92,43 @@ describe('Public PDF matches the current revision of the quote', () => {
     mock.profile = { business_name: '  ' };
     expect((await pdf(request, context())).status).toBe(503);
     expect(mock.download).not.toHaveBeenCalled();
+  });
+});
+describe('Public documents only ever read this quote\'s own files', () => {
+  it.each([
+    ['another owner\'s PDF', 'other-owner/other-quote/quote-v2.pdf'],
+    ['another quote of the same owner', 'owner-id/other-quote.pdf'],
+    ['a path that climbs out of the folder', 'owner-id/audit-id/../../other-owner/x.pdf'],
+    ['a nested path', 'owner-id/audit-id/a/b.pdf'],
+  ])('refuses %s', async (_label, path) => {
+    Object.assign(mock.row!, { pdf_path: path });
+    expect((await pdf(request, context())).status).toBe(404);
+    expect(mock.download).not.toHaveBeenCalled();
+    expect(mock.render).not.toHaveBeenCalled();
+  });
+  it.each([
+    ['another quote\'s signature', 'other-quote/signature.png'],
+    ['a path that climbs out of the folder', 'audit-id/../other-quote/signature.png'],
+    ['no folder at all', 'signature.png'],
+  ])('refuses %s', async (_label, path) => {
+    Object.assign(mock.row!, { status: 'accepted', signature_path: path });
+    expect((await signature(request, context())).status).toBe(404);
+    expect(mock.download).not.toHaveBeenCalled();
+  });
+  it.each(['audit-id/signature.png', 'audit-id/signature-5b1f.png'])('serves this quote\'s own signature (%s)', async path => {
+    Object.assign(mock.row!, { status: 'accepted', signature_path: path });
+    expect((await signature(request, context())).status).toBe(200);
+    expect(mock.download).toHaveBeenCalledWith(path);
+  });
+  it('re-renders a PDF stored by the older layout (it printed the private markup)', async () => {
+    Object.assign(mock.row!, { pdf_path: 'owner-id/audit-id.pdf', version: 4, pdf_version: 4 });
+    expect((await pdf(request, context())).status).toBe(200);
+    expect(mock.download).not.toHaveBeenCalled();
+    expect(mock.render).toHaveBeenCalledTimes(1);
+  });
+  it('a re-render prints the date the link stops working', async () => {
+    Object.assign(mock.row!, { version: 2, pdf_version: 1, expires_at: '2099-01-01T00:00:00Z' });
+    await pdf(request, context());
+    expect(mock.render).toHaveBeenCalledWith(expect.objectContaining({ validUntil: '2099-01-01T00:00:00.000Z' }));
   });
 });

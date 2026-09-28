@@ -54,8 +54,12 @@ begin
   end if;
 
   select count(*) into view_count from public.quote_events e where e.quote_id = audit_quote_id and e.type = 'viewed';
-  perform public.mark_quote_viewed(token);
-  perform public.mark_quote_viewed(token);
+  -- The call that records the first view says whose quote it was (for the
+  -- tradie's "opened" notification); every later call returns null.
+  if (public.mark_quote_viewed(token) ->> 'quote_id') is distinct from audit_quote_id::text then
+    raise exception 'First view did not report the quote';
+  end if;
+  if public.mark_quote_viewed(token) is not null then raise exception 'Second view reported again'; end if;
   if (select status from public.quotes where id = audit_quote_id) <> 'viewed' then raise exception 'View not recorded'; end if;
   if (select count(*) from public.quote_events e where e.quote_id = audit_quote_id and e.type = 'viewed') <> view_count + 1 then
     raise exception 'View event not idempotent';

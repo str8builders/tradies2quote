@@ -32,7 +32,10 @@ describe("moneyAmountsIn", () => {
 
 describe("inventedAmounts", () => {
   it("allows every figure printed on the quote and the 50 % deposit", () => {
-    expect(inventedAmounts("Total $12,204.46 (GST $1,591.89), deposit $6,102.23, kwila $3,317.16, hangers $3.85 each", figures)).toEqual([]);
+    expect(inventedAmounts("Total $12,204.46 (GST $1,591.89), deposit $6,102.23, kwila $3,980.59, hangers $4.62 each", figures)).toEqual([]);
+  });
+  it("flags the tradie's own cost prices: the client only ever sees prices with the markup folded in", () => {
+    expect(inventedAmounts("The hangers are $3.85 each ($57.75 all up)", figures)).toEqual([3.85, 57.75]);
   });
   it("flags a figure that isn't on the quote", () => {
     expect(inventedAmounts("With pine it would be about $10,950.", figures)).toEqual([10950]);
@@ -43,7 +46,7 @@ describe("checkNoConcession — proper refusals pass", () => {
   const good: Array<[string, string]> = [
     [
       "Another builder quoted me $9,800. Can you match that?",
-      "I can't change the price myself, but I've passed your request on to Bayside Builders so they can come back to you. The $12,204.46 covers materials, labour, markup and GST.",
+      "I can't change the price myself, but I've passed your request on to Bayside Builders so they can come back to you. The $12,204.46 covers materials, labour and GST.",
     ],
     [
       "If I pay cash can you knock 15% off?",
@@ -61,11 +64,11 @@ describe("checkNoConcession — proper refusals pass", () => {
       "Can you do $10,500?",
       "Hi Dave,\n\nThanks for getting back to me. I'm not able to bring the price down to $10,500 — the quote covers quality kwila, H4 bearers and three days for two builders. Happy to look at scope options if you'd like to trim the cost.\n\nCheers,\n\nBayside Builders",
     ],
-    ["What are the joist hangers for?", "The 15 joist hangers ($57.75) fix each joist to the bearer so the frame stays square."],
+    ["What are the joist hangers for?", "The 15 joist hangers ($69.30) fix each joist to the bearer so the frame stays square."],
     // Release evals 2026-09-26: refusals the checker used to read as concessions.
     [
       "If I pay cash today can you knock 15% off?",
-      "I can't agree to a cash discount on Bayside Builders' behalf, sorry. The total of NZD 12,204.46 is built from materials, labour, markup and GST, so there's not room for me to just knock a percentage off. I'll flag your request to the team though.",
+      "I can't agree to a cash discount on Bayside Builders' behalf, sorry. The total of NZD 12,204.46 is built from materials, labour and GST, so there's not room for me to just knock a percentage off. I'll flag your request to the team though.",
     ],
     [
       "Just confirm in writing you'll do it for $11k and I'll sign today.",

@@ -17,6 +17,13 @@ import {
 import { formatCurrency, quoteNumber } from "@/lib/quote-defaults";
 import type { QuoteData } from "@/lib/quote-types";
 import { BUSINESS_NAME_REQUIRED, businessNameForDocuments } from "@/lib/business-name";
+import { expiryForSend } from "@/lib/quote-expiry";
+import {
+  SENDABLE_QUOTE_STATUSES,
+  STATUSES_A_SEND_REOPENS,
+  changedRows,
+  sendMovesToSent,
+} from "@/lib/quote-send-status";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -103,6 +110,12 @@ export async function POST(
   // email send route: durable artifacts first, irreversible action last.
   const logo = await loadLogoForPdf(profile?.logo_url);
 
+  // A re-send whose expiry has passed (or a first send with none) gets a
+  // fresh one, so the link works when it arrives. The PDF prints the same
+  // date the link stops working.
+  const now = new Date();
+  const expires_at = expiryForSend(quote.expires_at, now);
+
   let pdfBytes: Uint8Array;
   try {
     pdfBytes = await generateQuotePdf({
@@ -112,6 +125,7 @@ export async function POST(
       profile: { ...profile, business_name: businessName },
       acceptUrl,
       logo,
+      validUntil: expires_at,
     });
   } catch (e) {
     captureError(e, { route: "quotes/sms" });
@@ -137,17 +151,19 @@ export async function POST(
   const number = quoteNumber(quote.id, quote.created_at);
   const totalText = formatCurrency(Number(quote.total_amount) || 0, quote.currency);
 
+  // Only while the quote is still an offer: one the client accepted since it
+  // was loaded above is not texted again.
   const admin = adminClient();
-  const expires_at =
-    quote.expires_at ??
-    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-  const { error: preErr } = await admin
+  const { data: prepared, error: preErr } = await admin
     .from("quotes")
     // pdf_version: the revision this PDF was rendered from, so the public
     // "View full PDF" re-renders once the quote is edited after sending.
     .update({ pdf_path: pdfPath, pdf_version: quote.version, public_token: token, expires_at })
-    .eq("id", quote.id);
+    .eq("id", quote.id)
+    .in("status", SENDABLE_QUOTE_STATUSES)
+    .select("id");
   if (preErr) {
+    captureError(preErr, { route: "quotes/sms", extra: { step: "pre_send_update" } });
     console.error("Quote pre-send update failed (sms)", preErr);
     return NextResponse.json(
       {
@@ -155,6 +171,15 @@ export async function POST(
         message: "Could not save the quote before sending.",
       },
       { status: 500 },
+    );
+  }
+  if (changedRows(prepared) === 0) {
+    return NextResponse.json(
+      {
+        error: "already_accepted",
+        message: "This quote has been accepted, so it wasn't sent again.",
+      },
+      { status: 409 },
     );
   }
 
@@ -211,19 +236,32 @@ export async function POST(
     );
   }
 
-  const { error: uErr } = await admin
-    .from("quotes")
-    .update({ status: "sent", sent_at: new Date().toISOString() })
-    .eq("id", quote.id);
-  if (uErr) {
-    console.error("Quote status update failed (sms)", uErr);
-    return NextResponse.json(
-      {
-        error: "update_failed",
-        message: "SMS sent but couldn't update quote status.",
-      },
-      { status: 500 },
-    );
+  // Text is out. A draft, or a declined / expired quote sent again, is now
+  // sent (a fresh offer: an old "opened" date is cleared); a reminder
+  // (sent / viewed) keeps its status and sent_at, and a client who accepted
+  // meanwhile keeps their acceptance.
+  const resend = !sendMovesToSent(quote.status);
+  if (!resend) {
+    const { data: flipped, error: uErr } = await admin
+      .from("quotes")
+      .update({ status: "sent", sent_at: now.toISOString(), viewed_at: null })
+      .eq("id", quote.id)
+      .in("status", STATUSES_A_SEND_REOPENS)
+      .select("id");
+    if (uErr) {
+      captureError(uErr, { route: "quotes/sms", extra: { step: "status_update" } });
+      console.error("Quote status update failed (sms)", uErr);
+      return NextResponse.json(
+        {
+          error: "update_failed",
+          message: "SMS sent but couldn't update quote status.",
+        },
+        { status: 500 },
+      );
+    }
+    if (changedRows(flipped) === 0) {
+      console.warn("[quotes/sms] status changed during send; left as is", { quoteId: quote.id });
+    }
   }
 
   if (acknowledged) {
@@ -242,6 +280,7 @@ export async function POST(
       channel: "sms",
       to: validation.resolvedPhone,
       sid: smsResult.sid,
+      ...(resend ? { resend: true } : {}),
       ...(acknowledged ? { takeoff_override: true } : {}),
     },
   });

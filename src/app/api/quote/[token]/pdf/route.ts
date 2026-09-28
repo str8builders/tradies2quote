@@ -2,13 +2,14 @@ import { type NextRequest, NextResponse } from "next/server";
 import { adminClient } from "@/lib/supabase/admin";
 import { consumeFixedWindow, tooManyRequestsResponse } from "@/lib/rate-limit";
 import { requestIp } from "@/lib/request-ip";
-import { downloadPdf } from "@/lib/quote-storage";
+import { downloadPdf, isCurrentLayoutPdfPath, isOwnPdfPath } from "@/lib/quote-storage";
 import { quoteNumber } from "@/lib/quote-defaults";
 import { classifyPublicQuote } from "@/lib/quote-public-view";
 import { generateQuotePdf } from "@/lib/pdf-generator";
 import { loadLogoForPdf } from "@/lib/pdf-logo";
 import { businessNameForDocuments } from "@/lib/business-name";
 import { captureError } from "@/lib/observability";
+import { quoteValidUntil } from "@/lib/quote-expiry";
 import type { QuoteData } from "@/lib/quote-types";
 
 export const runtime = "nodejs";
@@ -20,11 +21,15 @@ type Params = { token: string };
  * Customer-facing "View full PDF".
  *
  * Serves the PDF stored at send time while it still shows the current
- * revision of the quote (`pdf_version = version`). Once the tradie edits a
- * sent quote the stored file is stale — the customer would read one set of
- * figures on the page and another in the PDF — so it is re-rendered from the
- * current quote instead. Nothing is written back: the next send stores a
- * fresh file and stamps its revision.
+ * revision of the quote (`pdf_version = version`) and was made by the current
+ * PDF layout. Once the tradie edits a sent quote the stored file is stale —
+ * the customer would read one set of figures on the page and another in the
+ * PDF — so it is re-rendered from the current quote instead; so is a file
+ * stored by an older layout (it printed the private markup). Nothing is
+ * written back: the next send stores a fresh file and stamps its revision.
+ *
+ * The stored path comes from a row its owner can write, and the download runs
+ * as the service role, so a path outside this quote's own files is refused.
  */
 export async function GET(
   request: NextRequest,
@@ -57,6 +62,9 @@ export async function GET(
   if (error || !quote || !quote.pdf_path || quote.deleted_at) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
+  if (!isOwnPdfPath(quote.user_id, quote.id, quote.pdf_path)) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
   const view = classifyPublicQuote(quote, new Date());
   if (view.kind === "expired") {
     return NextResponse.json({ error: "expired" }, { status: 410 });
@@ -66,7 +74,11 @@ export async function GET(
   }
 
   let bytes: Uint8Array;
-  if (quote.pdf_version !== null && quote.pdf_version === quote.version) {
+  if (
+    quote.pdf_version !== null &&
+    quote.pdf_version === quote.version &&
+    isCurrentLayoutPdfPath(quote.user_id, quote.id, quote.pdf_path)
+  ) {
     try {
       bytes = await downloadPdf(quote.pdf_path);
     } catch (e) {
@@ -95,7 +107,7 @@ export async function GET(
 /** Render the quote as it stands now — the same document the send route stores. */
 async function renderCurrentRevision(
   admin: ReturnType<typeof adminClient>,
-  quote: { id: string; user_id: string; created_at: string; quote_data: unknown },
+  quote: { id: string; user_id: string; created_at: string; quote_data: unknown; status: string; expires_at: string | null },
   token: string,
 ): Promise<{ bytes: Uint8Array } | { error: string; status: number }> {
   const data = quote.quote_data as QuoteData | null;
@@ -120,6 +132,7 @@ async function renderCurrentRevision(
       profile: { ...profile, business_name: businessName },
       acceptUrl: `${appUrl}/quote/${token}`,
       logo: await loadLogoForPdf(profile?.logo_url),
+      validUntil: quoteValidUntil(quote, new Date()),
     });
     return { bytes };
   } catch (e) {

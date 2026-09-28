@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
+import { expiryForSend } from "@/lib/quote-expiry";
+import { STATUSES_A_SEND_REOPENS, changedRows, sendMovesToSent } from "@/lib/quote-send-status";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +19,10 @@ type Params = { id: string };
  * The sibling POST /api/quotes/[id]/sms already did the durable work
  * (PDF, public token, expiry) and handed back the composed text without
  * touching status. This route is the tradie asserting "I hit send", and
- * is the ONLY thing that flips the quote to `sent` on the device path.
+ * is the ONLY thing that flips the quote to `sent` on the device path —
+ * from draft, or from declined / expired when the tradie sends it again
+ * (the job page's "Send it again"; a declined quote left declined told the
+ * client the quote was no longer available).
  *
  * That split is deliberate: opening Messages is not sending. Every other
  * status in this app means what it says, and a text the tradie abandoned
@@ -53,7 +58,7 @@ export async function POST(
   // link for the customer to open and nothing was textable.
   const { data: quote, error: qErr } = await supabase
     .from("quotes")
-    .select("id, status, public_token")
+    .select("id, status, public_token, expires_at")
     .eq("id", id)
     .eq("user_id", user.id)
     .single();
@@ -71,33 +76,47 @@ export async function POST(
   }
   // IDEMPOTENT by design. The flip fires as a fire-and-forget POST on the
   // "Open Messages" tap AND is re-ensured on the "Done" tap, so this route
-  // is routinely called more than once for the same quote. Only the
-  // draft->sent transition writes — anything already past draft (sent,
-  // viewed, or a later lifecycle stage) is a no-op success. This prevents:
+  // is routinely called more than once for the same quote. Only a
+  // draft / declined / expired -> sent transition writes — a quote already
+  // sent or viewed (a reminder), or at a later lifecycle stage, is a no-op
+  // success. This prevents:
   //   • re-stamping sent_at (which would move the follow-up cadence anchor),
   //   • walking viewed -> sent BACKWARD if the client opened the link first,
+  //   • reopening a quote the client accepted meanwhile,
   //   • duplicate 'sent' audit rows.
   // The double-fire exists on purpose: a single dropped request must not
   // leave the quote stuck in draft (that stuck state is the exact
   // "QUOTE NOT FOUND" outage this whole change fixes).
-  if (quote.status !== "draft") {
+  if (!sendMovesToSent(quote.status)) {
     return NextResponse.json({ ok: true, already: quote.status });
   }
 
+  const now = new Date();
+  // The prepare step set a fresh expiry; this only repairs one that is
+  // missing or already past, so the link the client got works.
+  const expires_at = expiryForSend(quote.expires_at, now);
   const admin = adminClient();
-  const { error: uErr } = await admin
+  const { data: flipped, error: uErr } = await admin
     .from("quotes")
-    .update({ status: "sent", sent_at: new Date().toISOString() })
+    // A fresh offer: an old "opened" date is cleared for the next view to set.
+    .update({ status: "sent", sent_at: now.toISOString(), viewed_at: null, expires_at })
     .eq("id", quote.id)
     // Guard the transition at the DB layer too: only flip a row that is
-    // still draft, so two racing requests can't both write.
-    .eq("status", "draft");
+    // still in one of those statuses, so two racing requests can't both
+    // write and an acceptance in between is never reverted.
+    .in("status", STATUSES_A_SEND_REOPENS)
+    .select("id");
   if (uErr) {
+    captureError(uErr, { route: "quotes/sms/sent", extra: { step: "status_update" } });
     console.error("Quote status update failed (sms/sent)", uErr);
     return NextResponse.json(
       { error: "update_failed", message: "Couldn't update the quote status." },
       { status: 500 },
     );
+  }
+  if (changedRows(flipped) === 0) {
+    // The other tap (or another tab) got there first, or the status moved on.
+    return NextResponse.json({ ok: true, already: "changed" });
   }
 
   const { error: evErr } = await admin.from("quote_events").insert({

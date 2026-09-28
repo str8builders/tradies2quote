@@ -24,8 +24,10 @@ describe("quote and invoice quantity columns", () => {
     const quote: QuoteData = {
       client: { name: "Audit example — no customer", address: null, email: null, phone: null },
       job_summary: "Quantity and rate precision example. Local audit fixture only.",
-      line_items: items, ...computeQuoteTotals(items, 20, 15),
-      markup_pct: 20, tax_rate: 15, tax_label: "GST", currency: "NZD", terms: "", notes: [],
+      // No markup: the tradie's own rates are printed as-is (a markup is folded
+      // into client prices — see quote-client-view.test.ts).
+      line_items: items, ...computeQuoteTotals(items, 0, 15),
+      markup_pct: 0, tax_rate: 15, tax_label: "GST", currency: "NZD", terms: "", notes: [],
     };
     const calls: { text: string; x: number; y: number; width: number; page: PDFPage }[] = [];
     const original = PDFPage.prototype.drawText;
@@ -45,7 +47,8 @@ describe("quote and invoice quantity columns", () => {
       if (call.x === 282 && call.text !== "QTY") expect(call.x + call.width).toBeLessThanOrEqual(376.01);
       if (call.x === 386 && call.text !== "UNIT PRICE") expect(call.x + call.width).toBeLessThanOrEqual(462.01);
     }
-    expect(calls.some(c => c.text === "0.237504 m3")).toBe(true);
+    // The standard font prints ³ itself (it used to be flattened to "m3").
+    expect(calls.some(c => c.text === "0.237504 m³")).toBe(true);
     expect(calls.some(c => c.text === "$0.123456789012345")).toBe(true);
     if (kind === "invoice") {
       expect(calls.find(c => c.text === "PAYMENT")?.page).toBe(calls.find(c => c.text === "AMOUNT DUE")?.page);

@@ -3,6 +3,7 @@ import { captureError } from "@/lib/observability";
 import { consumeFixedWindow, tooManyRequestsResponse } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { generateQuotePdf } from "@/lib/pdf-generator";
+import { quoteValidUntil } from "@/lib/quote-expiry";
 import { loadLogoForPdf } from "@/lib/pdf-logo";
 import { quoteNumber } from "@/lib/quote-defaults";
 import type { QuoteData } from "@/lib/quote-types";
@@ -46,7 +47,7 @@ export async function GET(
 
   const { data: quote } = await supabase
     .from("quotes")
-    .select("id, quote_data, created_at, public_token")
+    .select("id, quote_data, created_at, public_token, status, expires_at")
     .eq("id", id)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -80,6 +81,7 @@ export async function GET(
       profile: { ...profile, business_name: businessName },
       acceptUrl,
       logo,
+      validUntil: quoteValidUntil(quote, new Date()),
     });
   } catch (e) {
     captureError(e, { route: "quotes/pdf" });

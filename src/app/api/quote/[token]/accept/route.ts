@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { captureError } from "@/lib/observability";
 import { adminClient } from "@/lib/supabase/admin";
 import { uploadSignature } from "@/lib/quote-storage";
-import { sendPushToUser } from "@/lib/push";
+import { pushInBackground } from "@/lib/quote-activity-push";
 import { sanitizeForPush } from "@/lib/moderation";
 import { quoteNumber } from "@/lib/quote-defaults";
 import { consumeDailyQuota, tooManyRequestsResponse } from "@/lib/rate-limit";
@@ -174,6 +174,9 @@ export async function POST(
     return NextResponse.json({ error: "quote_changed" }, { status: 409 });
   }
 
+  // Each attempt stores its signature under its own new name, so two
+  // overlapping accepts never share a file: the one accept_quote refuses
+  // deletes only its own, never the file the accepted quote points to.
   let signaturePath: string;
   try {
     signaturePath = await uploadSignature(
@@ -216,8 +219,9 @@ export async function POST(
   if (result?.error) {
     // The signature was uploaded before the RPC ran, so a reject here
     // (expired / already_accepted, e.g. a replay) leaves an orphan in
-    // storage. Best-effort delete it; a storage hiccup must not turn a
-    // correct 409/410 into a 500, so swallow any delete error.
+    // storage. Best-effort delete it — this attempt's own file only; a
+    // storage hiccup must not turn a correct 409/410 into a 500, so swallow
+    // any delete error.
     try {
       await admin.storage.from("signatures").remove([signaturePath]);
     } catch (cleanupErr) {
@@ -233,12 +237,12 @@ export async function POST(
   }
 
   // Notify the quote owner via push that their quote was just accepted.
-  // sendPushToUser never throws and no-ops when push isn't configured, so
-  // this can't break the customer's accept flow.
+  // Sent in the background (never awaited here), never throws, and no-ops
+  // when push isn't configured, so it can't break or slow the accept.
   // The name is anonymous free text off the public accept form — sanitise
   // before it becomes an OS-level notification banner on the tradie's phone
   // (strips newlines/control chars, caps length).
-  await sendPushToUser(quote.user_id, {
+  pushInBackground(quote.user_id, {
     title: "Quote accepted",
     body: `${sanitizeForPush(name) || "Your client"} accepted ${quoteNumber(quote.id, quote.created_at)}`,
     url: `/app/quotes/preview/${quote.id}`,

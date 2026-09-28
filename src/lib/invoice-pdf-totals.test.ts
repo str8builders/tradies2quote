@@ -54,18 +54,20 @@ async function totalsRows(kind: "invoice" | "quote") {
 const money = (v: string) => Number(v.replace(/[^0-9.-]/g, ""));
 
 describe("invoice PDF totals", () => {
-  it("shows the markup row, so the listed lines add up to the subtotal", async () => {
+  it("folds the private markup into the prices, so the listed lines add up to the subtotal with no markup row", async () => {
     const rows = await totalsRows("invoice");
     const byLabel = new Map(rows);
     expect(snapshot.markup_amount).toBe(90);
-    expect(byLabel.get("MARKUP (20%)")).toBe(formatCurrency(90, "NZD"));
-    const parts = ["MATERIALS SUBTOTAL", "OTHER SUBTOTAL", "MARKUP (20%)", "LABOUR SUBTOTAL"].map((l) =>
+    expect(rows.some(([label]) => /markup/i.test(label))).toBe(false);
+    // The $90 markup sits in the materials ($330 → $396) and other ($120 → $144) rows.
+    const parts = ["MATERIALS SUBTOTAL", "OTHER SUBTOTAL", "LABOUR SUBTOTAL"].map((l) =>
       money(byLabel.get(l) ?? "NaN"),
     );
-    expect(parts).toEqual([330, 120, 90, 850]);
+    expect(parts).toEqual([396, 144, 850]);
     expect(parts.reduce((a, b) => a + b, 0)).toBe(money(byLabel.get("SUBTOTAL (EXCL. GST)")!));
     expect(money(byLabel.get("SUBTOTAL (EXCL. GST)")!)).toBe(snapshot.subtotal_before_tax);
     expect(money(byLabel.get("AMOUNT DUE")!)).toBe(snapshot.total);
+    expect(byLabel.get("SUBTOTAL (EXCL. GST)")).toBe(formatCurrency(1390, "NZD"));
   });
 
   it("uses the same breakdown rows as the quote PDF", async () => {

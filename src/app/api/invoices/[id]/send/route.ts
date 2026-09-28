@@ -20,7 +20,10 @@ type Params = { id: string };
  * POST /api/invoices/[id]/send
  *
  * Mirrors the quote send route: generate the invoice PDF → email it
- * via Resend → stamp sent_at + flip status to "sent".
+ * via Resend → on the first send, stamp sent_at + flip draft to "sent".
+ * A re-send (a reminder) leaves the status, sent_at and due date alone, and
+ * an invoice marked paid (or cancelled) while the email was going out is
+ * never turned back into "sent".
  *
  * No public token / accept-online flow yet (invoices are pay-by-bank
  * for now). When Stripe Connect lands the PDF will carry a hosted
@@ -177,8 +180,7 @@ export async function POST(
     );
   }
 
-  // Flip status + stamp sent_at. Service role bypass not needed — the
-  // user-scoped query above already proved ownership.
+  // Service role — the user-scoped query above already proved ownership.
   const admin = adminClient();
 
   // AUDIT PARITY with quote/SMS sends: record the outbound event so the
@@ -198,23 +200,35 @@ export async function POST(
     }
   }
 
-  const { error: uErr } = await admin
-    .from("invoices")
-    .update({
-      status: "sent",
-      sent_at: sentAt.toISOString(),
-      ...(dueDate ? { due_date: dueDate } : {}),
-    })
-    .eq("id", invoice.id);
-  if (uErr) {
-    console.error("Invoice status update failed", uErr);
-    return NextResponse.json(
-      {
-        error: "update_failed",
-        message: "Invoice sent but couldn't update the status.",
-      },
-      { status: 500 },
-    );
+  // First send only: flip draft -> sent and stamp sent_at + the restarted due
+  // date. Conditional on the row still being a draft, so a payment recorded
+  // during the send (or a second tab's send) is never overwritten. A
+  // re-send changes nothing on the row.
+  if (invoice.status === "draft") {
+    const { data: flipped, error: uErr } = await admin
+      .from("invoices")
+      .update({
+        status: "sent",
+        sent_at: sentAt.toISOString(),
+        ...(dueDate ? { due_date: dueDate } : {}),
+      })
+      .eq("id", invoice.id)
+      .eq("status", "draft")
+      .select("id");
+    if (uErr) {
+      captureError(uErr, { route: "invoices/send", extra: { step: "status_update" } });
+      console.error("Invoice status update failed", uErr);
+      return NextResponse.json(
+        {
+          error: "update_failed",
+          message: "Invoice sent but couldn't update the status.",
+        },
+        { status: 500 },
+      );
+    }
+    if (!flipped || (Array.isArray(flipped) && flipped.length === 0)) {
+      console.warn("[invoices/send] invoice changed during send; left as is", { invoiceId: invoice.id });
+    }
   }
 
   return NextResponse.json({

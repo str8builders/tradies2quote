@@ -37,7 +37,10 @@ beforeEach(() => {
   const userDb = fakeSupabase((op: FakeOp) =>
     op.table === "invoices" ? { data: invoice } : { data: { business_name: "Fixture Builders", email: null } },
   );
-  adminDb = fakeSupabase(() => ({}));
+  // The conditional draft -> sent update reports the rows it changed.
+  adminDb = fakeSupabase((op: FakeOp) =>
+    op.table === "invoices" && op.action === "update" ? { data: [{ id: "inv-1" }] } : {},
+  );
   state.client = { auth: { getUser: async () => ({ data: { user: { id: "owner-1" } } }) }, from: userDb.from };
   state.admin = { from: adminDb.from };
   state.pdf.mockReset().mockResolvedValue(new Uint8Array([1]));
@@ -60,11 +63,37 @@ describe("invoice send refreshes the due date", () => {
     expect(invoiceUpdate()?.values).toMatchObject({ status: "sent", due_date: due, sent_at: "2026-09-24T10:00:00.000Z" });
   });
 
-  it("keeps the original due date on a re-send", async () => {
+  it("keeps the original due date on a re-send, and leaves the row alone", async () => {
     Object.assign(invoice, { status: "sent", sent_at: "2026-09-10T00:00:00.000Z" });
     expect((await send()).status).toBe(200);
     expect(state.pdf.mock.calls[0][0]).toMatchObject({ dueDate: "2026-09-08T09:00:00.000Z" });
-    expect(invoiceUpdate()?.values).toMatchObject({ due_date: "2026-09-08T09:00:00.000Z" });
+    expect(state.email.mock.calls[0][0]).toMatchObject({ dueDateLabel: formatIssueDate("2026-09-08T09:00:00.000Z") });
+    // A reminder: status, sent_at and due date stay as the client was first given.
+    expect(invoiceUpdate()).toBeUndefined();
+  });
+
+  it("an overdue invoice sent again stays overdue", async () => {
+    Object.assign(invoice, { status: "overdue", sent_at: "2026-09-10T00:00:00.000Z" });
+    expect((await send()).status).toBe(200);
+    expect(invoiceUpdate()).toBeUndefined();
+  });
+
+  it("only flips a row that is still a draft, so a payment recorded during the send stands", async () => {
+    expect((await send()).status).toBe(200);
+    expect(invoiceUpdate()?.filters).toEqual(
+      expect.arrayContaining([
+        ["eq", "id", "inv-1"],
+        ["eq", "status", "draft"],
+      ]),
+    );
+  });
+
+  it("still reports the email as sent when the invoice was marked paid meanwhile", async () => {
+    // The row is no longer a draft by the time the email is out: nothing changes.
+    adminDb = fakeSupabase(() => ({ data: [] }));
+    state.admin = { from: adminDb.from };
+    expect((await send()).status).toBe(200);
+    expect(invoiceUpdate()?.values).toMatchObject({ status: "sent" });
   });
 
   it("changes nothing when the email fails", async () => {

@@ -9,7 +9,9 @@
  *     render server has no font for) and capped in length;
  *   - money uses the app's own formatter and the quote's currency, and the
  *     total is the figure the client's quote link shows (quotes.total_amount);
- *   - the logo is only ever our own public `business-logos` storage URL.
+ *   - the logo is only ever our own public `business-logos` storage URL;
+ *   - line amounts are the client's prices (markup folded in), never the
+ *     tradie's cost prices.
  *
  * Loaded by the render worker through Node's TypeScript type stripping: keep
  * runtime imports relative with a `.ts` extension (no `@/`, no server-only).
@@ -22,6 +24,8 @@ import {
   round2,
 } from "../quote-defaults.ts";
 import { QUOTE_VIDEO_MAX_ITEMS } from "./constants.ts";
+import { quoteDataForClient } from "../quote-client-view.ts";
+import type { QuoteData } from "../quote-types.ts";
 
 export type QuoteVideoItem = { label: string; amount: string };
 
@@ -267,7 +271,14 @@ export function buildQuoteVideoProps(
   const taxLabel = cleanText(data.tax_label).slice(0, 16) || resolveTaxLabel(null, profile?.country, currency);
 
   const expires = quote.expires_at && Number.isFinite(Date.parse(quote.expires_at)) ? quote.expires_at : null;
-  const { items, moreItems } = keyItems(data.line_items, currency);
+  // The client's prices: markup folded into the lines, as on their quote link.
+  let clientLines: unknown = [];
+  try {
+    clientLines = quoteDataForClient(data as QuoteData).line_items;
+  } catch {
+    clientLines = []; // never fall back to the tradie's own prices
+  }
+  const { items, moreItems } = keyItems(clientLines, currency);
 
   return {
     businessName: truncateWords(cleanText(profile?.business_name) || FALLBACK_BUSINESS, MAX_BUSINESS),

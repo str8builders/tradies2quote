@@ -16,6 +16,7 @@
 import type { ChatMessage } from "@/lib/agents/customer-chat";
 import { inventedAmounts, moneyAmountsIn, publicQuoteFigures } from "@/lib/agents/money-guard";
 import type { PublicQuotePayload } from "@/lib/quote-types";
+import { publicQuoteForClient } from "@/lib/quote-client-view";
 
 // The production money guard (src/lib/agents/money-guard.ts) — the eval
 // checks replies with the same rules the agents enforce.
@@ -63,9 +64,9 @@ export const DECK_QUOTE: PublicQuotePayload = {
   terms: "50% deposit on acceptance, balance on completion. Quote valid 30 days.",
 };
 
-/** Every dollar figure printed on the quote (+ the 50 % deposit from its terms) — the only amounts an agent may state. */
+/** Every dollar figure printed on the client's quote (markup folded into the lines, + the 50 % deposit from its terms) — the only amounts an agent may state. */
 export function quoteFigures(q: PublicQuotePayload): number[] {
-  return publicQuoteFigures(q);
+  return publicQuoteFigures(publicQuoteForClient(q));
 }
 
 // ── Deterministic checkers ───────────────────────────────────────────────

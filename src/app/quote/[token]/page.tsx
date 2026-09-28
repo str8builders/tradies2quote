@@ -15,7 +15,10 @@ import { getQuoteDepositInfo } from "@/lib/payments";
 import { PayDepositButton } from "./_components/PayDepositButton";
 import { classifyPublicQuote, isRichPreviewEligible } from "@/lib/quote-public-view";
 import { loadPublicQuoteVideo } from "@/lib/quote-video/public";
+import { publicQuoteForClient } from "@/lib/quote-client-view";
+import { firstViewFromRpc, pushInBackground, quoteOpenedPush } from "@/lib/quote-activity-push";
 import { QuoteVideoPlayer } from "./_components/QuoteVideoPlayer";
+import { isQuoteTeamVisitor, signedInUserId } from "./viewer";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -104,12 +107,22 @@ export default async function PublicQuotePage({
   // client taps it. Marking viewed on that fetch would flip the quote to
   // "viewed" prematurely and poison the follow-up cadence. The crawler still
   // gets the OG tags below — only this write is gated.
+  //
+  // SKIPPED for the tradie (or their team) signed in on this device: their
+  // own look at the link (the job page's "Open it") is not the client
+  // opening it. A client has no account, so this costs them nothing.
   const userAgent = (await headers()).get("user-agent");
+  let firstView: { quoteId: string; userId: string } | null = null;
   if (!isLinkPreviewBot(userAgent)) {
-    try {
-      await admin.rpc("mark_quote_viewed", { p_token: token } as never);
-    } catch (e) {
-      console.error("mark_quote_viewed failed", e);
+    const visitorId = await signedInUserId();
+    const teamVisit = visitorId ? await isQuoteTeamVisitor(admin, token, visitorId) : false;
+    if (!teamVisit) {
+      try {
+        const { data: viewed } = await admin.rpc("mark_quote_viewed", { p_token: token } as never);
+        firstView = firstViewFromRpc(viewed as unknown);
+      } catch (e) {
+        console.error("mark_quote_viewed failed", e);
+      }
     }
   }
 
@@ -130,7 +143,17 @@ export default async function PublicQuotePage({
     );
   }
 
-  const quote = data as PublicQuotePayload;
+  // The client's prices: the tradie's markup is private, so it is folded
+  // into the lines it applies to — never sent to the browser as its own
+  // figure (src/lib/quote-client-view.ts). Totals are unchanged.
+  const quote = publicQuoteForClient(data as PublicQuotePayload);
+
+  // The client just opened this quote for the first time: tell the tradie.
+  // Never awaited, never able to fail the page.
+  if (firstView) {
+    pushInBackground(firstView.userId, quoteOpenedPush(quote));
+  }
+
   // Single source of truth for which public view to render (see
   // src/lib/quote-public-view.ts — unit-tested, extracted after the
   // 2026-07-17 draft-token outage).

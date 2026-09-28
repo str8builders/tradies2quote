@@ -45,10 +45,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const admin = adminClient();
+    // A deleted job takes no payments.
     const { data: q } = await admin
       .from("quotes")
-      .select("id, user_id, total_amount, currency, status")
+      .select("id, user_id, total_amount, accepted_total, currency, status")
       .eq("public_token", token)
+      .is("deleted_at", null)
       .maybeSingle();
     if (!q) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
@@ -69,7 +71,9 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
     if (alreadyPaid) return NextResponse.json({ error: "already_paid" }, { status: 409 });
 
-    const cents = depositCents(Number(q.total_amount ?? 0), status.depositPct);
+    // The deposit is a share of what the client accepted (accepted_total,
+    // recorded by accept_quote), not of whatever the total says now.
+    const cents = depositCents(Number(q.accepted_total ?? q.total_amount ?? 0), status.depositPct);
     if (cents <= 0) return NextResponse.json({ error: "no_deposit" }, { status: 409 });
 
     const currencyUpper = q.currency ?? "NZD";

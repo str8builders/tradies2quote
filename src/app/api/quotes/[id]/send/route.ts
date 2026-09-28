@@ -17,6 +17,13 @@ import {
 import { formatCurrency, quoteNumber } from "@/lib/quote-defaults";
 import type { QuoteData } from "@/lib/quote-types";
 import { BUSINESS_NAME_REQUIRED, businessNameForDocuments } from "@/lib/business-name";
+import { expiryForSend } from "@/lib/quote-expiry";
+import {
+  SENDABLE_QUOTE_STATUSES,
+  STATUSES_A_SEND_REOPENS,
+  changedRows,
+  sendMovesToSent,
+} from "@/lib/quote-send-status";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -105,6 +112,12 @@ export async function POST(
 
   const logo = await loadLogoForPdf(profile?.logo_url);
 
+  // A re-send whose expiry has passed (or a first send with none) gets a
+  // fresh one, so the link works when it arrives. The PDF prints the same
+  // date the link stops working.
+  const now = new Date();
+  const expires_at = expiryForSend(quote.expires_at, now);
+
   let pdfBytes: Uint8Array;
   try {
     pdfBytes = await generateQuotePdf({
@@ -114,6 +127,7 @@ export async function POST(
       profile: { ...profile, business_name: businessName },
       acceptUrl,
       logo,
+      validUntil: expires_at,
     });
   } catch (e) {
     captureError(e, { route: "quotes/send" });
@@ -144,17 +158,19 @@ export async function POST(
   // retry reuses the SAME token and PDF instead of minting a fresh
   // link the customer never receives; if this update itself fails,
   // nothing has been sent yet, so there is no inconsistency.
+  // Only while the quote is still an offer: one the client accepted since
+  // it was loaded above is not emailed again.
   const admin = adminClient();
-  const expires_at =
-    quote.expires_at ??
-    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-  const { error: preErr } = await admin
+  const { data: prepared, error: preErr } = await admin
     .from("quotes")
     // pdf_version: the revision this PDF was rendered from, so the public
     // "View full PDF" re-renders once the quote is edited after sending.
     .update({ pdf_path: pdfPath, pdf_version: quote.version, public_token: token, expires_at })
-    .eq("id", quote.id);
+    .eq("id", quote.id)
+    .in("status", SENDABLE_QUOTE_STATUSES)
+    .select("id");
   if (preErr) {
+    captureError(preErr, { route: "quotes/send", extra: { step: "pre_send_update" } });
     console.error("Quote pre-send update failed", preErr);
     return NextResponse.json(
       {
@@ -162,6 +178,15 @@ export async function POST(
         message: "Could not save the quote before sending.",
       },
       { status: 500 },
+    );
+  }
+  if (changedRows(prepared) === 0) {
+    return NextResponse.json(
+      {
+        error: "already_accepted",
+        message: "This quote has been accepted, so it wasn't sent again.",
+      },
+      { status: 409 },
     );
   }
 
@@ -195,20 +220,35 @@ export async function POST(
     );
   }
 
-  // Email is out — flip the status to sent.
-  const { error: uErr } = await admin
-    .from("quotes")
-    .update({ status: "sent", sent_at: new Date().toISOString() })
-    .eq("id", quote.id);
-  if (uErr) {
-    console.error("Quote status update failed", uErr);
-    return NextResponse.json(
-      {
-        error: "update_failed",
-        message: "Email sent but couldn't update quote status.",
-      },
-      { status: 500 },
-    );
+  // Email is out. A draft, or a declined / expired quote sent again, is now
+  // sent — a fresh offer, so an old "opened" date is cleared for the next
+  // view to set. A reminder (sent / viewed) keeps its status and sent_at. The
+  // status guard means a client who accepted while the email was going out
+  // keeps their acceptance.
+  const resend = !sendMovesToSent(quote.status);
+  if (!resend) {
+    const { data: flipped, error: uErr } = await admin
+      .from("quotes")
+      .update({ status: "sent", sent_at: now.toISOString(), viewed_at: null })
+      .eq("id", quote.id)
+      .in("status", STATUSES_A_SEND_REOPENS)
+      .select("id");
+    if (uErr) {
+      captureError(uErr, { route: "quotes/send", extra: { step: "status_update" } });
+      console.error("Quote status update failed", uErr);
+      return NextResponse.json(
+        {
+          error: "update_failed",
+          message: "Email sent but couldn't update quote status.",
+        },
+        { status: 500 },
+      );
+    }
+    if (changedRows(flipped) === 0) {
+      // Accepted (or sent from another tab) while this email went out:
+      // the newer status stands.
+      console.warn("[quotes/send] status changed during send; left as is", { quoteId: quote.id });
+    }
   }
 
   if (acknowledged) {
@@ -225,6 +265,7 @@ export async function POST(
     type: "sent",
     metadata: {
       to: validation.resolvedEmail,
+      ...(resend ? { resend: true } : {}),
       ...(acknowledged ? { takeoff_override: true } : {}),
     },
   });
