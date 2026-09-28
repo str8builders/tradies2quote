@@ -22,10 +22,10 @@ Before adding APIs you haven't used in this codebase yet (route handlers, server
 
 ## Stack
 
-- **Framework:** Next.js 16.2.4 (App Router) + React 19.2.4 + TypeScript strict
+- **Framework:** Next.js 16 (App Router; 16.3.4 installed from `^16.2.6`) + React 19.2.4 + TypeScript strict
 - **Styling:** Tailwind CSS v4 + Phosphor icons (no emojis in UI)
 - **Auth/DB/Storage:** Supabase via `@supabase/ssr` — project id `guiovuqccbzlbacaxepd`
-- **AI:** OpenAI Whisper (transcription) and Anthropic Claude `claude-sonnet-4` (quote generation, planned). Prefer `fetch` over SDKs where the API surface is small.
+- **AI:** models are set in one place, `src/lib/ai/models.ts` (each role can be overridden by an env var). Quotes, supplier scans and the default agent: `claude-sonnet-5`; drawings, the plan reader and deep agents: `claude-opus-4-8`; fast agents and chat moderation: `claude-haiku-4-5`; voice: `gpt-4o-transcribe`; photo plans: `gpt-4o-mini`. Prefer `fetch` over SDKs where the API surface is small.
 - **Hosting:** Sydney VPS, SSH alias `str8-sydney` (46.250.240.146 at the 6 September 2026 audit). Caddy → `t2q.service` → Next.js on 127.0.0.1:3001; app `/srv/t2q/app`, external environment `/srv/t2q/app.env`, database container `supabase-db`. Verify the live layout before release. See `deploy/README.md`; older VPS/Vercel layouts are historical.
 - **Planned later:** Stripe (subscriptions), Resend (email), react-pdf or pdf-lib (PDF generation)
 
