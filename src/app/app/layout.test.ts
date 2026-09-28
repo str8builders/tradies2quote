@@ -11,10 +11,10 @@ describe("/app layout — viewport (locked, installed-shell only)", () => {
     expect(viewport.userScalable).toBe(false);
   });
 
-  it("keeps the single-owner safe-area settings, unchanged from root", () => {
-    expect(viewport.width).toBe("device-width");
-    expect(viewport.initialScale).toBe(1);
-    expect(viewport.viewportFit).toBe("cover");
-    expect(viewport.themeColor).toBe("#0A0A0A");
+  it("sets only the zoom keys: the safe-area settings stay single-owned by the root", () => {
+    // Next merges viewport per key (mergeViewport clones the parent and
+    // overrides only the keys a segment sets), so width, viewportFit and
+    // themeColor come from src/app/layout.tsx.
+    expect(Object.keys(viewport).sort()).toEqual(["maximumScale", "userScalable"]);
   });
 });

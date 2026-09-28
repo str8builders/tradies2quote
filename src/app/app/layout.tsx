@@ -70,21 +70,17 @@ import { loadTopBarData } from "./_v2/lib/top-bar";
  * switch off, everything below renders exactly as before.
  */
 
-// Viewport LOCK owner for the installed app. The root layout
+// Viewport zoom LOCK owner for the signed-in app. The root layout
 // (src/app/layout.tsx) is zoomable by default now — public pages were
 // wrongly inheriting this lock and axe flagged it. /app/* still needs it:
 // in the installed iOS shell, focusing a form field force-zooms the page and
 // it never zooms back (the "app moves around inside the screen" report).
-// viewportFit/themeColor are unchanged from root, per the mobile shell
-// contract (single owner for the safe-area behaviour) — only the zoom
-// settings differ here.
+// Viewport fields merge per key, so only the zoom keys are set here:
+// viewportFit and themeColor stay single-owned by the root (mobile shell
+// contract — a route-level themeColor is a banned mask).
 export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  viewportFit: "cover",
-  themeColor: "#0A0A0A",
 };
 
 export default async function AppLayout({

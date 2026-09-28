@@ -33,7 +33,8 @@ describe("metadata inside the iPhone app", () => {
     h.native = true;
     const meta = await helpMetadata();
     expect(String(meta.description)).not.toMatch(MONEY);
-    expect(meta.title).toBe("Help & FAQ — Tradies2Quote");
+    // Absolute, so the site template doesn't add the brand a second time.
+    expect(meta.title).toEqual({ absolute: "Help & FAQ — Tradies2Quote" });
   });
 });
 

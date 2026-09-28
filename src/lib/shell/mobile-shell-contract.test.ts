@@ -105,9 +105,14 @@ describe("mobile shell contract — single owners", () => {
     expect(ruleBody(css, "body {")).toMatch(/touch-action:\s*manipulation/);
   });
 
-  it("iOS zoom lock: root viewport pins scale (maximumScale 1, userScalable false)", () => {
-    expect(rootLayout).toMatch(/maximumScale:\s*1\b/);
-    expect(rootLayout).toMatch(/userScalable:\s*false/);
+  it("iOS zoom lock: the signed-in app pins scale; public pages can zoom", () => {
+    // The installed shell's focus-zoom never zooms back, so /app/* is locked…
+    expect(appLayout).toMatch(/maximumScale:\s*1\b/);
+    expect(appLayout).toMatch(/userScalable:\s*false/);
+    // …while the root (every public page: client quotes, requests, legal)
+    // lets people pinch-zoom — a locked public viewport fails accessibility.
+    expect(rootLayout).toMatch(/userScalable:\s*true/);
+    expect(rootLayout).not.toMatch(/userScalable:\s*false/);
   });
 
   it("overscroll is suppressed on BOTH html and body (no rubber-band / chain)", () => {
