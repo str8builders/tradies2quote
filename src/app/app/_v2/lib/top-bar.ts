@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { shouldOfferT2QCAL } from "@/lib/calculator-app";
+import { getStoredTimeZone } from "@/lib/location/stored-zone";
 import { isNativeShellRequest } from "@/lib/native-shell";
 import { isOwnerEmail } from "@/lib/owner";
 import { avatarLetter, greetingName } from "@/lib/profile-name";
@@ -68,14 +69,14 @@ export const loadTopBarData = cache(async (): Promise<TopBarData> => {
     isNativeShellRequest(),
     getNewLookState(),
   ]);
-  const profile = user
-    ? await getCachedTopBarProfile(user.id)
-    : { firstName: null, businessName: null, avatarUrl: null, country: null, currency: null };
+  const [profile, storedZone] = user
+    ? await Promise.all([getCachedTopBarProfile(user.id), getStoredTimeZone(user.id)])
+    : [{ firstName: null, businessName: null, avatarUrl: null, country: null, currency: null }, null];
   const name = greetingName(profile);
   const email = user?.email ?? null;
   const isOwner = isOwnerEmail(email);
   const now = requestTime();
-  const timeZone = businessTimeZone(profile.country, profile.currency);
+  const timeZone = businessTimeZone(profile.country, profile.currency, storedZone);
   return {
     greeting: greetingFor(now, timeZone),
     today: longDay(now, timeZone),

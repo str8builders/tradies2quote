@@ -51,6 +51,13 @@ describe("LocationForm", () => {
     expect(auto).toContain("spot when you arrive at and leave a job with");
   });
 
+  it("says work hours only start the clock: leaving stops it whatever the time", () => {
+    native.on = true;
+    const out = form({ granted: true, autoClock: true });
+    expect(out).toContain("Starts your hours when you arrive at a job in your work hours, and stops them when you leave, whatever the time.");
+    expect(out).not.toContain("in your work hours only");
+  });
+
   it("in a browser there's no iOS note and automatic clock-in points to the iPhone app", () => {
     native.on = false;
     const out = form({ granted: true });

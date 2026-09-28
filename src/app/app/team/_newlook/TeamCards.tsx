@@ -83,8 +83,45 @@ function TeamHeading({ data, words }: { data: TeamData; words: TeamWords }) {
   );
 }
 
+/** "Are you sure?", in plain words, with the yes and a way back. */
+function ConfirmStep({
+  title,
+  detail,
+  yes,
+  no,
+  busy,
+  onYes,
+  onNo,
+  testId,
+}: {
+  title: string;
+  detail: string;
+  yes: string;
+  no: string;
+  busy: boolean;
+  onYes: () => void;
+  onNo: () => void;
+  testId: string;
+}) {
+  return (
+    <div className="space-y-3" data-testid={testId}>
+      <Callout tone="warn" title={<span className="break-words">{title}</span>}>
+        {detail}
+      </Callout>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Button variant="danger" fullWidth disabled={busy} onClick={onYes}>
+          {yes}
+        </Button>
+        <Button variant="secondary" fullWidth disabled={busy} onClick={onNo}>
+          {no}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function TeamCard({ team, data, words }: { team: TeamState; data: TeamData; words: TeamWords }) {
-  const { busy, act } = team;
+  const { busy, act, ask, cancelAsk, confirmAsk, confirming } = team;
   return (
     <Card as="section" padding="lg" className="space-y-4" aria-labelledby="team-name-title" data-testid="team-card">
       <TeamHeading data={data} words={words} />
@@ -115,9 +152,22 @@ function TeamCard({ team, data, words }: { team: TeamState; data: TeamData; word
       {data.team && !data.isOwner ? (
         <>
           <p className="text-ui-muted">{words.ownerManages}</p>
-          <Button variant="danger" fullWidth disabled={busy} icon={<SignOut weight="bold" />} onClick={() => void act("leave")}>
-            Leave team
-          </Button>
+          {confirming?.action === "leave" ? (
+            <ConfirmStep
+              testId="team-leave-confirm"
+              title={`Leave ${data.team.name}?`}
+              detail="You'll lose the shared client list. Hours you've already logged stay with the team."
+              yes="Leave team"
+              no="Stay in the team"
+              busy={busy}
+              onYes={() => void confirmAsk()}
+              onNo={cancelAsk}
+            />
+          ) : (
+            <Button variant="danger" fullWidth disabled={busy} icon={<SignOut weight="bold" />} onClick={() => ask({ action: "leave" })}>
+              Leave team
+            </Button>
+          )}
         </>
       ) : null}
     </Card>
@@ -125,7 +175,7 @@ function TeamCard({ team, data, words }: { team: TeamState; data: TeamData; word
 }
 
 function PeopleCard({ team, data, words }: { team: TeamState; data: TeamData; words: TeamWords }) {
-  const { busy, act, link, copyLink } = team;
+  const { busy, act, link, copyLink, ask, cancelAsk, confirmAsk, confirming } = team;
   return (
     <Card as="section" padding="none" className="overflow-hidden" aria-labelledby="team-people-title" data-testid="team-people">
       <div className="space-y-4 p-5 sm:p-6">
@@ -139,19 +189,39 @@ function PeopleCard({ team, data, words }: { team: TeamState; data: TeamData; wo
         ) : null}
       </div>
       <ul className="divide-y divide-ui-line border-t border-ui-line">
-        {data.roster.members.map((m) => (
-          <li key={m.user_id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 sm:px-6">
-            <div className="min-w-0">
-              <p className="font-semibold break-all text-ui-text">{m.email}</p>
-              {m.owner ? <p className="text-ui-sm text-ui-muted">Owner</p> : null}
-            </div>
-            {!m.owner ? (
-              <Button variant="secondary" size="sm" disabled={busy} onClick={() => void act("remove", { user_id: m.user_id })}>
-                Remove member
-              </Button>
-            ) : null}
-          </li>
-        ))}
+        {data.roster.members.map((m) =>
+          confirming?.action === "remove" && confirming.userId === m.user_id ? (
+            <li key={m.user_id} className="px-5 py-3 sm:px-6">
+              <ConfirmStep
+                testId="team-remove-confirm"
+                title={`Remove ${m.email}?`}
+                detail="They lose the shared client list straight away. Hours they've logged stay on your timesheet."
+                yes="Remove"
+                no="Keep them"
+                busy={busy}
+                onYes={() => void confirmAsk()}
+                onNo={cancelAsk}
+              />
+            </li>
+          ) : (
+            <li key={m.user_id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 sm:px-6">
+              <div className="min-w-0">
+                <p className="font-semibold break-all text-ui-text">{m.email}</p>
+                {m.owner ? <p className="text-ui-sm text-ui-muted">Owner</p> : null}
+              </div>
+              {!m.owner ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => ask({ action: "remove", userId: m.user_id, email: m.email })}
+                >
+                  Remove member
+                </Button>
+              ) : null}
+            </li>
+          ),
+        )}
         {data.roster.invitations.map((i) => (
           <li key={i.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 sm:px-6">
             <div className="min-w-0">

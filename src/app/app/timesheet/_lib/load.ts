@@ -171,15 +171,31 @@ function spot(lat: unknown, lng: unknown): LatLng | null {
 }
 
 /**
+ * The part of a route between clocking in and clocking out. Anything the
+ * phone sent after the finish (the drive home, before an automatic
+ * clock-out that landed late) isn't travel for that job. An open session
+ * (no finish yet) keeps everything from its start.
+ */
+export function routeWithin<T extends { t: number }>(route: readonly T[], startedAt: string, endedAt: string | null): T[] {
+  const from = Date.parse(startedAt);
+  const to = endedAt ? Date.parse(endedAt) : Number.POSITIVE_INFINITY;
+  if (!Number.isFinite(from) || Number.isNaN(to)) return [];
+  return route.filter((p) => p.t >= from && p.t <= to);
+}
+
+/**
  * For each clocked session: its start and finish pins (words and points),
- * and the kilometres along its route (points the person's location setting
- * allowed).
+ * and the kilometres along its route between start and finish (points the
+ * person's location setting allowed).
  */
 export async function sessionFacts(db: Db, ids: readonly string[]): Promise<Map<string, SessionFacts>> {
   const out = new Map<string, SessionFacts>();
   if (ids.length === 0) return out;
   const [sessionsResult, pointsResult] = await Promise.all([
-    db.from("work_sessions").select("id, start_place, end_place, start_lat, start_lng, end_lat, end_lng").in("id", ids),
+    db
+      .from("work_sessions")
+      .select("id, started_at, ended_at, start_place, end_place, start_lat, start_lng, end_lat, end_lng")
+      .in("id", ids),
     db
       .from("location_points")
       .select("session_id, recorded_at, latitude, longitude, accuracy")
@@ -194,7 +210,7 @@ export async function sessionFacts(db: Db, ids: readonly string[]): Promise<Map<
     bySession.set(p.session_id, list);
   }
   for (const s of sessionsResult.data ?? []) {
-    const route = bySession.get(s.id) ?? [];
+    const route = routeWithin(bySession.get(s.id) ?? [], s.started_at, s.ended_at);
     const start = spot(s.start_lat, s.start_lng);
     const end = spot(s.end_lat, s.end_lng);
     out.set(s.id, {

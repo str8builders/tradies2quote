@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Screen } from "@/components/ui/screen";
 import { TopBar } from "@/components/ui/top-bar";
+import { getStoredTimeZone } from "@/lib/location/stored-zone";
 import { createClient } from "@/lib/supabase/server";
 import { isNewLookOn } from "@/lib/ui/newLook";
 import { ScheduleCalendar } from "../_components/ScheduleCalendar";
@@ -34,8 +35,9 @@ export default async function CalendarPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: profile }, { data: jobRows }, { data: noteRows }] = await Promise.all([
+  const [{ data: profile }, storedZone, { data: jobRows }, { data: noteRows }] = await Promise.all([
     supabase.from("profiles").select("country, currency").eq("id", user.id).maybeSingle(),
+    getStoredTimeZone(user.id),
     // Same query as the old dashboard calendar.
     supabase
       .from("quotes")
@@ -56,7 +58,7 @@ export default async function CalendarPage() {
       .limit(500),
   ]);
 
-  const zone = businessTimeZone(profile?.country ?? null, profile?.currency ?? null);
+  const zone = businessTimeZone(profile?.country ?? null, profile?.currency ?? null, storedZone);
 
   return (
     <Screen height="fill" data-testid="calendar-page">

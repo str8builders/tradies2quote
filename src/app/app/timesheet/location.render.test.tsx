@@ -20,6 +20,7 @@ import { TeamMapView, ago } from "./team/TeamMapView";
 
 const site = { clientId: "c1", name: "Hemi Walker", address: "14 Kauri St", lat: -37.6868, lng: 176.1654, radiusM: 150 };
 const state = (over: Partial<LocationState> = {}): LocationState => ({
+  userId: "u1",
   consent: DEFAULT_CONSENT,
   open: null,
   sites: [site],

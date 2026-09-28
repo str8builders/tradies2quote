@@ -172,6 +172,7 @@ describe("the Job location sheet", () => {
 describe("ClockCard: the job's map while you're clocked in there", () => {
   const site = { clientId: "c1", name: "Hemi Walker", address: "14 Kauri St", lat: HEMI.lat, lng: HEMI.lng, radiusM: 150 };
   const state = (over: Partial<LocationState> = {}): LocationState => ({
+    userId: "u1",
     consent: { ...DEFAULT_CONSENT, granted: true },
     open: null,
     sites: [site],

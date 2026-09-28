@@ -21,6 +21,7 @@ import { DEFAULT_CONSENT, type LocationState } from "./_lib/location-types";
 const NZ = "Pacific/Auckland";
 const STARTED = "2026-09-25T23:19:00.000Z"; // Sat 26 Sept, 11:19am
 const state: LocationState = {
+  userId: "u1",
   consent: { ...DEFAULT_CONSENT, granted: true },
   open: { id: "s1", startedAt: STARTED, place: "Not at a job site", clientId: null, clientName: null, source: "tap" },
   sites: [],

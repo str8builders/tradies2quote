@@ -2,8 +2,33 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { currentFix, hasNativeLocation, nativeLocation, type SiteEvent } from "@/lib/location/device";
-import { clockIn, clockOut, getLocationState, issueDeviceKey, sendRoutePoints } from "../../timesheet/location-actions";
+import {
+  deviceTimeZone,
+  eventOutcome,
+  isSignOutAction,
+  nativeApi,
+  needsDeviceKey,
+  planSiteEvent,
+  zoneMark,
+  type ActionAnswer,
+} from "@/lib/location/bridge-rules";
+import {
+  currentFix,
+  hasNativeLocation,
+  nativeLocation,
+  stopNativeTracking,
+  type NativeStatus,
+  type SiteEvent,
+} from "@/lib/location/device";
+import { flushRoutePoints, registerRouteFlusher } from "@/lib/location/route-flush";
+import {
+  clockIn,
+  clockOut,
+  getLocationState,
+  issueDeviceKey,
+  saveDeviceTimeZone,
+  sendRoutePoints,
+} from "../../timesheet/location-actions";
 import type { LocationState } from "../../timesheet/_lib/location-types";
 
 /** Pages dispatch this after changing the location setting or clocking in/out. */
@@ -17,16 +42,42 @@ export function announceLocationChanged(): void {
 /** Web only: send the route every minute while clocked in and the page is open. */
 const FLUSH_MS = 60_000;
 
+/** sessionStorage: the account and zone last offered as the business's time zone (once per tab). */
+const ZONE_KEY = "t2q.zone";
+
+function readSession(key: string): string | null {
+  try {
+    return window.sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeSession(key: string, value: string): void {
+  try {
+    window.sessionStorage.setItem(key, value);
+  } catch {
+    // Private mode or storage off: it's offered again next page, no harm.
+  }
+}
+
 /**
  * Keeps location in step with the account, on every page of the new look.
  *
- * - In the iPhone app: tells the T2QLocation module whether to send the
- *   route (clocked in), which job sites to watch (automatic clock-in on)
- *   and in which hours, and gives it an upload key once. Arrivals and
- *   departures it saw, even while the app was closed, come back here and
- *   clock in or out with the time they really happened.
+ * - In the iPhone app: tells the T2QLocation module whose it is (the
+ *   upload key, route and arrivals are tied to the signed-in account),
+ *   whether to send the route (clocked in), which job sites to watch
+ *   (automatic clock-in on) and in which hours, and gives it an upload key
+ *   when it needs one. Arrivals and departures it saw, even while the app
+ *   was closed, come back here and clock in or out with the time they
+ *   really happened; the phone forgets each one only once the server has
+ *   it, so no signal means another go later, not a lost clock-in.
  * - In a browser: while clocked in with location on and the page open,
  *   sends the route once a minute (a browser can't in the background).
+ * - Before any Finish (see route-flush), the route still waiting is sent.
+ * - Signing out stops the phone's tracking and forgets its key.
+ * - The phone's or browser's time zone is offered as the business's (the
+ *   server keeps it only when it's in the business's country).
  * - Location off: everything stops.
  */
 export function LocationBridge() {
@@ -34,18 +85,23 @@ export function LocationBridge() {
 
   useEffect(() => {
     let cancelled = false;
+    /** Signing out: nothing may switch tracking back on from here. */
+    let signedOut = false;
     let state: LocationState | null = null;
+    let api = 1;
     let watchId: number | null = null;
     let flushTimer: number | null = null;
     let buffer: Array<{ t: number; lat: number; lng: number; acc: number | null }> = [];
-    let chain: Promise<unknown> = Promise.resolve();
+    let chain: Promise<void> = Promise.resolve();
     const native = hasNativeLocation();
+    const stopped = () => cancelled || signedOut;
 
-    const flush = () => {
+    // ── The route from a browser ─────────────────────────────────────────
+    const flushWeb = async () => {
       if (buffer.length === 0) return;
       const points = buffer;
       buffer = [];
-      void sendRoutePoints(points).catch(() => {
+      await sendRoutePoints(points).catch(() => {
         buffer = [...points, ...buffer].slice(-500);
       });
     };
@@ -54,7 +110,7 @@ export function LocationBridge() {
       watchId = null;
       if (flushTimer !== null) window.clearInterval(flushTimer);
       flushTimer = null;
-      flush();
+      void flushWeb();
     };
     const startWeb = () => {
       if (watchId !== null || !navigator.geolocation) return;
@@ -62,105 +118,174 @@ export function LocationBridge() {
         (pos) => {
           if (pos.coords.accuracy > 100) return;
           buffer.push({ t: pos.timestamp, lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy });
-          if (buffer.length >= 200) flush();
+          if (buffer.length >= 200) void flushWeb();
         },
         () => {},
         { enableHighAccuracy: true, maximumAge: 15000 },
       );
-      flushTimer = window.setInterval(flush, FLUSH_MS);
+      flushTimer = window.setInterval(() => void flushWeb(), FLUSH_MS);
     };
 
-    const sync = async () => {
+    // Finish work sends what's still waiting first (ClockCard, and departures below).
+    const unregisterFlusher = registerRouteFlusher(async () => {
+      if (!native) await flushWeb();
+      else if (api >= 2) await nativeLocation.flush();
+    });
+
+    // ── The iPhone app ───────────────────────────────────────────────────
+    const configureNative = async (next: LocationState) => {
+      if (!next.consent.granted) {
+        await stopNativeTracking();
+        return;
+      }
+      const status = await nativeLocation.status().catch((): NativeStatus | null => null);
+      api = nativeApi(status);
+      let token: string | null = null;
+      if (needsDeviceKey(status, next.userId)) {
+        const key = await issueDeviceKey().catch(() => null);
+        if (key && key.ok) token = key.value;
+      }
+      if (stopped()) return;
+      await nativeLocation
+        .configure({
+          userId: next.userId,
+          endpoint: `${window.location.origin}/api/location/points`,
+          token,
+          tracking: Boolean(next.open),
+          autoClock: next.consent.autoClock,
+          sites: next.geofences.map((s) => ({ id: s.clientId, name: s.name, lat: s.lat, lng: s.lng, radius: s.radiusM })),
+          window: {
+            start: next.consent.workStart,
+            end: next.consent.workEnd,
+            days: next.consent.workDays,
+            timeZone: next.timeZone,
+          },
+          openSite: next.open?.clientId ? { clientId: next.open.clientId, auto: next.open.source === "auto" } : null,
+        })
+        .catch(() => {});
+    };
+
+    /** Re-read the state and set tracking to match. False when it couldn't be read. */
+    const refresh = async (): Promise<boolean> => {
       let next: LocationState;
       try {
         next = await getLocationState();
       } catch {
-        return;
+        return false;
       }
-      if (cancelled) return;
+      if (stopped()) return false;
       state = next;
-      if (native) {
-        if (!next.consent.granted) {
-          await nativeLocation.stopAll().catch(() => {});
-          return;
+      if (native) await configureNative(next);
+      else if (next.consent.granted && next.open && document.visibilityState === "visible") startWeb();
+      else stopWeb();
+      return !stopped();
+    };
+
+    // Arrivals and departures the phone saw (even with the app closed), in
+    // order, with the time they happened. Each is confirmed to the phone once
+    // the server has it or it no longer applies; one that failed for want of
+    // signal waits, with everything after it, for the next go.
+    const drain = async () => {
+      const userId = state?.userId;
+      if (!userId || !state?.consent.granted) return;
+      const legacy = api < 2;
+      const none = { events: [] as SiteEvent[] };
+      const { events } = legacy
+        ? await nativeLocation.drainEvents().catch(() => none)
+        : await nativeLocation.pendingEvents({ userId }).catch(() => none);
+      let changed = false;
+      for (const event of events ?? []) {
+        if (stopped() || !state) break;
+        const plan = planSiteEvent(event, state, Date.now());
+        let answer: ActionAnswer = { ok: true };
+        if (plan.kind === "clockIn") {
+          answer = await clockIn({ source: "auto", at: plan.at, clientId: plan.clientId, fix: plan.fix }).catch(() => null);
+        } else if (plan.kind === "clockOut") {
+          await flushRoutePoints();
+          const fix = plan.fix ?? (plan.askFix ? await currentFix() : null);
+          answer = await clockOut({ at: plan.at, breakMinutes: 0, fix }).catch(() => null);
         }
-        let token: string | null = null;
-        const status = await nativeLocation.status().catch(() => ({ hasToken: false }));
-        if (!status.hasToken) {
-          const key = await issueDeviceKey().catch(() => null);
-          if (key && key.ok) token = key.value;
+        if (!legacy && eventOutcome(answer) === "retry") break;
+        if (plan.kind !== "skip" && answer?.ok) {
+          changed = true;
+          // The next event needs to know you're clocked in now (or not), and
+          // so does the phone before it forgets this one (a departure from
+          // here still has to count). Couldn't tell it: the next go does.
+          if (!(await refresh()) && !legacy) break;
         }
-        await nativeLocation
-          .configure({
-            endpoint: `${window.location.origin}/api/location/points`,
-            token,
-            tracking: Boolean(next.open),
-            autoClock: next.consent.autoClock,
-            sites: next.geofences.map((s) => ({ id: s.clientId, name: s.name, lat: s.lat, lng: s.lng, radius: s.radiusM })),
-            window: {
-              start: next.consent.workStart,
-              end: next.consent.workEnd,
-              days: next.consent.workDays,
-              timeZone: next.timeZone,
-            },
-            openSite: next.open?.clientId ? { clientId: next.open.clientId, auto: next.open.source === "auto" } : null,
-          })
-          .catch(() => {});
-        void drain();
-      } else if (next.consent.granted && next.open && document.visibilityState === "visible") {
-        startWeb();
-      } else {
-        stopWeb();
+        if (!legacy && event.id) await nativeLocation.ackEvents({ ids: [event.id] }).catch(() => {});
+      }
+      if (changed && !stopped()) router.refresh();
+    };
+
+    // ── The business's time zone ─────────────────────────────────────────
+    const offerTimeZone = async () => {
+      const userId = state?.userId;
+      const zone = deviceTimeZone();
+      if (!userId || !zone) return;
+      const mark = zoneMark(userId, zone);
+      if (readSession(ZONE_KEY) === mark) return;
+      const result = await saveDeviceTimeZone(zone).catch(() => null);
+      if (!result || stopped()) return;
+      writeSession(ZONE_KEY, mark);
+      if (result.changed) {
+        router.refresh();
+        void sync();
       }
     };
 
-    // Arrivals and departures, one at a time, with the time they happened.
-    const onSiteEvent = (event: SiteEvent) => {
-      chain = chain.then(async () => {
-        const now = state ?? (await getLocationState().catch(() => null));
-        if (!now || !now.consent.granted || !now.consent.autoClock) return;
-        const fix = event.lat != null && event.lng != null ? { lat: event.lat, lng: event.lng, acc: event.acc ?? null } : null;
-        if (event.type === "enter" && !now.open) {
-          await clockIn({ source: "auto", at: event.t, clientId: event.clientId, fix }).catch(() => null);
-        } else if (event.type === "exit" && now.open?.source === "auto" && now.open.clientId === event.clientId) {
-          await clockOut({ at: event.t, breakMinutes: 0, fix: fix ?? (await currentFix()) }).catch(() => null);
-        } else {
-          return;
-        }
-        await sync();
-        router.refresh();
-      });
-    };
-
-    // Collect what the phone saw (even with the app closed) and act on it.
-    const drain = async () => {
-      if (!native) return;
-      const { events } = await nativeLocation.drainEvents().catch(() => ({ events: [] as SiteEvent[] }));
-      for (const event of events ?? []) onSiteEvent(event);
+    // One at a time: reading the state, telling the phone, then its events.
+    const sync = (): Promise<void> => {
+      chain = chain
+        .then(async () => {
+          if (stopped() || !(await refresh())) return;
+          void offerTimeZone();
+          if (native) await drain();
+        })
+        .catch(() => {});
+      return chain;
     };
 
     let removeListener: (() => void) | null = null;
     if (native) {
-      void nativeLocation.addListener("siteEvent", () => void drain()).then((handle) => {
-        if (cancelled) void handle.remove();
-        else removeListener = () => void handle.remove();
-      });
+      void nativeLocation
+        .addListener("siteEvent", () => void sync())
+        .then((handle) => {
+          if (cancelled) void handle.remove();
+          else removeListener = () => void handle.remove();
+        })
+        .catch(() => {});
     }
+
+    // Signing out (the /auth/signout forms): the phone stops tracking and
+    // forgets the key before the next person can sign in on it.
+    const onSubmit = (event: SubmitEvent) => {
+      const form = event.target;
+      if (!(form instanceof HTMLFormElement)) return;
+      const action = event.submitter?.getAttribute("formaction") ?? form.getAttribute("action");
+      if (!isSignOutAction(action, window.location.href)) return;
+      signedOut = true;
+      if (native) void stopNativeTracking();
+      else stopWeb();
+    };
 
     const onVisible = () => {
       if (document.visibilityState === "visible") void sync();
       else if (!native) stopWeb();
     };
     const onChanged = () => void sync();
+    document.addEventListener("submit", onSubmit, true);
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener(LOCATION_CHANGED, onChanged);
     void sync();
 
     return () => {
       cancelled = true;
+      document.removeEventListener("submit", onSubmit, true);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener(LOCATION_CHANGED, onChanged);
       removeListener?.();
+      unregisterFlusher();
       if (!native) stopWeb();
     };
   }, [router]);

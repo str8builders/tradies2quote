@@ -15,11 +15,15 @@ export type TeamData = {
   };
 };
 
+/** Leaving the team, or removing someone from it, waiting for a yes. */
+export type TeamConfirm = { action: "leave" } | { action: "remove"; userId: string; email: string };
+
 /**
  * Your team: load it from /api/team and run each action there (verify and
  * accept an invitation, create, leave, invite, remove, revoke). Shared by
  * the old look's <TeamManager> and the new look's cards, so both behave the
- * same.
+ * same. The new look asks before leaving or removing someone (`ask`, then
+ * `confirmAsk` or `cancelAsk`).
  */
 export function useTeam(initialInvite: string) {
   const [code, setCode] = useState("");
@@ -30,6 +34,7 @@ export function useTeam(initialInvite: string) {
   const [link, setLink] = useState("");
   const [notice, setNotice] = useState("");
   const [invite, setInvite] = useState(initialInvite);
+  const [confirming, setConfirming] = useState<TeamConfirm | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -81,7 +86,44 @@ export function useTeam(initialInvite: string) {
     }
   }
 
-  return { code, setCode, codeSent, data, error, busy, link, notice, invite, load, act, copyLink };
+  /** Leaving or removing someone: ask first. */
+  function ask(next: TeamConfirm) {
+    setError("");
+    setNotice("");
+    setConfirming(next);
+  }
+
+  function cancelAsk() {
+    setConfirming(null);
+  }
+
+  /** The yes: do what was asked. */
+  async function confirmAsk() {
+    const asked = confirming;
+    if (!asked) return;
+    setConfirming(null);
+    if (asked.action === "leave") await act("leave");
+    else await act("remove", { user_id: asked.userId });
+  }
+
+  return {
+    code,
+    setCode,
+    codeSent,
+    data,
+    error,
+    busy,
+    link,
+    notice,
+    invite,
+    load,
+    act,
+    copyLink,
+    confirming,
+    ask,
+    cancelAsk,
+    confirmAsk,
+  };
 }
 
 export type TeamState = ReturnType<typeof useTeam>;

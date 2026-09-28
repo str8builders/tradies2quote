@@ -19,6 +19,7 @@ import { TAP } from "@/components/ui/styles";
 import { TextField } from "@/components/ui/text-field";
 import { currentFix } from "@/lib/location/device";
 import { siteAt } from "@/lib/location/geo";
+import { flushRoutePoints } from "@/lib/location/route-flush";
 import { mapsLink } from "@/lib/location/tiles";
 import { isStaleDeployError, reloadForUpdate } from "@/lib/stale-deploy";
 import {
@@ -371,6 +372,9 @@ export function FinishForm({
           !earlier && state.consent.granted ? await currentFix() : null;
         // Finishing at a job site you didn't start at: that's probably the client.
         const here = fix ? siteAt(fix, state.sites) : null;
+        // The last stretch of the route first: once the session closes,
+        // the server keeps nothing more for it.
+        await flushRoutePoints();
         const result = await clockOut({
           fix,
           at,

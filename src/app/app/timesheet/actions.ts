@@ -12,7 +12,11 @@ import { addDays, parseDayKey, weekLabel, weekStart as mondayOf } from "@/lib/ti
 import { businessOwnerFor, sessionFacts } from "./_lib/load";
 import { nameFromEmail } from "./_lib/people";
 
-export type TimesheetResult = { ok: true } | { ok: false; error: string };
+/**
+ * `clientId` on a failure: the new client that was saved before the hours
+ * weren't, so trying again uses it instead of making another.
+ */
+export type TimesheetResult = { ok: true } | { ok: false; error: string; clientId?: string };
 export type InvoiceResult = { ok: true; quoteId: string } | { ok: false; error: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -28,7 +32,14 @@ async function signedIn() {
 }
 
 export interface EntryInput {
+  /** The row to change (existing hours). */
   id?: string | null;
+  /**
+   * New hours: their id, made on the phone once per form. Saving again
+   * after an answer got lost (no signal) changes that row instead of
+   * adding the same hours twice.
+   */
+  newId?: string | null;
   workDate: string;
   start: string;
   finish: string;
@@ -52,21 +63,34 @@ export async function saveTimeEntry(input: EntryInput): Promise<TimesheetResult>
   const note = String(input.note ?? "").replace(/\s+/g, " ").trim() || null;
   if (note && note.length > NOTE_MAX) return { ok: false, error: `Keep the note to ${NOTE_MAX} characters.` };
   if (input.id && !UUID.test(input.id)) return { ok: false, error: "That entry can't be found." };
+  const newId = !input.id && input.newId ? String(input.newId) : null;
+  if (newId && !UUID.test(newId)) return { ok: false, error: "Couldn't save those hours. Try again." };
   if (input.clientId && !UUID.test(input.clientId)) return { ok: false, error: "Pick a client from the list." };
 
   const { supabase, user } = await signedIn();
   const ownerId = await businessOwnerFor(user.id);
 
+  // Saving again after the answer got lost: the first save may have landed.
+  // Then it's that row to change (with the client that save made), not a new one.
+  let landed: { id: string; client_id: string | null } | null = null;
+  if (newId) {
+    const { data } = await supabase.from("time_entries").select("id, client_id").eq("id", newId).eq("user_id", user.id).maybeSingle();
+    landed = data ?? null;
+  }
+
   let clientId = input.clientId || null;
+  let madeClient: string | null = null;
   const newName = String(input.newClientName ?? "").replace(/\s+/g, " ").trim();
-  if (!clientId && newName) {
+  if (!clientId && newName && landed?.client_id) {
+    clientId = landed.client_id;
+  } else if (!clientId && newName) {
     if (newName.length > 150) return { ok: false, error: "Keep the client's name under 150 characters." };
     const { data, error } = await supabase.rpc("save_client_contact", { p_data: { name: newName } });
     if (error || !data) {
       captureError(error ?? new Error("save_client_contact returned nothing"), { route: "timesheet/save-client" });
       return { ok: false, error: "Couldn't save the new client. Try again." };
     }
-    clientId = String((data as { id: string }).id);
+    clientId = madeClient = String((data as { id: string }).id);
   }
 
   const row = {
@@ -77,18 +101,30 @@ export async function saveTimeEntry(input: EntryInput): Promise<TimesheetResult>
     client_id: clientId,
     note,
   };
-  const result = input.id
-    ? await supabase
+  const change = (id: string) =>
+    supabase
+      .from("time_entries")
+      .update({ ...row, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .select("id");
+  const editId = input.id || landed?.id || null;
+  let result = editId
+    ? await change(editId)
+    : await supabase
         .from("time_entries")
-        .update({ ...row, updated_at: new Date().toISOString() })
-        .eq("id", input.id)
-        .eq("user_id", user.id)
-        .select("id")
-    : await supabase.from("time_entries").insert({ ...row, owner_id: ownerId, user_id: user.id }).select("id");
+        .insert({ ...row, ...(newId ? { id: newId } : {}), owner_id: ownerId, user_id: user.id })
+        .select("id");
+  // Two tries crossed and the other saved it first: make that row this one.
+  if (!editId && newId && result.error?.code === "23505") result = await change(newId);
   if (result.error) {
     console.error("[timesheet/save] failed", result.error);
     captureError(result.error, { route: "timesheet/save" });
-    return { ok: false, error: "Couldn't save those hours. Check your signal and try again." };
+    return {
+      ok: false,
+      error: "Couldn't save those hours. Check your signal and try again.",
+      ...(madeClient ? { clientId: madeClient } : {}),
+    };
   }
   if (!Array.isArray(result.data) || result.data.length === 0) {
     return { ok: false, error: "Those hours are on an invoice now, so they can't be changed." };

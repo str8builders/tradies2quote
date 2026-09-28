@@ -18,11 +18,13 @@ import UserNotifications
 ///    The app declares no background-location mode.
 ///  - Automatic clock-in ("autoClock"): iOS region monitoring on up to 18
 ///    job sites (needs "Always"), which works with the app closed and costs
-///    almost no battery. Arrivals and departures inside the person's work
-///    hours are saved with the time they happened and handed to the page,
-///    which clocks in or out at that time.
-/// Route points go to /api/location/points with this phone's upload key
-/// (kept in the keychain).
+///    almost no battery. Arrivals inside the person's work hours, and any
+///    departure that ends an automatic clock-in, are saved with the time
+///    they happened and handed to the page, which clocks in or out at that
+///    time. They stay saved until the page says the server has them.
+/// Route points go to /api/location/points with the signed-in person's
+/// upload key (kept in the keychain, tied to their account: someone else
+/// signing in on this phone starts from nothing).
 final class T2QLocationEngine: NSObject, CLLocationManagerDelegate {
     static let shared = T2QLocationEngine()
 
@@ -38,9 +40,15 @@ final class T2QLocationEngine: NSObject, CLLocationManagerDelegate {
     private var alwaysPromptPending = false
     private var uploading = false
     private var flushTimer: Timer?
+    /// Waiting for the route to be sent (the page's flush before Finish).
+    private var flushWaiters: [() -> Void] = []
 
     /// Told when arrivals or departures are waiting (the plugin tells the page).
     var onSiteEvent: (() -> Void)?
+
+    /// Arrivals and departures kept for the page: the newest 50, none older than a day.
+    private let maxEvents = 50
+    private let eventMaxAge: TimeInterval = 24 * 60 * 60
 
     enum Key {
         static let endpoint = "t2q.location.endpoint"
@@ -51,9 +59,11 @@ final class T2QLocationEngine: NSObject, CLLocationManagerDelegate {
         static let openSite = "t2q.location.openSite"
         static let buffer = "t2q.location.buffer"
         static let events = "t2q.location.events"
-        /// An arrival saved with the app closed, not yet handed to the page:
-        /// leaving that site before the page sees it still counts.
+        /// An arrival not yet confirmed by the page: leaving that site before
+        /// the page has clocked in still counts.
         static let pendingEnter = "t2q.location.pendingEnter"
+        /// The account the upload key, route and events belong to.
+        static let user = "t2q.location.user"
     }
 
     // MARK: - Starting
@@ -183,8 +193,15 @@ final class T2QLocationEngine: NSObject, CLLocationManagerDelegate {
     // MARK: - Settings from the page
 
     /// Main thread. Stores only plain values (see Plist.clean) and applies them.
-    func configure(endpoint: String?, token: String?, tracking: Bool, autoClock: Bool,
+    /// `userId` is the signed-in account: when it isn't the one this phone's
+    /// key, route and events belong to, all of that is forgotten first, so
+    /// nothing of one person's carries over to the next on the same phone.
+    func configure(userId: String?, endpoint: String?, token: String?, tracking: Bool, autoClock: Bool,
                    sites: Any?, window: Any?, openSite: Any?) {
+        if let userId = userId, !userId.isEmpty, store.string(forKey: Key.user) != userId {
+            forget()
+            store.set(userId, forKey: Key.user)
+        }
         if let token = token, !token.isEmpty { Keychain.write(token) }
         if let endpoint = endpoint, endpoint.hasPrefix("https://") || endpoint.hasPrefix("http://localhost") {
             store.set(endpoint, forKey: Key.endpoint)
@@ -206,29 +223,90 @@ final class T2QLocationEngine: NSObject, CLLocationManagerDelegate {
         apply()
     }
 
-    /// Arrivals and departures saved since the page last asked (oldest first).
-    /// From here the page is in charge of them.
+    /// Arrivals and departures not yet confirmed by the page (oldest first).
+    /// They stay until ackEvents: a clock-in the server never got is tried
+    /// again. None for another account than the one they were saved for.
+    func pendingEvents(for userId: String?) -> [[String: Any]] {
+        if let userId = userId, let bound = store.string(forKey: Key.user), bound != userId { return [] }
+        return keptEvents()
+    }
+
+    /// The page is done with these (the server has them, or they no longer apply).
+    func ackEvents(_ ids: [String]) {
+        guard !ids.isEmpty else { return }
+        let done = Set(ids)
+        let pending = store.string(forKey: Key.pendingEnter)
+        var left: [[String: Any]] = []
+        for event in keptEvents() {
+            guard let id = event["id"] as? String, done.contains(id) else {
+                left.append(event)
+                continue
+            }
+            if event["type"] as? String == "enter", let clientId = event["clientId"] as? String, clientId == pending {
+                store.removeObject(forKey: Key.pendingEnter)
+            }
+        }
+        store.set(left, forKey: Key.events)
+    }
+
+    /// For pages from before acknowledgements: hands the events over and forgets them.
     func drainEvents() -> [Any] {
-        let events = store.array(forKey: Key.events) ?? []
+        let events = keptEvents()
         store.removeObject(forKey: Key.events)
         store.removeObject(forKey: Key.pendingEnter)
         return events
     }
 
-    /// Location turned off: stop everything and forget the upload key.
+    /// The saved events, oldest first, each with an id (builds before
+    /// acknowledgements saved them without one), bounded: the newest 50,
+    /// none older than a day (the server refuses clock-ins that late anyway).
+    private func keptEvents() -> [[String: Any]] {
+        let saved = store.array(forKey: Key.events) as? [[String: Any]] ?? []
+        let oldest = (Date().timeIntervalSince1970 - eventMaxAge) * 1000
+        var kept: [[String: Any]] = []
+        var changed = false
+        for var event in saved {
+            guard let t = (event["t"] as? NSNumber)?.doubleValue, t >= oldest else {
+                changed = true
+                continue
+            }
+            if (event["id"] as? String) == nil {
+                event["id"] = UUID().uuidString
+                changed = true
+            }
+            kept.append(event)
+        }
+        if kept.count > maxEvents {
+            kept = Array(kept.suffix(maxEvents))
+            changed = true
+        }
+        if changed { store.set(kept, forKey: Key.events) }
+        return kept
+    }
+
+    /// Location turned off, signed out, or the key refused: stop everything
+    /// and forget the person (key, unsent route, events, sites).
     func stopAll() {
+        forget()
+        apply()
+    }
+
+    /// Everything that belongs to the person using location on this phone.
+    private func forget() {
+        Keychain.delete()
         store.set(false, forKey: Key.tracking)
         store.set(false, forKey: Key.autoClock)
-        store.removeObject(forKey: Key.buffer)
-        store.removeObject(forKey: Key.events)
-        store.removeObject(forKey: Key.pendingEnter)
-        Keychain.delete()
-        apply()
+        for key in [Key.user, Key.buffer, Key.events, Key.pendingEnter, Key.openSite, Key.sites, Key.window] {
+            store.removeObject(forKey: key)
+        }
     }
 
     func watchingCount() -> Int { ourRegions().count }
 
     func isTracking() -> Bool { store.bool(forKey: Key.tracking) }
+
+    /// The account this phone's location belongs to, if any.
+    func boundUser() -> String? { store.string(forKey: Key.user) }
 
     // MARK: - Applying the settings
 
@@ -347,7 +425,11 @@ final class T2QLocationEngine: NSObject, CLLocationManagerDelegate {
     // MARK: - Arrivals and departures
 
     private func siteEvent(_ type: String, _ region: CLRegion) {
-        guard region.identifier.hasPrefix(regionPrefix), store.bool(forKey: Key.autoClock), inWorkWindow(Date()) else { return }
+        guard region.identifier.hasPrefix(regionPrefix), store.bool(forKey: Key.autoClock) else { return }
+        // Work hours only decide when an arrival starts the clock. Leaving
+        // always ends an automatic clock-in, or someone who leaves after
+        // hours would stay clocked in overnight.
+        if type == "enter", !inWorkWindow(Date()) { return }
         let clientId = String(region.identifier.dropFirst(regionPrefix.count))
         let pending = store.string(forKey: Key.pendingEnter)
         let clockedIn = store.bool(forKey: Key.tracking) || pending != nil
@@ -356,15 +438,20 @@ final class T2QLocationEngine: NSObject, CLLocationManagerDelegate {
         // Arriving counts when not clocked in; leaving only ends an automatic clock-in at this site.
         guard (type == "enter" && !clockedIn) || (type == "exit" && clockedIn && openAuto) else { return }
 
-        var event: [String: Any] = ["type": type, "clientId": clientId, "t": Date().timeIntervalSince1970 * 1000]
+        var event: [String: Any] = [
+            "id": UUID().uuidString,
+            "type": type,
+            "clientId": clientId,
+            "t": Date().timeIntervalSince1970 * 1000,
+        ]
         if let here = manager.location, abs(here.timestamp.timeIntervalSinceNow) < 120, here.horizontalAccuracy > 0 {
             event["lat"] = here.coordinate.latitude
             event["lng"] = here.coordinate.longitude
             event["acc"] = here.horizontalAccuracy
         }
-        var events = store.array(forKey: Key.events) ?? []
+        var events = keptEvents()
         events.append(event)
-        store.set(Array(events.suffix(50)), forKey: Key.events)
+        store.set(Array(events.suffix(maxEvents)), forKey: Key.events)
         if type == "enter" {
             store.set(clientId, forKey: Key.pendingEnter)
         } else if pending == clientId {
@@ -382,15 +469,35 @@ final class T2QLocationEngine: NSObject, CLLocationManagerDelegate {
 
     // MARK: - Sending the route
 
+    /// Send the route now (the page does this before Finish, so the last
+    /// stretch is in before the session closes). `done` runs once nothing is
+    /// left to send, or sending failed, or there's no key.
+    func flushNow(_ done: @escaping () -> Void) {
+        flushWaiters.append(done)
+        flush()
+    }
+
+    private func settleFlushWaiters() {
+        let waiting = flushWaiters
+        flushWaiters.removeAll()
+        waiting.forEach { $0() }
+    }
+
     private func flush() {
-        guard !uploading,
-              let token = Keychain.read(),
+        // An upload is under way: it settles the waiters when it's done.
+        guard !uploading else { return }
+        guard let token = Keychain.read(),
               let endpoint = store.string(forKey: Key.endpoint),
-              let url = URL(string: endpoint) else { return }
+              let url = URL(string: endpoint) else {
+            settleFlushWaiters()
+            return
+        }
         let buffer = store.array(forKey: Key.buffer) as? [[String: Any]] ?? []
-        guard !buffer.isEmpty else { return }
         let batch = Array(buffer.prefix(500))
-        guard let body = try? JSONSerialization.data(withJSONObject: ["points": batch]) else { return }
+        guard !batch.isEmpty, let body = try? JSONSerialization.data(withJSONObject: ["points": batch]) else {
+            settleFlushWaiters()
+            return
+        }
         var request = URLRequest(url: url, timeoutInterval: 30)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -404,15 +511,24 @@ final class T2QLocationEngine: NSObject, CLLocationManagerDelegate {
                 guard let self = self else { return }
                 self.uploading = false
                 let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-                if code == 200 {
+                var more = false
+                if code == 200 || code == 400 {
+                    // Kept (or refused as malformed, which sending again won't fix).
                     let now = self.store.array(forKey: Key.buffer) as? [[String: Any]] ?? []
-                    self.store.set(Array(now.dropFirst(batch.count)), forKey: Key.buffer)
-                } else if code == 401 {
-                    // Key revoked (location turned off elsewhere): stop sending.
-                    Keychain.delete()
-                    self.store.removeObject(forKey: Key.buffer)
+                    let rest = Array(now.dropFirst(batch.count))
+                    self.store.set(rest, forKey: Key.buffer)
+                    more = code == 200 && !rest.isEmpty
+                } else if code == 401 || code == 403 {
+                    // The key is refused: location was turned off, or the
+                    // account is gone. Stop tracking and forget it all.
+                    self.stopAll()
                 }
                 UIApplication.shared.endBackgroundTask(task)
+                if more, !self.flushWaiters.isEmpty {
+                    self.flush()
+                } else {
+                    self.settleFlushWaiters()
+                }
             }
         }.resume()
     }
@@ -496,10 +612,17 @@ public class T2QLocationPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "requestAlways", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "configure", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "pendingEvents", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "ackEvents", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "drainEvents", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "flush", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopAll", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "openSettings", returnType: CAPPluginReturnPromise),
     ]
+
+    /// What this build does, for the page (1: before events were acknowledged
+    /// and keys tied to an account; 2: pendingEvents, ackEvents, flush, userId).
+    private let api = 2
 
     private var engine: T2QLocationEngine { T2QLocationEngine.shared }
 
@@ -548,15 +671,19 @@ public class T2QLocationPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func status(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
-            call.resolve([
+            var result: [String: Any] = [
+                "api": self.api,
                 "hasToken": Keychain.read() != nil,
                 "tracking": self.engine.isTracking(),
                 "watching": self.engine.watchingCount(),
-            ])
+            ]
+            if let user = self.engine.boundUser() { result["userId"] = user }
+            call.resolve(result)
         }
     }
 
     @objc func configure(_ call: CAPPluginCall) {
+        let userId = call.getString("userId")
         let endpoint = call.getString("endpoint")
         let token = call.getString("token")
         let tracking = call.getBool("tracking") ?? false
@@ -565,8 +692,24 @@ public class T2QLocationPlugin: CAPPlugin, CAPBridgedPlugin {
         let window = call.getObject("window")
         let openSite = call.getObject("openSite")
         DispatchQueue.main.async {
-            self.engine.configure(endpoint: endpoint, token: token, tracking: tracking, autoClock: autoClock,
+            self.engine.configure(userId: userId, endpoint: endpoint, token: token, tracking: tracking, autoClock: autoClock,
                                   sites: sites, window: window, openSite: openSite)
+            call.resolve()
+        }
+    }
+
+    @objc func pendingEvents(_ call: CAPPluginCall) {
+        let userId = call.getString("userId")
+        DispatchQueue.main.async {
+            let events = Plist.clean(self.engine.pendingEvents(for: userId)) as? [Any] ?? []
+            call.resolve(["events": events])
+        }
+    }
+
+    @objc func ackEvents(_ call: CAPPluginCall) {
+        let ids = (call.getArray("ids") ?? []).compactMap { $0 as? String }
+        DispatchQueue.main.async {
+            self.engine.ackEvents(ids)
             call.resolve()
         }
     }
@@ -575,6 +718,12 @@ public class T2QLocationPlugin: CAPPlugin, CAPBridgedPlugin {
         DispatchQueue.main.async {
             let events = Plist.clean(self.engine.drainEvents()) as? [Any] ?? []
             call.resolve(["events": events])
+        }
+    }
+
+    @objc func flush(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            self.engine.flushNow { call.resolve() }
         }
     }
 

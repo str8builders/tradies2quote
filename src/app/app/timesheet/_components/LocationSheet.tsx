@@ -131,7 +131,7 @@ export function LocationForm({
         label="Automatic clock-in at jobs"
         description={
           native
-            ? "Starts your hours when you arrive at a job and stops them when you leave, in your work hours only. Your phone checks this itself; nothing is sent until you arrive."
+            ? "Starts your hours when you arrive at a job in your work hours, and stops them when you leave, whatever the time. Your phone checks this itself; nothing is sent until you arrive."
             : "In the Tradies2Quote iPhone app."
         }
       />

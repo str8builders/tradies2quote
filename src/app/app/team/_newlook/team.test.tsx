@@ -23,10 +23,11 @@ vi.mock("@/app/app/_components/AppHeader", () => ({ AppHeader: () => null }));
 
 import TeamPage from "../page";
 import { AppHeader } from "@/app/app/_components/AppHeader";
+import { Button } from "@/components/ui/button";
 import { Screen } from "@/components/ui/screen";
 import { teamWords } from "@/lib/team-copy";
 import { TeamManager } from "../TeamManager";
-import type { TeamData, TeamState } from "../_lib/useTeam";
+import type { TeamConfirm, TeamData, TeamState } from "../_lib/useTeam";
 import { TeamCards, TeamView, rosterSummary } from "./TeamCards";
 
 const MONEY = /subscri|\bplans?\b|upgrade|billing|\$\d|free trial|7-day|no card|\bcrew\b|\bbuilder\b/i;
@@ -83,11 +84,35 @@ function team(over: Partial<TeamState> = {}): TeamState {
     load: async () => {},
     act: async () => {},
     copyLink: async () => {},
+    confirming: null,
+    ask: noop,
+    cancelAsk: noop,
+    confirmAsk: async () => {},
     ...over,
   };
 }
 const view = (over: Partial<TeamState> = {}, inApp = false) =>
   renderToStaticMarkup(<TeamView team={team(over)} words={teamWords(inApp)} />);
+
+/** The page's own cards expanded (they use no hooks), so a button's tap can be checked without a browser. */
+const OWN_PARTS = new Set(["TeamCard", "PeopleCard", "ConfirmStep"]);
+function expand(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(expand);
+  if (!node || typeof node !== "object" || !("props" in node)) return node;
+  const element = node as ReactElement<Record<string, unknown>>;
+  if (typeof element.type === "function" && OWN_PARTS.has(element.type.name)) {
+    return expand((element.type as (props: unknown) => unknown)(element.props));
+  }
+  const props = Object.fromEntries(Object.entries(element.props ?? {}).map(([k, v]) => [k, expand(v)]));
+  return { ...element, props };
+}
+function buttonNamed(t: TeamState, label: string): ReactElement<{ onClick: () => void }> {
+  const found = findAll(expand(TeamView({ team: t, words: teamWords(false) })), Button).find(
+    (b) => b.props.children === label,
+  );
+  expect(found, label).toBeDefined();
+  return found as unknown as ReactElement<{ onClick: () => void }>;
+}
 
 beforeEach(() => {
   env.on = false;
@@ -161,6 +186,45 @@ describe("TeamView (new look)", () => {
     expect(html).toContain(teamWords(false).ownerManages);
     expect(html).toContain(">Leave team<");
     expect(html).not.toContain(">Remove member<");
+    expect(html).not.toContain('data-testid="team-leave-confirm"');
+  });
+
+  it("tapping Leave team or Remove member only asks: nothing is sent yet", () => {
+    const asked: TeamConfirm[] = [];
+    const acted: string[] = [];
+    const spy = { ask: (c: TeamConfirm) => void asked.push(c), act: async (a: string) => void acted.push(a) };
+    buttonNamed(team({ ...spy, data: { ...OWNER, isOwner: false } }), "Leave team").props.onClick();
+    buttonNamed(team(spy), "Remove member").props.onClick();
+    expect(asked).toEqual([{ action: "leave" }, { action: "remove", userId: "u2", email: "sam@bayside.co.nz" }]);
+    expect(acted).toEqual([]);
+  });
+
+  it("leaving asks first: what it means, then Leave team or Stay in the team", () => {
+    const answered: string[] = [];
+    const asking = team({
+      data: { ...OWNER, isOwner: false },
+      confirming: { action: "leave" },
+      confirmAsk: async () => void answered.push("yes"),
+      cancelAsk: () => void answered.push("no"),
+    });
+    const html = text(renderToStaticMarkup(<TeamView team={asking} words={teamWords(false)} />));
+    expect(html).toContain("Leave Bayside Builders?");
+    expect(html).toContain("You'll lose the shared client list. Hours you've already logged stay with the team.");
+    expect(html).toContain("Stay in the team");
+    buttonNamed(asking, "Leave team").props.onClick();
+    buttonNamed(asking, "Stay in the team").props.onClick();
+    expect(answered).toEqual(["yes", "no"]);
+  });
+
+  it("removing someone asks first, on their row only, in plain words", () => {
+    const html = view({ confirming: { action: "remove", userId: "u2", email: "sam@bayside.co.nz" } });
+    expect(html).toContain('data-testid="team-remove-confirm"');
+    const plain = text(html);
+    expect(plain).toContain("Remove sam@bayside.co.nz?");
+    expect(plain).toContain("They lose the shared client list straight away. Hours they've logged stay on your timesheet.");
+    expect(html).toContain(">Keep them<");
+    // Jo's row still offers its own button; Sam's is the question now.
+    expect(html.match(/>Remove member</g)).toHaveLength(1);
   });
 
   it("no team yet: make one", () => {

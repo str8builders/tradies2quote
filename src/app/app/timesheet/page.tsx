@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Screen } from "@/components/ui/screen";
+import { getStoredTimeZone } from "@/lib/location/stored-zone";
 import { getCachedAuthUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { resolveWeek } from "@/lib/timesheet/week";
@@ -40,11 +41,12 @@ export default async function TimesheetPage({
   const params = await searchParams;
 
   const db = await createClient();
-  const [{ data: place }, bar] = await Promise.all([
+  const [{ data: place }, bar, storedZone] = await Promise.all([
     db.from("profiles").select("country, currency").eq("id", user.id).maybeSingle(),
     loadTopBarData(),
+    getStoredTimeZone(user.id),
   ]);
-  const zone = businessTimeZone(place?.country ?? null, place?.currency ?? null);
+  const zone = businessTimeZone(place?.country ?? null, place?.currency ?? null, storedZone);
   const now = requestTime();
   const today = dayKeyInZone(now, zone) ?? now.toISOString().slice(0, 10);
   const [data, location] = await Promise.all([

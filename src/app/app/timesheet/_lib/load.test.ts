@@ -22,6 +22,9 @@ vi.mock("@/lib/location/street-geocode", () => ({
   geocodeStreet: vi.fn(async () => {
     throw new Error("no lookups on page load");
   }),
+  lookUpStreet: vi.fn(async () => {
+    throw new Error("no lookups on page load");
+  }),
 }));
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
@@ -60,7 +63,7 @@ vi.mock("@/lib/supabase/server", () => ({
   }),
 }));
 
-import { loadTimesheet } from "./load";
+import { loadTimesheet, routeWithin } from "./load";
 
 const row = (over: Record<string, unknown>) => ({
   id: "e1",
@@ -172,5 +175,38 @@ describe("loadTimesheet: where each entry's hours were", () => {
     const e1 = (await byId()).get("e1")!;
     expect(e1.site).toBeNull();
     expect(e1.address).toBe("14 Kauri Street, Mount Maunganui");
+  });
+});
+
+describe("travel is the route between clocking in and clocking out", () => {
+  const START = "2026-09-21T19:00:00.000Z";
+  const END = "2026-09-22T03:30:00.000Z";
+  const at = (iso: string, minutes: number) => new Date(Date.parse(iso) + minutes * 60_000).toISOString();
+  const point = (recorded: string, lat: number) => ({ session_id: "s1", recorded_at: recorded, latitude: lat, longitude: 176.1654, accuracy: 10 });
+
+  it("routeWithin keeps start to finish, and everything from the start while still open", () => {
+    const route = [{ t: Date.parse(START) - 1 }, { t: Date.parse(START) }, { t: Date.parse(END) }, { t: Date.parse(END) + 1 }];
+    expect(routeWithin(route, START, END)).toEqual([{ t: Date.parse(START) }, { t: Date.parse(END) }]);
+    expect(routeWithin(route, START, null)).toHaveLength(3);
+    expect(routeWithin(route, "not a time", END)).toEqual([]);
+  });
+
+  it("the drive home after the finish isn't counted as the job's travel", async () => {
+    db.answers.work_sessions = {
+      data: [
+        { id: "s1", started_at: START, ended_at: END, start_place: null, end_place: null, start_lat: null, start_lng: null, end_lat: null, end_lng: null },
+      ],
+    };
+    db.answers.location_points = {
+      data: [
+        point(at(START, 10), -37.6868),
+        point(at(START, 20), -37.6958), // about 1 km south, during work
+        point(at(END, 25), -37.7858), // 10 km further, after the (late) clock-out
+      ],
+    };
+    const e1 = (await byId()).get("e1")!;
+    expect(e1.km).toBe(1);
+    const sessions = db.queries.find((q) => q.table === "work_sessions")!;
+    expect(sessions.columns).toContain("started_at, ended_at");
   });
 });

@@ -53,6 +53,8 @@ select pg_temp.assert_rejected($q$insert into public.job_sites(client_id,owner_i
 -- Clock out makes the hours, in the business's time zone.
 reset role;
 update public.work_sessions set started_at = (date_trunc('day', now() at time zone 'Pacific/Auckland') - interval '1 day' + interval '7 hours') at time zone 'Pacific/Auckland' where id=(select id from s1);
+-- The route was driven during the shift (clock_out drops points after the finish).
+update public.location_points set recorded_at = (date_trunc('day', now() at time zone 'Pacific/Auckland') - interval '1 day' + interval '9 hours') at time zone 'Pacific/Auckland' where session_id=(select id from s1);
 set local role authenticated;
 select pg_temp.as_user('d1000000-0000-0000-0000-000000000002');
 create temp table out1 as select public.clock_out(
@@ -85,12 +87,13 @@ select pg_temp.assert_true((select total_amount=776.25 from public.invoices wher
 
 -- The purge: route points and unbilled pins go after 90 days; billed pins stay.
 reset role;
-update public.location_points set recorded_at = now() - interval '91 days';
-update public.work_sessions set started_at = now() - interval '91 days', ended_at = now() - interval '91 days' + interval '8 hours';
+-- Only the fixture's rows: the restored copy holds real, recent location data.
+update public.location_points set recorded_at = now() - interval '91 days' where session_id=(select id from s1);
+update public.work_sessions set started_at = now() - interval '91 days', ended_at = now() - interval '91 days' + interval '8 hours' where id=(select id from s1);
 select pg_temp.assert_true((public.purge_location_history()->>'points')::int = 2,'route points older than 90 days deleted');
-select pg_temp.assert_true((select end_place is not null from public.work_sessions limit 1),'pins on invoiced hours kept');
+select pg_temp.assert_true((select end_place is not null from public.work_sessions where id=(select id from s1)),'pins on invoiced hours kept');
 update public.invoices set deleted_at = now() where id=(select (r->>'invoice_id')::uuid from inv);
 create temp table purged as select public.purge_location_history() as r;
-select pg_temp.assert_true((select (r->>'pins')::int from purged) = 1 and (select end_place is null and end_lat is null from public.work_sessions limit 1),'unbilled pins cleared after 90 days');
+select pg_temp.assert_true((select (r->>'pins')::int from purged) = 1 and (select end_place is null and end_lat is null from public.work_sessions where id=(select id from s1)),'unbilled pins cleared after 90 days');
 rollback;
 \echo 'Location consent, clock in/out, route, sites, access, purge and travel checks passed.'

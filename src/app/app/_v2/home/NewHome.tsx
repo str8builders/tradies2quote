@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Screen } from "@/components/ui/screen";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getStoredTimeZone } from "@/lib/location/stored-zone";
 import { getCachedAuthUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { isWeatherImpactEnabled } from "@/lib/weather-impact/feature-flag";
@@ -37,19 +38,22 @@ export async function loadHomeData({
   isOwner,
   now,
   setupDismissed,
+  storedZone = null,
 }: {
   db: Pick<SupabaseClient, "from">;
   userId: string;
   isOwner: boolean;
   now: Date;
   setupDismissed: boolean;
+  /** The business's saved time zone (profiles.time_zone), when there is one. */
+  storedZone?: string | null;
 }): Promise<HomeData> {
   const [board, extras] = await Promise.all([
     loadBoard(db, userId, "app/home"),
     loadHomeExtras(db, userId, { withSetup: !setupDismissed }),
   ]);
   const { profile } = extras;
-  const timeZone = businessTimeZone(profile.country, profile.currency);
+  const timeZone = businessTimeZone(profile.country, profile.currency, storedZone);
   const hasJobs = board.quotes.length > 0;
 
   const todos = board.failed
@@ -95,6 +99,7 @@ async function HomeBody({ userId, isOwner, t2qcal }: { userId: string; isOwner: 
       isOwner,
       now,
       setupDismissed: isSetupDismissed((await cookies()).get(SETUP_DISMISSED_COOKIE)?.value),
+      storedZone: await getStoredTimeZone(userId),
     }),
     getCachedAuthUser(),
   ]);

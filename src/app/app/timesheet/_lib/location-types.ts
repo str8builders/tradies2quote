@@ -2,6 +2,8 @@ import type { JobSite } from "@/lib/location/geo";
 
 /** What the Timesheet knows about your location setting and your day. */
 export interface LocationState {
+  /** Your account: the iPhone app ties its upload key, route and arrivals to it. */
+  userId: string;
   consent: {
     granted: boolean;
     autoClock: boolean;
@@ -22,7 +24,7 @@ export interface LocationState {
   sites: JobSite[];
   /** The ones the phone watches for automatic clock-in (iOS: up to 20). */
   geofences: JobSite[];
-  /** IANA zone of the business, for clocking out. */
+  /** IANA zone of the business (its saved zone, else its country's), for clocking out and work hours. */
   timeZone: string;
 }
 

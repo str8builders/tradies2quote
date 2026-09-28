@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ButtonLink } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
 import { Screen } from "@/components/ui/screen";
+import { getStoredTimeZone } from "@/lib/location/stored-zone";
 import { getCachedAuthUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { isNewLookOn } from "@/lib/ui/newLook";
@@ -53,14 +54,15 @@ export default async function JobsPage({
 
   const supabase = await createClient();
   const now = requestTime();
-  const [board, deleted, profile, bar] = await Promise.all([
+  const [board, deleted, profile, bar, storedZone] = await Promise.all([
     loadBoard(supabase, user.id),
     loadDeletedJobs(supabase, user.id, now),
     supabase.from("profiles").select("country, currency").eq("id", user.id).maybeSingle(),
     loadTopBarData(),
+    getStoredTimeZone(user.id),
   ]);
   const place = (profile.data ?? {}) as { country?: string | null; currency?: string | null };
-  const zone = businessTimeZone(place.country, place.currency);
+  const zone = businessTimeZone(place.country, place.currency, storedZone);
   const rows = board.failed ? [] : buildJobRows(board.quotes, board.invoices, now, zone);
   // Each deleted job with the invoices it would come back with: the ones
   // deleted with it, and any never deleted (still on the board).

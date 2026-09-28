@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { FloppyDisk, Trash } from "@phosphor-icons/react/dist/ssr";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
@@ -10,6 +10,7 @@ import { TextField } from "@/components/ui/text-field";
 import { TAP } from "@/components/ui/styles";
 import { BREAK_CHOICES, NOTE_MAX, formatHours, workedTime } from "@/lib/timesheet/hours";
 import { deleteTimeEntry, saveTimeEntry } from "../actions";
+import { newRowId } from "../_lib/ids";
 import type { TimesheetClient, TimesheetEntry } from "../_lib/types";
 
 const NEW_CLIENT = "__new__";
@@ -85,6 +86,10 @@ function EntryForm({
   const [newClient, setNewClient] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  /** New hours keep one id however many times Save is tapped (see newRowId). */
+  const newId = useRef<string | null>(null);
+  /** A new client that was saved when the hours weren't: trying again uses it. */
+  const madeClient = useRef<{ name: string; id: string } | null>(null);
   const worked = workedTime(form.start, form.finish, form.breakMinutes);
   const set = <K extends keyof EntryDraft>(key: K, value: EntryDraft[K]) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -99,19 +104,24 @@ function EntryForm({
       setError("Type the new client's name, or pick one from the list.");
       return;
     }
+    if (!form.id) newId.current ??= newRowId();
+    const typed = newClient.trim();
+    const made = clientChoice === NEW_CLIENT && madeClient.current?.name === typed ? madeClient.current.id : null;
     startTransition(async () => {
       try {
         const result = await saveTimeEntry({
           id: form.id,
+          newId: form.id ? null : newId.current,
           workDate: form.workDate,
           start: form.start,
           finish: form.finish,
           breakMinutes: form.breakMinutes,
-          clientId: clientChoice && clientChoice !== NEW_CLIENT ? clientChoice : null,
-          newClientName: clientChoice === NEW_CLIENT ? newClient : null,
+          clientId: clientChoice && clientChoice !== NEW_CLIENT ? clientChoice : made,
+          newClientName: clientChoice === NEW_CLIENT && !made ? newClient : null,
           note: form.note,
         });
         if (!result.ok) {
+          if (result.clientId && clientChoice === NEW_CLIENT) madeClient.current = { name: typed, id: result.clientId };
           setError(result.error);
           return;
         }

@@ -6,15 +6,23 @@ import { placeLabel, isValidLatLng } from "@/lib/location/geo";
 import { createDeviceToken } from "@/lib/location/device-token";
 import type { Fix } from "@/lib/location/fix";
 import { geofenceSites, loadJobSites } from "@/lib/location/sites";
+import { readStoredTimeZone, writeStoredTimeZone } from "@/lib/location/stored-zone";
 import { captureError } from "@/lib/observability";
 import type { Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { parseTime } from "@/lib/timesheet/hours";
-import { businessTimeZone } from "../_v2/lib/dates";
+import { businessTimeZone, businessZoneFrom, isIanaZone } from "../_v2/lib/dates";
 import { businessOwnerFor } from "./_lib/load";
 import { DEFAULT_CONSENT, type LocationState } from "./_lib/location-types";
 
-export type LocationResult<T = undefined> = ({ ok: true } & (T extends undefined ? object : { value: T })) | { ok: false; error: string };
+/**
+ * `retry` on a failure: trying the same thing again later may work (no
+ * signal, a server hiccup), unlike an answer such as "already clocked in".
+ * The phone's saved arrivals and departures are kept for another go then.
+ */
+export type LocationResult<T = undefined> =
+  | ({ ok: true } & (T extends undefined ? object : { value: T }))
+  | { ok: false; error: string; retry?: boolean };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PATH = "/app/timesheet";
@@ -40,8 +48,11 @@ async function placeFor(
 }
 
 async function zoneFor(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<string> {
-  const { data } = await supabase.from("profiles").select("country, currency").eq("id", userId).maybeSingle();
-  return businessTimeZone(data?.country ?? null, data?.currency ?? null);
+  const [{ data }, stored] = await Promise.all([
+    supabase.from("profiles").select("country, currency").eq("id", userId).maybeSingle(),
+    readStoredTimeZone(supabase, userId),
+  ]);
+  return businessTimeZone(data?.country ?? null, data?.currency ?? null, stored);
 }
 
 /**
@@ -52,15 +63,17 @@ async function zoneFor(supabase: Awaited<ReturnType<typeof createClient>>, userI
 export async function getLocationState({ lookUp = false }: { lookUp?: boolean } = {}): Promise<LocationState> {
   const { supabase, user } = await signedIn();
   const ownerId = await businessOwnerFor(user.id);
-  const [consentResult, openResult, profileResult] = await Promise.all([
+  const [consentResult, openResult, profileResult, storedZone] = await Promise.all([
     supabase.from("location_consents").select("*").eq("user_id", user.id).maybeSingle(),
     supabase.from("work_sessions").select("id, started_at, start_place, client_id, source").eq("user_id", user.id).is("ended_at", null).maybeSingle(),
     supabase.from("profiles").select("country, currency").eq("id", user.id).maybeSingle(),
+    readStoredTimeZone(supabase, user.id),
   ]);
   const sites = await loadJobSites(supabase, ownerId, { country: profileResult.data?.country ?? null, geocode: lookUp });
   const c = consentResult.data;
   const open = openResult.data;
   return {
+    userId: user.id,
     consent: c
       ? {
           granted: c.granted,
@@ -82,8 +95,30 @@ export async function getLocationState({ lookUp = false }: { lookUp?: boolean } 
       : null,
     sites,
     geofences: await geofenceSites(supabase, ownerId, sites),
-    timeZone: businessTimeZone(profileResult.data?.country ?? null, profileResult.data?.currency ?? null),
+    timeZone: businessTimeZone(profileResult.data?.country ?? null, profileResult.data?.currency ?? null, storedZone),
   };
+}
+
+/**
+ * The phone's or browser's own time zone, from the app shell: saved as the
+ * business's zone when it's a real zone in the business's country and not
+ * the one already saved. A zone abroad (a holiday) is left alone, so the
+ * business stays where it is. `changed`: pages should re-read their days.
+ */
+export async function saveDeviceTimeZone(zone: string): Promise<{ ok: boolean; changed: boolean }> {
+  if (!isIanaZone(zone)) return { ok: false, changed: false };
+  const { supabase, user } = await signedIn();
+  const [{ data: place }, stored] = await Promise.all([
+    supabase.from("profiles").select("country, currency").eq("id", user.id).maybeSingle(),
+    readStoredTimeZone(supabase, user.id),
+  ]);
+  const wanted = businessZoneFrom(zone, place?.country ?? null, place?.currency ?? null);
+  if (!wanted || wanted === stored) return { ok: true, changed: false };
+  const saved = await writeStoredTimeZone(supabase, user.id, wanted);
+  if (saved === "saved") return { ok: true, changed: true };
+  // Before 20260929_profiles_time_zone.sql there's nowhere to keep it: quietly the country's zone, as before.
+  if (saved !== "missing") captureError(saved.error, { route: "timesheet/time-zone" });
+  return { ok: false, changed: false };
 }
 
 export interface ConsentInput {
@@ -178,8 +213,9 @@ export async function clockIn(input: {
   if (error) {
     if (/Already clocked in/.test(error.message)) return { ok: false, error: "You're already clocked in." };
     if (/out of range/.test(error.message)) return { ok: false, error: "That start time is too long ago." };
+    if (/Client not found/.test(error.message)) return { ok: false, error: "That client isn't in the client list any more." };
     captureError(error, { route: "timesheet/clock-in" });
-    return { ok: false, error: "Couldn't start work. Check your signal and try again." };
+    return { ok: false, error: "Couldn't start work. Check your signal and try again.", retry: true };
   }
   revalidatePath(PATH);
   return { ok: true, value: { place: where.place } };
@@ -213,8 +249,9 @@ export async function clockOut(input: {
     if (/out of range/.test(error.message)) return { ok: false, error: "That finish time is in the future." };
     if (/break is longer/.test(error.message)) return { ok: false, error: "The break is longer than the time worked." };
     if (/after start/.test(error.message)) return { ok: false, error: "That's less than a minute of work." };
+    if (/over 24 hours/.test(error.message)) return { ok: false, error: "That's more than 24 hours after you started: pick the time you finished." };
     captureError(error, { route: "timesheet/clock-out" });
-    return { ok: false, error: "Couldn't finish work. Check your signal and try again." };
+    return { ok: false, error: "Couldn't finish work. Check your signal and try again.", retry: true };
   }
   revalidatePath(PATH);
   return { ok: true, value: { place: where.place } };
