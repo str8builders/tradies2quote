@@ -1,6 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { LOGO_ASPECT, LOGO_PIECES, preloadLogoPieces } from "./logo-pieces";
 
 export const WELCOME_FRAMES = 150;
 export const WELCOME_FPS = 30;
@@ -12,8 +13,8 @@ const DISPLAY = 'var(--font-archivo-black), "Archivo Black", "Arial Black", syst
 const MONO = 'var(--font-ibm-plex-mono), "IBM Plex Mono", ui-monospace, monospace';
 
 /**
- * The T, the 2 and the Q of the Tradies2Quote mark binding together before
- * the app opens. Pure: the same component draws the poster at its final
+ * The T, the 2 and the Q of the owner's T2Q logo (logo-pieces.ts) binding
+ * together before the app opens. Pure: the same component draws the poster at its final
  * frame, so a reduced-motion visit or a failed player still shows the mark.
  *
  *   0–40   T slides in from the left, Q from the right, the 2 drops between
@@ -37,16 +38,20 @@ export function LogoAssembly({ frame, fps, calm = false }: { frame: number; fps:
   const float = calm ? 0 : Math.sin(frame / 20) * 3 * settled;
   const snap = 1 + 0.06 * Math.sin(Math.min(1, Math.max(0, bind)) * Math.PI);
   const glow = interpolate(frame, [44, 70], [0, 1], clamp);
-  const letter = (text: string, color: string, transform: string, opacity: number) =>
-    <span style={{ color, display: "inline-block", transform, opacity: Math.max(0, Math.min(1, opacity)), textShadow: color === "#ff5f15" ? `0 0 ${u(30 * glow)} rgba(255,95,21,${0.55 * glow})` : `0 ${u(4)} ${u(24)} rgba(0,0,0,.45)` }}>{text}</span>;
+  // Plain <img>: LogoAssembly is also the poster (drawn outside a composition,
+  // where Remotion's <Img> can't run).
+  const piece = (p: (typeof LOGO_PIECES)[keyof typeof LOGO_PIECES], transform: string, opacity: number, filter: string) =>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={p.src} alt="" draggable={false} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", transformOrigin: p.origin, transform, opacity: Math.max(0, Math.min(1, opacity)), filter }} />;
+  const shadow = `drop-shadow(0 ${u(4)} ${u(24)} rgba(0,0,0,.45))`;
   return <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: u(24), overflow: "hidden", fontFamily: DISPLAY, transform: `translateY(${float}px)` }}>
-    <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", height: u(230), transform: `scale(${snap})` }}>
+    <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", height: u(250), transform: `scale(${snap})` }}>
       <div aria-hidden style={{ position: "absolute", left: "50%", top: "50%", width: u(300), height: u(300), marginLeft: u(-150), marginTop: u(-150), borderRadius: "50%", background: "radial-gradient(circle, rgba(255,234,0,.5), rgba(255,95,21,.22) 40%, transparent 70%)", opacity: flash, filter: "blur(6px)" }} />
       <div aria-hidden style={{ position: "absolute", left: "50%", top: "50%", width: u(220), height: u(220), marginLeft: u(-110), marginTop: u(-110), borderRadius: "50%", border: `${u(3)} solid #ffea00`, opacity: ringOpacity, transform: `scale(${1 + ring * 1.7})` }} />
-      <div style={{ display: "flex", alignItems: "baseline", fontSize: u(200), lineHeight: 1, letterSpacing: "-0.06em", whiteSpace: "nowrap", position: "relative" }}>
-        {letter("T", "#ffffff", `translateX(${(1 - t) * -320}px) rotate(${(1 - t) * -14}deg)`, t * 1.6)}
-        {letter("2", "#ff5f15", `translateY(${(1 - two) * -300}px) scale(${0.7 + 0.3 * Math.min(1, two)})`, two * 2)}
-        {letter("Q", "#ffffff", `translateX(${(1 - q) * 320}px) rotate(${(1 - q) * 14}deg)`, q * 1.6)}
+      <div data-testid="welcome-logo" style={{ position: "relative", width: u(520), height: u(520 / LOGO_ASPECT) }}>
+        {piece(LOGO_PIECES.T, `translateX(${(1 - t) * -320}px) rotate(${(1 - t) * -14}deg)`, t * 1.6, shadow)}
+        {piece(LOGO_PIECES.two, `translateY(${(1 - two) * -300}px) scale(${0.7 + 0.3 * Math.min(1, two)})`, two * 2, `drop-shadow(0 0 ${u(30 * glow)} rgba(255,95,21,${0.55 * glow}))`)}
+        {piece(LOGO_PIECES.Q, `translateX(${(1 - q) * 320}px) rotate(${(1 - q) * 14}deg)`, q * 1.6, shadow)}
       </div>
     </div>
     <div style={{ width: u(420), display: "flex", flexDirection: "column", alignItems: "center", gap: u(14) }}>
@@ -60,8 +65,12 @@ export function LogoAssembly({ frame, fps, calm = false }: { frame: number; fps:
 export function WelcomeScene({ onReady, calm = false }: { onReady?: () => void; calm?: boolean }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  // No canvas to wait for: the scene is ready as soon as it mounts.
-  useEffect(() => { onReady?.(); }, [onReady]);
+  // Ready once the logo's pieces are decoded (at most 1.5 s).
+  useEffect(() => {
+    let live = true;
+    void preloadLogoPieces().then(() => { if (live) onReady?.(); });
+    return () => { live = false; };
+  }, [onReady]);
   return <AbsoluteFill data-testid="welcome-scene" data-frame={frame} style={{ background: "transparent", containerType: "inline-size" }}>
     <LogoAssembly frame={frame} fps={fps} calm={calm} />
   </AbsoluteFill>;

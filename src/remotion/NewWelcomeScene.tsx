@@ -1,6 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { LOGO_ASPECT, LOGO_PIECES, LOGO_SRC, preloadLogoPieces } from "./logo-pieces";
 import { hash01 } from "./marketing/anim";
 
 /**
@@ -12,9 +13,10 @@ import { hash01 } from "./marketing/anim";
  *    0– 40  a blueprint grid draws itself out from the middle
  *   10– 60  an orange tape case slides in and its hi-vis blade shoots across,
  *           the readout counting up to 2400 mm
- *   44– 80  the T slams down from the left and the Q from the right: the
- *           screen shakes, dust kicks out
- *   72–104  the orange 2 drops in like a stamped steel plate: sparks
+ *   44– 80  the logo's T slams down from the left and its Q from the right:
+ *           the screen shakes, dust kicks out
+ *   72–104  the orange 2 drops in like a stamped steel plate: sparks, and the
+ *           three land as the owner's T2Q logo (logo-pieces.ts)
  *  100–128  a hi-vis caution stripe sweeps through the mark
  *  112–160  "Good morning," types in, then your name in orange
  *  150–184  chips pop up: today's date, "Ready to quote"
@@ -102,13 +104,25 @@ function Tape({ frame }: { frame: number }) {
   );
 }
 
-function Letter({ text, color, style }: { text: string; color: string; style: React.CSSProperties }) {
+/** One piece of the logo, on the logo's full canvas (so the three land exactly as the mark). */
+function Piece({ piece, style }: { piece: (typeof LOGO_PIECES)[keyof typeof LOGO_PIECES]; style: React.CSSProperties }) {
   return (
-    <span style={{ display: "inline-block", color, fontFamily: DISPLAY, fontSize: 250, lineHeight: 1, letterSpacing: "-0.06em", ...style }}>
-      {text}
-    </span>
+    // A plain <img>: the art is also drawn outside a composition (the
+    // first-paint poster), where Remotion's <Img> can't run; the pieces are
+    // preloaded before the player starts (NewWelcomeScene).
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={piece.src}
+      alt=""
+      draggable={false}
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", transformOrigin: piece.origin, ...style }}
+    />
   );
 }
+
+/** The logo, 600 wide, centred on the impact point (360, 560). */
+const LOGO_WIDTH = 600;
+const LOGO_HEIGHT = LOGO_WIDTH / LOGO_ASPECT;
 
 function Dust({ frame, at, x }: { frame: number; at: number; x: number }) {
   const p = lerp(frame, [at, at + 24], [0, 1]);
@@ -177,24 +191,33 @@ export function NewWelcomeArt({ frame, fps, greeting, name, today, calm = false 
       <Grid frame={frame} />
       <Tape frame={frame} />
 
-      <div style={{ position: "absolute", left: 0, right: 0, top: 420, height: 280, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div aria-hidden style={{ position: "absolute", width: 520, height: 520, borderRadius: "50%", background: `radial-gradient(circle, rgba(255,95,21,${0.35 * glow}), transparent 65%)` }} />
-        <div style={{ position: "relative", display: "flex", alignItems: "baseline", whiteSpace: "nowrap" }}>
-          <Letter text="T" color={TEXT} style={{ transform: `translate(${(1 - t) * -420}px, ${(1 - t) * -260}px) rotate(${(1 - t) * -24}deg)`, opacity: Math.min(1, t * 2) }} />
-          <Letter
-            text="2"
-            color={ORANGE}
-            style={{
-              transform: `translateY(${(1 - two) * -620}px) perspective(600px) rotateX(${(1 - Math.min(1, two)) * 70}deg)`,
-              opacity: Math.min(1, two * 2),
-              textShadow: `0 0 ${40 * glow}px rgba(255,95,21,${0.6 * glow})`,
-            }}
-          />
-          <Letter text="Q" color={TEXT} style={{ transform: `translate(${(1 - q) * 420}px, ${(1 - q) * -260}px) rotate(${(1 - q) * 24}deg)`, opacity: Math.min(1, q * 2) }} />
-          {/* The caution stripe, clipped to the letters' box. */}
-          <div aria-hidden style={{ position: "absolute", inset: "-10% -6%", overflow: "hidden", mixBlendMode: "screen", pointerEvents: "none" }}>
-            <div style={{ position: "absolute", top: 0, bottom: 0, width: "40%", left: `${30 + stripe * 80}%`, transform: "skewX(-20deg)", background: `repeating-linear-gradient(135deg, ${HIVIS} 0 18px, transparent 18px 36px)`, opacity: stripe > -1 && stripe < 1 ? 0.55 : 0 }} />
-          </div>
+      <div aria-hidden style={{ position: "absolute", left: 100, top: 300, width: 520, height: 520, borderRadius: "50%", background: `radial-gradient(circle, rgba(255,95,21,${0.35 * glow}), transparent 65%)` }} />
+      <div data-testid="welcome-logo" style={{ position: "absolute", left: 360 - LOGO_WIDTH / 2, top: 560 - LOGO_HEIGHT / 2, width: LOGO_WIDTH, height: LOGO_HEIGHT }}>
+        <Piece piece={LOGO_PIECES.T} style={{ transform: `translate(${(1 - t) * -420}px, ${(1 - t) * -260}px) rotate(${(1 - t) * -24}deg)`, opacity: Math.min(1, t * 2) }} />
+        <Piece
+          piece={LOGO_PIECES.two}
+          style={{
+            transform: `translateY(${(1 - two) * -620}px) perspective(600px) rotateX(${(1 - Math.min(1, two)) * 70}deg)`,
+            opacity: Math.min(1, two * 2),
+            filter: `drop-shadow(0 0 ${40 * glow}px rgba(255,95,21,${0.6 * glow}))`,
+          }}
+        />
+        <Piece piece={LOGO_PIECES.Q} style={{ transform: `translate(${(1 - q) * 420}px, ${(1 - q) * -260}px) rotate(${(1 - q) * 24}deg)`, opacity: Math.min(1, q * 2) }} />
+        {/* The caution stripe sweeps across the logo itself (masked to its shape). */}
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: 0,
+            overflow: "hidden",
+            pointerEvents: "none",
+            WebkitMaskImage: `url(${LOGO_SRC})`,
+            maskImage: `url(${LOGO_SRC})`,
+            WebkitMaskSize: "100% 100%",
+            maskSize: "100% 100%",
+          }}
+        >
+          <div style={{ position: "absolute", top: 0, bottom: 0, width: "40%", left: `${30 + stripe * 80}%`, transform: "skewX(-20deg)", background: `repeating-linear-gradient(135deg, ${HIVIS} 0 18px, transparent 18px 36px)`, opacity: stripe > -1 && stripe < 1 ? 0.5 : 0 }} />
         </div>
       </div>
 
@@ -234,8 +257,16 @@ export function NewWelcomeArt({ frame, fps, greeting, name, today, calm = false 
 export function NewWelcomeScene({ onReady, ...props }: NewWelcomeProps & { onReady?: () => void }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  // Ready once the logo's pieces are decoded (at most 1.5 s), so the letters
+  // never land as empty boxes on a slow connection.
   useEffect(() => {
-    onReady?.();
+    let live = true;
+    void preloadLogoPieces().then(() => {
+      if (live) onReady?.();
+    });
+    return () => {
+      live = false;
+    };
   }, [onReady]);
   return (
     <AbsoluteFill data-testid="new-welcome-scene" data-frame={frame} style={{ background: "transparent" }}>
