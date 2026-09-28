@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const mock = vi.hoisted(() => ({
   user: { id: "u1" } as { id: string } | null,
-  profile: { address: "14 Kauri St, Mount Maunganui 3116" } as { address: string | null } | null,
+  profile: { address: "14 Kauri St, Mount Maunganui 3116", country: null } as
+    | { address: string | null; country?: string | null }
+    | null,
   geocode: vi.fn(),
   forecast: vi.fn(),
   capture: vi.fn(),
@@ -22,7 +24,7 @@ vi.mock("@/lib/supabase/server", () => ({
       select: (columns: string) => ({
         eq: (column: string, value: string) => ({
           maybeSingle: async () => {
-            expect([table, columns, column, value]).toEqual(["profiles", "address", "id", "u1"]);
+            expect([table, columns, column, value]).toEqual(["profiles", "address, country", "id", "u1"]);
             return { data: mock.profile, error: null };
           },
         }),
@@ -51,7 +53,7 @@ const calm = {
 
 afterEach(() => {
   mock.user = { id: "u1" };
-  mock.profile = { address: "14 Kauri St, Mount Maunganui 3116" };
+  mock.profile = { address: "14 Kauri St, Mount Maunganui 3116", country: null };
   vi.clearAllMocks();
 });
 
@@ -87,8 +89,16 @@ describe("GET /api/weather/base", () => {
     expect(body.locality).toBe("Mount Maunganui");
     expect(body.current).toMatchObject({ condition: "clear", temperatureC: 17 });
     expect(body.trades).toHaveLength(9);
-    expect(mock.geocode).toHaveBeenCalledWith(expect.objectContaining({ address: "14 Kauri St, Mount Maunganui 3116" }));
+    expect(mock.geocode).toHaveBeenCalledWith(expect.objectContaining({ address: "14 Kauri St, Mount Maunganui 3116", country: null }));
     expect(mock.forecast).toHaveBeenCalledWith({ latitude: -37.64, longitude: 176.19 });
+  });
+
+  it("passes the business's own country to the geocoder, to disambiguate a shared town name", async () => {
+    mock.profile = { address: "14 Kauri St, Mount Maunganui 3116", country: "AU" };
+    mock.geocode.mockResolvedValueOnce({ latitude: -37.6, longitude: 176.1, timezone: null, matchedName: "Mount Maunganui" });
+    mock.forecast.mockResolvedValueOnce(calm);
+    await GET();
+    expect(mock.geocode).toHaveBeenCalledWith(expect.objectContaining({ country: "AU" }));
   });
 
   it("the forecast service failing: 502, reported", async () => {

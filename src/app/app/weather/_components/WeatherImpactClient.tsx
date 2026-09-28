@@ -1,6 +1,6 @@
 "use client";
 
-import { formatNZTime, formatWeekdayShort } from "@/lib/format-date";
+import { datePartsInZone, formatNZTime, formatWeekdayShort } from "@/lib/format-date";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -109,6 +109,46 @@ export const CONTEXT_TOGGLES: ReadonlyArray<{
   { key: "exteriorFinishApplication", label: "Exterior finish / adhesive" },
 ];
 
+export type WeatherFetchState = "idle" | "loading" | "ready" | "error";
+export interface WeatherFetchSnapshot {
+  fetchState: WeatherFetchState;
+  fetchError: string | null;
+}
+
+/**
+ * Every transition the job-site fetch effect can make, as a pure function of
+ * the EVENT alone — never the previous snapshot. That's what proves "every
+ * path must end loading": whatever `fetchState` a `no_location` event is
+ * applied on top of (including "loading", from a fetch that's about to be
+ * aborted), it always yields a clean idle snapshot, never a stuck "loading".
+ *
+ * The bug this closes: deselecting a job (jobLocation → null) while its
+ * fetch was still in flight aborted the request in the effect's cleanup,
+ * but the cleanup only set a local `cancelled` flag — it never reset
+ * `fetchState`. The new run's `if (!jobLocation) return` then exited before
+ * touching `fetchState` at all, so it stayed "loading" forever: the "Use my
+ * device location" button (disabled only while loading) never re-enabled,
+ * with no error shown and nothing to retry.
+ */
+export function nextFetchSnapshot(
+  event:
+    | { type: "no_location" }
+    | { type: "start" }
+    | { type: "success" }
+    | { type: "failure"; message: string },
+): WeatherFetchSnapshot {
+  switch (event.type) {
+    case "no_location":
+      return { fetchState: "idle", fetchError: null };
+    case "start":
+      return { fetchState: "loading", fetchError: null };
+    case "success":
+      return { fetchState: "ready", fetchError: null };
+    case "failure":
+      return { fetchState: "error", fetchError: event.message };
+  }
+}
+
 /**
  * The check itself, shared by both looks: WeatherImpactClient below draws it
  * in the old look, ../_newlook/WeatherImpact.tsx in the new one. Only the
@@ -122,9 +162,7 @@ export function useWeatherImpact({ jobLocation }: Pick<WeatherImpactProps, "jobL
     ...DEFAULT_WEATHER_CONTEXT,
   });
   const [weather, setWeather] = useState<WeatherImpactInput>(EMPTY_WEATHER);
-  const [fetchState, setFetchState] = useState<"idle" | "loading" | "ready" | "error">(
-    "idle",
-  );
+  const [fetchState, setFetchState] = useState<WeatherFetchState>("idle");
   const [fetchError, setFetchError] = useState<string | null>(null);
   // WHICH location the current weather values are for — always shown.
   // null = manual entry (no live fetch yet).
@@ -135,19 +173,31 @@ export function useWeatherImpact({ jobLocation }: Pick<WeatherImpactProps, "jobL
     [trade, weather, context],
   );
 
+  const applyFetchSnapshot = (snapshot: WeatherFetchSnapshot) => {
+    setFetchState(snapshot.fetchState);
+    setFetchError(snapshot.fetchError);
+  };
+
   // Job-location-first: when the server resolved the selected job's site,
   // fetch the live weather for THAT location automatically. All state
   // updates happen inside async callbacks (React 19 compiler rule: no
   // synchronous setState in an effect body).
   useEffect(() => {
-    if (!jobLocation) return;
+    if (!jobLocation) {
+      // No job selected — including just having been deselected mid-fetch.
+      // Always resets to a clean idle snapshot (see nextFetchSnapshot):
+      // never leaves a previous job's "loading"/"error" stuck on screen.
+      // setTimeout, not a direct call: same React 19 compiler rule as below
+      // (no synchronous setState in an effect body).
+      const reset = setTimeout(() => applyFetchSnapshot(nextFetchSnapshot({ type: "no_location" })), 0);
+      return () => clearTimeout(reset);
+    }
     let cancelled = false;
     const controller = new AbortController();
     const abortTimer = setTimeout(() => controller.abort(), 15_000);
     const start = setTimeout(() => {
       if (cancelled) return;
-      setFetchState("loading");
-      setFetchError(null);
+      applyFetchSnapshot(nextFetchSnapshot({ type: "start" }));
       fetchOpenMeteoWeather({
         latitude: jobLocation.latitude,
         longitude: jobLocation.longitude,
@@ -157,15 +207,18 @@ export function useWeatherImpact({ jobLocation }: Pick<WeatherImpactProps, "jobL
           if (cancelled) return;
           setWeather(nextWeather);
           setLocationFor(`Job site: ${jobLocation.matchedName}`);
-          setFetchState("ready");
+          applyFetchSnapshot(nextFetchSnapshot({ type: "success" }));
         })
         .catch((error) => {
           if (cancelled) return;
-          setFetchState("error");
-          setFetchError(
-            error instanceof Error && error.name !== "AbortError"
-              ? error.message
-              : "Could not load weather for the job site. Retry, or enter conditions manually.",
+          applyFetchSnapshot(
+            nextFetchSnapshot({
+              type: "failure",
+              message:
+                error instanceof Error && error.name !== "AbortError"
+                  ? error.message
+                  : "Could not load weather for the job site. Retry, or enter conditions manually.",
+            }),
           );
         })
         .finally(() => clearTimeout(abortTimer));
@@ -319,7 +372,9 @@ export function WeatherImpactClient({
                     : weather.source ?? "Manual conditions"
                 }
               />
-              {weather.observedAt ? <Badge label={`Observed ${formatObserved(weather.observedAt)}`} /> : null}
+              {weather.observedAt ? (
+                <Badge label={`Observed ${formatObserved(weather.observedAt, weather.timezone, weather.utcOffsetSeconds)}`} />
+              ) : null}
             </div>
           </div>
         </div>
@@ -721,7 +776,29 @@ function getCurrentPosition(): Promise<GeolocationPosition> {
   });
 }
 
-export function formatObserved(value: string) {
+/**
+ * "2:00 pm" for a live reading's `observedAt`, in the FORECAST LOCATION's own
+ * time zone — never the viewer's device zone, and never hardcoded to NZ (a
+ * UK/US/AU/CA job's observation was otherwise silently relabelled with NZ's
+ * clock). Open-Meteo's `current.time` carries no UTC offset — it's already
+ * the location's own wall-clock time (via `timezone=auto`) — so it's read
+ * back as UTC-equivalent digits (`${value}Z`) rather than through the
+ * viewer's `Date` parsing, then re-shown in the reported zone; `timezone`
+ * and `utcOffsetSeconds` are both Open-Meteo's own fields (see
+ * normalizeOpenMeteo). Falls back to the old NZ formatting only when a
+ * reading has neither (e.g. an older cached value) — never a blank label.
+ */
+export function formatObserved(value: string, timezone?: string | null, utcOffsetSeconds?: number | null) {
+  if (timezone && utcOffsetSeconds != null) {
+    const asIfUtc = Date.parse(`${value}Z`);
+    if (!Number.isNaN(asIfUtc)) {
+      const parts = datePartsInZone(new Date(asIfUtc - utcOffsetSeconds * 1000), timezone);
+      if (parts) {
+        const h12 = parts.hour % 12 || 12;
+        return `${h12}:${String(parts.minute).padStart(2, "0")} ${parts.hour < 12 ? "am" : "pm"}`;
+      }
+    }
+  }
   const label = formatNZTime(value);
   return label === "—" ? value : label;
 }

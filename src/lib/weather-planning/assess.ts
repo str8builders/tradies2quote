@@ -103,7 +103,10 @@ export async function assessJob(input: AssessJobInput): Promise<AssessJobResult>
     const clientsAddress = await loadClientAddress(db, quote.client_id);
     const picked = pickJobAddress({ clientsAddress, quoteData: quote.quote_data });
     if (!picked) return { status: "skipped", reason: "no_address" };
-    const geo = await geocodeAddress({ address: picked.address, fetchImpl: input.fetchImpl });
+    // Prefer a geocode match in the business's own country — a town name
+    // like "Richmond" exists in more than one of our markets.
+    const country = await loadBusinessCountry(db, input.userId);
+    const geo = await geocodeAddress({ address: picked.address, country, fetchImpl: input.fetchImpl });
     if (!geo) return { status: "skipped", reason: "location_unknown" };
     lat = geo.latitude;
     lon = geo.longitude;
@@ -248,6 +251,12 @@ async function loadClientAddress(db: ReturnType<typeof adminClient>, clientId: s
   if (!clientId) return null;
   const { data } = await db.from("clients").select("address").eq("id", clientId).maybeSingle();
   return data?.address ?? null;
+}
+
+/** The business's own country (NZ/AU/UK/US/CA), to disambiguate the geocode. */
+async function loadBusinessCountry(db: ReturnType<typeof adminClient>, userId: string): Promise<string | null> {
+  const { data } = await db.from("profiles").select("country").eq("id", userId).maybeSingle();
+  return data?.country ?? null;
 }
 
 async function loadRule(db: ReturnType<typeof adminClient>, jobType: string): Promise<JobTypeRule> {

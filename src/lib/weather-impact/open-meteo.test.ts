@@ -1,6 +1,65 @@
 import { describe, expect, it } from "vitest";
 import { normalizeOpenMeteo } from "./open-meteo";
 
+// Current-hour precipitation: `precipitation` is already rain+showers+snow
+// for the hour (Open-Meteo's contract), so summing all three double- (or
+// triple-) counts. See src/lib/weather-impact/open-meteo.ts.
+describe("normalizeOpenMeteo current precipitation (no double-counting)", () => {
+  it("uses precipitation as-is — a realistic payload where it already includes rain + showers", () => {
+    // A realistic Open-Meteo `current` block: light rain, no showers, and
+    // `precipitation` already totals them (0.4 = 0.4 rain + 0 showers).
+    const out = normalizeOpenMeteo({
+      current: {
+        time: "2026-06-12T09:00",
+        precipitation: 0.4,
+        rain: 0.4,
+        showers: 0,
+        weather_code: 61,
+      },
+    });
+    expect(out.precipitationMmPerHour).toBe(0.4); // NOT 0.8 (0.4 + 0.4 + 0)
+  });
+
+  it("a mixed rain+showers hour: still just the reported total, not the sum of all three", () => {
+    const out = normalizeOpenMeteo({
+      current: { time: "2026-06-12T09:00", precipitation: 1.2, rain: 0.5, showers: 0.7, weather_code: 80 },
+    });
+    expect(out.precipitationMmPerHour).toBe(1.2); // NOT 2.4 (1.2 + 0.5 + 0.7)
+  });
+
+  it("falls back to rain + showers only when precipitation itself is missing", () => {
+    const out = normalizeOpenMeteo({
+      current: { time: "2026-06-12T09:00", rain: 0.3, showers: 0.2, weather_code: 80 },
+    });
+    expect(out.precipitationMmPerHour).toBe(0.5);
+  });
+
+  it("no reading at all stays zero, not null (rounded/summed from empty)", () => {
+    const out = normalizeOpenMeteo({ current: { time: "2026-06-12T09:00", weather_code: 0 } });
+    expect(out.precipitationMmPerHour).toBe(0);
+  });
+});
+
+// The forecast location's own zone (`timezone=auto` in the request), so the
+// "Observed" time can be shown for that place, not hardcoded to NZ.
+describe("normalizeOpenMeteo timezone/offset (for the forecast location's own clock)", () => {
+  it("carries the resolved IANA zone and its UTC offset", () => {
+    const out = normalizeOpenMeteo({
+      timezone: "America/Chicago",
+      utc_offset_seconds: -18000,
+      current: { time: "2026-06-12T09:00", weather_code: 0 },
+    });
+    expect(out.timezone).toBe("America/Chicago");
+    expect(out.utcOffsetSeconds).toBe(-18000);
+  });
+
+  it("missing from the response stays null, never a fabricated default", () => {
+    const out = normalizeOpenMeteo({ current: { time: "2026-06-12T09:00", weather_code: 0 } });
+    expect(out.timezone).toBeNull();
+    expect(out.utcOffsetSeconds).toBeNull();
+  });
+});
+
 // 5-day daily outlook normalization — the strip shown on /app/weather.
 describe("normalizeOpenMeteo daily (5-day outlook)", () => {
   const daily = {

@@ -23,11 +23,33 @@ export const TRADE_KEY = "t2q-weather-trade";
 export const DEFAULT_TRADE: WeatherImpactTrade = "general_outdoor";
 
 const PREFIX = "t2q-weather:";
-/** The key of the forecast this session last showed. */
-const LAST = `${PREFIX}last`;
-/** When location was allowed but the phone couldn't find itself. */
-const NO_FIX = `${PREFIX}nofix`;
 const BASE = "base";
+
+/**
+ * Every session-cache key is namespaced to the signed-in account (its id or
+ * email — whatever's on hand; never the previous account's). Without this,
+ * a shared phone (or the next person signing in on the same browser tab —
+ * sessionStorage outlives a sign-out within a tab) could show the previous
+ * account's cached place and forecast until the TTL lapsed. `""` (signed
+ * out, or the caller has nothing to key on) still gets its OWN bucket rather
+ * than silently reusing whatever the last real account left behind.
+ */
+function scopedKey(accountKey: string, suffix: string): string {
+  return `${PREFIX}${accountKey ? accountTag(accountKey) : "anon"}:${suffix}`;
+}
+
+/**
+ * A short stable tag for the account (FNV-1a), so the cache keys tell
+ * accounts apart without writing an email address into the phone's storage.
+ */
+export function accountTag(accountKey: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < accountKey.length; i += 1) {
+    hash ^= accountKey.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(36);
+}
 
 export type WeatherSource = "device" | "base";
 /** No forecast to show: no business address, or it couldn't be found on the map. */
@@ -68,6 +90,10 @@ export interface WeatherDeps {
   currentFix(): Promise<Fix | null>;
   /** GET a URL as JSON; never throws (status 0 when offline). */
   getJson(url: string): Promise<{ ok: boolean; status: number; body: unknown }>;
+  /** The signed-in account's id or email — namespaces the session cache so a
+   *  shared phone, or the next account in this tab, never sees the previous
+   *  one's place. `""` when there's genuinely nothing to key on. */
+  accountKey: string;
 }
 
 interface Stored {
@@ -96,9 +122,9 @@ export function isHereWeather(value: unknown): value is HereWeather {
   return Boolean(v && typeof v === "object" && v.current && typeof v.current === "object" && Array.isArray(v.days) && Array.isArray(v.trades));
 }
 
-function readStored(storage: StorageLike | null, key: string, now: number): Stored | null {
+function readStored(storage: StorageLike | null, accountKey: string, key: string, now: number): Stored | null {
   try {
-    const raw = storage?.getItem(PREFIX + key);
+    const raw = storage?.getItem(scopedKey(accountKey, key));
     if (!raw) return null;
     const v = JSON.parse(raw) as Partial<Stored> | null;
     if (!v || typeof v.at !== "number" || v.at - now > 60_000) return null;
@@ -112,38 +138,38 @@ function readStored(storage: StorageLike | null, key: string, now: number): Stor
   }
 }
 
-function keep(storage: StorageLike | null, stored: Stored): void {
+function keep(storage: StorageLike | null, accountKey: string, stored: Stored): void {
   try {
-    storage?.setItem(PREFIX + stored.key, JSON.stringify(stored));
-    storage?.setItem(LAST, stored.key);
-    if (stored.source === "device") storage?.setItem(NO_FIX, "");
+    storage?.setItem(scopedKey(accountKey, stored.key), JSON.stringify(stored));
+    storage?.setItem(scopedKey(accountKey, "last"), stored.key);
+    if (stored.source === "device") storage?.setItem(scopedKey(accountKey, "nofix"), "");
   } catch {
     // Full or blocked storage: it just fetches again next time.
   }
 }
 
-function lastShown(storage: StorageLike | null, now: number): Stored | null {
+function lastShown(storage: StorageLike | null, accountKey: string, now: number): Stored | null {
   try {
-    const key = storage?.getItem(LAST);
-    return key ? readStored(storage, key, now) : null;
+    const key = storage?.getItem(scopedKey(accountKey, "last"));
+    return key ? readStored(storage, accountKey, key, now) : null;
   } catch {
     return null;
   }
 }
 
 /** The phone couldn't find itself in the last half hour (so don't wait on it again every tab). */
-function missedFix(storage: StorageLike | null, now: number): boolean {
+function missedFix(storage: StorageLike | null, accountKey: string, now: number): boolean {
   try {
-    const at = Number(storage?.getItem(NO_FIX) || NaN);
+    const at = Number(storage?.getItem(scopedKey(accountKey, "nofix")) || NaN);
     return Number.isFinite(at) && now - at >= 0 && now - at <= WEATHER_TTL_MS;
   } catch {
     return false;
   }
 }
 
-function markMissedFix(storage: StorageLike | null, now: number): void {
+function markMissedFix(storage: StorageLike | null, accountKey: string, now: number): void {
   try {
-    storage?.setItem(NO_FIX, String(now));
+    storage?.setItem(scopedKey(accountKey, "nofix"), String(now));
   } catch {
     // Not kept: it tries the phone again next time.
   }
@@ -159,9 +185,9 @@ function stateOf(stored: Stored, now: number): WeatherState {
 async function weatherAt(deps: WeatherDeps, fix: Fix, fresh: boolean): Promise<WeatherState> {
   const now = deps.now();
   const key = spotKey(fix);
-  const hit = fresh ? null : readStored(deps.storage, key, now);
+  const hit = fresh ? null : readStored(deps.storage, deps.accountKey, key, now);
   if (hit) {
-    keep(deps.storage, hit);
+    keep(deps.storage, deps.accountKey, hit);
     return stateOf(hit, now);
   }
   const [lat, lng] = key.split(",");
@@ -171,16 +197,16 @@ async function weatherAt(deps: WeatherDeps, fix: Fix, fresh: boolean): Promise<W
   const town = (res.body as { locality?: unknown }).locality;
   const locality = typeof town === "string" && town.trim() ? town.trim() : null;
   const stored: Stored = { at: now, source: "device", key, locality, weather: { current, days, trades } };
-  keep(deps.storage, stored);
+  keep(deps.storage, deps.accountKey, stored);
   return stateOf(stored, now);
 }
 
 /** The forecast at the business address (from the session when it's fresh). */
 async function weatherAtBase(deps: WeatherDeps, fresh: boolean): Promise<WeatherState> {
   const now = deps.now();
-  const hit = fresh ? null : readStored(deps.storage, BASE, now);
+  const hit = fresh ? null : readStored(deps.storage, deps.accountKey, BASE, now);
   if (hit) {
-    keep(deps.storage, hit);
+    keep(deps.storage, deps.accountKey, hit);
     return stateOf(hit, now);
   }
   const res = await deps.getJson("/api/weather/base");
@@ -188,14 +214,14 @@ async function weatherAtBase(deps: WeatherDeps, fresh: boolean): Promise<Weather
   if (res.status === 404) {
     const none: NoWeatherReason = body.reason === "not-found" ? "not-found" : "no-address";
     const stored: Stored = { at: now, source: "base", key: BASE, locality: null, weather: null, none };
-    keep(deps.storage, stored);
+    keep(deps.storage, deps.accountKey, stored);
     return stateOf(stored, now);
   }
   if (!res.ok || !isHereWeather(res.body)) return { kind: "error" };
   const { current, days, trades } = res.body;
   const locality = typeof body.locality === "string" && body.locality.trim() ? body.locality.trim() : null;
   const stored: Stored = { at: now, source: "base", key: BASE, locality, weather: { current, days, trades } };
-  keep(deps.storage, stored);
+  keep(deps.storage, deps.accountKey, stored);
   return stateOf(stored, now);
 }
 
@@ -204,27 +230,28 @@ async function weatherAtBase(deps: WeatherDeps, fresh: boolean): Promise<Weather
  * last showed while it's fresh (unless location has since been allowed or
  * taken away), else where the phone is when location is already allowed,
  * else the business address. `fresh` skips the session copy (Try again).
+ * Every read/write is namespaced to `deps.accountKey` — see scopedKey.
  */
 export async function resolveWeather(deps: WeatherDeps, { fresh = false }: { fresh?: boolean } = {}): Promise<WeatherState> {
   const now = deps.now();
   const allowed = await deps.locationAllowed().catch(() => false);
-  const usePhone = allowed && (fresh || !missedFix(deps.storage, now));
+  const usePhone = allowed && (fresh || !missedFix(deps.storage, deps.accountKey, now));
   if (!fresh) {
-    const last = lastShown(deps.storage, now);
+    const last = lastShown(deps.storage, deps.accountKey, now);
     if (last && (last.source === "device") === usePhone) return stateOf(last, now);
   }
   if (usePhone) {
     const fix = await deps.currentFix().catch(() => null);
     if (fix) return weatherAt(deps, fix, fresh);
-    markMissedFix(deps.storage, deps.now());
+    markMissedFix(deps.storage, deps.accountKey, deps.now());
   }
   return weatherAtBase(deps, fresh);
 }
 
 /** Off to add or fix the business address: look it up afresh when back. */
-export function forgetBase(storage: StorageLike | null): void {
+export function forgetBase(storage: StorageLike | null, accountKey: string): void {
   try {
-    storage?.setItem(PREFIX + BASE, "");
+    storage?.setItem(scopedKey(accountKey, BASE), "");
   } catch {
     // Not kept anyway.
   }

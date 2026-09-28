@@ -1,6 +1,9 @@
 import type { WeatherDailyForecast, WeatherForecastWindow, WeatherImpactInput } from "./types";
 
 interface OpenMeteoResponse {
+  /** IANA zone the lat/lon resolved to — requested via `timezone=auto` below. */
+  timezone?: string;
+  utc_offset_seconds?: number;
   current?: {
     time?: string;
     temperature_2m?: number;
@@ -94,11 +97,17 @@ export function normalizeOpenMeteo(data: OpenMeteoResponse): WeatherImpactInput 
   const current = data.current ?? {};
   const hourly = data.hourly ?? {};
   const currentHourIndex = findCurrentHourIndex(hourly.time, current.time);
+  // Open-Meteo's `precipitation` is already the total (rain + showers + snow
+  // water-equivalent) for the hour — summing `rain` and `showers` on top of
+  // it double-counted them. Only fall back to rain+showers when `precipitation`
+  // itself is missing (best-effort reconstruction, not the common case).
   const precipitation =
-    (current.precipitation ?? 0) + (current.rain ?? 0) + (current.showers ?? 0);
+    current.precipitation ?? (current.rain ?? 0) + (current.showers ?? 0);
   const forecast = buildForecast(hourly, currentHourIndex);
   return {
     observedAt: current.time ?? null,
+    timezone: data.timezone ?? null,
+    utcOffsetSeconds: data.utc_offset_seconds ?? null,
     source: "Open-Meteo",
     summary: weatherCodeSummary(current.weather_code),
     condition: current.weather_code == null ? null : codeCondition(current.weather_code),

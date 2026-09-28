@@ -12,21 +12,43 @@ type Geocoded = { latitude: number; longitude: number; timezone: string | null; 
 const env = vi.hoisted(() => ({
   newLook: false,
   user: { id: "user-1", email: "sam@bayside.co.nz" } as { id: string; email: string } | null,
-  quotes: [] as unknown[],
+  // Two buckets, matching the page's two queries — booked/upcoming
+  // (status="scheduled") and everything else, newest first.
+  scheduledRows: [] as unknown[],
+  recentRows: [] as unknown[],
   site: null as unknown,
+  profile: null as { country?: string | null } | null,
   geocoded: null as Geocoded | null,
+  geocodeArgs: [] as unknown[],
   clients: 0,
+  lastQueries: [] as import("@/test/fake-board-db").BoardDbQuery[],
 }));
 
 vi.mock("@/lib/supabase/auth", () => ({ getCachedAuthUser: async () => ({ user: env.user, error: null }) }));
 vi.mock("@/lib/ui/newLook", () => ({ isNewLookOn: async () => env.newLook }));
-vi.mock("@/lib/weather-planning/geocode", () => ({ geocodeAddress: vi.fn(async () => env.geocoded) }));
+vi.mock("@/lib/weather-planning/geocode", () => ({
+  geocodeAddress: vi.fn(async (args: unknown) => {
+    env.geocodeArgs.push(args);
+    return env.geocoded;
+  }),
+}));
 vi.mock("@/lib/supabase/server", async () => {
   const { fakeBoardDb } = await import("@/test/fake-board-db");
   return {
     createClient: async () => {
       env.clients += 1;
-      return fakeBoardDb({ quotes: () => ({ data: env.quotes }), quote_site_context: () => ({ data: env.site }) });
+      const db = fakeBoardDb({
+        // The picker's two queries share a table name; tell them apart by
+        // the status filter each one carries.
+        quotes: (q) => {
+          const scheduledOnly = q.filters.some(([m, c, v]) => m === "eq" && c === "status" && v === "scheduled");
+          return { data: scheduledOnly ? env.scheduledRows : env.recentRows };
+        },
+        quote_site_context: () => ({ data: env.site }),
+        profiles: () => ({ data: env.profile }),
+      });
+      env.lastQueries = db.queries;
+      return db;
     },
   };
 });
@@ -76,13 +98,15 @@ async function bothLooks(quote?: string) {
   return fresh;
 }
 
-const ROWS = [
-  { id: "q-1", status: "draft", scheduled_for: null, quote_data: { job_summary: "New fence", client: { address: "4 Hill St, Katikati" } } },
+const SCHEDULED_ROWS = [
   { id: "q-2", status: "scheduled", scheduled_for: "2026-09-30", quote_data: { job_summary: "Deck rebuild", client: { address: "12 Beach Rd, Tauranga" } } },
+];
+const RECENT_ROWS = [
+  { id: "q-1", status: "draft", scheduled_for: null, quote_data: { job_summary: "New fence", client: { address: "4 Hill St, Katikati" } } },
   { id: "q-3", status: "draft", scheduled_for: null, quote_data: { job_summary: "No address yet", client: {} } },
 ];
 
-// Scheduled jobs first; a quote with no client address isn't offered.
+// Scheduled (booked/upcoming) jobs first; a quote with no client address isn't offered.
 const JOBS = [
   { id: "q-2", label: "Deck rebuild — 12 Beach Rd, Tauranga", address: "12 Beach Rd, Tauranga", scheduled: true },
   { id: "q-1", label: "New fence — 4 Hill St, Katikati", address: "4 Hill St, Katikati", scheduled: false },
@@ -91,10 +115,14 @@ const JOBS = [
 beforeEach(() => {
   env.newLook = false;
   env.user = { id: "user-1", email: "sam@bayside.co.nz" };
-  env.quotes = ROWS;
+  env.scheduledRows = SCHEDULED_ROWS;
+  env.recentRows = RECENT_ROWS;
   env.site = null;
+  env.profile = null;
   env.geocoded = null;
+  env.geocodeArgs = [];
   env.clients = 0;
+  env.lastQueries = [];
 });
 
 afterEach(() => {
@@ -145,6 +173,8 @@ describe("/app/weather, the new-look switch", () => {
       resolvedFrom: "site_context",
     });
     expect(props.geocodeFailed).toBe(false);
+    // Coordinates already on record → never re-geocoded.
+    expect(env.geocodeArgs).toEqual([]);
   });
 
   it("a job with no stored coordinates: its address is placed now, or flagged when it can't be", async () => {
@@ -163,6 +193,44 @@ describe("/app/weather, the new-look switch", () => {
     const lost = await bothLooks("q-1");
     expect(lost.jobLocation).toBeNull();
     expect(lost.geocodeFailed).toBe(true);
+  });
+
+  it("geocoding a job with no stored coordinates prefers a match in the business's own country", async () => {
+    env.profile = { country: "AU" };
+    env.geocoded = { latitude: -37.55, longitude: 175.93, timezone: "Pacific/Auckland", matchedName: "Katikati" };
+    await page("q-1");
+    expect(env.geocodeArgs.at(-1)).toMatchObject({ address: "4 Hill St, Katikati", country: "AU" });
+  });
+
+  it("the most relevant jobs first: booked/upcoming, then newest — never the oldest on record", async () => {
+    // The bug this regresses: a single query ordered by scheduled_for
+    // ascending with limit(40) could fill the whole page with the OLDEST
+    // scheduled dates on record (completed jobs keep their job date), and a
+    // recent draft or a later-dated booking would never be reached at all.
+    const oldCompletedJobs = Array.from({ length: 45 }, (_, i) => ({
+      id: `old-${i}`,
+      status: "completed",
+      scheduled_for: "2020-01-01",
+      quote_data: { job_summary: `Old job ${i}`, client: { address: `${i} Old Rd, Tauranga` } },
+    }));
+    env.recentRows = [RECENT_ROWS[0], ...oldCompletedJobs]; // the recent draft, then 45 old completed jobs
+    const props = await bothLooks();
+    const jobOptions = props.jobOptions as typeof JOBS;
+    expect(jobOptions).toHaveLength(20); // capped, even with 46 eligible rows
+    expect(jobOptions[0]).toEqual(JOBS[0]); // the booked job, still first
+    expect(jobOptions[1]).toEqual(JOBS[1]); // the recent draft — not one of the 45 old jobs
+  });
+
+  it("the picker's own queries exclude deleted jobs and split scheduled from the rest", async () => {
+    await page();
+    const quotesQueries = env.lastQueries.filter((q) => q.table === "quotes");
+    expect(quotesQueries).toHaveLength(2);
+    for (const q of quotesQueries) {
+      expect(q.filters).toContainEqual(["is", "deleted_at", null]);
+      expect(q.filters).toContainEqual(["eq", "user_id", "user-1"]);
+    }
+    expect(quotesQueries[0].filters).toContainEqual(["eq", "status", "scheduled"]);
+    expect(quotesQueries[1].filters).toContainEqual(["neq", "status", "scheduled"]);
   });
 
   it("on, parked for this account: the screen says so, and nothing is looked up", async () => {

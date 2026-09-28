@@ -30,38 +30,78 @@ interface OpenMeteoGeoResponse {
 
 export interface GeocodeArgs {
   address: string;
+  /**
+   * The business's own country — "NZ" | "AU" | "UK" | "US" | "CA" (the app's
+   * `profiles.country` convention, see src/lib/quote-defaults.ts) or a raw
+   * ISO-3166-1 alpha-2 code. A common town name ("Richmond", "Hamilton",
+   * "Cambridge", "Palmerston") exists in more than one of our markets, so
+   * without this a job address can silently resolve to the wrong country's
+   * town. Best-effort, not a hard filter: a same-country match is preferred,
+   * but when there isn't one the unfiltered fallback below still resolves a
+   * genuinely cross-border job address rather than reporting "unknown".
+   */
+  country?: string | null;
   signal?: AbortSignal;
   fetchImpl?: typeof fetch;
 }
 
 /**
+ * The app stores "UK" (see COUNTRY_TAX_DEFAULTS in quote-defaults.ts) but the
+ * assigned ISO-3166-1 alpha-2 code — what Open-Meteo's `countryCode` filter
+ * expects — is "GB" ("UK" is only exceptionally reserved). Everything else
+ * the app uses (NZ/AU/US/CA) already is its own ISO code. Anything that
+ * isn't a plausible 2-letter code is ignored rather than sent, so a stray
+ * value can never break the query.
+ */
+export function openMeteoCountryCode(country: string | null | undefined): string | null {
+  const c = (country ?? "").trim().toUpperCase();
+  if (!c) return null;
+  if (c === "UK") return "GB";
+  return /^[A-Z]{2}$/.test(c) ? c : null;
+}
+
+/**
  * Best-effort geocode. Tries progressively coarser tokens of the address
- * (e.g. "Upper Hutt", then "Wellington") until one resolves. Returns null if
- * none do — the caller must treat null as "cannot assess", not as a default.
+ * (e.g. "Upper Hutt", then "Wellington") until one resolves, preferring a
+ * match in the business's own country when one is given. Returns null if
+ * nothing resolves — the caller must treat null as "cannot assess", not as
+ * a default.
  */
 export async function geocodeAddress(args: GeocodeArgs): Promise<GeocodeResult | null> {
   const doFetch = args.fetchImpl ?? fetch;
-  for (const query of candidateQueries(args.address)) {
-    const params = new URLSearchParams({ name: query, count: "1", language: "en", format: "json" });
-    let res: Response;
-    try {
-      res = await doFetch(`${GEOCODE_URL}?${params}`, { signal: args.signal });
-    } catch {
-      continue;
+  const queries = candidateQueries(args.address);
+  const countryCode = openMeteoCountryCode(args.country);
+
+  const search = async (withCountry: boolean): Promise<GeocodeResult | null> => {
+    for (const query of queries) {
+      const params = new URLSearchParams({ name: query, count: "1", language: "en", format: "json" });
+      if (withCountry && countryCode) params.set("countryCode", countryCode);
+      let res: Response;
+      try {
+        res = await doFetch(`${GEOCODE_URL}?${params}`, { signal: args.signal });
+      } catch {
+        continue;
+      }
+      if (!res.ok) continue;
+      const data = (await res.json()) as OpenMeteoGeoResponse;
+      const hit = data.results?.[0];
+      if (hit) {
+        return {
+          latitude: hit.latitude,
+          longitude: hit.longitude,
+          timezone: hit.timezone ?? null,
+          matchedName: [hit.name, hit.admin1, hit.country].filter(Boolean).join(", "),
+        };
+      }
     }
-    if (!res.ok) continue;
-    const data = (await res.json()) as OpenMeteoGeoResponse;
-    const hit = data.results?.[0];
-    if (hit) {
-      return {
-        latitude: hit.latitude,
-        longitude: hit.longitude,
-        timezone: hit.timezone ?? null,
-        matchedName: [hit.name, hit.admin1, hit.country].filter(Boolean).join(", "),
-      };
-    }
+    return null;
+  };
+
+  if (countryCode) {
+    const inCountry = await search(true);
+    if (inCountry) return inCountry;
   }
-  return null;
+  return search(false);
 }
 
 /**

@@ -46,6 +46,14 @@ export interface WeatherDailyForecast {
 
 export interface WeatherImpactInput {
   observedAt?: string | null;
+  /**
+   * IANA zone the forecast location resolved to (Open-Meteo's own
+   * `timezone`, requested via `timezone=auto`) — the observed time must be
+   * shown in THIS zone, not the viewer's device zone or a hardcoded one.
+   */
+  timezone?: string | null;
+  /** Open-Meteo's `utc_offset_seconds` for that zone at `observedAt`. */
+  utcOffsetSeconds?: number | null;
   source?: string | null;
   summary?: string | null;
   /** Coarse condition right now (live fetches only), for an icon. */

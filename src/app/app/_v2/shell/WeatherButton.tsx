@@ -50,7 +50,7 @@ async function getJson(url: string): Promise<{ ok: boolean; status: number; body
 }
 
 /** The browser's side of the weather. Only from effects and taps, never while rendering. */
-function browserDeps(): WeatherDeps {
+function browserDeps(accountKey: string): WeatherDeps {
   return {
     storage: storage("sessionStorage"),
     now: () => Date.now(),
@@ -62,6 +62,7 @@ function browserDeps(): WeatherDeps {
       }),
     currentFix,
     getJson,
+    accountKey,
   };
 }
 
@@ -151,13 +152,14 @@ export function WeatherButtonView({
  * switching tabs is instant; looked up again when the app comes back after
  * that. Your trade is remembered on this device.
  */
-export function WeatherButton({ preview }: { preview?: WeatherState } = {}) {
+export function WeatherButton({ preview, accountKey }: { preview?: WeatherState; accountKey?: string | null } = {}) {
   const [state, setState] = useState<WeatherState>(preview ?? { kind: "loading" });
   const [trade, setTrade] = useState<WeatherImpactTrade>(DEFAULT_TRADE);
   const [open, setOpen] = useState(false);
   const [locating, setLocating] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const shownAt = useRef(0);
+  const key = accountKey ?? "";
 
   useEffect(() => {
     if (state.kind === "ready") shownAt.current = state.reading.at;
@@ -168,7 +170,7 @@ export function WeatherButton({ preview }: { preview?: WeatherState } = {}) {
     if (preview) return;
     let live = true;
     const saved = readTrade(storage("localStorage"));
-    void resolveWeather(browserDeps()).then((next) => {
+    void resolveWeather(browserDeps(key)).then((next) => {
       if (!live) return;
       setTrade(saved);
       setState(next);
@@ -176,7 +178,7 @@ export function WeatherButton({ preview }: { preview?: WeatherState } = {}) {
     // Back in the app after a while: a stale forecast is looked up again.
     const onVisible = () => {
       if (document.visibilityState !== "visible" || Date.now() - shownAt.current < WEATHER_TTL_MS) return;
-      void resolveWeather(browserDeps()).then((next) => {
+      void resolveWeather(browserDeps(key)).then((next) => {
         if (live) setState(next);
       });
     };
@@ -185,17 +187,17 @@ export function WeatherButton({ preview }: { preview?: WeatherState } = {}) {
       live = false;
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [preview]);
+  }, [preview, key]);
 
   const retry = () => {
     setState({ kind: "loading" });
-    void resolveWeather(browserDeps(), { fresh: true }).then(setState);
+    void resolveWeather(browserDeps(key), { fresh: true }).then(setState);
   };
 
   const locate = () => {
     setNotice(null);
     setLocating(true);
-    void weatherFromPhone(browserDeps()).then((next) => {
+    void weatherFromPhone(browserDeps(key)).then((next) => {
       setLocating(false);
       if (next) setState(next);
       else setNotice(NO_FIX_NOTICE);
@@ -218,7 +220,7 @@ export function WeatherButton({ preview }: { preview?: WeatherState } = {}) {
         onTrade={chooseTrade}
         onRetry={retry}
         onEditAddress={() => {
-          forgetBase(storage("sessionStorage"));
+          forgetBase(storage("sessionStorage"), key);
           setOpen(false);
         }}
         onUseLocation={locate}

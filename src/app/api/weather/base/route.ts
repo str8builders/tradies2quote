@@ -24,8 +24,8 @@ class AddressNotFound extends Error {
  * the lookup swallows network errors, and a blip shouldn't stick for a day.
  */
 const placeOf = unstable_cache(
-  async (address: string) => {
-    const geo = await geocodeAddress({ address, signal: AbortSignal.timeout(8000) });
+  async (address: string, country: string | null) => {
+    const geo = await geocodeAddress({ address, country, signal: AbortSignal.timeout(8000) });
     if (!geo) throw new AddressNotFound(address);
     return { lat: geo.latitude, lng: geo.longitude, locality: geo.matchedName.split(",")[0]?.trim() || null };
   },
@@ -43,14 +43,14 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data: profile } = await supabase.from("profiles").select("address").eq("id", user.id).maybeSingle();
+  const { data: profile } = await supabase.from("profiles").select("address, country").eq("id", user.id).maybeSingle();
   const address = typeof profile?.address === "string" ? profile.address.trim() : "";
   if (!address) {
     return NextResponse.json({ error: "No business address yet.", reason: "no-address" } satisfies NoBaseWeather, { status: 404 });
   }
 
   try {
-    const place = await placeOf(address);
+    const place = await placeOf(address, profile?.country ?? null);
     const weather = await loadHereWeather(roundCoord(place.lat), roundCoord(place.lng));
     return NextResponse.json({ ...weather, locality: place.locality } satisfies BaseWeather, {
       headers: { "cache-control": "private, max-age=300" },

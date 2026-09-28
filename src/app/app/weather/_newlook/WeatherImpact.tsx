@@ -278,7 +278,9 @@ function Verdict({ w }: { w: WeatherImpactState }) {
         <StatusPill>
           {result.confidence === "degraded" ? "Incomplete weather data" : (weather.source ?? "Manual conditions")}
         </StatusPill>
-        {weather.observedAt ? <StatusPill>{`Observed ${formatObserved(weather.observedAt)}`}</StatusPill> : null}
+        {weather.observedAt ? (
+          <StatusPill>{`Observed ${formatObserved(weather.observedAt, weather.timezone, weather.utcOffsetSeconds)}`}</StatusPill>
+        ) : null}
       </div>
     </section>
   );

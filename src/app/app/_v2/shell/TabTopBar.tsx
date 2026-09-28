@@ -41,7 +41,7 @@ export function TabTopBar({ data, title, description, weatherPreview }: TabTopBa
             <h1 className="ui-heading truncate text-ui-2xl text-ui-text">{greeting ? data.greeting : title}</h1>
           )}
         </div>
-        {data.weather ? <WeatherButton preview={weatherPreview} /> : null}
+        {data.weather ? <WeatherButton preview={weatherPreview} accountKey={data.email} /> : null}
       </div>
       {description ? <p className="text-ui-base text-ui-muted">{description}</p> : null}
       {/* Home only: a one-time pointer to the settings behind the photo. */}

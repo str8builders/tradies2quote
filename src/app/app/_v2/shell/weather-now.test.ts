@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Fix } from "@/lib/location/fix";
 import type { HereWeather } from "@/lib/weather-impact/here";
 import {
+  accountTag,
   DEFAULT_TRADE,
   TRADE_KEY,
   WEATHER_TTL_MS,
@@ -56,7 +57,15 @@ function deps({
   fix = { lat: -37.68679, lng: 176.16543, acc: 12 },
   reply,
   storage = memoryStorage(),
-}: { clock?: { t: number }; allowed?: boolean; fix?: Fix | null; reply?: (url: string) => Reply; storage?: StorageLike | null } = {}) {
+  accountKey = "user-1",
+}: {
+  clock?: { t: number };
+  allowed?: boolean;
+  fix?: Fix | null;
+  reply?: (url: string) => Reply;
+  storage?: StorageLike | null;
+  accountKey?: string;
+} = {}) {
   return {
     storage,
     now: () => clock.t,
@@ -69,6 +78,7 @@ function deps({
           ? { ok: true, status: 200, body: { ...WEATHER, locality: "Tauranga" } }
           : { ok: true, status: 200, body: WEATHER }),
     ),
+    accountKey,
   } satisfies WeatherDeps;
 }
 
@@ -142,7 +152,7 @@ describe("resolveWeather: where the forecast is for", () => {
     clock.t = NOW + 6 * 60 * 1000;
     await resolveWeather(d);
     expect(d.getJson).toHaveBeenCalledTimes(2);
-    forgetBase(d.storage);
+    forgetBase(d.storage, d.accountKey);
     await resolveWeather(d);
     expect(d.getJson).toHaveBeenCalledTimes(3);
   });
@@ -186,10 +196,74 @@ describe("resolveWeather: where the forecast is for", () => {
   });
 
   it("a stale or damaged session copy is ignored", async () => {
-    const storage = memoryStorage({ "t2q-weather:last": "base", "t2q-weather:base": "{not json" });
+    const tag = accountTag("user-1");
+    const storage = memoryStorage({ [`t2q-weather:${tag}:last`]: "base", [`t2q-weather:${tag}:base`]: "{not json" });
     const d = deps({ storage });
     await resolveWeather(d);
     expect(d.getJson).toHaveBeenCalledTimes(1);
+  });
+});
+
+// The bug this closes: sessionStorage outlives a sign-out within the same
+// browser tab, and the old cache keys ("t2q-weather:last", ":base", ":nofix",
+// plus one per spot) carried no account at all. A shared phone, or the next
+// person signing in on the same tab, would see the PREVIOUS account's cached
+// place and forecast until the TTL lapsed. Every key is now namespaced to
+// `deps.accountKey`.
+describe("the session cache is namespaced per account (a shared phone, or the next sign-in)", () => {
+  it("two accounts sharing one tab/storage never see each other's cached place", async () => {
+    const storage = memoryStorage();
+    const alice = deps({ storage, accountKey: "alice@bayside.co.nz", reply: () => ({ ok: true, status: 200, body: { ...WEATHER, locality: "Tauranga" } }) });
+    expect(ready(await resolveWeather(alice)).reading.locality).toBe("Tauranga");
+    expect(alice.getJson).toHaveBeenCalledTimes(1);
+
+    // Same tab, same storage, a DIFFERENT account signs in: must not reuse
+    // (or clobber) Alice's cached reading — a fresh lookup, not her forecast.
+    const bob = deps({ storage, accountKey: "bob@bayside.co.nz", reply: () => ({ ok: true, status: 200, body: { ...WEATHER, locality: "Rotorua" } }) });
+    expect(ready(await resolveWeather(bob)).reading.locality).toBe("Rotorua");
+    expect(bob.getJson).toHaveBeenCalledTimes(1); // a real fetch, not Alice's cache
+
+    // Alice's own next tab still gets HER cached reading, untouched by Bob.
+    const aliceAgain = deps({ storage, accountKey: "alice@bayside.co.nz" });
+    expect(ready(await resolveWeather(aliceAgain)).reading.locality).toBe("Tauranga");
+    expect(aliceAgain.getJson).not.toHaveBeenCalled();
+  });
+
+  it("switching accounts never inherits 'the phone couldn't find itself' from the last one", async () => {
+    const storage = memoryStorage();
+    const alice = deps({ storage, accountKey: "alice@bayside.co.nz", allowed: true, fix: null });
+    expect(ready(await resolveWeather(alice)).reading.source).toBe("base");
+    expect(alice.currentFix).toHaveBeenCalledTimes(1); // tried, and missed
+
+    // Bob's phone CAN find him — the previous account's missed-fix note
+    // must not make his session skip trying.
+    const bob = deps({ storage, accountKey: "bob@bayside.co.nz", allowed: true, fix: { lat: -38.13, lng: 176.25, acc: 10 } });
+    expect(ready(await resolveWeather(bob)).reading.source).toBe("device");
+    expect(bob.currentFix).toHaveBeenCalledTimes(1);
+  });
+
+  it("forgetBase only clears the calling account's own cached business address", async () => {
+    const storage = memoryStorage();
+    const alice = deps({ storage, accountKey: "alice@bayside.co.nz" });
+    const bob = deps({ storage, accountKey: "bob@bayside.co.nz" });
+    await resolveWeather(alice);
+    await resolveWeather(bob);
+    expect(alice.getJson).toHaveBeenCalledTimes(1);
+    expect(bob.getJson).toHaveBeenCalledTimes(1);
+
+    forgetBase(storage, "alice@bayside.co.nz");
+    await resolveWeather(alice);
+    expect(alice.getJson).toHaveBeenCalledTimes(2); // hers was forgotten
+    await resolveWeather(bob);
+    expect(bob.getJson).toHaveBeenCalledTimes(1); // his is untouched
+  });
+
+  it("no account key (defensive default): still its own bucket, never the bare old keys", async () => {
+    const storage = memoryStorage();
+    const anon = deps({ storage, accountKey: "" });
+    await resolveWeather(anon);
+    expect(storage.data["t2q-weather:anon:last"]).toBeDefined();
+    expect(storage.data["t2q-weather:last"]).toBeUndefined();
   });
 });
 
@@ -288,5 +362,15 @@ describe("the words", () => {
     expect(degrees(null)).toBeNull();
     expect(spotKey({ lat: -37.6, lng: 176 })).toBe("-37.60,176.00");
     expect(localDayKey(new Date(2026, 8, 6))).toBe("2026-09-06");
+  });
+});
+
+describe("accountTag", () => {
+  it("is stable, short, and never the address itself", () => {
+    const tag = accountTag("sam@example.com");
+    expect(tag).toBe(accountTag("sam@example.com"));
+    expect(tag).not.toContain("@");
+    expect(tag.length).toBeLessThanOrEqual(7);
+    expect(accountTag("jo@example.com")).not.toBe(tag);
   });
 });

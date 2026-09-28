@@ -58,37 +58,57 @@ export default async function WeatherImpactPage({
 
   if (enabled) {
     const supabase = await createClient();
-    // Scheduled jobs first (the ones weather decisions are about), then the
-    // most recent others. RLS scopes everything to this user.
-    const { data: rows } = await supabase
-      .from("quotes")
-      .select("id, status, scheduled_for, quote_data")
-      .eq("user_id", user.id)
-      .is("deleted_at", null)
-      .order("scheduled_for", { ascending: true, nullsFirst: false })
-      .order("created_at", { ascending: false })
-      .limit(40);
+    // Most relevant first: booked/upcoming (status=scheduled) jobs, soonest
+    // first, then everything else by newest. Two separate queries rather
+    // than one ordered-and-limited(40) blend — a business with more than 40
+    // OLD jobs that still carry a past scheduled_for (completed work keeps
+    // its job date) could otherwise fill the whole page with the oldest
+    // scheduled dates on record and never reach a recent draft, or even a
+    // genuinely upcoming booking dated later than that. RLS scopes
+    // everything to this user regardless.
+    const [{ data: scheduledRows }, { data: recentRows }] = await Promise.all([
+      supabase
+        .from("quotes")
+        .select("id, status, scheduled_for, quote_data")
+        .eq("user_id", user.id)
+        .eq("status", "scheduled")
+        .is("deleted_at", null)
+        .order("scheduled_for", { ascending: true, nullsFirst: false })
+        .limit(40),
+      supabase
+        .from("quotes")
+        .select("id, status, scheduled_for, quote_data")
+        .eq("user_id", user.id)
+        .neq("status", "scheduled")
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .limit(40),
+    ]);
 
-    for (const row of rows ?? []) {
-      const address = addressFromQuoteData(row.quote_data);
-      if (!address) continue; // no job address on record → not offerable
-      const qd = row.quote_data as Record<string, unknown> | null;
-      const summary =
-        qd && typeof qd.job_summary === "string" && qd.job_summary.trim()
-          ? qd.job_summary.trim()
-          : "Quote";
-      jobOptions.push({
-        id: row.id,
-        label: `${summary.slice(0, 60)} — ${address.slice(0, 60)}`,
-        address,
-        scheduled: row.status === "scheduled",
-      });
-    }
-    // Scheduled jobs at the top of the picker; cap the list.
-    jobOptions = [
-      ...jobOptions.filter((o) => o.scheduled),
-      ...jobOptions.filter((o) => !o.scheduled),
-    ].slice(0, 20);
+    const toOptions = (
+      rows: Array<{ id: string; quote_data: unknown }> | null,
+      scheduled: boolean,
+    ): JobOption[] => {
+      const out: JobOption[] = [];
+      for (const row of rows ?? []) {
+        const address = addressFromQuoteData(row.quote_data);
+        if (!address) continue; // no job address on record → not offerable
+        const qd = row.quote_data as Record<string, unknown> | null;
+        const summary =
+          qd && typeof qd.job_summary === "string" && qd.job_summary.trim()
+            ? qd.job_summary.trim()
+            : "Quote";
+        out.push({
+          id: row.id,
+          label: `${summary.slice(0, 60)} — ${address.slice(0, 60)}`,
+          address,
+          scheduled,
+        });
+      }
+      return out;
+    };
+    // Booked/upcoming jobs at the top of the picker; cap the list.
+    jobOptions = [...toOptions(scheduledRows, true), ...toOptions(recentRows, false)].slice(0, 20);
 
     const selected = selectedQuoteId
       ? jobOptions.find((o) => o.id === selectedQuoteId) ?? null
@@ -112,7 +132,14 @@ export default async function WeatherImpactPage({
         };
       } else {
         // 2. Geocode the stored job address now (server-side, free API).
-        const geo = await geocodeAddress({ address: selected.address });
+        // Prefer a match in the business's own country — a town name like
+        // "Richmond" exists in more than one of our markets.
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("country")
+          .eq("id", user.id)
+          .maybeSingle();
+        const geo = await geocodeAddress({ address: selected.address, country: profile?.country ?? null });
         if (geo) {
           jobLocation = {
             quoteId: selected.id,
