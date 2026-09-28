@@ -184,7 +184,7 @@ async function DashboardData({
       // → null is the common case.
       supabase
         .from("profiles")
-        .select("business_name, address, request_slug")
+        .select("business_name, address, request_slug, country")
         .eq("id", userId)
         .maybeSingle(),
       // Count of the tradie's own PRICED materials. Generated quotes never
@@ -270,7 +270,7 @@ async function DashboardData({
   // <WeekOutlook /> strip uses (unstable_cache dedupes), so this adds
   // no extra upstream calls. Empty map when no address / no forecast.
   const weekOutlookData = profile?.address
-    ? await getWeekOutlook(profile.address as string).catch(() => null)
+    ? await getWeekOutlook(profile.address as string, (profile.country as string | null) ?? null).catch(() => null)
     : null;
   const calendarWeather = Object.fromEntries(
     (weekOutlookData?.days ?? []).map((d) => [
@@ -431,6 +431,7 @@ async function DashboardData({
               renders nothing without a profile address or forecast. */}
           <WeekOutlook
             address={(profile?.address as string | null) ?? null}
+            country={(profile?.country as string | null) ?? null}
             todayISO={todayISO}
           />
 

@@ -81,8 +81,10 @@ export function classifyOutlookDay(d: WeatherDailyForecast): DayOutlook {
   };
 }
 
-async function loadWeekOutlook(address: string): Promise<WeekOutlookData | null> {
-  const geo = await geocodeAddress({ address });
+async function loadWeekOutlook(address: string, country?: string | null): Promise<WeekOutlookData | null> {
+  // The business's country first, so a town name found in several countries
+  // ("Richmond") is the business's own.
+  const geo = await geocodeAddress({ address, country: country ?? undefined });
   if (!geo) return null;
   const input = await fetchOpenMeteoWeather({
     latitude: geo.latitude,

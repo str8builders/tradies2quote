@@ -83,11 +83,14 @@ export function WeatherLineView({
  */
 export async function WeatherLine({
   address,
+  country = null,
   todayKey,
   href,
   variant = "row",
 }: {
   address: string;
+  /** The business's country, so the address is looked up there first. */
+  country?: string | null;
   todayKey: string | null;
   href: string | null;
   variant?: "row" | "chip";
@@ -95,7 +98,7 @@ export async function WeatherLine({
   let day: DayOutlook | null = null;
   let locality = "";
   try {
-    const outlook = await getWeekOutlook(address);
+    const outlook = await getWeekOutlook(address, country);
     day = outlook ? pickToday(outlook.days, todayKey) : null;
     locality = outlook?.locality ?? "";
   } catch {

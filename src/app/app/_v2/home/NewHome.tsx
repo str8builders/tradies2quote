@@ -25,7 +25,7 @@ function requestTime(): Date {
 
 export interface HomeData extends Omit<HomeViewProps, "weather"> {
   /** Where the weather line is for, or null for none. */
-  weather: { address: string; todayKey: string | null; href: string | null } | null;
+  weather: { address: string; country: string | null; todayKey: string | null; href: string | null } | null;
 }
 
 /**
@@ -83,6 +83,7 @@ export async function loadHomeData({
     weather: profile.address
       ? {
           address: profile.address,
+          country: profile.country ?? null,
           todayKey: dayKeyInZone(now, timeZone),
           href: isWeatherImpactEnabled(isOwner) ? "/app/weather" : null,
         }
@@ -112,7 +113,7 @@ async function HomeBody({ userId, isOwner, t2qcal }: { userId: string; isOwner: 
         weather={
           weather ? (
             <Suspense fallback={<Skeleton shape="line" className="h-9 w-48 rounded-full" />}>
-              <WeatherLine address={weather.address} todayKey={weather.todayKey} href={weather.href} variant="chip" />
+              <WeatherLine address={weather.address} country={weather.country} todayKey={weather.todayKey} href={weather.href} variant="chip" />
             </Suspense>
           ) : null
         }

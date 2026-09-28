@@ -269,7 +269,7 @@ describe("loadHomeData: the day, from real rows", () => {
     expect(data.tiles?.paidThisMonth).toEqual({ amount: 575, count: 1, currency: "NZD", otherCurrencies: 0 });
     // Name, logo, rate, 9 prices and a quote: set up, so no card.
     expect(data.setup).toBeNull();
-    expect(data.weather).toEqual({ address: "Tauranga", todayKey: "2026-09-25", href: "/app/weather" });
+    expect(data.weather).toEqual({ address: "Tauranga", country: "NZ", todayKey: "2026-09-25", href: "/app/weather" });
     expect(data.failed).toBe(false);
   });
 

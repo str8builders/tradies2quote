@@ -50,9 +50,12 @@ function dayLabel(dateISO: string, todayISO: string): string {
 
 export async function WeekOutlook({
   address,
+  country = null,
   todayISO,
 }: {
   address: string | null;
+  /** The business's country, so the address is looked up there first. */
+  country?: string | null;
   todayISO: string;
 }) {
   if (!address) {
@@ -74,7 +77,7 @@ export async function WeekOutlook({
   }
   let outlook;
   try {
-    outlook = await getWeekOutlook(address);
+    outlook = await getWeekOutlook(address, country);
   } catch {
     return null;
   }
