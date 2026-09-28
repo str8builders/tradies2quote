@@ -202,8 +202,9 @@ export function QuoteSummary() {
         </div>
       </div>
       <div style={card}>
-        <TotalsRow label="Materials subtotal" value={formatMoney(EXAMPLE.materialsSubtotal)} />
-        <TotalsRow label="Markup" value={formatMoney(EXAMPLE.markup)} />
+        {/* The client never sees the tradie's markup: in the app it is folded
+            into the material prices (src/lib/quote-client-view.ts). */}
+        <TotalsRow label="Materials subtotal" value={formatMoney(EXAMPLE.materialsSubtotal + EXAMPLE.markup)} />
         <TotalsRow label="Labour subtotal" value={formatMoney(EXAMPLE.labourSubtotal)} />
         <TotalsRow label="Subtotal (excl. GST)" value={formatMoney(EXAMPLE.subtotal)} divider />
         <TotalsRow label={`GST (${EXAMPLE.gstRate}%)`} value={formatMoney(EXAMPLE.gst)} />
