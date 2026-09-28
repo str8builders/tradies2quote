@@ -7,6 +7,8 @@ describe("clip addresses", () => {
     expect(clipSrc("request", 600)).toBe("/jobsite/screens/request-600.mp4?v=2");
     expect(firstFrameSrc("request")).toBe("/jobsite/screens/request-first.webp?v=2");
     expect(lastFrameSrc("request")).toBe("/jobsite/screens/request.webp?v=2");
+    // The client's quote without a markup row (28 Sep 2026).
+    expect(clipSrc("send", 420)).toBe("/jobsite/screens/send-420.mp4?v=2");
   });
 
   it("the others keep their plain file names", () => {
