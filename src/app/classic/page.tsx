@@ -25,9 +25,13 @@ import { redirect } from "next/navigation";
 // The website as it was before the 3D job-site homepage (27 Sep 2026), kept
 // to look back at: not indexed, and the home page is the canonical one. The
 // same code is tagged website-classic-2026-09-27.
+// No `alternates.canonical` here: pairing noindex with a canonical pointing
+// at "/" sends mixed signals (Google's own guidance is not to combine them),
+// and it very nearly gave the home page a canonical of a page that isn't
+// itself indexed. `robots.index: false` alone is enough to keep this out of
+// search.
 export const metadata: Metadata = {
   title: "The previous website",
-  alternates: { canonical: "/" },
   robots: { index: false, follow: false },
 };
 

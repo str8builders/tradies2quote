@@ -23,7 +23,10 @@ import { isNativeShellRequest } from "@/lib/native-shell";
 export async function generateMetadata(): Promise<Metadata> {
   const nativeShell = await isNativeShellRequest();
   return {
-    title: "Help & FAQ — Tradies2Quote",
+    // `{ absolute }` bypasses the root layout's "Tradies2Quote | %s" title
+    // template — a plain string here rendered as
+    // "Tradies2Quote | Help & FAQ — Tradies2Quote".
+    title: { absolute: "Help & FAQ — Tradies2Quote" },
     description: nativeShell
       ? "Answers to common questions about Tradies2Quote — the voice-first AI quoting app for tradies. Sending quotes, the materials library."
       : "Answers to common questions about Tradies2Quote — the voice-first AI quoting app for tradies. Trial, billing, sending quotes, the materials library.",
@@ -237,7 +240,7 @@ export default async function HelpPage() {
   const nativeShell = await isNativeShellRequest();
   const faqs = nativeShell ? FAQS.filter((f) => !f.billing) : FAQS;
   return (
-    <div
+    <main
       data-theme="dark"
       className="studio-public studio-help min-h-[100dvh] text-white"
     >
@@ -347,6 +350,6 @@ export default async function HelpPage() {
           )}
         </div>
       </div>
-    </div>
+    </main>
   );
 }

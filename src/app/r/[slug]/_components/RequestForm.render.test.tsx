@@ -16,4 +16,6 @@ describe("public quote request form — photo field", () => {
   it("accepts iPhone HEIC photos (they are converted on the device before upload)", () => {
     expect(html).toMatch(/accept="[^"]*image\/heic/);
   });
+
 });
+

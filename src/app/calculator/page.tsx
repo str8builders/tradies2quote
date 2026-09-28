@@ -21,12 +21,12 @@ import nativeCatalog from "@/t2qcal/lib/native-catalog.json";
 export const metadata: Metadata = {
   title: "T2QCAL — the calculator that quotes",
   description:
-    "Construction calculators that sign in with your Tradies2Quote account. 95 calculators with live measured drawings, camera measuring for pitch, height and lengths, 76 trade manuals and standards that read offline, and quantities that cross straight into a draft quote at your own markup and GST.",
+    "Construction calculators that sign in with your Tradies2Quote account. 95 calculators with live measured drawings, camera measuring for pitch, height and lengths, 76 trade manuals and standards (61 of them readable offline), and quantities that cross straight into a draft quote at your own markup and GST.",
   alternates: { canonical: "/calculator" },
   openGraph: {
     title: "T2QCAL — the calculator that quotes",
     description:
-      "95 construction calculators, camera measuring, 76 trade manuals offline, and quantities that go straight into a Tradies2Quote draft. One account, both apps.",
+      "95 construction calculators, camera measuring, 76 trade manuals and standards (61 offline), and quantities that go straight into a Tradies2Quote draft. One account, both apps.",
     url: "/calculator",
   },
 };
@@ -300,7 +300,7 @@ export default async function CalculatorPage() {
               ))}
             </ul>
 
-            <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-400">
+            <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-300">
               Metric and imperial throughout · quantities cross into a quote
               draft with the working attached
             </p>
@@ -335,7 +335,7 @@ export default async function CalculatorPage() {
                     className="rounded-sm border border-ink-600 bg-ink-900 px-3 py-1.5 text-sm text-ink-100"
                   >
                     {name}{" "}
-                    <span className="font-mono text-xs text-ink-400">
+                    <span className="font-mono text-xs text-ink-300">
                       ×{count}
                     </span>
                   </li>
@@ -389,7 +389,7 @@ export default async function CalculatorPage() {
                 </li>
               ))}
             </ul>
-            <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-400">
+            <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-300">
               A check, not a survey · take the tape for the cut
             </p>
           </div>
@@ -433,7 +433,7 @@ export default async function CalculatorPage() {
                 millimetres-to-inches conversion, and padding it with a
                 plausible-looking reference would be worse than saying nothing.
               </p>
-              <p className="mt-6 flex items-start gap-2.5 text-sm text-ink-400">
+              <p className="mt-6 flex items-start gap-2.5 text-sm text-ink-300">
                 <MagnifyingGlass
                   size={18}
                   weight="bold"
@@ -483,7 +483,7 @@ export default async function CalculatorPage() {
               ))}
             </dl>
 
-            <p className="mt-12 text-center text-sm text-ink-400">
+            <p className="mt-12 text-center text-sm text-ink-300">
               Already quoting with us?{" "}
               <Link href="/app" className="text-brand hover:underline">
                 Open Tradies2Quote
@@ -582,7 +582,7 @@ function Shot({
           className="h-auto w-full"
         />
       </div>
-      <figcaption className="mt-3 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-ink-400 md:text-left">
+      <figcaption className="mt-3 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-ink-300 md:text-left">
         {caption}
       </figcaption>
     </figure>

@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const alt =
-  "tradies2Quote — Voice in. Quote out. Under 60 seconds.";
+  "tradies2Quote — Voice in. Quote out. Your final say.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -88,7 +88,7 @@ export default function OgImage() {
             }}
           >
             <span>Voice in. Quote out.</span>
-            <span style={{ color: "#ff5a1f" }}>Under 60 seconds.</span>
+            <span style={{ color: "#ff5a1f" }}>Your final say.</span>
           </div>
           <div
             style={{
@@ -98,7 +98,7 @@ export default function OgImage() {
               display: "flex",
             }}
           >
-            Voice-first AI quoting for tradies. Built for NZ, AU, UK, US, CA.
+            Voice-first AI quoting for NZ tradies.
           </div>
         </div>
       </div>

@@ -51,9 +51,11 @@ describe("the homepage: the 3D job-site website", () => {
 });
 
 describe("the previous homepage, kept at /classic", () => {
-  it("is not indexed, and points search engines at the homepage", () => {
+  it("is not indexed, and carries no canonical that could point search engines elsewhere", () => {
     expect(classicMetadata.robots).toMatchObject({ index: false, follow: false });
-    expect(classicMetadata.alternates?.canonical).toBe("/");
+    // Not "/" — noindex + a canonical pointing at the (indexed) homepage
+    // sends mixed signals. noindex alone is enough.
+    expect(classicMetadata.alternates?.canonical).toBeUndefined();
   });
 
   it("never renders in the native shell either", async () => {

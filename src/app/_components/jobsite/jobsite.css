@@ -325,7 +325,12 @@
 .jobsite-faq summary:focus-visible { outline: 2px solid var(--js-hivis); outline-offset: 2px; }
 .jobsite-faq details p { margin: 0 0 18px; max-width: 64ch; color: var(--js-muted); line-height: 1.6; }
 .jobsite-help { margin-top: 40px; color: var(--js-muted); }
-.jobsite-help a { color: var(--js-text); text-decoration-color: var(--js-accent); text-underline-offset: 4px; }
+/* --js-text (#f2efea) against --js-muted (#bdb7ae) is only ~1.7:1 — too
+   close to tell the link apart from the surrounding text by colour alone
+   (WCAG 1.4.1, use of color). text-decoration-color had no visible line to
+   colour without also setting text-decoration itself — added below,
+   matching .jobsite-t2qcal a's identical underline treatment. */
+.jobsite-help a { color: var(--js-text); text-decoration: underline; text-decoration-color: var(--js-accent); text-underline-offset: 4px; }
 
 /* ── Step links and the sticky start button ────────────────────────── */
 .jobsite-steps {

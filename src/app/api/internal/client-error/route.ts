@@ -20,13 +20,24 @@ export const dynamic = "force-dynamic";
  *     whether a write happened (and never reveals throttling: no oracle).
  *   - Non-blocking + failure-safe: the write is scheduled off the response via
  *     captureClientReport; this handler never throws.
- *   - Bounded: oversized or non-JSON payloads are dropped (still 204).
+ *   - Bounded: only an absurdly oversized or non-JSON payload is dropped
+ *     (still 204) — see MAX_BYTES. A legitimate report that's merely large
+ *     (a long stack) is truncated field-by-field downstream instead of
+ *     dropped whole: see sanitizeClientReport's own MAX_STACK/MAX_MESSAGE.
  *   - Rate-limited per IP (short fixed window) so a runaway client loop or a
  *     scripted spammer can't inflate event volume. Throttled requests are
  *     silently dropped (no write) and STILL return 204. The cap is far above
  *     any real browser's error rate, so normal users never notice it.
  */
-const MAX_BYTES = 8 * 1024; // 8 KB — generous for name+message+stack, caps abuse
+// The browser caps its own stack at 3,500 characters (clientReport.ts), but
+// JSON-escaping (every `\n` in a stack becomes `\\n`, etc.) can close to
+// double that on the wire, plus name/message/path/flags. 8 KB was cutting it
+// close enough that real reports were silently dropped rather than merely
+// truncated. 32 KB keeps this an abuse guard, not a loss mechanism for a
+// legitimate report — sanitizeClientReport truncates the parsed fields
+// (stack to 4 KB, message to 500 chars) regardless of how close to this
+// ceiling the raw body lands.
+const MAX_BYTES = 32 * 1024;
 // Per IP, per serverless instance: a real browser never emits anywhere near 60
 // distinct errors a minute; a runaway loop / spammer does. Recovers each window.
 const RATE_LIMIT = 60;

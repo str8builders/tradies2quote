@@ -29,7 +29,7 @@ export function SectionTabs() {
                   className={`inline-flex items-center px-4 py-4 font-mono text-xs uppercase tracking-[0.2em] border-b-2 transition-colors ${
                     active
                       ? "text-white border-brand"
-                      : "text-ink-400 border-transparent hover:text-ink-100"
+                      : "text-ink-300 border-transparent hover:text-ink-100"
                   }`}
                 >
                   {tab.label}

@@ -105,6 +105,13 @@ describe("the job-site story is complete as plain HTML (search, screen readers, 
     expect(text).toContain("support@tradies2quote.com");
   });
 
+  it("never marks a room's still image as high priority — the house is several screens below the hero", () => {
+    // talk.jpg (the first room) used to preload at fetchpriority="high"
+    // despite being well below the fold; next/image only emits the
+    // attribute when `priority` is set, so its absence proves the prop is gone.
+    expect(html).not.toMatch(/fetchpriority="high"/);
+  });
+
   it("makes no claim the app can't back up", () => {
     expect(text).not.toMatch(/60 seconds|under a minute/i);
     expect(text).not.toMatch(/testimonial|trusted by \d|\d+\+? tradies use/i);

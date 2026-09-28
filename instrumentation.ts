@@ -45,22 +45,28 @@ export async function onRequestError(
     // Node runtime only — the internal sink hashes fingerprints with
     // node:crypto, which the Edge runtime (proxy only) can't load.
     if (process.env.NEXT_RUNTIME === "nodejs") {
-      // "/" has no Server Actions: action-id errors there are exploit scans
-      // (React2Shell probes with ids like "x", "0", "action"), not app bugs.
+      // Unknown action ids aren't app bugs: on "/" (which has no Server
+      // Actions) they're exploit scans (React2Shell probes with ids like "x",
+      // "0", "action"); anywhere else they're a page from before the last
+      // deploy, which reloads itself on the client.
       const message = err instanceof Error ? err.message : String(err);
-      if (
-        request.path === "/" &&
-        /Failed to find Server Action|Server Reference ID did not match/i.test(message)
-      ) {
+      if (/Failed to find Server Action|Server Reference ID did not match/i.test(message)) {
+        if (request.path !== "/") console.warn("[stale-deploy] old server action", request.path);
         return;
       }
+      const { captureError, isDroppedConnectionNoise } = await import("@/lib/observability");
       // The phone left mid-page (tab closed, app sent to the background,
-      // signal dropped): Node reports the half-sent stream, but nothing is
-      // broken, so it isn't an app error.
-      if (/The destination stream closed early|ERR_STREAM_PREMATURE_CLOSE/i.test(message)) {
+      // signal dropped): Next/Node report the half-sent stream a different
+      // way at almost every layer — Next's own "failed to pipe response"
+      // carries the real reason in `.cause`, and Node's stream error has
+      // message "Premature close" with the machine-readable code only in
+      // `.code` (ERR_STREAM_PREMATURE_CLOSE) — neither of which showed up
+      // checking `.message` alone. Nothing is broken, so it isn't an app
+      // error; see isDroppedConnectionNoise for the full pattern + the
+      // `.cause`-walk this now does.
+      if (isDroppedConnectionNoise(err)) {
         return;
       }
-      const { captureError } = await import("@/lib/observability");
       captureError(err, {
       route: request.path,
       surface:

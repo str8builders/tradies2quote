@@ -2,7 +2,36 @@
 
 import { useEffect } from "react";
 import { reportClientError } from "@/lib/observability/clientReport";
+import { isStaleDeployError } from "@/lib/stale-deploy";
 import { maybeRecoverFromStaleDeploy } from "@/lib/staleDeploy";
+
+// Kept in sync with the same pattern in
+// src/lib/observability/clientErrors.ts (server-side; checks the reported
+// stack's top frame instead of `event.filename`).
+const EXTENSION_URL_PATTERN =
+  /^(chrome|moz|safari(-web)?|ms-browser)-extension:|^webkit-masked-url:/i;
+// Cross-origin scripts (most third-party embeds, and some extensions) report
+// as this opaque, stack-less message — real, but never actionable from our
+// side. ResizeObserver's own loop-limit notice is benign browser noise, not
+// an app bug, and is well known to fire with no useful `event.error` either.
+const OPAQUE_NOISE_PATTERN = /^Script error\.?$|ResizeObserver loop/;
+
+/**
+ * Whether a window `error` event is noise not worth reporting: either an
+ * opaque cross-origin/browser message with no real Error to inspect, or one
+ * whose source file is a browser extension (or a Safari content-blocker's
+ * masked URL). Pulled out as a pure function of the event's own fields so
+ * it's unit-testable without dispatching a real ErrorEvent.
+ */
+export function isNoiseErrorEvent(event: {
+  error?: unknown;
+  message?: string | null;
+  filename?: string | null;
+}): boolean {
+  if (!event.error && OPAQUE_NOISE_PATTERN.test(event.message ?? "")) return true;
+  if (event.filename && EXTENSION_URL_PATTERN.test(event.filename)) return true;
+  return false;
+}
 
 /**
  * Global window error hooks — the piece clientReport.ts was written for but
@@ -39,8 +68,11 @@ export function GlobalErrorListeners() {
     };
 
     const onError = (event: ErrorEvent) => {
+      if (isNoiseErrorEvent(event)) return;
       const key = `e:${event.message}`;
-      if (shouldReport(key)) {
+      // A page from before the last deploy: it reloads itself below, and
+      // there's nothing to fix, so it isn't reported.
+      if (!isStaleDeployError(event.error ?? event.message) && shouldReport(key)) {
         reportClientError(event.error ?? event.message, "error");
       }
       maybeRecoverFromStaleDeploy(event.message ?? "");
@@ -48,7 +80,7 @@ export function GlobalErrorListeners() {
     const onRejection = (event: PromiseRejectionEvent) => {
       const reason = event.reason;
       const key = `r:${reason instanceof Error ? reason.message : String(reason)}`;
-      if (shouldReport(key)) {
+      if (!isStaleDeployError(reason) && shouldReport(key)) {
         reportClientError(reason, "unhandledrejection");
       }
       maybeRecoverFromStaleDeploy(

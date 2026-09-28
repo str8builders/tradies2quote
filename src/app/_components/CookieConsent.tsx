@@ -33,7 +33,9 @@ import { isNativeIOSApp } from "@/lib/native-app";
  * a strict CSP / private-mode localStorage block never throws.
  */
 
-const CONSENT_KEY = "t2q-cookie-consent";
+// Exported so the footer's <CookieSettingsButton> (below) can clear the
+// same key a visitor's Accept/Decline wrote.
+export const CONSENT_KEY = "t2q-cookie-consent";
 const ANALYTICS_SRC = "https://uptimewatch-vert.vercel.app/track.js";
 
 type Consent = "accepted" | "declined" | null;
@@ -161,5 +163,37 @@ export function CookieConsent() {
         </div>
       ) : null}
     </>
+  );
+}
+
+/**
+ * Footer control (rendered on public pages via <Footer>) that lets a visitor
+ * undo an earlier Accept/Decline. Once a choice is stored, <CookieConsent>
+ * never shows the banner again — this is the only way back.
+ *
+ * Clears the stored choice and reloads, rather than trying to reset
+ * <CookieConsent>'s own React state from outside it: a fresh mount re-runs
+ * its "have they chosen already?" read for free, and the analytics script
+ * tag it renders is only ever added via a real page load (Script), never
+ * removed client-side, so a reload is the reliable way to actually stop it
+ * after Decline.
+ */
+export function CookieSettingsButton() {
+  return (
+    <button
+      type="button"
+      data-testid="cookie-settings-button"
+      className="hover:text-white"
+      onClick={() => {
+        try {
+          window.localStorage.removeItem(CONSENT_KEY);
+        } catch {
+          /* private mode / blocked storage — nothing stored to clear */
+        }
+        window.location.reload();
+      }}
+    >
+      Cookie settings
+    </button>
   );
 }

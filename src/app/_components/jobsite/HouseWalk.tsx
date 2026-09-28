@@ -50,11 +50,9 @@ function PhoneFigure({ clip, alt }: { clip: string; alt: string }) {
 
 function RoomFootage({
   room,
-  index,
   level,
 }: {
   room: Room;
-  index: number;
   level: "full" | "lite" | "still";
 }) {
   if (room.media.kind === "photo") {
@@ -76,7 +74,6 @@ function RoomFootage({
         fill
         sizes="100vw"
         className="house-still"
-        priority={index === 0}
       />
       {level !== "still" ? (
         <video
@@ -180,7 +177,7 @@ export function HouseWalk({ nativeShell }: { nativeShell: boolean }) {
         >
           <div className="house-pin">
             <div className="house-footage">
-              <RoomFootage room={room} index={i} level={level} />
+              <RoomFootage room={room} level={level} />
             </div>
             <div className="house-scrim" aria-hidden="true" />
             <div className="house-side">

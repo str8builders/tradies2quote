@@ -50,7 +50,7 @@ export default async function TermsPage() {
         <h1 className="font-display text-4xl sm:text-5xl uppercase tracking-tight text-white">
           Terms of <span className="text-brand">Service</span>
         </h1>
-        <p className="mt-3 font-mono text-xs uppercase tracking-[0.2em] text-ink-400">
+        <p className="mt-3 font-mono text-xs uppercase tracking-[0.2em] text-ink-300">
           Last updated {LEGAL.lastUpdatedDisplay}
         </p>
 

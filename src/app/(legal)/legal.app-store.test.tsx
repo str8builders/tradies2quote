@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({ native: false }));
 vi.mock("@/lib/native-shell", () => ({ isNativeShellRequest: async () => h.native }));
 
+import { LEGAL } from "@/lib/legal";
 import LegalLayout from "./layout";
 import PrivacyPage from "./privacy/page";
 import SupportPage from "./support/page";
@@ -85,9 +86,9 @@ describe("support", () => {
 });
 
 describe("privacy policy", () => {
-  it("hosting in Sydney, Australia (never France), dated 26 September 2026", () => {
+  it(`hosting in Sydney, Australia (never France), dated ${LEGAL.privacyLastUpdatedDisplay}`, () => {
     const out = text(html(PrivacyPage()));
-    expect(out).toContain("Last updated 26 September 2026");
+    expect(out).toContain(`Last updated ${LEGAL.privacyLastUpdatedDisplay}`);
     expect(out).toContain("Sydney, Australia");
     expect(out).not.toMatch(/France|European Union\)/);
   });

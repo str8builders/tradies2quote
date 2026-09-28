@@ -55,8 +55,8 @@ export const LEGAL: LegalConfig = {
   privacyEmail: "privacy@tradies2quote.com",
   lastUpdated: "2026-07-18",
   lastUpdatedDisplay: "18 July 2026",
-  // Sydney hosting and the Location section (timesheet pins, travel,
-  // automatic clock-in, maps and weather).
-  privacyLastUpdated: "2026-09-26",
-  privacyLastUpdatedDisplay: "26 September 2026",
+  // Cookies section: names the UptimeWatch analytics host and what it
+  // collects, and points at the footer's "Cookie settings" withdrawal control.
+  privacyLastUpdated: "2026-09-28",
+  privacyLastUpdatedDisplay: "28 September 2026",
 };

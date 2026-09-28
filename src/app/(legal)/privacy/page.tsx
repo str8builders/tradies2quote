@@ -36,7 +36,7 @@ export default function PrivacyPage() {
         <h1 className="font-display text-4xl sm:text-5xl uppercase tracking-tight text-white">
           Privacy <span className="text-brand">Policy</span>
         </h1>
-        <p className="mt-3 font-mono text-xs uppercase tracking-[0.2em] text-ink-400">
+        <p className="mt-3 font-mono text-xs uppercase tracking-[0.2em] text-ink-300">
           Last updated {LEGAL.privacyLastUpdatedDisplay}
         </p>
 
@@ -495,9 +495,22 @@ export default function PrivacyPage() {
             We do <strong>not</strong> use advertising cookies or tracking
             pixels, and nothing follows you around the web. On our website,
             if you choose Accept on the cookie banner, a small analytics
-            script also runs to show us what&apos;s working; choose Decline
-            and it never loads. The iPhone app uses essential cookies only:
-            it shows no cookie banner and never loads that script.
+            script from <strong>UptimeWatch</strong> (uptimewatch-vert.vercel.app)
+            also runs to show us what&apos;s working; choose Decline and it
+            never loads. The script itself sets no cookie. Every page view
+            sends the page&apos;s address and the page you came from; if the
+            page hits a JavaScript error, it also sends the error message, a
+            short stack trace, your last few clicks and page changes, your
+            browser, operating system, device type, viewport size and
+            language, so we can fix it. It also reports how quickly the page
+            loaded and felt (Core Web Vitals). The iPhone app uses essential
+            cookies only: it shows no cookie banner and never loads that
+            script.
+          </p>
+          <p>
+            Changed your mind? <strong>Cookie settings</strong>, in the
+            website&apos;s footer, clears your saved choice and asks again —
+            on any page, at any time.
           </p>
         </LegalSection>
 

@@ -29,7 +29,7 @@ const MIC_TOPIC = {
 const BILLING_TOPIC = {
   icon: CreditCard,
   title: "Trial, plans & billing",
-  body: `New accounts get a 7-day free trial with no card required. Paid plans (when they launch) auto-renew monthly until you cancel. To cancel a paid plan, email ${LEGAL.supportEmail} from the address on your account — your access continues until the end of the current period.`,
+  body: `New accounts get a 7-day free trial with no card required. Paid plans start at $49/month (NZD, GST inclusive) and auto-renew monthly until you cancel. To cancel a paid plan, email ${LEGAL.supportEmail} from the address on your account — your access continues until the end of the current period.`,
 };
 
 /** The same answer for the iPhone app, which has no Safari address bar. */
@@ -93,7 +93,7 @@ export default async function SupportPage() {
                 className="text-brand shrink-0"
               />
               <div className="min-w-0">
-                <div className="font-mono text-xs uppercase tracking-[0.25em] text-ink-400">
+                <div className="font-mono text-xs uppercase tracking-[0.25em] text-ink-300">
                   Email us
                 </div>
                 <div className="font-display text-base uppercase tracking-tight text-white truncate sm:text-lg">
@@ -118,7 +118,7 @@ export default async function SupportPage() {
                 className="text-brand shrink-0"
               />
               <div className="min-w-0">
-                <div className="font-mono text-xs uppercase tracking-[0.25em] text-ink-400">
+                <div className="font-mono text-xs uppercase tracking-[0.25em] text-ink-300">
                   Privacy &amp; data
                 </div>
                 <div className="font-display text-base uppercase tracking-tight text-white truncate sm:text-lg">

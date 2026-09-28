@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { SITE_OPEN_GRAPH } from "@/lib/site-open-graph";
 import {
   Archivo_Black,
   IBM_Plex_Sans,
@@ -103,15 +104,15 @@ export const metadata: Metadata = {
   // No site-wide canonical: every page inherited "/" from here, which told
   // Google that T2QCAL and its calculators were copies of the home page.
   // The home page and the landing pages set their own.
-  openGraph: {
-    type: "website",
-    siteName: "Tradies2Quote",
-    title: "Tradies2Quote — AI quotes & invoices for NZ tradies",
-    description:
-      "Turn site notes into a professional quote. Review your scope, rates and GST before you send. Built for NZ tradies.",
-    url: "/",
-    locale: "en_NZ",
-  },
+  //
+  // No site-wide `url` either, for the same reason applied to Open Graph
+  // shares: a page that sets its own `openGraph` (e.g. /calculator) fully
+  // replaces this object, but every OTHER page (the quote page, /support,
+  // /help, /privacy, /terms, /login, /signup, the 404 page, …) inherited
+  // this url verbatim, so sharing any of them unfurled as the homepage. Only
+  // the homepage itself should claim "/" — it does so in its own metadata
+  // export (src/app/page.tsx).
+  openGraph: SITE_OPEN_GRAPH,
   twitter: {
     card: "summary_large_image",
     title: "Tradies2Quote — AI quotes & invoices for NZ tradies",
@@ -158,6 +159,18 @@ export const metadata: Metadata = {
     // Newer cross-platform equivalent of apple-mobile-web-app-capable.
     "mobile-web-app-capable": "yes",
   },
+  // No server-rendered text here depends on time, locale or randomness, so
+  // any text the client shows differently on first paint is something ELSE
+  // rewriting the page before hydration — iOS Safari's own phone/date/email/
+  // address detection is one of those (it wraps matched text in extra
+  // markup). Turning all four off removes that specific cause of a React
+  // #418 hydration-mismatch report.
+  formatDetection: {
+    telephone: false,
+    date: false,
+    email: false,
+    address: false,
+  },
 };
 
 // MOBILE SHELL CONTRACT — viewport owner. See docs/mobile-shell-contract.md.
@@ -169,17 +182,25 @@ export const metadata: Metadata = {
 //     override (e.g. white on /app) as a safe-area fix — that masks, it doesn't
 //     fix, and it caused a regression. The bottom nav, not the OS chrome, owns
 //     the safe area.
+//
+// This is the PUBLIC default: zoomable (maximumScale 5, userScalable true) —
+// axe flags a locked viewport on public pages, and there's no installed-shell
+// focus-zoom bug here to work around. `/`, `/classic` and `/t2qcal` each set
+// their own (identical) override for the same reason; every other public
+// route (the quote page, the request page, the legal pages, /help, /install,
+// /calculator) has no override of its own, so it now inherits THIS zoomable
+// default instead of silently picking up a lock meant for the installed app.
+//
+// The installed iOS PWA shell still needs the lock: focusing a form field
+// there force-zooms the page and it never zooms back — the "app moves around
+// inside the screen" report. That lock now lives in src/app/app/layout.tsx
+// (the only place it's still needed), which sets its own `viewport` export
+// with maximumScale 1 / userScalable false and the same viewportFit/themeColor.
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  // Locked to 1 (+ userScalable:false): in the installed iOS shell, focusing
-  // a form field force-zooms the page and it never zooms back — the "app
-  // moves around inside the screen" report. This disables pinch/double-tap
-  // zoom and the focus-zoom. Text size is unaffected (the 16px input rule in
-  // globals.css removes the focus-zoom TRIGGER; this removes the ability to
-  // stay zoomed). viewportFit/themeColor unchanged → shell-contract test green.
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
   // Wave 14.1 — `cover` lets the browser render the page under the
   // iPhone notch / Android camera cutout. Combined with each
   // top-of-page header's `pt-[env(safe-area-inset-top)]`, the page

@@ -30,7 +30,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "tradies2Quote",
     short_name: "T2Q",
     description:
-      "Voice-first AI quoting for tradies. Record, generate, send a branded quote in under 60 seconds.",
+      "Voice-first AI quoting for tradies. Record, generate and send a branded quote.",
     start_url: "/app",
     scope: "/",
     display: "standalone",

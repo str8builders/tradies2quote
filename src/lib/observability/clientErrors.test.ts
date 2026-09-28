@@ -103,4 +103,54 @@ describe("sanitizeClientReport — bounded, PII-free, surface=client", () => {
     expect(r).not.toBeNull();
     expect(r!.stack).toContain("page");
   });
+
+  it("drops a stack that is entirely browser-extension frames", () => {
+    const stack = [
+      "TypeError: Cannot read properties of undefined (reading 'M_ID')",
+      "    at Object.t (chrome-extension://abcdefghijklmnopqrstuvwxyz012345/content.js:1:1)",
+    ].join("\n");
+    expect(sanitizeClientReport({ message: "boom", stack })).toBeNull();
+  });
+
+  it("drops a stack whose TOP frame is an extension, even if a deeper frame is our own https:// code (an extension wrapping a page function)", () => {
+    const stack = [
+      "TypeError: boom",
+      "    at Object.wrapped (moz-extension://abcdefgh-1234-5678-90ab-cdefghijklmn/content.js:1:1)",
+      "    at handleClick (https://app.example.com/_next/static/chunks/app/quote/page-9f3a2b1c.js:5:200)",
+    ].join("\n");
+    expect(sanitizeClientReport({ message: "boom", stack })).toBeNull();
+  });
+
+  it("drops a Safari content-blocker's masked-url top frame", () => {
+    const stack = "Error: boom\n    at f (webkit-masked-url://hidden/script.js:1:1)";
+    expect(sanitizeClientReport({ message: "boom", stack })).toBeNull();
+  });
+
+  it("keeps a real error whose stack is our own https:// code throughout", () => {
+    const r = sanitizeClientReport({ message: "boom", stack: chromeStack("aa11bb22", 3, 3) });
+    expect(r).not.toBeNull();
+  });
+
+  it("carries only the known boolean page-rewrite flags into extra, dropping anything else", () => {
+    const r = sanitizeClientReport({
+      message: "boom",
+      flags: { translated: true, appleDataDetectors: false, grammarly: true, notAFlag: "x" },
+    })!;
+    expect(r.extra).toEqual({ translated: true, appleDataDetectors: false, grammarly: true });
+  });
+
+  it("merges flags alongside kind in extra", () => {
+    const r = sanitizeClientReport({
+      message: "boom",
+      kind: "boundary",
+      flags: { translated: true, appleDataDetectors: false, grammarly: false },
+    })!;
+    expect(r.extra).toEqual({ kind: "boundary", translated: true, appleDataDetectors: false, grammarly: false });
+  });
+
+  it("extra is null when there is neither a kind nor any flag", () => {
+    expect(sanitizeClientReport({ message: "boom" })!.extra).toBeNull();
+    expect(sanitizeClientReport({ message: "boom", flags: {} })!.extra).toBeNull();
+    expect(sanitizeClientReport({ message: "boom", flags: "nonsense" })!.extra).toBeNull();
+  });
 });

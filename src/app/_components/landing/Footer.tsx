@@ -2,6 +2,7 @@ import Link from "next/link";
 import { LEGAL } from "@/lib/legal";
 import { Logo } from "./Logo";
 import { MotionToggle } from "../wallpaper/MotionToggle";
+import { CookieSettingsButton } from "../CookieConsent";
 
 export function Footer({
   // 3.1.3(f) — set server-side (see src/lib/native-shell.ts) inside the iOS
@@ -34,7 +35,7 @@ export function Footer({
             <ul className="space-y-2 text-ink-200 text-sm">
               <li>
                 <Link
-                  href="/#demo-reel"
+                  href="/#talk"
                   data-testid="footer-link-how"
                   className="hover:text-white"
                 >
@@ -43,7 +44,7 @@ export function Footer({
               </li>
               <li>
                 <Link
-                  href="/#features"
+                  href="/#request"
                   data-testid="footer-link-features"
                   className="hover:text-white"
                 >
@@ -158,6 +159,9 @@ export function Footer({
                 >
                   Terms
                 </Link>
+              </li>
+              <li>
+                <CookieSettingsButton />
               </li>
             </ul>
           </div>

@@ -175,6 +175,9 @@ export function RequestForm({ slug, business }: { slug: string; business: string
           className={`${INPUT} min-h-36`}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
+          // The notice above the form says AI reads the request to suggest
+          // follow-up questions; asking as soon as they finish describing the
+          // job gets the answers in before they send.
           onBlur={() => void loadQuestions()}
           maxLength={3000}
           placeholder="e.g. Replace about 12 metres of old timber fence along the driveway, 1.8 high, and take the old one away."

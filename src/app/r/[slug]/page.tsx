@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { adminClient } from "@/lib/supabase/admin";
 import { isValidRequestSlug } from "@/lib/quote-requests/slug";
@@ -55,15 +56,24 @@ export default async function RequestQuotePage({ params }: { params: Promise<Par
           </div>
         </header>
 
-        <p className="mb-6 text-sm text-ink-300 sm:text-base">
+        <p className="mb-2 text-sm text-ink-300 sm:text-base">
           Tell {business} what you need done, in your own words. They&rsquo;ll review it and come
           back to you with a quote. No account needed.
+        </p>
+        <p className="mb-6 text-xs text-ink-500">
+          This goes to {business}. AI reads what you write to suggest follow-up
+          questions and prepare a first draft quote for {business} to check —
+          see our{" "}
+          <Link href="/privacy" className="text-brand underline underline-offset-2 hover:text-hivis">
+            Privacy Policy
+          </Link>
+          .
         </p>
 
         <RequestForm slug={slug} business={business} />
 
         <p className="mt-8 text-xs text-ink-500">
-          Powered by Tradies2Quote. Your details go only to {business}.
+          Powered by Tradies2Quote.
         </p>
       </main>
     </div>

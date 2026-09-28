@@ -34,6 +34,33 @@ const MAX_FRAME = 300;
 
 const ALLOWED_KINDS = new Set(["error", "unhandledrejection", "boundary"]);
 
+// Browser-extension / in-page-rewriter URLs. A stack (or a top frame) made of
+// only these isn't an app bug — it's an extension's own script, or Safari's
+// content-blocker masking a URL it redacted. Kept in sync with the same
+// pattern in GlobalErrorListeners.tsx (client-side; checks `event.filename`
+// before a report is even sent).
+const EXTENSION_URL_PATTERN =
+  /^(chrome|moz|safari(-web)?|ms-browser)-extension:|^webkit-masked-url:/i;
+
+/**
+ * The literal first stack-frame line, Chrome ("at fn (url)") or
+ * Firefox/Safari ("fn@url") — deliberately NOT `extractClientTopFrame`,
+ * which prefers the first frame WITH an https:// URL for fingerprinting
+ * (skipping past a leading extension frame to the real code underneath). An
+ * extension wrapping/monkey-patching a page function throws from ITS OWN
+ * top frame with our https:// code one frame further down, so checking the
+ * true first frame is the only way to catch that case.
+ */
+function firstFrameLine(stack: string): string | null {
+  const lines = stack.split("\n").map((l) => l.trim()).filter(Boolean);
+  return lines.find((l) => l.startsWith("at ") || /^[^\s@]+@/.test(l)) ?? null;
+}
+
+/** The scheme://… URL embedded in a stack-frame line ("at fn (url)" / "fn@url"), if any. */
+function frameUrl(frameLine: string): string | null {
+  return frameLine.match(/\b[a-z][a-z0-9+.-]*:\/\/[^\s)]+/i)?.[0] ?? null;
+}
+
 /** Raw shape the browser sends. Everything is optional / untrusted. */
 export interface ClientErrorReport {
   name?: unknown;
@@ -42,6 +69,25 @@ export interface ClientErrorReport {
   kind?: unknown;
   /** location.pathname only — never a full URL with query/hash. */
   path?: unknown;
+  /** Page-rewrite signals for classifying a #418 — see clientReport.ts. */
+  flags?: unknown;
+}
+
+const FLAG_KEYS = ["translated", "appleDataDetectors", "grammarly"] as const;
+
+/** Keeps only the known boolean flags; drops anything else (untrusted input). */
+function sanitizeFlags(raw: unknown): Record<string, boolean> | null {
+  if (!raw || typeof raw !== "object") return null;
+  const out: Record<string, boolean> = {};
+  let any = false;
+  for (const key of FLAG_KEYS) {
+    const v = (raw as Record<string, unknown>)[key];
+    if (typeof v === "boolean") {
+      out[key] = v;
+      any = true;
+    }
+  }
+  return any ? out : null;
 }
 
 function toEnvironment(v: string | null): AppErrorRow["environment"] {
@@ -126,20 +172,28 @@ export function sanitizeClientReport(raw: unknown): AppErrorRow | null {
   const rawMessage = typeof r.message === "string" ? r.message : "";
   const rawStack = typeof r.stack === "string" ? r.stack : null;
   if (!rawMessage && !rawStack) return null; // nothing actionable
-  // Errors thrown by browser extensions (every frame is chrome-extension://,
-  // moz-extension://, safari-web-extension://…) are not app errors.
+  const frames = extractClientTopFrame(rawStack);
   if (rawStack) {
+    // Errors thrown by browser extensions (every frame is chrome-extension://,
+    // moz-extension://, safari-web-extension://…) are not app errors.
     const frameUrls = rawStack.match(/\b[a-z][a-z0-9+.-]*:\/\/[^\s)]+/gi) ?? [];
     if (frameUrls.length > 0 && frameUrls.every((u) => !/^https?:\/\//i.test(u))) return null;
+    // Narrower but just as real: the TOP frame is an extension (or a Safari
+    // content-blocker's masked URL) even though a deeper frame is our own
+    // https:// code — e.g. an extension wrapping/monkey-patching a page
+    // function, which then throws from inside the extension's own call.
+    const firstFrame = firstFrameLine(rawStack);
+    const firstFrameUrl = firstFrame ? frameUrl(firstFrame) : null;
+    if (firstFrameUrl && EXTENSION_URL_PATTERN.test(firstFrameUrl)) return null;
   }
 
   const name =
     typeof r.name === "string" && r.name ? truncate(r.name, MAX_NAME) : "Error";
   const normalizedMessage = normalizeMessage(rawMessage).slice(0, MAX_NORMALISED);
-  const frames = extractClientTopFrame(rawStack);
   const route = typeof r.path === "string" ? sanitizeRoutePath(r.path) : null;
   const kind =
     typeof r.kind === "string" && ALLOWED_KINDS.has(r.kind) ? r.kind : null;
+  const flags = sanitizeFlags(r.flags);
   const build = getBuildIdentity();
 
   return {
@@ -164,6 +218,6 @@ export function sanitizeClientReport(raw: unknown): AppErrorRow | null {
     stack: rawStack ? truncate(scrubText(rawStack), MAX_STACK) : null,
     http_status: null,
     request_id: null,
-    extra: kind ? { kind } : null,
+    extra: kind || flags ? { ...(kind ? { kind } : {}), ...(flags ?? {}) } : null,
   };
 }

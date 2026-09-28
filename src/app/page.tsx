@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { redirect } from "next/navigation";
 import { isNativeShellRequest } from "@/lib/native-shell";
+import { SITE_OPEN_GRAPH } from "@/lib/site-open-graph";
 import { JobSiteStory } from "./_components/jobsite/JobSiteStory";
 import { NativeAppRedirect } from "./_components/landing/NativeAppRedirect";
 
@@ -10,6 +11,8 @@ import { NativeAppRedirect } from "./_components/landing/NativeAppRedirect";
 // same way. Other fields mirror the root viewport.
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
+  // The only page whose shares unfurl as the homepage (see site-open-graph.ts).
+  openGraph: { ...SITE_OPEN_GRAPH, url: "/" },
 };
 
 export const viewport: Viewport = {
