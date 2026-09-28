@@ -10,6 +10,7 @@ import {
   SubmitButton,
 } from "../_components/AuthCard";
 import { createClient } from "@/lib/supabase/server";
+import { currentPasswordRequired } from "@/lib/auth/password-change";
 
 export const metadata: Metadata = {
   title: "Set a new password",
@@ -38,6 +39,11 @@ export default async function ResetPasswordPage({
       "/forgot-password?error=Reset%20link%20expired%20or%20invalid.%20Request%20a%20new%20one.",
     );
   }
+
+  // From the reset email (or a sign-in a few minutes ago) the new password
+  // is enough; any other session must also give the current one.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const needsCurrent = currentPasswordRequired(claimsData?.claims?.amr);
 
   return (
     <div className="relative min-h-screen flex flex-col bg-ink-900 text-white overflow-hidden">
@@ -74,6 +80,25 @@ export default async function ResetPasswordPage({
           >
             <form action={resetPasswordAction} className="space-y-4">
               <FormError message={error} />
+              {needsCurrent ? (
+                <>
+                  <FormField
+                    label="Current password"
+                    name="current_password"
+                    type="password"
+                    autoComplete="current-password"
+                  />
+                  <p className="text-xs text-ink-400">
+                    Forgot it?{" "}
+                    <Link
+                      href="/forgot-password"
+                      className="inline-flex min-h-11 items-center text-brand hover:text-hivis"
+                    >
+                      Get a reset link by email
+                    </Link>
+                  </p>
+                </>
+              ) : null}
               <FormField
                 label="New password"
                 name="password"

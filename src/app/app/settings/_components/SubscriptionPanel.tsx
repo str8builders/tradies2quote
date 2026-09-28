@@ -7,17 +7,21 @@ import {
   Lightning,
 } from "@phosphor-icons/react/dist/ssr";
 import type { SubscriptionStatus } from "@/lib/subscription";
+import { canManageBilling } from "../_newlook/plan";
 import { ManageBillingButton } from "./ManageBillingButton";
 
 /**
  * Settings → Billing & subscription panel.
  *
  * Three states:
- *   - paid     : "Pro plan · next charge MMM DD" + Manage billing button
+ *   - paid     : "Pro plan · next charge MMM DD" (or the free beta's end)
  *   - trialing : "Trial · N days left" + Upgrade link
  *   - expired  : "Trial ended" + Upgrade link
  *
- * Renders nothing if `state` is somehow missing (defensive — should never happen).
+ * "Manage billing" shows in EVERY state whenever the tradie has their own
+ * Stripe customer: during the beta, and for a lapsed, unpaid or paused
+ * subscription, Stripe may still be charging them, and the billing page is
+ * the only place to update the card or cancel.
  */
 export function SubscriptionPanel({
   status,
@@ -26,10 +30,18 @@ export function SubscriptionPanel({
   status: SubscriptionStatus;
   stripeConfigured: boolean;
 }) {
+  const manage = canManageBilling(status);
   if (status.state === "paid") {
     const renewalLabel = status.currentPeriodEnd
       ? `Current period ends ${formatDate(status.currentPeriodEnd)}`
       : "Active subscription";
+    const detail = status.managedByTeam
+      ? "Your team owner manages billing."
+      : status.plan
+        ? `$${PLANS[status.plan].price} NZD / month · ${renewalLabel}`
+        : status.betaFreeUntil
+          ? `Free access until ${formatDate(status.betaFreeUntil)}.`
+          : "Your account has complimentary access.";
     return (
       <section
         data-testid="settings-billing-paid"
@@ -42,11 +54,9 @@ export function SubscriptionPanel({
         <h2 className="mt-2 font-display text-xl uppercase tracking-tight text-white">
           Tradies2Quote {status.plan ? PLANS[status.plan].name : "access"}
         </h2>
-        <p className="mt-1 text-sm text-ink-300">
-          {status.managedByTeam ? "Your team owner manages billing." : status.plan ? `$${PLANS[status.plan].price} NZD / month · ${renewalLabel}` : "Your account has complimentary access."}
-        </p>
+        <p className="mt-1 text-sm text-ink-300">{detail}</p>
         <div className="mt-4">
-          {status.stripeCustomerId && !status.managedByTeam ? <ManageBillingButton /> : null}
+          {manage ? <ManageBillingButton /> : null}
         </div>
       </section>
     );
@@ -78,12 +88,14 @@ export function SubscriptionPanel({
             : `${status.trialDaysLeft} days left in your trial.`}
       </h2>
       <p className="mt-1 text-sm text-ink-300">
-        {isExpired
-          ? "You can still view and send existing quotes. Subscribe to keep creating new ones."
-          : `Trial ends ${formatDate(status.trialEndsAt)}. Subscribe to keep the lights on past that date.`}
+        {status.managedByTeam
+          ? "Your team owner manages billing."
+          : isExpired
+            ? "You can still view and send existing quotes. Subscribe to keep creating new ones."
+            : `Trial ends ${formatDate(status.trialEndsAt)}. Subscribe to keep the lights on past that date.`}
       </p>
-      <div className="mt-4">
-        {stripeConfigured ? (
+      <div className="mt-4 flex flex-wrap items-start gap-3">
+        {status.managedByTeam ? null : stripeConfigured ? (
           <Link
             href="/app/upgrade"
             data-testid="settings-billing-upgrade-link"
@@ -98,6 +110,11 @@ export function SubscriptionPanel({
             Checkout isn&rsquo;t configured yet.
           </p>
         )}
+        {manage ? (
+          <div>
+            <ManageBillingButton />
+          </div>
+        ) : null}
       </div>
     </section>
   );

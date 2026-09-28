@@ -89,26 +89,30 @@ export async function saveSettings(
     };
   }
 
+  // Only the fields this form actually sent: a field that wasn't on the page
+  // (an older or partial form) is left alone instead of being blanked. A
+  // field that was sent empty is cleared, as the tradie asked.
+  const submitted: Record<string, unknown> = {
+    business_name: businessName,
+    email,
+    phone,
+    address,
+    gst_number: gstNumber,
+    payment_instructions: paymentInstructions,
+    country,
+    currency,
+    tax_rate: gstRate,
+    default_labour_rate: labourRate,
+    default_markup_pct: markupPct,
+  };
+  const row: Record<string, unknown> = { id: user.id, updated_at: new Date().toISOString() };
+  for (const [column, value] of Object.entries(submitted)) {
+    if (formData.has(column)) row[column] = value;
+  }
+
   const { error } = await supabase
     .from("profiles")
-    .upsert(
-      {
-        id: user.id,
-        business_name: businessName,
-        email,
-        phone,
-        address,
-        gst_number: gstNumber,
-        payment_instructions: paymentInstructions,
-        country,
-        currency,
-        tax_rate: gstRate,
-        default_labour_rate: labourRate,
-        default_markup_pct: markupPct,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "id" },
-    );
+    .upsert(row as { id: string }, { onConflict: "id" });
 
   if (error) {
     console.error("saveSettings upsert failed", error);

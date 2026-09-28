@@ -5,6 +5,7 @@ import { ArrowClockwise, House } from "@phosphor-icons/react/dist/ssr";
 import { captureToSentry } from "@/lib/observability/sentryBrowser";
 import { reportClientError } from "@/lib/observability/clientReport";
 import { maybeRecoverFromStaleDeploy } from "@/lib/staleDeploy";
+import { shouldReportBoundaryError } from "@/lib/boundary-report";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
 import { Screen } from "@/components/ui/screen";
@@ -24,20 +25,27 @@ import { Screen } from "@/components/ui/screen";
  * An error boundary can't ask which look is on, so this is drawn once in
  * ui- tokens and kit parts (as settings' LoadFailed is): it paints its own
  * ui background, so it reads right in both shells, dark or outdoor.
+ *
+ * Never clears sessionStorage or localStorage: pages keep unsent work there
+ * (the new-quote page backs up what was said) and a reload or retry must
+ * find it again.
  */
 export default function AppError({
   error,
-  reset,
+  retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry: () => void;
 }) {
   useEffect(() => {
     // Report to Sentry (no-op without a DSN), then log the full error for the
-    // owner's browser console (and Vercel function logs for SSR errors). End
-    // users only ever see the digest.
-    captureToSentry(error);
-    reportClientError(error, "boundary");
+    // owner's browser console. End users only ever see the digest. Not for a
+    // server error (it has a digest: the server already recorded it) or a
+    // stale deploy (reloaded below).
+    if (shouldReportBoundaryError(error)) {
+      captureToSentry(error);
+      reportClientError(error, "boundary");
+    }
     console.error("[/app/* error]", error);
     // Stale-deploy chunk death during render lands HERE, not on
     // window.onerror — reload once so the user's next tap works instead
@@ -58,7 +66,9 @@ export default function AppError({
               <Button
                 variant="secondary"
                 icon={<ArrowClockwise weight="bold" />}
-                onClick={() => reset()}
+                // retry() fetches the page again; reset() only re-rendered it,
+                // so a server error came straight back.
+                onClick={() => retry()}
                 data-testid="app-error-retry"
               >
                 Try again

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { captureError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
 import { stripeClient } from "@/lib/stripe-client";
 import { ensureConnectedAccount, paymentsEnabled } from "@/lib/payments";
@@ -47,6 +48,7 @@ export async function POST() {
     return NextResponse.json({ url: link.url });
   } catch (e) {
     console.error("[payments/connect] failed", e);
+    captureError(e, { route: "/api/payments/connect" });
     return NextResponse.json(
       { error: "connect_failed", message: "Could not start Stripe onboarding. Please try again." },
       { status: 500 },

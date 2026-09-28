@@ -4,6 +4,7 @@ import sharp from "sharp";
 import { createClient } from "@/lib/supabase/server";
 import { isValidRequestSlug, requestLinkFor } from "@/lib/quote-requests/slug";
 import { consumeFixedWindow, tooManyRequestsResponse } from "@/lib/rate-limit";
+import { allowedQrLogoUrl, fetchQrLogo, MAX_LOGO_PIXELS } from "./logo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +19,10 @@ export const dynamic = "force-dynamic";
  *   ?download=1            send as a file instead of showing inline
  *
  * With a logo the code is generated at error-correction H, which tolerates
- * the ~22 % of the pattern the logo covers.
+ * the ~22 % of the pattern the logo covers. The logo is only ever fetched
+ * from our own business-logos storage (see ./logo.ts): logo_url is writable
+ * through the REST API, and fetching it blindly let it reach internal
+ * services (SSRF).
  */
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -47,7 +51,8 @@ export async function GET(request: NextRequest) {
   const format = params.get("format") === "png" ? "png" : "svg";
   const wantLogo = params.get("logo") === "1";
   const size = Math.min(2048, Math.max(256, Number(params.get("size")) || 512));
-  const logoUrl = typeof profile?.logo_url === "string" && /^https:\/\//i.test(profile.logo_url) ? profile.logo_url : null;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? null;
+  const logoUrl = allowedQrLogoUrl(profile?.logo_url, supabaseUrl);
   const withLogo = wantLogo && format === "png" && Boolean(logoUrl);
   const options = { errorCorrectionLevel: (withLogo ? "H" : "M") as "H" | "M", margin: 2, width: size, color: { dark: "#111111", light: "#ffffff" } };
   const filename = `tradies2quote-request-${slug}.${format}`;
@@ -57,14 +62,13 @@ export async function GET(request: NextRequest) {
   };
   if (format === "png") {
     let png: Buffer = await QRCode.toBuffer(link, { ...options, type: "png" });
-    if (withLogo && logoUrl) {
+    if (withLogo) {
       try {
-        const res = await fetch(logoUrl, { signal: AbortSignal.timeout(8000) });
-        if (res.ok) {
-          const logo = Buffer.from(await res.arrayBuffer());
+        const logo = await fetchQrLogo(logoUrl, supabaseUrl);
+        if (logo) {
           const badge = Math.round(size * 0.24);
           const inner = Math.round(badge * 0.8);
-          const logoPng = await sharp(logo).resize(inner, inner, { fit: "inside", withoutEnlargement: false }).png().toBuffer();
+          const logoPng = await sharp(logo, { limitInputPixels: MAX_LOGO_PIXELS }).resize(inner, inner, { fit: "inside", withoutEnlargement: false }).png().toBuffer();
           const meta = await sharp(logoPng).metadata();
           const plate = await sharp({ create: { width: badge, height: badge, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } } })
             .composite([{ input: logoPng, left: Math.round((badge - (meta.width ?? inner)) / 2), top: Math.round((badge - (meta.height ?? inner)) / 2) }])

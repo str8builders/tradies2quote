@@ -8,8 +8,9 @@ import {
   EMAIL_KINDS,
   firstNameFromEmail,
   kindForUser,
+  lastDayWording,
   renderEmail,
-  requiresZeroSentQuotes,
+  requiresNoQuotes,
   sendTrialEmail,
   trialEndsLabel,
   type EmailKind,
@@ -27,7 +28,8 @@ type Counters = {
   scanned: number;
   windowed: number;
   alreadySent: number;
-  hasSentQuote: number;
+  /** Onboarding nudges skipped because the tradie has made a quote. */
+  hasQuote: number;
   sent: number;
   failed: number;
   errors: { user_id: string; kind: EmailKind; error: string }[];
@@ -72,7 +74,7 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     scanned: 0,
     windowed: 0,
     alreadySent: 0,
-    hasSentQuote: 0,
+    hasQuote: 0,
     sent: 0,
     failed: 0,
     errors: [],
@@ -142,20 +144,21 @@ async function handle(request: NextRequest): Promise<NextResponse> {
         continue;
       }
 
-      // Onboarding kinds skip users who've already sent a quote.
-      if (requiresZeroSentQuotes(kind)) {
+      // "You haven't made a quote yet": skip anyone who has made ANY quote —
+      // a draft, a declined or expired one, even one they've since deleted —
+      // not only sent ones.
+      if (requiresNoQuotes(kind)) {
         const { count, error: countErr } = await admin
           .from("quotes")
           .select("id", { count: "exact", head: true })
-          .eq("user_id", user.id)
-          .in("status", ["sent", "viewed", "accepted", "scheduled", "in_progress", "completed"]);
+          .eq("user_id", user.id);
         if (countErr) {
           counters.failed += 1;
           counters.errors.push({ user_id: user.id, kind, error: countErr.message });
           continue;
         }
         if ((count ?? 0) > 0) {
-          counters.hasSentQuote += 1;
+          counters.hasQuote += 1;
           // Record a dedup row anyway so we don't re-check this user
           // every hour for the rest of the window — they've graduated
           // past needing the nudge.
@@ -176,6 +179,7 @@ async function handle(request: NextRequest): Promise<NextResponse> {
         videoUrl: process.env.TRIAL_QUICKSTART_VIDEO_URL || undefined,
         calendlyUrl: process.env.TRIAL_CALENDLY_URL || undefined,
         trialEndsLabel: trialEndsLabel(trialAnchor),
+        trialEnds: kind === "trial_day_0" ? lastDayWording(trialAnchor, now) : undefined,
       });
 
       const result = await sendTrialEmail({ to: user.email, rendered,

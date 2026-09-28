@@ -100,7 +100,7 @@ describe("TrialBanner, new look: the same banners as ui-token strips", () => {
     expect(link).toContain('href="/app/upgrade"');
     expect(link).toContain('data-tone="bad"');
     expect(out).toContain("Your trial has ended, so new quotes are paused.");
-    expect(out).toContain("Subscribe for $49 a month");
+    expect(out).toContain("Subscribe for NZ$49 a month");
   });
 
   it("last days: a warn-tone strip, in plain words", async () => {
@@ -109,7 +109,7 @@ describe("TrialBanner, new look: the same banners as ui-token strips", () => {
     expect(link).toContain('href="/app/upgrade"');
     expect(link).toContain('data-tone="warn"');
     expect(out).toContain("Your trial ends in 2 days.");
-    expect(out).toContain("Subscribe for $49 a month");
+    expect(out).toContain("Subscribe for NZ$49 a month");
     expect(await trialNew(SUBS.tomorrow)).toContain("Your trial ends tomorrow.");
     expect(await trialNew(SUBS.lastDay)).toContain("Your trial ends today.");
   });

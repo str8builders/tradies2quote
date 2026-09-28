@@ -3,8 +3,10 @@ import { captureError } from "@/lib/observability";
 import { adminClient } from "@/lib/supabase/admin";
 import { isAuthorizedCron } from "@/lib/cron-auth";
 import {
+  engagementRecipient,
   reviewsEnabled,
   followupsEnabled,
+  replyToFor,
   sendReviewRequestEmail,
   sendFollowupEmail,
 } from "@/lib/engagement";
@@ -29,6 +31,16 @@ type Counters = {
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The client's name and email as written on the quote itself (not the
+ * clients row linked by quotes.client_id, which the public request form
+ * links loosely: see engagementRecipient).
+ */
+const QUOTE_CLIENT_COLUMNS =
+  "client_name:quote_data->client->>name, client_email:quote_data->client->>email, client_contact:quote_data->client->>contact";
+
+type QuoteClientColumns = { client_name: string | null; client_email: string | null; client_contact: string | null };
 
 async function handle(request: NextRequest): Promise<NextResponse> {
   const secret = process.env.CRON_SECRET;
@@ -72,10 +84,23 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     const userIds = settings.map((s) => s.user_id);
     const { data: profiles, error: profilesError } = await admin
       .from("profiles")
-      .select("id, business_name, currency")
+      .select("id, business_name, currency, email")
       .in("id", userIds);
     if (profilesError) throw profilesError;
     const profById = new Map((profiles ?? []).map((p) => [p.id, p]));
+
+    /** Where this quote's email went (newest send first), for the recipient rule. */
+    const recipientFor = async (quoteId: string, client: QuoteClientColumns): Promise<string | null> => {
+      const { data: events, error: eventsError } = await admin
+        .from("quote_events")
+        .select("metadata, created_at")
+        .eq("quote_id", quoteId)
+        .eq("type", "sent")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (eventsError) throw eventsError;
+      return engagementRecipient(events ?? [], { email: client.client_email, contact: client.client_contact });
+    };
 
     // ── Review requests: completed quotes, opted-in tradie with a review URL ──
     if (reviewsOn) {
@@ -84,9 +109,10 @@ async function handle(request: NextRequest): Promise<NextResponse> {
         if (!s.auto_review_enabled || !s.google_review_url) continue;
         const { data: quotes, error: quotesError } = await admin
           .from("quotes")
-          .select("id, client_id, completed_at")
+          .select(`id, client_id, completed_at, ${QUOTE_CLIENT_COLUMNS}`)
           .eq("user_id", s.user_id)
           .eq("status", "completed")
+          .is("deleted_at", null)
           .gte("completed_at", since)
           .not("client_id", "is", null);
 
@@ -100,13 +126,9 @@ async function handle(request: NextRequest): Promise<NextResponse> {
           if (existingError) throw existingError;
           if (existing) continue;
 
-          const { data: client, error: clientError } = await admin
-            .from("clients")
-            .select("name, email")
-            .eq("id", q.client_id as string)
-            .maybeSingle();
-          if (clientError) throw clientError;
-          if (!client?.email) continue;
+          const client = q as unknown as QuoteClientColumns;
+          const to = await recipientFor(q.id, client);
+          if (!to) continue;
           eligible += 1;
           if (dryRun) continue;
 
@@ -121,10 +143,11 @@ async function handle(request: NextRequest): Promise<NextResponse> {
           if (claimErr?.code === "23505") continue;
           if (claimErr) throw claimErr;
           const result = await sendReviewRequestEmail({
-            to: client.email,
-            clientName: client.name || "there",
+            to,
+            clientName: client.client_name?.trim() || "there",
             businessName: prof?.business_name || "your tradie",
             reviewUrl: s.google_review_url,
+            replyTo: replyToFor(prof?.email),
           });
           if (!result.ok) {
             counters.failed += 1;
@@ -139,15 +162,20 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     }
 
     // ── Follow-ups: sent/viewed quotes >2 days old, not yet accepted ──────────
+    // Never for a deleted quote or one past its expiry: its "Review & accept"
+    // link would only reach "not found" or "expired".
     if (followupsOn) {
       const twoDaysAgo = new Date(now - 2 * DAY_MS).toISOString();
+      const nowIso = new Date(now).toISOString();
       for (const s of settings) {
         if (!s.auto_followup_enabled) continue;
         const { data: quotes, error: quotesError } = await admin
           .from("quotes")
-          .select("id, client_id, sent_at, public_token, total_amount, currency, created_at")
+          .select(`id, client_id, sent_at, public_token, total_amount, currency, created_at, expires_at, ${QUOTE_CLIENT_COLUMNS}`)
           .eq("user_id", s.user_id)
           .in("status", ["sent", "viewed"])
+          .is("deleted_at", null)
+          .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
           .not("client_id", "is", null)
           .not("public_token", "is", null)
           .lte("sent_at", twoDaysAgo);
@@ -155,6 +183,8 @@ async function handle(request: NextRequest): Promise<NextResponse> {
         if (quotesError) throw quotesError;
         for (const q of quotes ?? []) {
           if (!q.sent_at) continue;
+          // Belt and braces for the filter above.
+          if (q.expires_at && Date.parse(q.expires_at) <= now) continue;
           const days = Math.floor((now - Date.parse(q.sent_at)) / DAY_MS);
           const step = days >= 5 ? 2 : 1;
 
@@ -167,13 +197,9 @@ async function handle(request: NextRequest): Promise<NextResponse> {
           if (existingError) throw existingError;
           if (existing) continue;
 
-          const { data: client, error: clientError } = await admin
-            .from("clients")
-            .select("name, email")
-            .eq("id", q.client_id as string)
-            .maybeSingle();
-          if (clientError) throw clientError;
-          if (!client?.email) continue;
+          const client = q as unknown as QuoteClientColumns;
+          const to = await recipientFor(q.id, client);
+          if (!to) continue;
           eligible += 1;
           if (dryRun) continue;
 
@@ -186,13 +212,14 @@ async function handle(request: NextRequest): Promise<NextResponse> {
           if (claimErr?.code === "23505") continue;
           if (claimErr) throw claimErr;
           const result = await sendFollowupEmail({
-            to: client.email,
-            clientName: client.name || "there",
+            to,
+            clientName: client.client_name?.trim() || "there",
             businessName: prof?.business_name || "your tradie",
             quoteNumber: quoteNumber(q.id, q.created_at),
             total: formatCurrency(Number(q.total_amount ?? 0), currency),
             acceptUrl: `${appUrl}/quote/${q.public_token}`,
             step,
+            replyTo: replyToFor(prof?.email),
           });
           if (!result.ok) {
             counters.failed += 1;

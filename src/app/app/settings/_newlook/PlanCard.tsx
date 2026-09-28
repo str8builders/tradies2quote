@@ -22,18 +22,22 @@ export function PlanCard({ summary }: { summary: PlanSummary }) {
         <p className="font-semibold text-ui-text">{summary.title}</p>
         <p className="mt-1 text-ui-sm text-ui-muted">{summary.detail}</p>
       </div>
-      {summary.action === "manage" ? <BillingButton /> : null}
-      {summary.action === "choose" ? (
-        <ButtonLink
-          href="/app/upgrade"
-          variant="secondary"
-          fullWidth
-          iconEnd={<ArrowRight weight="bold" />}
-          data-testid="settings-choose-plan"
-        >
-          Choose a plan
-        </ButtonLink>
-      ) : null}
+      {summary.actions.map((action) =>
+        action === "manage" ? (
+          <BillingButton key="manage" />
+        ) : (
+          <ButtonLink
+            key="choose"
+            href="/app/upgrade"
+            variant="secondary"
+            fullWidth
+            iconEnd={<ArrowRight weight="bold" />}
+            data-testid="settings-choose-plan"
+          >
+            Choose a plan
+          </ButtonLink>
+        ),
+      )}
       {summary.note ? <p className="text-ui-sm text-ui-muted">{summary.note}</p> : null}
     </Card>
   );

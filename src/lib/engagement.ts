@@ -23,6 +23,51 @@ export function followupsEnabled(): boolean {
   return process.env.FOLLOWUPS_ENABLED === "true";
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function validEmail(value: unknown): string | null {
+  const email = typeof value === "string" ? value.trim() : "";
+  return email.length <= 254 && EMAIL_RE.test(email) ? email : null;
+}
+
+/**
+ * The address a quote was actually emailed to: the newest "sent" event from
+ * the email path (/api/quotes/[id]/send records `metadata.to`). SMS sends
+ * carry a channel and a phone number, so they're skipped. `events` newest first.
+ */
+export function sentToAddress(events: ReadonlyArray<{ metadata: unknown }>): string | null {
+  for (const event of events) {
+    const meta = event.metadata;
+    if (!meta || typeof meta !== "object") continue;
+    const { to, channel } = meta as { to?: unknown; channel?: unknown };
+    if (channel !== undefined && channel !== null && channel !== "email") continue;
+    const email = validEmail(to);
+    if (email) return email;
+  }
+  return null;
+}
+
+/**
+ * Who a follow-up or review request goes to: the address the quote was sent
+ * to, else the email written on the quote itself (a quote only ever texted,
+ * or an older send without the event). NEVER the client record linked by
+ * quotes.client_id: the public request form links that loosely, so it can
+ * be someone else, who would then get this quote's link.
+ */
+export function engagementRecipient(
+  events: ReadonlyArray<{ metadata: unknown }>,
+  quoteClient: { email?: unknown; contact?: unknown },
+): string | null {
+  // Same rule as the send route: the email field, else a legacy contact
+  // field that holds an email.
+  return sentToAddress(events) ?? validEmail(quoteClient.email) ?? validEmail(quoteClient.contact);
+}
+
+/** Replies reach the tradie (the platform's sending address has no mailbox). */
+export function replyToFor(businessEmail: unknown): string | null {
+  return validEmail(businessEmail);
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -38,6 +83,8 @@ async function sendEmail(args: {
   subject: string;
   text: string;
   html: string;
+  /** The tradie's business email, so the client's reply reaches them. */
+  replyTo?: string | null;
 }): Promise<SendResult> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL;
@@ -53,6 +100,7 @@ async function sendEmail(args: {
     body: JSON.stringify({
       from,
       to: [args.to],
+      ...(args.replyTo ? { reply_to: args.replyTo } : {}),
       subject: args.subject,
       text: args.text,
       html: args.html,
@@ -73,6 +121,7 @@ export async function sendReviewRequestEmail(args: {
   clientName: string;
   businessName: string;
   reviewUrl: string;
+  replyTo?: string | null;
 }): Promise<SendResult> {
   const subject = `Thanks from ${args.businessName} — quick favour?`;
   const text = `Hi ${args.clientName},
@@ -99,7 +148,7 @@ ${args.businessName}`;
   <p style="color: #666; font-size: 13px; margin-top: 32px;">— ${escapeHtml(args.businessName)}</p>
 </body></html>`;
 
-  return sendEmail({ to: args.to, subject, text, html });
+  return sendEmail({ to: args.to, subject, text, html, replyTo: args.replyTo });
 }
 
 /** Gentle "just checking you got the quote" nudge with the accept link. */
@@ -111,6 +160,7 @@ export async function sendFollowupEmail(args: {
   total: string;
   acceptUrl: string;
   step: number;
+  replyTo?: string | null;
 }): Promise<SendResult> {
   const subject =
     args.step >= 2
@@ -140,5 +190,5 @@ ${args.businessName}`;
   <p style="color: #666; font-size: 13px; margin-top: 32px;">— ${escapeHtml(args.businessName)}</p>
 </body></html>`;
 
-  return sendEmail({ to: args.to, subject, text, html });
+  return sendEmail({ to: args.to, subject, text, html, replyTo: args.replyTo });
 }

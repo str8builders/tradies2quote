@@ -1,4 +1,4 @@
-import { samePhone } from "./phone";
+import { normalisePhone, samePhone } from "./phone";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { captureError } from "@/lib/observability";
@@ -134,6 +134,26 @@ export async function findTradieBySlug(
 
 export type CreatedRequest = { requestId: string; quoteId: string; clientId: string };
 
+/** Emails compare trimmed and lower-cased (how save_client_contact stores them). */
+export function normaliseEmail(value: string | null | undefined): string {
+  return (value ?? "").trim().toLowerCase();
+}
+
+/**
+ * `value` as a LIKE pattern that matches only itself: `%`, `_` and the
+ * escape character are escaped. (PostgREST also reads `*` as `%` and can't
+ * escape it, so callers re-check candidates for exact equality.)
+ */
+export function likeLiteral(value: string): string {
+  return value.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
+/**
+ * Fewest digits for a phone number to identify an existing client: a full
+ * number with its area or mobile prefix, not a fragment like "123456".
+ */
+export const MIN_MATCH_PHONE_DIGITS = 8;
+
 export async function createQuoteRequest(opts: {
   admin: SupabaseClient<Database>;
   tradieUserId: string;
@@ -144,20 +164,23 @@ export async function createQuoteRequest(opts: {
   const { admin, tradieUserId, input } = opts;
 
   // Reuse an existing client with the same email (or phone) so repeat
-  // requests don't litter the tradie's client list.
+  // requests don't litter the tradie's client list. Anyone can fill in this
+  // form, so a match must be exact: the old `ilike(email, <typed text>)`
+  // treated % and _ as wildcards, and "%@%.%" linked the requester to some
+  // other client — who then got this requester's quote emails.
   let clientId: string | null = null;
   if (input.email) {
+    const wanted = normaliseEmail(input.email);
     const { data } = await admin
       .from("clients")
-      .select("id")
+      .select("id, email")
       .eq("user_id", tradieUserId)
-      .ilike("email", input.email)
+      .ilike("email", likeLiteral(wanted))
       .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    clientId = data?.id ?? null;
+      .limit(20);
+    clientId = (data ?? []).find((c) => normaliseEmail(c.email) === wanted)?.id ?? null;
   }
-  if (!clientId && input.phone) {
+  if (!clientId && input.phone && normalisePhone(input.phone).length >= MIN_MATCH_PHONE_DIGITS) {
     // Format-insensitive: "021 555 1234" and "+64 21 555 1234" are one client.
     const { data } = await admin
       .from("clients")
@@ -166,7 +189,9 @@ export async function createQuoteRequest(opts: {
       .not("phone", "is", null)
       .order("created_at", { ascending: true })
       .limit(500);
-    clientId = (data ?? []).find((c) => samePhone(c.phone, input.phone))?.id ?? null;
+    const matches = (data ?? []).filter((c) => samePhone(c.phone, input.phone));
+    // Only an unambiguous match: a number two clients share could be anyone's.
+    clientId = matches.length === 1 ? matches[0].id : null;
   }
   if (!clientId) {
     const { data, error } = await admin

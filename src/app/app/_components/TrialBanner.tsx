@@ -97,7 +97,7 @@ export async function TrialBanner({ look = "old" }: { look?: "new" | "old" } = {
             data-testid="trial-banner-expired"
             tone="bad"
             icon={<Lightning weight="bold" />}
-            action="Subscribe for $49 a month"
+            action="Subscribe for NZ$49 a month"
           >
             Your trial has ended, so new quotes are paused.
           </NoticeLink>
@@ -117,7 +117,7 @@ export async function TrialBanner({ look = "old" }: { look?: "new" | "old" } = {
             Trial ended · Read-only mode · New quotes paused
           </p>
           <span className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.18em] text-white">
-            Subscribe — $49/mo
+            Subscribe — NZ$49 a month
             <ArrowRight size={12} weight="bold" />
           </span>
         </div>
@@ -144,7 +144,7 @@ export async function TrialBanner({ look = "old" }: { look?: "new" | "old" } = {
           data-testid="trial-banner-warning"
           tone="warn"
           icon={<Lightning weight="bold" />}
-          action="Subscribe for $49 a month"
+          action="Subscribe for NZ$49 a month"
         >
           {trialEndsSentence(daysLeft)}
         </NoticeLink>
@@ -165,7 +165,7 @@ export async function TrialBanner({ look = "old" }: { look?: "new" | "old" } = {
           {label} — keep things flowing
         </p>
         <span className="inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.18em] text-white">
-          Subscribe — $49/mo
+          Subscribe — NZ$49 a month
           <ArrowRight size={12} weight="bold" />
         </span>
       </div>

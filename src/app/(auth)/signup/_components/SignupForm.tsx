@@ -1,8 +1,9 @@
 "use client";
 import { PendingSubmit } from "../../_components/PendingSubmit";
+import { rememberEmail, restoreEmailInto } from "../../_components/remembered-email";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   Envelope,
@@ -39,11 +40,20 @@ type Props = {
 
 export function SignupForm({ error, next, native = false }: Props) {
   const [show, setShow] = useState(false);
+  const emailRef = useRef<HTMLInputElement>(null);
+  // After a reload (an update landed mid-sign-up) or a failed attempt, the
+  // email typed a moment ago comes back. Never the password.
+  useEffect(() => {
+    restoreEmailInto(emailRef.current);
+  }, [error]);
 
   return (
     <form
       action={signupAction}
-      onSubmit={() => (window as unknown as { uw?: (e: string) => void }).uw?.("signup")}
+      onSubmit={(e) => {
+        rememberEmail(new FormData(e.currentTarget).get("email"));
+        (window as unknown as { uw?: (e: string) => void }).uw?.("signup");
+      }}
       className="space-y-4"
       data-testid="signup-form"
     >
@@ -66,6 +76,7 @@ export function SignupForm({ error, next, native = false }: Props) {
         autoComplete="email"
         required
         testId="signup-email"
+        inputRef={emailRef}
       />
       <Field
         icon={Lock}
@@ -132,6 +143,7 @@ type FieldProps = {
   required?: boolean;
   testId?: string;
   right?: React.ReactNode;
+  inputRef?: React.Ref<HTMLInputElement>;
 };
 
 function Field({
@@ -143,6 +155,7 @@ function Field({
   required,
   testId,
   right,
+  inputRef,
 }: FieldProps) {
   return (
     <label className="block">
@@ -152,6 +165,7 @@ function Field({
       <span className="mt-1 flex items-center gap-2 h-12 px-3 bg-ink-800 border border-ink-600 focus-within:border-brand rounded-sm">
         <Icon size={16} weight="bold" className="text-brand shrink-0" />
         <input
+          ref={inputRef}
           name={name}
           type={type}
           autoComplete={autoComplete}

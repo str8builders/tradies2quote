@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 import { captureToSentry } from "@/lib/observability/sentryBrowser";
 import { reportClientError } from "@/lib/observability/clientReport";
+import { shouldReportBoundaryError } from "@/lib/boundary-report";
+import { maybeRecoverFromStaleDeploy } from "@/lib/staleDeploy";
 
 /**
  * Global error boundary — the absolute last-resort fallback. Next.js
@@ -17,18 +19,24 @@ import { reportClientError } from "@/lib/observability/clientReport";
  */
 export default function GlobalError({
   error,
-  reset,
+  retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry: () => void;
 }) {
   useEffect(() => {
     // Next's Sentry SDK does NOT auto-instrument global-error — the
     // root-layout-crash case, the worst class of error, must be reported
-    // explicitly or it's silently swallowed. No-ops without a DSN.
-    captureToSentry(error);
-    reportClientError(error, "boundary");
+    // explicitly or it's silently swallowed. No-ops without a DSN. Not for
+    // a server error (it has a digest: the server recorded it) or a stale
+    // deploy (reloaded below).
+    if (shouldReportBoundaryError(error)) {
+      captureToSentry(error);
+      reportClientError(error, "boundary");
+    }
     console.error("[global error]", error);
+    // A page left open across an update: load the new version once.
+    maybeRecoverFromStaleDeploy(`${error.name ?? ""} ${error.message ?? ""}`);
   }, [error]);
 
   return (
@@ -97,7 +105,8 @@ export default function GlobalError({
           ) : null}
           <button
             type="button"
-            onClick={() => reset()}
+            // retry() fetches again; reset() only re-rendered the failed tree.
+            onClick={() => retry()}
             style={{
               marginTop: "24px",
               backgroundColor: "#FF5F15",

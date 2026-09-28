@@ -2,8 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import type Stripe from "stripe";
 import { captureError } from "@/lib/observability";
 import { adminClient } from "@/lib/supabase/admin";
-import { subscriptionPlan } from "@/lib/stripe-subscription";
+import { isLiveSubscriptionStatus, isUnmappedCustomerError, subscriptionPlan } from "@/lib/stripe-subscription";
 import { isStripeConfigured, stripeClient, planForPrice } from "@/lib/stripe-client";
+import { ledgerHasEvent, ledgerRecordEvent } from "@/lib/stripe-webhook-ledger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
@@ -32,10 +33,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "bad_signature" }, { status: 400 });
   }
   const admin = adminClient();
-  const ledger = await admin.from("stripe_webhook_events").select("event_id").eq("event_id", event.id).maybeSingle();
-  if (ledger.error) return NextResponse.json({ error: "ledger_unavailable" }, { status: 500 });
-  if (ledger.data) return NextResponse.json({ received: true, duplicate: true });
+  // Keyed on this endpoint + the event: the deposits webhook gets the same
+  // checkout.session.completed and records it separately.
+  const ledger = await ledgerHasEvent(admin, "subscriptions", event.id);
+  if (!ledger.ok) return NextResponse.json({ error: "ledger_unavailable" }, { status: 500 });
+  if (ledger.done) return NextResponse.json({ received: true, duplicate: true });
   try {
+    let ignored: string | null = null;
     let subscriptionId: string | null = null;
     let checkout: Stripe.Checkout.Session | null = null;
     if (event.type === "checkout.session.completed") {
@@ -61,13 +65,20 @@ export async function POST(request: NextRequest) {
           id: sub.id, customer, user_id: sub.metadata?.t2q_user_id || null, plan, status: sub.status,
           created: sub.created, observed_at: observedAt, period_end: end ? new Date(end * 1000).toISOString() : null,
         } });
-        if (result.error) throw result.error;
+        if (result.error) {
+          // A deleted account's customer mapping is gone, but Stripe still
+          // reports its now-cancelled subscription. Nothing to sync, and a
+          // 500 would make Stripe retry for three days. A LIVE subscription
+          // on an unmapped customer stays an error: someone may be billed.
+          if (isUnmappedCustomerError(result.error) && !isLiveSubscriptionStatus(sub.status)) ignored = "unmapped_customer";
+          else throw result.error;
+        }
       } else if (checkout?.metadata?.t2q_user_id) throw new Error("Checkout price is not a supported app plan.");
     }
     // Mark complete only after the state write succeeds; failed writes remain retryable.
-    const saved = await admin.from("stripe_webhook_events").insert({ event_id: event.id, type: event.type });
-    if (saved.error && saved.error.code !== "23505") throw saved.error;
-    return NextResponse.json({ received: true });
+    const saved = await ledgerRecordEvent(admin, "subscriptions", event.id, event.type);
+    if (!saved.ok) throw saved.error;
+    return NextResponse.json(ignored ? { received: true, ignored } : { received: true });
   } catch (error) {
     captureError(error, { route: "stripe/webhook" });
     return NextResponse.json({ error: "handler_failed", type: event.type }, { status: 500 });

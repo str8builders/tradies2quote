@@ -15,7 +15,13 @@ export async function saveDepositPctAction(pct: number): Promise<{ ok: boolean; 
   if (!user) redirect("/login");
 
   const clamped = Math.min(100, Math.max(0, Math.round(Number(pct) || 0)));
-  await setDepositPct(user.id, clamped);
+  try {
+    const saved = await setDepositPct(user.id, clamped);
+    if (!saved.ok) return { ok: false, error: saved.error };
+  } catch {
+    // setDepositPct reports database errors itself; this is the network.
+    return { ok: false, error: "Couldn't save the deposit. Check your signal and try again." };
+  }
   revalidatePath("/app/settings");
   return { ok: true };
 }

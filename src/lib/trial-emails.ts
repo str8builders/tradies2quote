@@ -7,28 +7,33 @@ import { fetchWithTimeout, TIMEOUTS } from "@/lib/fetchTimeout";
  * Pure logic + one Resend send wrapper. The cron route at
  * /api/cron/trial-emails is the only caller.
  *
- * Five email kinds, all keyed off `auth.users.created_at` (= trial start).
- * The 7-day trial length is fixed per the build spec; if/when Stripe lands,
- * paying users skip the expiry branch.
+ * Five email kinds, all keyed off the trial start (profiles.trial_started_at,
+ * else auth.users.created_at). The 7-day trial length is fixed per the build
+ * spec; paying users skip the whole lot.
  *
- *   onboarding_24h   — 24h after signup, zero quotes sent
- *   onboarding_3day  — 3 days after signup, zero quotes sent (Calendly CTA)
- *   trial_minus_2    — 5 days after signup (T-2)
- *   trial_day_0      — 7 days after signup (T)
- *   trial_plus_3     — 10 days after signup (T+3)
+ *   onboarding_24h   — from 1 day in, no quote made yet
+ *   onboarding_3day  — from 3 days in, no quote made yet (call offer)
+ *   trial_minus_2    — from 4 days in: "your trial ends on <date>"
+ *   trial_day_0      — the LAST day: the final 26 hours, only while the trial
+ *                      is still running; it says exactly when it ends
+ *   trial_plus_3     — from 10 days in (3 days after it ended)
  *
- * Vercel Hobby caps cron at once-per-day, so the scheduler runs daily.
- * `kindForUser` returns the MOST-RECENT kind the user qualifies for; the
- * dedup ledger (`lifecycle_emails` unique on user_id+kind) makes the job
- * idempotent so re-runs and missed-day catch-ups never double-send. A user
- * who sits in the 24h-to-3day band for two days only ever gets the
- * onboarding_24h email once.
+ * The scheduler runs once a day (09:00 NZ time), so a kind whose window opens
+ * at hour H goes out at the first run after H. The last-day email's window
+ * ends when the trial does: it used to open at 168 h — the very moment the
+ * trial ended — so "after tonight" arrived after the account had locked.
+ * `kindForUser` returns the kind whose window the user is in; the dedup ledger
+ * (`lifecycle_emails` unique on user_id+kind) makes each kind at-most-once.
  */
 
 const RESEND_URL = "https://api.resend.com/emails";
 const TRIAL_DAYS = 7;
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
+/** Trial dates in emails are New Zealand dates (the scheduler's zone too). */
+const EMAIL_TIME_ZONE = "Pacific/Auckland";
+/** Plans are priced in NZ dollars only (src/lib/plans.ts). */
+const FROM_PRICE = "NZ$49 a month";
 
 export type EmailKind =
   | "onboarding_24h"
@@ -46,39 +51,44 @@ export const EMAIL_KINDS: readonly EmailKind[] = [
 ] as const;
 
 /**
- * How many hours after signup each email becomes eligible to send.
- * A user is "in band" for a kind from this hour onwards until the NEXT
- * kind's threshold opens — the dedup ledger then guarantees at-most-
- * once delivery across the entire band.
+ * The last-day email's window: the final 26 hours of the trial. A daily run
+ * lands in any 24-hour window, but two 09:00 runs are 25 hours apart when
+ * daylight saving ends; 26 hours can't be skipped.
  */
-const KIND_THRESHOLD_HOURS: Record<EmailKind, number> = {
-  onboarding_24h: 24,
-  onboarding_3day: 3 * 24,
-  trial_minus_2: (TRIAL_DAYS - 2) * 24,
-  trial_day_0: TRIAL_DAYS * 24,
-  trial_plus_3: (TRIAL_DAYS + 3) * 24,
+const LAST_DAY_HOURS = 26;
+
+/**
+ * Hours after the trial start during which each kind may be sent
+ * ([from, until)). The windows follow each other, so a user is in at most one,
+ * and each is wider than the longest gap between two daily runs.
+ */
+const KIND_WINDOWS: Record<EmailKind, { from: number; until: number }> = {
+  onboarding_24h: { from: 24, until: 3 * 24 },
+  onboarding_3day: { from: 3 * 24, until: 4 * 24 + 2 },
+  trial_minus_2: { from: 4 * 24 + 2, until: TRIAL_DAYS * 24 - LAST_DAY_HOURS },
+  // The day before: never at or after the moment the trial ends.
+  trial_day_0: { from: TRIAL_DAYS * 24 - LAST_DAY_HOURS, until: TRIAL_DAYS * 24 },
+  trial_plus_3: { from: (TRIAL_DAYS + 3) * 24, until: Number.POSITIVE_INFINITY },
 };
 
-/** Kinds gated by "tradie has not yet sent any quote". */
-const REQUIRES_ZERO_SENT: ReadonlySet<EmailKind> = new Set([
+/** Kinds sent only to tradies who haven't made a single quote yet. */
+const REQUIRES_NO_QUOTES: ReadonlySet<EmailKind> = new Set([
   "onboarding_24h",
   "onboarding_3day",
 ]);
 
-export function requiresZeroSentQuotes(kind: EmailKind): boolean {
-  return REQUIRES_ZERO_SENT.has(kind);
+/**
+ * "Haven't made a quote yet": ANY quote counts (a draft, a declined or
+ * expired one, even one they have since deleted), not only sent ones.
+ */
+export function requiresNoQuotes(kind: EmailKind): boolean {
+  return REQUIRES_NO_QUOTES.has(kind);
 }
 
 /**
- * Returns the most-recent EmailKind the user qualifies for, or null if
- * they're younger than 24h. The caller is expected to consult the dedup
- * ledger and skip if this kind was already sent — meaning users only
- * ever receive each kind once across the entire eligibility band.
- *
- * Picking "most recent" matters for resilience: if the daily cron is
- * down for a couple of days, a user who skipped the 24h slot still gets
- * their most-relevant message on the next successful run, instead of
- * being pinned to an outdated onboarding nudge.
+ * The EmailKind whose window the user is in, or null (younger than 24h, or
+ * between the trial's end and the "door open" email). The caller consults
+ * the dedup ledger, so each kind goes out at most once.
  *
  * `now` is injected so tests don't depend on wall clock.
  */
@@ -87,12 +97,9 @@ export function kindForUser(
   now: Date = new Date(),
 ): EmailKind | null {
   const elapsedHours = (now.getTime() - signedUpAt.getTime()) / HOUR_MS;
-  // Walk the kinds in reverse so the latest-eligible threshold wins.
-  for (let i = EMAIL_KINDS.length - 1; i >= 0; i--) {
-    const kind = EMAIL_KINDS[i];
-    if (elapsedHours >= KIND_THRESHOLD_HOURS[kind]) {
-      return kind;
-    }
+  for (const kind of EMAIL_KINDS) {
+    const window = KIND_WINDOWS[kind];
+    if (elapsedHours >= window.from && elapsedHours < window.until) return kind;
   }
   return null;
 }
@@ -106,6 +113,11 @@ type TemplateArgs = {
   calendlyUrl?: string;
   /** Trial-end date as a localized string, e.g. "Sun 24 May". */
   trialEndsLabel: string;
+  /**
+   * For the last-day email: when the trial ends, relative to the send, e.g.
+   * { day: "today", time: "2:15 pm" } (NZ time). See lastDayWording().
+   */
+  trialEnds?: { day: string; time: string };
 };
 
 export interface RenderedEmail {
@@ -144,16 +156,16 @@ function btn(href: string, label: string): string {
 }
 
 function renderOnboarding24h(args: TemplateArgs): RenderedEmail {
-  const subject = "Record your first quote in 60 seconds";
+  const subject = "Make your first quote";
   const newQuoteUrl = `${args.appUrl}/app/quotes/new`;
   const videoLine = args.videoUrl
-    ? `\n\nWant a 60-second walkthrough first? ${args.videoUrl}`
+    ? `\n\nWant a quick walkthrough first? ${args.videoUrl}`
     : "";
   const text = `Hi ${args.firstName},
 
-You signed up yesterday but haven't recorded a quote yet. The hardest part is the first one — pick a job you'd quote today, tap the mic, and just talk.
+You haven't made a quote yet. The hardest part is the first one — pick a job you'd quote today, tap the mic, and just talk.
 
-Most tradies get a usable quote on their first try, then tweak the lines.
+You can check and change every line before anything goes to a client.
 
 Start here: ${newQuoteUrl}${videoLine}
 
@@ -161,10 +173,10 @@ Cheers,
 Challis (tradies2Quote)`;
   const html = shell(`
 <p>Hi ${escapeHtml(args.firstName)},</p>
-<p>You signed up yesterday but haven't recorded a quote yet. The hardest part is the first one — pick a job you'd quote today, tap the mic, and just talk.</p>
-<p>Most tradies get a usable quote on their first try, then tweak the lines.</p>
-${btn(newQuoteUrl, "Record your first quote")}
-${args.videoUrl ? `<p style="color: #666; font-size: 13px;">Prefer a 60-sec walkthrough first? <a href="${args.videoUrl}" style="color: #FF5F15;">Watch the demo</a>.</p>` : ""}
+<p>You haven't made a quote yet. The hardest part is the first one — pick a job you'd quote today, tap the mic, and just talk.</p>
+<p>You can check and change every line before anything goes to a client.</p>
+${btn(newQuoteUrl, "Make your first quote")}
+${args.videoUrl ? `<p style="color: #666; font-size: 13px;">Prefer a quick walkthrough first? <a href="${args.videoUrl}" style="color: #FF5F15;">Watch the demo</a>.</p>` : ""}
 <p>Cheers,<br>Challis (tradies2Quote)</p>
 `);
   return { subject, text, html };
@@ -197,13 +209,13 @@ ${args.calendlyUrl ? btn(args.calendlyUrl, "Grab a 15-min slot") : '<p>Just repl
 }
 
 function renderTrialMinus2(args: TemplateArgs): RenderedEmail {
-  const subject = "Your trial ends in 2 days";
+  const subject = `Your free trial ends ${args.trialEndsLabel}`;
   const settingsUrl = `${args.appUrl}/app/settings`;
   const text = `Hi ${args.firstName},
 
 Heads up — your 7-day trial ends on ${args.trialEndsLabel}. No card on file so nothing auto-charges.
 
-If you're getting value, the cheapest plan is $49/mo and unlocks unlimited quotes. If not, no drama, your account just goes read-only after the trial ends — you can still log in and grab any PDFs you sent.
+If it's working for you, plans start at ${FROM_PRICE} with unlimited quotes. If not, no drama, your account just goes read-only after the trial ends — you can still log in and grab any PDFs you sent.
 
 Manage your account: ${settingsUrl}
 
@@ -211,7 +223,7 @@ Manage your account: ${settingsUrl}
   const html = shell(`
 <p>Hi ${escapeHtml(args.firstName)},</p>
 <p>Heads up — your 7-day trial ends on <strong>${escapeHtml(args.trialEndsLabel)}</strong>. No card on file so nothing auto-charges.</p>
-<p>If you're getting value, the cheapest plan is $49/mo and unlocks unlimited quotes. If not, no drama, your account just goes read-only after the trial ends — you can still log in and grab any PDFs you sent.</p>
+<p>If it's working for you, plans start at ${FROM_PRICE} with unlimited quotes. If not, no drama, your account just goes read-only after the trial ends — you can still log in and grab any PDFs you sent.</p>
 ${btn(settingsUrl, "Manage your account")}
 <p>— Challis</p>
 `);
@@ -219,22 +231,24 @@ ${btn(settingsUrl, "Manage your account")}
 }
 
 function renderTrialDay0(args: TemplateArgs): RenderedEmail {
-  const subject = "Your trial ends today";
+  const ends = args.trialEnds ?? { day: `on ${args.trialEndsLabel}`, time: "" };
+  const at = ends.time ? ` at ${ends.time} (NZ time)` : "";
+  const subject = `Your free trial ends ${ends.day}`;
   const settingsUrl = `${args.appUrl}/app/settings`;
   const text = `Hi ${args.firstName},
 
-Today's the last day of your free trial. After tonight your account flips to read-only — quotes you've already sent keep working, but you can't make new ones until you upgrade.
+Your free trial ends ${ends.day}${at}. After that you can't make new quotes until you choose a plan. Quotes you've already sent keep working for your clients.
 
-If you've been on the fence, $49/mo is the easy answer. Click below to pick a plan.
+Plans start at ${FROM_PRICE}. Pick one here:
 
 ${settingsUrl}
 
 — Challis`;
   const html = shell(`
 <p>Hi ${escapeHtml(args.firstName)},</p>
-<p>Today's the last day of your free trial. After tonight your account flips to read-only — quotes you've already sent keep working, but you can't make new ones until you upgrade.</p>
-<p>If you've been on the fence, <strong>$49/mo</strong> is the easy answer. Pick a plan below.</p>
-${btn(settingsUrl, "Upgrade now")}
+<p>Your free trial ends <strong>${escapeHtml(`${ends.day}${at}`)}</strong>. After that you can't make new quotes until you choose a plan. Quotes you've already sent keep working for your clients.</p>
+<p>Plans start at <strong>${FROM_PRICE}</strong>. Pick one below.</p>
+${btn(settingsUrl, "Choose a plan")}
 <p>— Challis</p>
 `);
   return { subject, text, html };
@@ -247,7 +261,7 @@ function renderTrialPlus3(args: TemplateArgs): RenderedEmail {
 
 Your trial ended three days ago. Your quotes are still saved and your account is right where you left it — you just can't make new ones without a plan.
 
-If now's not the time, no worries. If you want to give it another go, $49/mo unlocks everything: ${settingsUrl}
+If now's not the time, no worries. If you want to give it another go, plans start at ${FROM_PRICE}: ${settingsUrl}
 
 Either way, hit reply if there's something I can fix.
 
@@ -255,7 +269,7 @@ Either way, hit reply if there's something I can fix.
   const html = shell(`
 <p>Hi ${escapeHtml(args.firstName)},</p>
 <p>Your trial ended three days ago. Your quotes are still saved and your account is right where you left it — you just can't make new ones without a plan.</p>
-<p>If now's not the time, no worries. If you want to give it another go, $49/mo unlocks everything.</p>
+<p>If now's not the time, no worries. If you want to give it another go, plans start at ${FROM_PRICE}.</p>
 ${btn(settingsUrl, "Reactivate")}
 <p style="color: #666; font-size: 13px;">Either way, hit reply if there's something I can fix.</p>
 <p>— Challis</p>
@@ -271,8 +285,37 @@ export function trialEndsLabel(signedUpAt: Date): string {
     weekday: "short",
     day: "numeric",
     month: "short",
-    timeZone: "Pacific/Auckland",
+    timeZone: EMAIL_TIME_ZONE,
   });
+}
+
+/** The NZ calendar date of an instant as [year, month, day]. */
+function nzDate(at: Date): [number, number, number] {
+  const parts = new Intl.DateTimeFormat("en-NZ", {
+    timeZone: EMAIL_TIME_ZONE,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  }).formatToParts(at);
+  const part = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((p) => p.type === type)?.value);
+  return [part("year"), part("month"), part("day")];
+}
+
+/**
+ * When the trial ends, in words for the last-day email sent at `now`:
+ * { day: "today" | "tomorrow" | "on Sun 24 May", time: "2:15 pm" }, NZ time.
+ */
+export function lastDayWording(signedUpAt: Date, now: Date): { day: string; time: string } {
+  const end = new Date(signedUpAt.getTime() + TRIAL_DAYS * DAY_MS);
+  const time = end
+    .toLocaleTimeString("en-NZ", { timeZone: EMAIL_TIME_ZONE, hour: "numeric", minute: "2-digit", hour12: true })
+    .toLowerCase();
+  const [ey, em, ed] = nzDate(end);
+  const [ny, nm, nd] = nzDate(now);
+  const endDay = Date.UTC(ey, em - 1, ed);
+  const today = Date.UTC(ny, nm - 1, nd);
+  const day = endDay === today ? "today" : endDay - today === DAY_MS ? "tomorrow" : `on ${trialEndsLabel(signedUpAt)}`;
+  return { day, time };
 }
 
 export type SendResult =

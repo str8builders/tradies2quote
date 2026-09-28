@@ -14,8 +14,9 @@ import { isNativeShellRequest } from "@/lib/native-shell";
  *
  * Order of operations (children before parents, auth user LAST):
  *   1. Verify the caller's session + typed "DELETE" confirmation.
- *   2. Best-effort cancel any live Stripe subscription so a deleted
- *      account can never keep being billed.
+ *   2. Cancel every live Stripe subscription on the customer (brief Stripe
+ *      failures are retried); if any cancel fails, stop and delete nothing,
+ *      so a deleted account can never keep being billed.
  *   3. Purge storage objects (avatars, quote PDFs, signatures).
  *   4. Purge user rows — quote children by quote_id first (they don't all
  *      cascade), then user_id-keyed tables, then quotes/profiles.

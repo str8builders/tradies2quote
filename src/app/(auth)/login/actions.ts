@@ -4,9 +4,11 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { safeNextPath } from "@/lib/safe-redirect";
 import { consumeFixedWindow } from "@/lib/rate-limit";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { WELCOME_SEEN_COOKIE } from "@/lib/welcome-cookie";
 import { friendlyAuthError } from "@/lib/auth/friendlyAuthError";
+import { allowSignInAttempt, SIGNIN_TOO_MANY_MESSAGE } from "@/lib/auth/signin-throttle";
+import { requestIp } from "@/lib/request-ip";
 
 export async function loginAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
@@ -15,6 +17,12 @@ export async function loginAction(formData: FormData) {
 
   if (!email || !password) {
     redirect(`/login?error=Email%20and%20password%20required&next=${encodeURIComponent(next)}`);
+  }
+
+  // Throttled per IP and per email before Supabase sees it (Supabase only
+  // sees this server's IP). Same answer for a known or unknown address.
+  if (!allowSignInAttempt({ ip: requestIp({ headers: await headers() }), email })) {
+    redirect(`/login?error=${encodeURIComponent(SIGNIN_TOO_MANY_MESSAGE)}&next=${encodeURIComponent(next)}`);
   }
 
   const supabase = await createClient();

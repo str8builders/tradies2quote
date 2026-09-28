@@ -3,6 +3,7 @@ import { AuthSplitShell } from "../../_components/auth/AuthSplitShell";
 import { AuthMarketingPanel } from "../../_components/auth/AuthMarketingPanel";
 import { LoginForm } from "./_components/LoginForm";
 import { isNativeShellRequest } from "@/lib/native-shell";
+import { NativeTrackingStop } from "@/app/_components/NativeTrackingStop";
 
 export const metadata: Metadata = {
   title: "Log in",
@@ -50,6 +51,10 @@ export default async function LoginPage({
           <div className="mt-8">
             <LoginForm next={next} error={error} message={message} native={native} />
           </div>
+          {/* iPhone app: nobody is signed in here (after sign-out, an expired
+              session or account deletion), so stop location tracking and
+              forget the upload key. Renders nothing; a no-op in a browser. */}
+          <NativeTrackingStop />
         </>
       }
     />

@@ -5,6 +5,7 @@ import { adminClient } from "@/lib/supabase/admin";
 import { isStripeConfigured } from "@/lib/stripe-client";
 import { isOwnerEmail } from "@/lib/owner";
 import { isCompedEmail } from "@/lib/reviewer";
+import { captureError } from "@/lib/observability";
 
 /**
  * The single source of truth for "what tier is this user on?"
@@ -29,6 +30,60 @@ import { isCompedEmail } from "@/lib/reviewer";
 const TRIAL_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** BETA_FREE_UNTIL dates are New Zealand dates: the business and most tradies are there. */
+export const BETA_TIME_ZONE = "Pacific/Auckland";
+
+/** Offset of `timeZone` from UTC at `instant` (whole-second instants), in ms. */
+function zoneOffsetMs(instant: number, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    second: "numeric",
+  }).formatToParts(new Date(instant));
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((p) => p.type === type)?.value);
+  const wall = Date.UTC(part("year"), part("month") - 1, part("day"), part("hour"), part("minute"), part("second"));
+  return wall - instant;
+}
+
+/** The UTC instant of 00:00 on y-m-d (day may overflow the month) in `timeZone`. */
+function zonedMidnight(y: number, m: number, d: number, timeZone: string): number {
+  const wall = Date.UTC(y, m - 1, d);
+  const guess = wall - zoneOffsetMs(wall, timeZone);
+  // A second pass settles a daylight-saving change between the guess and the answer.
+  return wall - zoneOffsetMs(guess, timeZone);
+}
+
+/**
+ * BETA_FREE_UNTIL as the LAST moment of free access.
+ *
+ * A plain date ("2026-10-31") means the whole of that day in New Zealand:
+ * free until 23:59:59.999 NZ time. `new Date("2026-10-31")` is UTC midnight,
+ * which ended the beta at 1 pm NZDT on the 31st. A full ISO timestamp is
+ * taken as the exact instant. Anything unparseable (or an impossible date
+ * like 2026-02-31) is ignored, so normal billing rules apply.
+ */
+export function parseBetaFreeUntil(raw: string | null | undefined): Date | null {
+  const value = raw?.trim();
+  if (!value) return null;
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (dateOnly) {
+    const [y, m, d] = [Number(dateOnly[1]), Number(dateOnly[2]), Number(dateOnly[3])];
+    const check = new Date(Date.UTC(y, m - 1, d));
+    if (check.getUTCFullYear() !== y || check.getUTCMonth() !== m - 1 || check.getUTCDate() !== d) {
+      return null;
+    }
+    return new Date(zonedMidnight(y, m, d + 1, BETA_TIME_ZONE) - 1);
+  }
+  const ms = Date.parse(value);
+  return Number.isNaN(ms) ? null : new Date(ms);
+}
+
 export type SubscriptionState = "trialing" | "paid" | "expired";
 
 export interface SubscriptionStatus {
@@ -42,20 +97,91 @@ export interface SubscriptionStatus {
   trialDaysLeft: number | null;
   /** When the paid subscription period ends. Only present if `paid`. */
   currentPeriodEnd: Date | null;
-  /** Stripe customer id. Only present if user has ever started checkout. */
+  /**
+   * The user's OWN Stripe customer id, whenever they have ever started
+   * checkout — in every state, including the beta, a trial or an expired
+   * account. It is what shows "Manage billing": a lapsed, unpaid, paused or
+   * incomplete subscription (or one whose stored period end is stale) still
+   * needs a way to update the card or cancel. Null for team members (their
+   * owner manages billing) and for owner / review accounts.
+   */
   stripeCustomerId: string | null;
   /** Raw Stripe status string ("active", "trialing", "past_due", etc).
    *  null when user has never started a subscription. */
   stripeSubscriptionStatus: string | null;
   /** If a project-wide free beta window is active (BETA_FREE_UNTIL env
-   *  var set to a future ISO date), this is the date it ends. Tradies
-   *  see a banner "Beta — free until <date>" until that timestamp. */
+   *  var set to a future date), the last moment of free access. Tradies
+   *  without a paid plan see "Free access until <date>" until then. Null
+   *  for tradies who pay for a plan: their subscription is what counts. */
   betaFreeUntil: Date | null;
 }
 
+type SubscriptionRow = {
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  status: string | null;
+  current_period_end: string | null;
+  plan: string | null;
+};
+
+/** Everything the status needs from the database, read in one go. */
+async function readBilling(
+  userId: string,
+  stripeConfigured: boolean,
+): Promise<{ trialStartedAt: string | null; sub: SubscriptionRow | null; billingUserId: string }> {
+  // Wave 39 — fetch profiles.trial_started_at (the override anchor for
+  // restarted/extended trials) AND the subscriptions row in parallel.
+  // When trial_started_at is present, it wins over the immutable
+  // auth.users.created_at; that's how the bulk-restart script
+  // (supabase/scripts/restart_all_trials.sql) gives every existing
+  // user a fresh 7-day window without recreating their auth rows.
+  const admin = adminClient();
+  let billingUserId = userId;
+  if (stripeConfigured) {
+    const result = await admin.rpc("active_team_owner" as never, { p_user: userId } as never);
+    if (result.error) throw result.error;
+    billingUserId = (result.data as string | null) ?? userId;
+  }
+  // `trial_started_at` is the Wave 39 column added by
+  // supabase/migrations/20260519_trial_started_at.sql. Generated
+  // Supabase types don't include it until you regenerate via
+  // `supabase gen types typescript --linked > ...`, so the read goes
+  // through `as never` and the result is narrowed manually.
+  const [profileRes, subRes] = await Promise.all([
+    admin
+      .from("profiles")
+      .select("trial_started_at" as never)
+      .eq("id", userId)
+      .maybeSingle(),
+    stripeConfigured
+      ? admin
+          .from("subscriptions")
+          .select(
+            "stripe_customer_id, stripe_subscription_id, status, current_period_end, plan",
+          )
+          .eq("user_id", billingUserId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null } as const),
+  ]);
+
+  if (profileRes.error) throw profileRes.error;
+  if (subRes.error) throw subRes.error;
+  const profileRow = profileRes.data as { trial_started_at: string | null } | null;
+  return {
+    trialStartedAt: profileRow?.trial_started_at ?? null,
+    sub: (subRes.data as SubscriptionRow | null) ?? null,
+    billingUserId,
+  };
+}
+
 /**
- * Read the user's status. Single Supabase round-trip — pulls auth user
- * created_at AND any subscriptions row in one query path.
+ * Read the user's status: the owner / review-account bypasses first, then
+ * the database (trial anchor, team owner and subscription row), then the
+ * beta window.
+ *
+ * The subscription is read BEFORE the beta decides anything: during the free
+ * beta a paying subscriber is still being charged by Stripe, so they must
+ * still see their plan and "Manage billing" to update the card or cancel.
  *
  * `signedUpAt` is the trial anchor (auth.users.created_at). The caller
  * usually has the user object already; pass it in to save a round-trip.
@@ -74,19 +200,15 @@ export async function getSubscriptionStatus(args: {
   // BETA_FREE_UNTIL — temporary free-for-all window. Lets the operator
   // invite mates to test without anyone tripping the paywall, and self-
   // expires when the date passes so the paywall comes back without a
-  // manual flip. ISO date string (e.g. "2026-06-01" or full ISO).
-  // Invalid / past dates fall through silently to normal billing rules.
-  const betaFreeUntilRaw = process.env.BETA_FREE_UNTIL;
-  const betaFreeUntil =
-    betaFreeUntilRaw && !Number.isNaN(Date.parse(betaFreeUntilRaw))
-      ? new Date(betaFreeUntilRaw)
-      : null;
-  const betaActive = betaFreeUntil !== null && now < betaFreeUntil;
+  // manual flip. A plain date is the whole of that NZ day; invalid / past
+  // dates fall through silently to normal billing rules.
+  const betaFreeUntil = parseBetaFreeUntil(process.env.BETA_FREE_UNTIL);
+  const betaActive = betaFreeUntil !== null && now.getTime() <= betaFreeUntil.getTime();
 
   // Provisional trial dates using signedUpAt as the anchor. Used by
-  // the owner-bypass + beta-active early returns where the trial
-  // state is overridden anyway. The non-bypass path below re-derives
-  // these from profiles.trial_started_at if set.
+  // the owner-bypass + beta early returns where the trial state is
+  // overridden anyway. The path below re-derives these from
+  // profiles.trial_started_at if set.
   const provisionalTrialEndsAt = new Date(
     signedUpAt.getTime() + TRIAL_DAYS * DAY_MS,
   );
@@ -124,67 +246,46 @@ export async function getSubscriptionStatus(args: {
     };
   }
 
-  // Beta window applies to everyone else too — treat them as paid so
+  // The beta window applies to everyone else too — treat them as paid so
   // there's no friction during invite-mates testing.
-  if (betaActive) {
-    return {
-      state: "paid",
-      trialEndsAt: provisionalTrialEndsAt,
-      trialDaysLeft: null,
-      currentPeriodEnd: betaFreeUntil,
-      stripeCustomerId: null,
-      stripeSubscriptionStatus: "beta_free",
-      betaFreeUntil,
-    };
+  const betaStatus = (
+    trialEndsAt: Date,
+    billing: { customer: string | null; status: string | null; managedByTeam: boolean },
+  ): SubscriptionStatus => ({
+    state: "paid",
+    plan: null,
+    managedByTeam: billing.managedByTeam,
+    trialEndsAt,
+    trialDaysLeft: null,
+    currentPeriodEnd: betaFreeUntil,
+    stripeCustomerId: billing.customer,
+    stripeSubscriptionStatus: billing.status,
+    betaFreeUntil,
+  });
+
+  const stripeConfigured = isStripeConfigured();
+  // Without Stripe nobody can have been billed: the beta answer needs no reads.
+  if (betaActive && !stripeConfigured) {
+    return betaStatus(provisionalTrialEndsAt, { customer: null, status: null, managedByTeam: false });
   }
 
-  // Wave 39 — fetch profiles.trial_started_at (the override anchor for
-  // restarted/extended trials) AND the subscriptions row in parallel.
-  // When trial_started_at is present, it wins over the immutable
-  // auth.users.created_at; that's how the bulk-restart script
-  // (supabase/scripts/restart_all_trials.sql) gives every existing
-  // user a fresh 7-day window without recreating their auth rows.
-  const admin = adminClient();
-  let billingUserId = userId;
-  if (isStripeConfigured()) {
-    const result = await admin.rpc("active_team_owner" as never, { p_user: userId } as never);
-    if (result.error) throw result.error;
-    billingUserId = (result.data as string | null) ?? userId;
+  let billing: Awaited<ReturnType<typeof readBilling>>;
+  try {
+    billing = await readBilling(userId, stripeConfigured);
+  } catch (error) {
+    // Everyone has access during the beta, so a failed read only costs the
+    // billing button; outside it the caller must not guess.
+    if (!betaActive) throw error;
+    captureError(error, { route: "lib/subscription" });
+    return betaStatus(provisionalTrialEndsAt, { customer: null, status: null, managedByTeam: false });
   }
-  // `trial_started_at` is the Wave 39 column added by
-  // supabase/migrations/20260519_trial_started_at.sql. Generated
-  // Supabase types don't include it until you regenerate via
-  // `supabase gen types typescript --linked > ...`, so the read goes
-  // through `as never` and the result is narrowed manually. Re-running
-  // type generation after the migration is applied will let us drop
-  // the cast.
-  const [profileRes, subRes] = await Promise.all([
-    admin
-      .from("profiles")
-      .select("trial_started_at" as never)
-      .eq("id", userId)
-      .maybeSingle(),
-    isStripeConfigured()
-      ? admin
-          .from("subscriptions")
-          .select(
-            "stripe_customer_id, stripe_subscription_id, status, current_period_end, plan",
-          )
-          .eq("user_id", billingUserId)
-          .maybeSingle()
-      : Promise.resolve({ data: null, error: null } as const),
-  ]);
-
-  if (profileRes.error) throw profileRes.error;
-  if (subRes.error) throw subRes.error;
+  const { trialStartedAt, sub, billingUserId } = billing;
+  const managedByTeam = billingUserId !== userId;
+  // Only the user's own customer: a team member's billing is the owner's.
+  const ownCustomer = managedByTeam ? null : sub?.stripe_customer_id ?? null;
 
   // Derive the real trial anchor.
-  const profileRow = profileRes.data as {
-    trial_started_at: string | null;
-  } | null;
-  const trialAnchor = profileRow?.trial_started_at
-    ? new Date(profileRow.trial_started_at)
-    : signedUpAt;
+  const trialAnchor = trialStartedAt ? new Date(trialStartedAt) : signedUpAt;
   const trialEndsAt = new Date(trialAnchor.getTime() + TRIAL_DAYS * DAY_MS);
   const trialMsLeft = trialEndsAt.getTime() - now.getTime();
   const trialDaysLeft = Math.ceil(trialMsLeft / DAY_MS);
@@ -194,9 +295,9 @@ export async function getSubscriptionStatus(args: {
   // app run end-to-end during development before keys are wired. We
   // still respect the trial_started_at anchor in dev so test users
   // can experience the trial-expired UI by setting the anchor back.
-  if (!isStripeConfigured()) {
+  if (!stripeConfigured) {
     return {
-      state: inTrial ? "trialing" : "trialing",
+      state: "trialing",
       trialEndsAt,
       trialDaysLeft: inTrial ? trialDaysLeft : 0,
       currentPeriodEnd: null,
@@ -206,9 +307,10 @@ export async function getSubscriptionStatus(args: {
     };
   }
 
-  const sub = subRes.data;
-
   const subStatus = sub?.status ?? null;
+  // Stripe's status for a real subscription. The row checkout saves before
+  // any subscription exists holds a placeholder "incomplete": report none.
+  const stripeStatus = sub?.stripe_subscription_id ? subStatus : null;
   const periodEnd = sub?.current_period_end
     ? new Date(sub.current_period_end)
     : null;
@@ -222,12 +324,13 @@ export async function getSubscriptionStatus(args: {
   // Everything else (canceled, unpaid, incomplete, incomplete_expired,
   // paused) loses access immediately.
   const ACTIVE_STATUSES = new Set(["active", "trialing", "past_due"]);
+  const plan = storedPlan(sub?.plan);
   const hasActiveSub =
     subStatus !== null &&
     ACTIVE_STATUSES.has(subStatus) &&
     // If the period has ended and Stripe hasn't bumped us yet, treat
     // as expired so the user can't slip through a webhook delay.
-    periodEnd !== null && periodEnd.getTime() > now.getTime() && storedPlan(sub?.plan) !== null;
+    periodEnd !== null && periodEnd.getTime() > now.getTime() && plan !== null;
 
   if (hasActiveSub) {
     return {
@@ -235,21 +338,26 @@ export async function getSubscriptionStatus(args: {
       trialEndsAt,
       trialDaysLeft: null,
       currentPeriodEnd: periodEnd,
-      plan: storedPlan(sub?.plan),
-      managedByTeam: billingUserId !== userId,
-      stripeCustomerId: billingUserId === userId ? sub?.stripe_customer_id ?? null : null,
-      stripeSubscriptionStatus: subStatus,
+      plan,
+      managedByTeam,
+      stripeCustomerId: ownCustomer,
+      stripeSubscriptionStatus: stripeStatus,
       betaFreeUntil: null,
     };
   }
 
+  if (betaActive) {
+    return betaStatus(trialEndsAt, { customer: ownCustomer, status: stripeStatus, managedByTeam });
+  }
+
   return {
     state: inTrial ? "trialing" : "expired",
+    managedByTeam,
     trialEndsAt,
     trialDaysLeft,
     currentPeriodEnd: periodEnd,
-    stripeCustomerId: sub?.stripe_customer_id ?? null,
-    stripeSubscriptionStatus: subStatus,
+    stripeCustomerId: ownCustomer,
+    stripeSubscriptionStatus: stripeStatus,
     betaFreeUntil: null,
   };
 }

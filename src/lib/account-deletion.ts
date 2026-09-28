@@ -2,7 +2,8 @@ import "server-only";
 
 import { adminClient } from "@/lib/supabase/admin";
 import { captureError } from "@/lib/observability";
-import { isStripeConfigured, stripeClient } from "@/lib/stripe-client";
+import { tryStripe } from "@/lib/stripe-client";
+import { isLiveSubscriptionStatus as isLive } from "@/lib/stripe-subscription";
 
 /**
  * The account purge itself, with no opinion about who asked for it.
@@ -14,8 +15,10 @@ import { isStripeConfigured, stripeClient } from "@/lib/stripe-client";
  * runs — one implementation, one ordering, one set of guarantees.
  *
  * Order of operations (children before parents, auth user LAST):
- *   1. Best-effort cancel any live Stripe subscription so a deleted account
- *      can never keep being billed.
+ *   1. Cancel EVERY live Stripe subscription on the user's customer (not just
+ *      the one id we stored), retrying Stripe's transient errors. If any
+ *      cancel fails, nothing is deleted: a deleted account must never keep
+ *      being billed, and a login that still exists can simply try again.
  *   2. Purge storage objects (avatars, logos, quote PDFs, photos, plans,
  *      quote videos, signatures).
  *   3. Purge rows — quote children by quote_id first (they don't all cascade),
@@ -69,31 +72,191 @@ const USER_TABLES = [
 
 export type PurgeResult = { ok: true } | { ok: false; error: string };
 
+/**
+ * Shown when billing could not be stopped. Deliberately says nothing about
+ * plans or payments: the iPhone app shows it too (App Store 3.1.3(f)).
+ */
+export const BILLING_STOP_FAILED =
+  "We couldn't close your account just now, so nothing was deleted. Please try again in a few minutes. If it keeps happening, email support@tradies2quote.com.";
+
+/** The slice of the Stripe client the billing stop uses (a fake in tests). */
+export interface BillingStripe {
+  subscriptions: {
+    list(params: { customer: string; status: "all"; limit: number; starting_after?: string }): PromiseLike<{
+      data: Array<{ id: string; status: string }>;
+      has_more: boolean;
+    }>;
+    retrieve(id: string): PromiseLike<{ id: string; status: string }>;
+    cancel(id: string): PromiseLike<{ id: string; status: string }>;
+  };
+  checkout: {
+    sessions: {
+      list(params: { customer: string; status: "open"; limit: number }): PromiseLike<{ data: Array<{ id: string }> }>;
+      expire(id: string): PromiseLike<unknown>;
+    };
+  };
+}
+
+type Sleep = (ms: number) => Promise<void>;
+const realSleep: Sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Stripe's temporary failures: network/timeouts, rate limits, lock
+ * conflicts (409) and its own 5xx. Anything else (a bad key, a missing
+ * object) will not fix itself by asking again.
+ */
+export function isTransientStripeError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const e = error as { type?: unknown; statusCode?: unknown; code?: unknown };
+  if (e.type === "StripeConnectionError" || e.type === "StripeRateLimitError" || e.type === "StripeAPIError") return true;
+  if (e.code === "lock_timeout" || e.code === "rate_limit") return true;
+  return typeof e.statusCode === "number" && (e.statusCode === 409 || e.statusCode === 429 || e.statusCode >= 500);
+}
+
+async function withStripeRetry<T>(run: () => PromiseLike<T>, sleep: Sleep, attempts = 3): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await run();
+    } catch (error) {
+      if (attempt >= attempts || !isTransientStripeError(error)) throw error;
+      await sleep(400 * 3 ** (attempt - 1)); // 0.4 s, then 1.2 s
+    }
+  }
+}
+
+function isMissing(error: unknown): boolean {
+  const e = error as { code?: unknown; statusCode?: unknown } | null;
+  return !!e && (e.code === "resource_missing" || e.statusCode === 404);
+}
+
+/**
+ * Cancel every live subscription on `customerId`, plus `subscriptionId` if
+ * Stripe lists it elsewhere (or no customer was stored). Throws when any
+ * subscription is still live afterwards. Returns the ids it cancelled.
+ */
+export async function cancelLiveSubscriptions(
+  stripe: BillingStripe,
+  ids: { customerId: string | null; subscriptionId: string | null },
+  sleep: Sleep = realSleep,
+): Promise<string[]> {
+  const live = new Map<string, string>();
+  const seen = new Set<string>();
+  if (ids.customerId) {
+    const customer = ids.customerId;
+    let startingAfter: string | undefined;
+    for (let page = 0; page < 20; page++) {
+      let list: { data: Array<{ id: string; status: string }>; has_more: boolean };
+      try {
+        list = await withStripeRetry(
+          () =>
+            stripe.subscriptions.list({
+              customer,
+              status: "all",
+              limit: 100,
+              ...(startingAfter ? { starting_after: startingAfter } : {}),
+            }),
+          sleep,
+        );
+      } catch (error) {
+        // A customer Stripe doesn't have (deleted, which cancels everything
+        // on it, or a test-mode id) has nothing left to bill.
+        if (isMissing(error)) break;
+        throw error;
+      }
+      for (const sub of list.data) {
+        seen.add(sub.id);
+        if (isLive(sub.status)) live.set(sub.id, sub.status);
+      }
+      if (!list.has_more || list.data.length === 0) break;
+      startingAfter = list.data[list.data.length - 1].id;
+    }
+  }
+  if (ids.subscriptionId && !seen.has(ids.subscriptionId)) {
+    const subscriptionId = ids.subscriptionId;
+    try {
+      const sub = await withStripeRetry(() => stripe.subscriptions.retrieve(subscriptionId), sleep);
+      if (isLive(sub.status)) live.set(sub.id, sub.status);
+    } catch (error) {
+      if (!isMissing(error)) throw error; // gone for good: nothing to bill
+    }
+  }
+
+  const cancelled: string[] = [];
+  for (const id of live.keys()) {
+    try {
+      const result = await withStripeRetry(() => stripe.subscriptions.cancel(id), sleep);
+      if (isLive(result.status)) throw new Error(`Subscription ${id} is still ${result.status} after cancelling.`);
+    } catch (error) {
+      // A retry after a timeout can find it already cancelled: check before failing.
+      const now = await withStripeRetry(() => stripe.subscriptions.retrieve(id), sleep).catch(() => null);
+      if (!now || isLive(now.status)) throw error;
+    }
+    cancelled.push(id);
+  }
+  return cancelled;
+}
+
+/**
+ * Step 1 of the purge. Reads the stored Stripe ids and cancels everything
+ * live; any failure (the read, a missing key, a cancel) stops the deletion.
+ * Open checkout pages are closed too (best effort: they expire within the
+ * hour anyway) so none can start a subscription for a deleted account.
+ */
+export async function stopBilling(
+  admin: ReturnType<typeof adminClient>,
+  userId: string,
+  deps: { stripe?: BillingStripe | null; sleep?: Sleep } = {},
+): Promise<PurgeResult> {
+  const route = "settings/delete-account";
+  const { data: row, error } = await admin
+    .from("subscriptions")
+    .select("stripe_customer_id, stripe_subscription_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) {
+    captureError(error, { route, extra: { step: "billing.read" } });
+    return { ok: false, error: BILLING_STOP_FAILED };
+  }
+  const customerId = row?.stripe_customer_id || null;
+  const subscriptionId = row?.stripe_subscription_id || null;
+  if (!customerId && !subscriptionId) return { ok: true };
+
+  const stripe = deps.stripe === undefined ? (tryStripe() as BillingStripe | null) : deps.stripe;
+  if (!stripe) {
+    captureError(new Error("delete-account: Stripe ids are stored but STRIPE_SECRET_KEY is not set."), { route });
+    return { ok: false, error: BILLING_STOP_FAILED };
+  }
+  const sleep = deps.sleep ?? realSleep;
+  try {
+    await cancelLiveSubscriptions(stripe, { customerId, subscriptionId }, sleep);
+  } catch (e) {
+    captureError(e, { route, extra: { step: "billing.cancel" } });
+    return { ok: false, error: BILLING_STOP_FAILED };
+  }
+  if (customerId) {
+    try {
+      const open = await withStripeRetry(
+        () => stripe.checkout.sessions.list({ customer: customerId, status: "open", limit: 100 }),
+        sleep,
+      );
+      for (const session of open.data) {
+        await withStripeRetry(() => stripe.checkout.sessions.expire(session.id), sleep);
+      }
+    } catch (e) {
+      captureError(e, { route, extra: { step: "billing.checkout-expire" } });
+    }
+  }
+  return { ok: true };
+}
+
 export async function purgeAccount(userId: string): Promise<PurgeResult> {
   const admin = adminClient();
 
   // ── 1. Stop billing first — a deleted account must never keep paying. ──
-  try {
-    if (isStripeConfigured()) {
-      const { data: sub } = await admin
-        .from("subscriptions")
-        .select("stripe_subscription_id")
-        .eq("user_id", userId)
-        .maybeSingle();
-      const subId = sub?.stripe_subscription_id;
-      if (typeof subId === "string" && subId.length > 0) {
-        await stripeClient()
-          .subscriptions.cancel(subId)
-          .catch(() => {
-            // Already canceled / not found — fine either way.
-          });
-      }
-    }
-  } catch (e) {
-    // Billing cleanup is best-effort: Stripe being down must not block a
-    // user's legal right to delete their data. Surface it for follow-up.
-    captureError(e, { route: "settings/delete-account" });
-  }
+  // If Stripe can't confirm every subscription is cancelled, stop here with
+  // nothing deleted: the login still exists, so the tradie can try again.
+  const billing = await stopBilling(admin, userId);
+  if (!billing.ok) return billing;
 
   // ── 2. Collect quote ids while the rows still exist. ──
   const { data: quoteRows, error: quotesReadErr } = await admin

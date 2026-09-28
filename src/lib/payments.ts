@@ -1,5 +1,6 @@
 import "server-only";
 
+import { captureError } from "@/lib/observability";
 import { round2 } from "@/lib/quote-defaults";
 import { stripeClient } from "@/lib/stripe-client";
 import { adminClient } from "@/lib/supabase/admin";
@@ -79,6 +80,18 @@ export async function getConnectStatus(userId: string): Promise<ConnectStatus> {
   };
 }
 
+/**
+ * The profile's country as the ISO 3166-1 code Stripe needs. The app stores
+ * the United Kingdom as "UK" (its tax tables and settings use that), which
+ * Stripe rejects: it is "GB". Anything that isn't a two-letter code falls
+ * back to NZ, as before.
+ */
+export function stripeCountry(country: string | null | undefined): string {
+  const code = (country ?? "").trim().toUpperCase();
+  if (code === "UK") return "GB";
+  return /^[A-Z]{2}$/.test(code) ? code : "NZ";
+}
+
 /** Ensure a connected Express account exists for the user; returns its id. */
 export async function ensureConnectedAccount(
   userId: string,
@@ -86,26 +99,34 @@ export async function ensureConnectedAccount(
   countryIso2: string | null,
 ): Promise<string> {
   const admin = adminClient();
-  const { data: existing } = await admin
+  const { data: existing, error: readError } = await admin
     .from("payment_accounts")
     .select("stripe_account_id")
     .eq("user_id", userId)
     .maybeSingle();
+  // Never guess "no account" from a failed read: that would open a second one.
+  if (readError) throw readError;
   if (existing?.stripe_account_id) return existing.stripe_account_id;
 
   const stripe = stripeClient();
-  const account = await stripe.accounts.create({
-    type: "express",
-    email: email ?? undefined,
-    country: (countryIso2 || "NZ").toUpperCase(),
-    capabilities: { transfers: { requested: true } },
-    business_type: "individual",
-    metadata: { user_id: userId },
-  });
+  const country = stripeCountry(countryIso2);
+  const account = await stripe.accounts.create(
+    {
+      type: "express",
+      email: email ?? undefined,
+      country,
+      capabilities: { transfers: { requested: true } },
+      business_type: "individual",
+      metadata: { user_id: userId },
+    },
+    // A retry after a failed save below gets the same account back, not a new one.
+    { idempotencyKey: `t2q-connect-account-${userId}-${country}` },
+  );
 
-  await admin
+  const { error: saveError } = await admin
     .from("payment_accounts")
     .upsert({ user_id: userId, stripe_account_id: account.id }, { onConflict: "user_id" });
+  if (saveError) throw saveError;
   return account.id;
 }
 
@@ -150,8 +171,10 @@ export async function refreshConnectStatus(userId: string): Promise<ConnectStatu
 /**
  * For the public quote page: should we show a "pay deposit" button for this
  * token, and for how much? Returns null when payments are off or the quote
- * isn't found. `show` is false when the tradie isn't payment-ready or the
- * deposit is already paid.
+ * isn't found (or was deleted). `show` is false when the tradie isn't
+ * payment-ready or the deposit is already paid. The amount is the one
+ * /api/payments/checkout charges: a share of what the client accepted
+ * (accepted_total), else the quote total.
  */
 export async function getQuoteDepositInfo(
   token: string,
@@ -160,8 +183,9 @@ export async function getQuoteDepositInfo(
   const admin = adminClient();
   const { data: q } = await admin
     .from("quotes")
-    .select("id, user_id, total_amount, currency")
+    .select("id, user_id, total_amount, accepted_total, currency")
     .eq("public_token", token)
+    .is("deleted_at", null)
     .maybeSingle();
   if (!q) return null;
 
@@ -176,16 +200,31 @@ export async function getQuoteDepositInfo(
     .eq("status", "paid")
     .maybeSingle();
 
-  const cents = depositCents(Number(q.total_amount ?? 0), status.depositPct);
+  const cents = depositCents(Number(q.accepted_total ?? q.total_amount ?? 0), status.depositPct);
   return { show: !paid && cents > 0, amountCents: cents, currency };
 }
 
-/** Persist the tradie's chosen deposit percentage. */
-export async function setDepositPct(userId: string, pct: number): Promise<void> {
+export type SaveDepositResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Persist the tradie's chosen deposit percentage. Says so when nothing was
+ * saved — a failed write, or no card-payments account to save it on — so
+ * the screen never shows "Saved" for a deposit that wasn't.
+ */
+export async function setDepositPct(userId: string, pct: number): Promise<SaveDepositResult> {
   const admin = adminClient();
   const clamped = Math.min(100, Math.max(0, Math.round(Number(pct) || 0)));
-  await admin
+  const { data, error } = await admin
     .from("payment_accounts")
     .update({ deposit_pct: clamped, updated_at: new Date().toISOString() })
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .select("user_id");
+  if (error) {
+    captureError(error, { route: "settings/deposit" });
+    return { ok: false, error: "Couldn't save the deposit. Try again." };
+  }
+  if (!data || data.length === 0) {
+    return { ok: false, error: "Turn on card payments before setting a deposit." };
+  }
+  return { ok: true };
 }

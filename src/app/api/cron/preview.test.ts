@@ -7,7 +7,7 @@ vi.mock('@/lib/digest/collect', () => ({ collectWeeklyDigest: mock.weekly }));
 vi.mock('@/lib/digest/weekly', () => ({ buildWeeklyDigest: () => ({ subject: 'test', text: 'test', html: 'test' }) }));
 vi.mock('@/lib/digest/errorsCollect', () => ({ collectErrorDigest: mock.errors }));
 vi.mock('@/lib/digest/errors', () => ({ buildErrorDigest: () => ({ subject: 'test', text: 'test', html: 'test' }) }));
-vi.mock('@/lib/engagement', () => ({ reviewsEnabled: () => true, followupsEnabled: () => true, sendFollowupEmail: mock.followup, sendReviewRequestEmail: mock.review }));
+vi.mock('@/lib/engagement', async (original) => ({ ...await original<typeof import('@/lib/engagement')>(), reviewsEnabled: () => true, followupsEnabled: () => true, sendFollowupEmail: mock.followup, sendReviewRequestEmail: mock.review }));
 import { POST as weekly } from './weekly-digest/route';
 import { POST as errors } from './error-digest/route';
 import { POST as engagement } from './engagement/route';
@@ -24,13 +24,13 @@ beforeEach(() => {
   });
   mock.from.mockImplementation((table: string) => {
     const query: Record<string, unknown> = {};
-    for (const method of ['select', 'eq', 'or', 'in', 'gte', 'not', 'lte']) query[method] = () => query;
+    for (const method of ['select', 'eq', 'or', 'in', 'gte', 'not', 'lte', 'is', 'order', 'limit']) query[method] = () => query;
     query.insert = () => { throw new Error('Preview must not write'); };
     const data: Record<string, unknown> = {
       feature_settings: [{ user_id: 'owner', auto_followup_enabled: true, auto_review_enabled: true, google_review_url: 'https://example.invalid/review' }],
       profiles: [{ id: 'owner', business_name: 'Fixture', currency: 'NZD' }],
       quotes: [{ id: 'quote', client_id: 'client', sent_at: '2026-09-01T00:00:00Z', public_token: 'fixture', created_at: '2026-09-01T00:00:00Z' }],
-      clients: { name: 'Fixture', email: 'client@example.invalid' },
+      quote_events: [{ metadata: { to: 'client@example.invalid' }, created_at: '2026-09-01T00:00:00Z' }],
     };
     const result = () => { mock.calls.push(table); return { data: data[table] ?? null, error: mock.dbFailure ? { message: 'unavailable' } : null }; };
     query.maybeSingle = async () => result(); query.then = (resolve: (v: unknown) => void) => resolve(result());

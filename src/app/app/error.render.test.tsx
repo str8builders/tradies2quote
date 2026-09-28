@@ -18,7 +18,7 @@ import AppError from "./error";
 
 const render = (digest?: string) => {
   const error = Object.assign(new Error("secret stack detail"), digest ? { digest } : {});
-  return renderToStaticMarkup(<AppError error={error} reset={() => {}} />);
+  return renderToStaticMarkup(<AppError error={error} retry={() => {}} />);
 };
 // Rendered once up front (the first render pays for warming React up).
 const plain = render();

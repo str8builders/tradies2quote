@@ -5,7 +5,7 @@ import {friendlyAuthError} from "@/lib/auth/friendlyAuthError";
  * free text in the URL: a crafted link cannot put its own words on the
  * sign-in screen, and every message reads like the website's own.
  */
-export type SignInErrorCode="missing"|"credentials"|"unconfirmed"|"rate"|"email"|"other";
+export type SignInErrorCode="missing"|"credentials"|"unconfirmed"|"rate"|"throttled"|"email"|"other";
 
 export function signInErrorCode(message:string|null|undefined):SignInErrorCode{
   const text=(message??"").trim();
@@ -24,6 +24,8 @@ export function signInErrorMessage(code:string|undefined):string|null{
     case "unconfirmed":return "Please confirm your email first. Tap the link we emailed you, then sign in here. No email? Send a new one from the Tradies2Quote sign-in page.";
     case "credentials":return friendlyAuthError("Invalid login credentials","login");
     case "rate":return friendlyAuthError("rate limit","login");
+    // Our own limit on sign-in tries (src/lib/auth/signin-throttle.ts).
+    case "throttled":return "Too many tries. Wait a few minutes and try again.";
     case "email":return friendlyAuthError("invalid email","login");
     case "other":return friendlyAuthError("","login");
     default:return null;

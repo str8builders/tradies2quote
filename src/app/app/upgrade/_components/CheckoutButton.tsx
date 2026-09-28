@@ -3,6 +3,7 @@
 import { PLANS, type PlanId } from "@/lib/plans";
 import { useState } from "react";
 import { ArrowRight, Lock } from "@phosphor-icons/react/dist/ssr";
+import { ManageBillingButton } from "../../settings/_components/ManageBillingButton";
 
 /**
  * Client-side trigger for the Stripe Checkout redirect.
@@ -15,21 +16,27 @@ import { ArrowRight, Lock } from "@phosphor-icons/react/dist/ssr";
 export function CheckoutButton({plan = "solo"}: {plan?: PlanId}) {
   const [state, setState] = useState<"idle" | "loading" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string>("");
+  // Checkout refuses a second subscription and says to use Manage billing:
+  // put that button right here instead of sending them looking for it.
+  const [offerManage, setOfferManage] = useState(false);
 
   async function go() {
     setState("loading");
     setErrorMsg("");
+    setOfferManage(false);
     try {
       const res = await fetch("/api/stripe/checkout", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({plan}) });
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean;
         url?: string;
         message?: string;
+        manage?: boolean;
       };
       if (!res.ok || !data.ok || !data.url) {
         setErrorMsg(
           data.message ?? "Could not start checkout. Try again in a moment.",
         );
+        setOfferManage(data.manage === true);
         setState("error");
         return;
       }
@@ -69,6 +76,11 @@ export function CheckoutButton({plan = "solo"}: {plan?: PlanId}) {
         >
           {errorMsg}
         </p>
+      )}
+      {state === "error" && offerManage && (
+        <div className="mt-3" data-testid="upgrade-checkout-manage">
+          <ManageBillingButton />
+        </div>
       )}
     </>
   );

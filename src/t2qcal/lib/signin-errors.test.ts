@@ -11,6 +11,7 @@ describe("T2QCAL sign-in errors", () => {
   it("shows plain wording, and nothing for unknown or crafted codes", () => {
     expect(signInErrorMessage("unconfirmed")).toMatch(/confirm your email/);
     expect(signInErrorMessage("credentials")).toMatch(/don't match/);
+    expect(signInErrorMessage("throttled")).toBe("Too many tries. Wait a few minutes and try again.");
     expect(signInErrorMessage("Your account is locked, call 0800 SCAM")).toBeNull();
     expect(signInErrorMessage(undefined)).toBeNull();
   });

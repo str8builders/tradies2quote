@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight, BookOpen, SignOut } from "@phosphor-icons/react/dist/ssr";
+import { ArrowClockwise, ArrowRight, BookOpen, SignOut } from "@phosphor-icons/react/dist/ssr";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedAuthUser } from "@/lib/supabase/auth";
 import {
@@ -89,16 +89,25 @@ export default async function SettingsPage({
   // clients query after, removes that serialization. `getTeamContext` is
   // `React.cache`-wrapped, so this doesn't add a duplicate round trip for
   // any other call on this request.
-  const [{ data: profile }, teamContext] = await Promise.all([
+  const [profileRead, teamContext] = await Promise.all([
     supabase
       .from("profiles")
       .select(
         "business_name, email, phone, address, gst_number, payment_instructions, country, currency, tax_label, tax_rate, default_labour_rate, default_markup_pct, logo_url, ai_consent_at, request_slug",
       )
       .eq("id", user.id)
-      .maybeSingle(),
+      .maybeSingle()
+      .then(
+        (result) => result,
+        (error: unknown) => ({ data: null, error }),
+      ),
     getTeamContext(user.id),
   ]);
+  // A failed read must never become a form: Save sends every field, so saving
+  // over blanks would wipe the business name, address, GST number and bank
+  // details. Show a retry instead, as the new-look settings pages do.
+  if (profileRead.error) return <SettingsLoadFailed />;
+  const profile = profileRead.data;
   const { data: clientsRows } = await supabase
     .from("clients")
     .select("id, email, phone")
@@ -392,6 +401,38 @@ export default async function SettingsPage({
         {/* Apple Guideline 5.1.1(v): account deletion must be initiable
             in-app — a support-email-only path is an automatic rejection. */}
         <DeleteAccountSection />
+      </main>
+    </div>
+  );
+}
+
+/** The old look's "couldn't load" state: nothing saveable, one way to retry. */
+function SettingsLoadFailed() {
+  return (
+    <div className="min-h-screen text-white">
+      <AppHeader context="Settings" />
+      <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
+        <section
+          role="alert"
+          data-testid="settings-load-failed"
+          className="t2q-card-pro border-red-500/40 p-5 sm:p-6"
+        >
+          <h1 className="font-display text-xl uppercase tracking-tight text-white">
+            Couldn&rsquo;t load your settings.
+          </h1>
+          <p className="mt-2 text-sm text-ink-300">
+            Nothing has been changed. Check your signal, then try again.
+          </p>
+          <Link
+            href="/app/settings"
+            prefetch={false}
+            data-testid="settings-load-retry"
+            className="t2q-btn-primary-pro mt-4 inline-flex h-11 items-center gap-2 px-5"
+          >
+            <ArrowClockwise size={16} weight="bold" />
+            Try again
+          </Link>
+        </section>
       </main>
     </div>
   );

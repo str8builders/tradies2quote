@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     if (customerId) {
       const subscriptions = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 100 });
       if (subscriptions.data.some((s) => s.metadata.t2q_user_id === user.id && !["canceled", "incomplete_expired"].includes(s.status))) {
-        return NextResponse.json({ message: "You already have a subscription. Use Manage subscription to change your plan.", manage: true }, { status: 409 });
+        return NextResponse.json({ message: "You already have a subscription. Use Manage billing to change or cancel it.", manage: true }, { status: 409 });
       }
     }
     const priceId = getPlanPriceId(plan)!;

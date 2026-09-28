@@ -5,6 +5,7 @@ import Link from "next/link";
 import { captureToSentry } from "@/lib/observability/sentryBrowser";
 import { reportClientError } from "@/lib/observability/clientReport";
 import { maybeRecoverFromStaleDeploy } from "@/lib/staleDeploy";
+import { shouldReportBoundaryError } from "@/lib/boundary-report";
 import {
   ArrowClockwise,
   ArrowLeft,
@@ -19,22 +20,29 @@ import {
  * `src/app/app/error.tsx`.
  *
  * Mirrors that /app boundary's calm, no-stack-trace style: log the full
- * error to the console (and Vercel function logs for SSR errors) for
- * owner debugging, show the user only Next's error digest, and give two
- * clear exits — retry, or back to home.
+ * error to the console for owner debugging, show the user only Next's error
+ * digest, and give two clear exits — retry, or back to home.
+ *
+ * Reports only real client-side errors (see shouldReportBoundaryError): a
+ * server error (it has a digest) is already recorded by the server, and a
+ * stale deploy (e.g. /login's "Server Action … was not found" after an
+ * update) just reloads. The sign-in and sign-up forms keep the typed email
+ * across that reload.
  */
 export default function RootError({
   error,
-  reset,
+  retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry: () => void;
 }) {
   useEffect(() => {
     // Report to Sentry (no-op without a DSN) so client render crashes caught
     // by this boundary aren't only in the console.
-    captureToSentry(error);
-    reportClientError(error, "boundary");
+    if (shouldReportBoundaryError(error)) {
+      captureToSentry(error);
+      reportClientError(error, "boundary");
+    }
     console.error("[root error]", error);
     // Render-path chunk death after a deploy lands here, not on
     // window.onerror — reload once instead of stranding the user.
@@ -69,7 +77,9 @@ export default function RootError({
           <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
             <button
               type="button"
-              onClick={() => reset()}
+              // retry() fetches the page again; reset() only re-rendered it,
+              // so a server error came straight back.
+              onClick={() => retry()}
               data-testid="root-error-retry"
               className="t2q-btn-primary-pro inline-flex h-11 items-center justify-center gap-2 px-5"
             >
