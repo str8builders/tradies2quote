@@ -578,6 +578,7 @@ export function useQuoteImport({ currency, taxRate = 0.15, needsAiConsent = fals
     const payload: SupplierQuoteRow[] = includable.map((r) => ({
       name: r.name.trim(),
       unit: r.unit.trim() || "each",
+      unitDetected: r.unitDetected,
       // Library prices are ex-GST unit prices at full precision.
       default_unit_price: unitPriceExGst(Number(r.price), gstInclusive, taxRate),
       sku: r.sku,
@@ -1062,7 +1063,7 @@ export function QuoteImportClient(props: QuoteImportProps) {
                         <input
                           type="text"
                           value={r.unit}
-                          onChange={(e) => patchRow(r.id, { unit: e.target.value })}
+                          onChange={(e) => patchRow(r.id, { unit: e.target.value, unitDetected: true })}
                           aria-label="Unit"
                           className="w-20 rounded-sm border border-ink-700 bg-ink-900 px-2 py-1.5 text-sm text-white outline-none focus:border-brand"
                         />

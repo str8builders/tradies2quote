@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { round2 } from "@/lib/quote-defaults";
 import { createClient } from "@/lib/supabase/server";
+import { loadAllMaterials } from "@/lib/materials/loadLibrary";
+import { nameKey } from "@/lib/materials/priceList";
 import { STARTER_MATERIALS } from "./_data";
 
 export type QuickStartResult =
@@ -32,19 +34,7 @@ export async function saveQuickStartMaterials(
 
   const rows = STARTER_MATERIALS.map((m) => {
     const price = parsePrice(formData.get(`price_${m.slug}`));
-    return price === null
-      ? null
-      : {
-          user_id: user.id,
-          name: m.name,
-          unit: m.unit,
-          category: m.category,
-          default_unit_price: price,
-          country: "NZ",
-          is_ai_estimated: false,
-          price_source: "user_library",
-          price_confidence: "high",
-        };
+    return price === null ? null : { name: m.name, unit: m.unit, category: m.category, default_unit_price: price };
   }).filter((r): r is NonNullable<typeof r> => r !== null);
 
   if (rows.length === 0) {
@@ -54,20 +44,49 @@ export async function saveQuickStartMaterials(
     redirect("/app?onboarded=skipped");
   }
 
-  // Defence-in-depth: the materials table has a unique (user_id, name)
-  // constraint. If the tradie already manually added one of these
-  // names, the insert below will 23505. Use upsert so a repeat run is
-  // idempotent and never errors the form.
-  const { error } = await supabase
-    .from("materials")
-    .upsert(rows, { onConflict: "user_id,name", ignoreDuplicates: true });
-
-  if (error) {
-    console.error("saveQuickStartMaterials failed", error);
+  // Case-insensitive (trimmed, spaces collapsed) match against what's
+  // already saved — the same rule the rest of the library uses for a
+  // duplicate name. A starter item already there (any case/spacing) is
+  // reported as "already in your list", never silently dropped and never
+  // counted as newly added.
+  let existingKeys: Set<string>;
+  try {
+    const existing = await loadAllMaterials<{ name: string }>(supabase, user.id, { select: "name" });
+    existingKeys = new Set(existing.map((m) => nameKey(m.name)));
+  } catch (e) {
+    console.error("saveQuickStartMaterials: reading the library failed", e);
     return { error: "Could not save your materials. Try again." };
+  }
+
+  const toInsert = rows.filter((r) => !existingKeys.has(nameKey(r.name)));
+  const alreadyThere = rows.length - toInsert.length;
+
+  if (toInsert.length > 0) {
+    const { error } = await supabase.from("materials").insert(
+      toInsert.map((r) => ({
+        user_id: user.id,
+        name: r.name,
+        unit: r.unit,
+        category: r.category,
+        default_unit_price: r.default_unit_price,
+        country: "NZ",
+        is_ai_estimated: false,
+        price_source: "user_library",
+        price_confidence: "high",
+      })),
+    );
+    if (error) {
+      console.error("saveQuickStartMaterials failed", error);
+      return { error: "Could not save your materials. Try again." };
+    }
   }
 
   revalidatePath("/app/materials");
   revalidatePath("/app");
-  redirect(`/app?onboarded=${rows.length}`);
+  // Land on the list itself, which says what happened: `started` is the
+  // count actually ADDED (never a claim about rows that were already there),
+  // `already` how many the tradie had.
+  redirect(
+    `/app/materials?started=${toInsert.length}${alreadyThere > 0 ? `&already=${alreadyThere}` : ""}`,
+  );
 }

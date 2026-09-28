@@ -210,6 +210,10 @@ function CheckSheet({ c }: { c: CaptureFormState }) {
             name="default_unit_price"
             value={c.finalPrice !== null ? String(c.finalPrice) : ""}
           />
+          {/* Tells createMaterial this save came from Capture, so Prices can
+              show "Price saved" only on an actual save — never guessed from
+              the referer, which looks the same after Cancel. */}
+          <input type="hidden" name="source" value="capture" />
           <input type="hidden" name="supplier" value={c.supplier.trim()} />
           <input type="hidden" name="supplier_url" value={c.url.trim()} />
           <input type="hidden" name="notes" value={c.notes.trim()} />

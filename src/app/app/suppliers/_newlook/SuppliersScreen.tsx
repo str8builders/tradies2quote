@@ -10,13 +10,23 @@ export const SUPPLIERS_INTRO =
  * /app/suppliers in the new look: the page title with a way back to Prices
  * (the /app shell pads the notch), then the supplier websites and the read.
  */
-export function SuppliersScreen({ initialUrl }: { initialUrl: string }) {
+export function SuppliersScreen({
+  initialUrl,
+  taxRate,
+  taxLabel,
+}: {
+  initialUrl: string;
+  /** The tradie's own tax rate as a fraction (0.15 = 15%), never a fixed 15%. */
+  taxRate?: number;
+  /** "GST", "VAT", "Tax" — whatever the rest of the app calls it for this tradie's country. */
+  taxLabel?: string;
+}) {
   return (
     <Screen data-testid="suppliers-screen">
       <TopBar title="Shop supplier websites" back={{ href: PRICES_PATH, label: "Prices" }} safeArea={false} />
       <div className="mx-auto w-full max-w-xl flex-1 space-y-6 px-4 pt-5 pb-10">
         <p className="text-ui-base text-ui-muted">{SUPPLIERS_INTRO}</p>
-        <SupplierShop initialUrl={initialUrl} />
+        <SupplierShop initialUrl={initialUrl} taxRate={taxRate} taxLabel={taxLabel} />
       </div>
     </Screen>
   );

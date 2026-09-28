@@ -248,6 +248,10 @@ describe("CopyPriceView: the check before saving", () => {
     expect(field(form, "supplier_url")).toContain(`value="${BUNNINGS}"`);
     expect(field(form, "notes")).toContain('value="Trade price"');
     expect(field(form, "price_includes_gst")).toBe("");
+    // Tells createMaterial this save came from Capture — the explicit
+    // signal the Prices page's "Price saved" banner keys off (never
+    // guessed from the referer, which looks the same after Cancel).
+    expect(field(form, "source")).toContain('value="capture"');
     const save = tag(form, 'data-testid="capture-confirm-save"');
     expect(save).toContain('type="submit"');
     expect(save).toContain('data-variant="primary"');

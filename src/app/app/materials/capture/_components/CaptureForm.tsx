@@ -403,6 +403,11 @@ export function CaptureForm(props: CaptureFormProps) {
                 name="default_unit_price"
                 value={finalPrice !== null ? String(finalPrice) : ""}
               />
+              {/* Tells createMaterial this save came from Capture, so the
+                  Prices page can show "Price saved" only on an actual save —
+                  never guessed from the referer, which looks the same after
+                  Cancel. */}
+              <input type="hidden" name="source" value="capture" />
               <input type="hidden" name="supplier" value={supplier.trim()} />
               <input type="hidden" name="supplier_url" value={url.trim()} />
               <input type="hidden" name="notes" value={notes.trim()} />

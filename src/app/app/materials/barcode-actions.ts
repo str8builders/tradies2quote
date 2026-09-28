@@ -4,9 +4,10 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { captureError } from "@/lib/observability";
-import { NZ_DEFAULTS } from "@/lib/quote-defaults";
 import { preciseUnitPrice, unitPriceExGst } from "@/lib/materials/quoteExtraction";
 import { isBarcodeUnit, normalizeBarcode } from "@/lib/materials/barcode";
+import { loadAllMaterials } from "@/lib/materials/loadLibrary";
+import { profileTaxFraction } from "./actions";
 
 // Barcode scanning for the material library. The library learns as the
 // tradie scans: a code is looked up in THEIR items only, and a new product is
@@ -124,10 +125,14 @@ async function findByName(
   userId: string,
   name: string,
 ): Promise<{ id: string; name: string } | null> {
-  const { data, error } = await supabase.from("materials").select("id, name").eq("user_id", userId);
-  if (error) throw error;
+  // The whole library, a page at a time (loadAllMaterials) — a plain
+  // `.select()` here silently missed row 1,001 onwards for a big library,
+  // so a name collision past that point went undetected.
+  const rows = await loadAllMaterials<{ id: string; name: string }>(supabase, userId, {
+    select: "id, name",
+  });
   const key = name.trim().toLowerCase();
-  return (data ?? []).find((m) => m.name.trim().toLowerCase() === key) ?? null;
+  return rows.find((m) => m.name.trim().toLowerCase() === key) ?? null;
 }
 
 /**
@@ -151,12 +156,6 @@ function parsePrice(raw: unknown): number | null {
         : Number.NaN;
   if (!Number.isFinite(n) || n <= 0 || n > MAX_PRICE) return null;
   return preciseUnitPrice(n);
-}
-
-async function taxFraction(supabase: ServerClient, userId: string): Promise<number> {
-  const { data } = await supabase.from("profiles").select("tax_rate").eq("id", userId).maybeSingle();
-  const pct = Number(data?.tax_rate ?? NZ_DEFAULTS.tax_rate);
-  return Number.isFinite(pct) && pct >= 0 ? pct / 100 : NZ_DEFAULTS.tax_rate / 100;
 }
 
 /**
@@ -234,7 +233,7 @@ export async function saveBarcodeMaterialAction(
 
   const storedPrice =
     source.priceIncludesGst === true
-      ? unitPriceExGst(price, true, await taxFraction(supabase, user.id))
+      ? unitPriceExGst(price, true, await profileTaxFraction(supabase, user.id))
       : price;
 
   const { data, error } = await supabase

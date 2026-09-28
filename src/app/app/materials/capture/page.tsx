@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isNewLookOn } from "@/lib/ui/newLook";
+import { profileTaxFraction } from "../actions";
 import { AppHeader } from "../../_components/AppHeader";
 import { CaptureForm } from "./_components/CaptureForm";
 import { cleanSharedTitle, supplierFromUrl } from "./_lib/supplier-from-url";
@@ -50,12 +51,12 @@ export default async function CapturePage({
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  // The tradie's own tax rate (stored as a percentage) drives the inc/ex-GST maths.
-  const [{ data: profile }, newLook] = await Promise.all([
-    supabase.from("profiles").select("tax_rate").eq("id", user.id).maybeSingle(),
+  // The tradie's own tax rate by country (a blank rate is the business
+  // country's default — UK 20 % VAT, never NZ's 15 % for everyone).
+  const [taxRate, newLook] = await Promise.all([
+    profileTaxFraction(supabase, user.id),
     isNewLookOn(),
   ]);
-  const taxRate = Number(profile?.tax_rate ?? 15) / 100;
 
   // Some share-sheet integrations stuff the URL into `text` rather than `url`.
   // Prefer the explicit url param; fall back to text when it looks URL-shaped.

@@ -381,7 +381,7 @@ function LineCard({ q, row: r, currency }: { q: ScanState; row: ScanReviewRow; c
           caption="Unit"
           autoComplete="off"
           value={r.unit}
-          onChange={(event) => q.patchRow(r.id, { unit: event.target.value })}
+          onChange={(event) => q.patchRow(r.id, { unit: event.target.value, unitDetected: true })}
         />
         {/* A discount line needs the minus key, so it keeps the full number keyboard. */}
         <LineField

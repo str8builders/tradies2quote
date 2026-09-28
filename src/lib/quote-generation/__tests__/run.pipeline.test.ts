@@ -113,6 +113,7 @@ function makeDb(opts: { transcript: string; profile: Row; library?: Row[] }) {
       is: chain,
       order: chain,
       limit: chain,
+      range: chain,
       single: async () => result(),
       maybeSingle: async () => result(),
       then: (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>

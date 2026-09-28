@@ -5,6 +5,7 @@ import {
   normaliseUnit,
   parseSupplierQuoteExtraction,
   toExGst,
+  unitWasRead,
   type ExtractedSupplierItem,
   type SupplierQuoteExtraction,
 } from "./quoteExtraction";
@@ -23,6 +24,18 @@ describe("normaliseUnit", () => {
     expect(normaliseUnit("")).toBe("each");
     expect(normaliseUnit(null)).toBe("each");
     expect(normaliseUnit("widget")).toBe("widget");
+  });
+});
+
+describe("unitWasRead — telling a real unit apart from normaliseUnit's default", () => {
+  it("is true only for a non-blank string", () => {
+    expect(unitWasRead("each")).toBe(true);
+    expect(unitWasRead("box")).toBe(true);
+    expect(unitWasRead(" ")).toBe(false);
+    expect(unitWasRead("")).toBe(false);
+    expect(unitWasRead(null)).toBe(false);
+    expect(unitWasRead(undefined)).toBe(false);
+    expect(unitWasRead(42)).toBe(false);
   });
 });
 
@@ -49,6 +62,24 @@ describe("parseSupplierQuoteExtraction", () => {
     expect(r.value.items).toHaveLength(2);
     expect(r.value.items[0].name).toBe("90x45 H1.2 SG8 Pine");
     expect(r.value.notes).toContain("bottom row was smudged");
+  });
+
+  it("flags unit_detected: false only when the row carried no real unit — never overwrite a saved unit with this default", () => {
+    const r = parseSupplierQuoteExtraction({
+      supplier: "ITM",
+      items: [
+        { name: "Read a unit", unit: "box", price: 1 },
+        { name: "No unit printed", unit: "", price: 1 },
+        { name: "Unit field missing", price: 1 },
+      ],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.items.map((i) => [i.unit, i.unit_detected])).toEqual([
+      ["box", true],
+      ["each", false],
+      ["each", false],
+    ]);
   });
 
   it("coerces '$1,234.50' price strings to numbers", () => {

@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { round2 } from "@/lib/quote-defaults";
 import { createClient } from "@/lib/supabase/server";
+import { nameKey } from "@/lib/materials/priceList";
+import { loadAllMaterials } from "@/lib/materials/loadLibrary";
 
 /**
  * Server action for the in-app supplier browser save flow.
@@ -57,20 +59,39 @@ export async function saveSupplierMaterial(input: {
   if (price === null)
     return { ok: false, error: "Price must be a non-negative number." };
 
-  const { data, error } = await supabase
-    .from("materials")
-    .insert({
-      user_id: user.id,
-      name,
-      unit,
-      default_unit_price: price,
-      supplier: optional(input.supplier),
-      supplier_url: optional(input.supplier_url),
-      notes: optional(input.notes),
-      is_ai_estimated: false,
-    })
-    .select("id")
-    .single();
+  // Case-insensitive (trimmed, spaces collapsed) match against the tradie's
+  // library — the DB's unique index is case-SENSITIVE, so "Pine 90x45"
+  // captured again as "pine 90x45" would otherwise create a near-duplicate
+  // instead of updating the item any existing quote/kit already points at.
+  const key = nameKey(name);
+  let existing: { id: string } | null;
+  try {
+    const rows = await loadAllMaterials<{ id: string; name: string }>(supabase, user.id, {
+      select: "id, name",
+    });
+    existing = rows.find((r) => nameKey(r.name) === key) ?? null;
+  } catch (e) {
+    console.error("saveSupplierMaterial: name lookup failed", e);
+    return { ok: false, error: "Could not save material." };
+  }
+
+  const record = {
+    unit,
+    default_unit_price: price,
+    supplier: optional(input.supplier),
+    supplier_url: optional(input.supplier_url),
+    notes: optional(input.notes),
+    is_ai_estimated: false,
+  };
+
+  // A case-variant match updates the existing item (its saved name is kept)
+  // instead of creating a second one the exact-match unique index misses.
+  // Only what this page actually read is written: the tradie's own notes (or
+  // anything else left blank here) are never wiped.
+  const patch = Object.fromEntries(Object.entries(record).filter(([, v]) => v !== null && v !== undefined));
+  const { data, error } = existing
+    ? await supabase.from("materials").update(patch).eq("id", existing.id).eq("user_id", user.id).select("id").single()
+    : await supabase.from("materials").insert({ user_id: user.id, name, ...record }).select("id").single();
 
   if (error) {
     if (error.code === "23505") {

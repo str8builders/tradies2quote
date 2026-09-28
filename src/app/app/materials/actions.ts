@@ -8,7 +8,11 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { NZ_DEFAULTS, resolveTaxLabel, resolveTaxRate } from "@/lib/quote-defaults";
 import { preciseUnitPrice, unitPriceExGst } from "@/lib/materials/quoteExtraction";
-import { MAX_PRICE_LIST_ROWS } from "@/lib/materials/priceList";
+import { MAX_PRICE_LIST_ROWS, nameKey } from "@/lib/materials/priceList";
+import { loadAllMaterials } from "@/lib/materials/loadLibrary";
+import { getSubscriptionStatus, canWrite } from "@/lib/subscription";
+import { isNativeShellRequest } from "@/lib/native-shell";
+import { NEW_QUOTES_PAUSED } from "@/lib/trial-ended";
 import {
   chunks,
   keepLater,
@@ -57,7 +61,7 @@ type ServerClient = Awaited<ReturnType<typeof createClient>>;
  * rate is the business country's default (UK 20 %), never NZ's 15 % for all —
  * the same rule the import screens state to the tradie.
  */
-async function profileTaxFraction(supabase: ServerClient, userId: string): Promise<number> {
+export async function profileTaxFraction(supabase: ServerClient, userId: string): Promise<number> {
   const { data } = await supabase
     .from("profiles")
     .select("tax_rate, country, currency")
@@ -80,6 +84,27 @@ async function toStoredPrice(
   return unitPriceExGst(price, true, await profileTaxFraction(supabase, userId));
 }
 
+/**
+ * The tradie's own saved item with this name, matched the way the rest of
+ * the library dedupes: trimmed, internal spaces collapsed, any case — so
+ * "Pine 90x45" and "pine  90x45" are the same item, not two. The DB's
+ * unique index is case-SENSITIVE (`materials_user_id_name_key`), so without
+ * this a differently-cased name sails past it and creates a near-duplicate;
+ * any quote or kit already pointing at the original item never sees the
+ * fresh price.
+ */
+async function findExistingByName(
+  supabase: ServerClient,
+  userId: string,
+  name: string,
+): Promise<{ id: string; name: string } | null> {
+  const key = nameKey(name);
+  const rows = await loadAllMaterials<{ id: string; name: string }>(supabase, userId, {
+    select: "id, name",
+  });
+  return rows.find((r) => nameKey(r.name) === key) ?? null;
+}
+
 export async function createMaterial(
   _prev: ActionResult,
   formData: FormData,
@@ -94,6 +119,10 @@ export async function createMaterial(
   const unit = readField(formData, "unit");
   const priceRaw = readField(formData, "default_unit_price");
   const price = parsePrice(priceRaw);
+  // Set by the capture form's hidden field only — distinguishes a
+  // successful capture save from the plain "add material" form, so the
+  // Prices screen can show "price saved" only when something actually was.
+  const fromCapture = formData.get("source") === "capture";
 
   if (!name) return { error: "Name is required." };
   if (!unit) return { error: "Unit is required." };
@@ -105,16 +134,30 @@ export async function createMaterial(
     formData.get("price_includes_gst") === "on",
   );
 
-  const { error } = await supabase.from("materials").insert({
-    user_id: user.id,
-    name,
+  let existing: { id: string; name: string } | null;
+  try {
+    existing = await findExistingByName(supabase, user.id, name);
+  } catch (e) {
+    console.error("createMaterial: name lookup failed", e);
+    return { error: "Could not save material." };
+  }
+  // Already in the list under any capitals or spacing ("pine 90X45" for
+  // "Pine 90x45"): say so rather than add a near-duplicate — or quietly
+  // overwrite the saved item's supplier and notes with this form's blanks.
+  if (existing) {
+    return { error: `You already have “${existing.name}” in your list. Open it to change its price.` };
+  }
+
+  const record = {
     unit,
     default_unit_price: storedPrice,
     supplier: readOptional(formData, "supplier"),
     supplier_url: readOptional(formData, "supplier_url"),
     notes: readOptional(formData, "notes"),
     is_ai_estimated: false,
-  });
+  };
+
+  const { error } = await supabase.from("materials").insert({ user_id: user.id, name, ...record });
 
   if (error) {
     if (error.code === "23505") {
@@ -125,7 +168,9 @@ export async function createMaterial(
   }
 
   revalidatePath("/app/materials");
-  redirect("/app/materials");
+  // An explicit, success-only signal — never guessed from the referer
+  // (which is set the same way whether the tradie saved or hit Cancel).
+  redirect(fromCapture ? "/app/materials?captured=1" : "/app/materials");
 }
 
 export async function updateMaterial(
@@ -328,33 +373,26 @@ async function writeLibraryRows(
   return { inserted, updated, problems };
 }
 
-/** The API returns at most this many rows per request. */
-const LIBRARY_PAGE = 1000;
-
 /**
  * The tradie's saved items, as much as matching needs: all of them, a page
- * at a time, so a big library (imported price lists run to thousands) is
- * matched in full instead of creating clashing duplicates past row 1,000.
+ * at a time (loadAllMaterials), so a big library (imported price lists run
+ * to thousands) is matched in full instead of creating clashing duplicates
+ * past row 1,000.
  */
 async function loadSavedItems(
   supabase: ServerClient,
   userId: string,
 ): Promise<SavedItem[] | null> {
-  const items: SavedItem[] = [];
-  for (let from = 0; ; from += LIBRARY_PAGE) {
-    const { data, error } = await supabase
-      .from("materials")
-      .select("id, name, sku, notes")
-      .eq("user_id", userId)
-      .order("id")
-      .range(from, from + LIBRARY_PAGE - 1);
-    if (error) {
-      console.error("materials import: reading the library failed", error);
-      return null;
-    }
-    const page = (data ?? []) as Array<Partial<SavedItem> & { id: string; name: string }>;
-    for (const m of page) items.push({ id: m.id, name: m.name, sku: m.sku ?? null, notes: m.notes ?? null });
-    if (page.length < LIBRARY_PAGE) return items;
+  try {
+    const rows = await loadAllMaterials<Partial<SavedItem> & { id: string; name: string }>(
+      supabase,
+      userId,
+      { select: "id, name, sku, notes", order: [{ column: "id", ascending: true }] },
+    );
+    return rows.map((m) => ({ id: m.id, name: m.name, sku: m.sku ?? null, notes: m.notes ?? null }));
+  } catch (error) {
+    console.error("materials import: reading the library failed", error);
+    return null;
   }
 }
 
@@ -508,6 +546,14 @@ export type SupplierQuoteRow = {
   notes: string | null;
   /** The scanner's confidence in the line (0..1): the clearer read wins a repeated name. */
   confidence?: number;
+  /**
+   * False when `unit` is only the scanner's/extraction's "each" default —
+   * never genuinely read off the quote or confirmed by the tradie. Undefined
+   * (an older caller) is treated as detected, matching the previous
+   * behaviour. Only false stops `unit` from overwriting a saved item's
+   * existing unit on update (see the `valid` mapping below).
+   */
+  unitDetected?: boolean;
 };
 
 export type SupplierImportResult = {
@@ -543,7 +589,16 @@ export async function importSupplierQuoteItems(
   const valid: LibraryImportRow[] = rows
     .map((r) => ({
       name: typeof r.name === "string" ? r.name.trim() : "",
-      unit: typeof r.unit === "string" && r.unit.trim() ? r.unit.trim() : "each",
+      // Null (not "each") when the unit was never actually read/confirmed —
+      // a saved item's own unit is only ever touched by a real value
+      // (libraryPatch skips a null/blank unit; a genuinely new item still
+      // defaults to "each" at insert time, below).
+      unit:
+        r.unitDetected === false
+          ? null
+          : typeof r.unit === "string" && r.unit.trim()
+            ? r.unit.trim()
+            : null,
       default_unit_price: preciseUnitPrice(Number(r.default_unit_price)),
       sku: typeof r.sku === "string" && r.sku.trim() ? r.sku.trim() : null,
       supplier: supplierName,
@@ -656,6 +711,22 @@ export async function createQuoteFromScan(
     return { error: "No lines to turn into a quote." };
   }
 
+  // Creating a quote from a scan is still creating a quote — it must respect
+  // the same trial/plan gate /api/quotes/generate does, or an expired-trial
+  // account could keep making quotes through this path alone.
+  const sub = await getSubscriptionStatus({
+    userId: user.id,
+    signedUpAt: new Date(user.created_at ?? Date.now()),
+    email: user.email,
+  });
+  if (!canWrite(sub)) {
+    return {
+      error: (await isNativeShellRequest())
+        ? NEW_QUOTES_PAUSED
+        : "Your free trial has ended. Subscribe to keep creating quotes from scanned supplier quotes.",
+    };
+  }
+
   const { data: profileRow } = await supabase
     .from("profiles")
     .select("tax_label, tax_rate, currency, country")
@@ -669,7 +740,14 @@ export async function createQuoteFromScan(
   // Deterministic reconciliation + the 1:1 mirror — the server is the
   // authority for money. Unit prices keep full precision and the check
   // compares the raw printed values like with like (see scanToQuote.ts).
-  const built = buildScanQuote(lines, meta, { currency, taxLabel, taxRate });
+  // The acknowledgement flag is passed through so an overridden mismatch
+  // still produces a SENDABLE quote (see buildScanQuote / exGstSupplierSubtotal).
+  const built = buildScanQuote(
+    lines,
+    meta,
+    { currency, taxLabel, taxRate },
+    { acknowledge: meta?.acknowledge === true },
+  );
   if (!built.ok) return { error: built.error };
   const { validation, lineItems, quoteData } = built.value;
 

@@ -10,17 +10,20 @@ export function GstTick({
   checked,
   onChange,
   testId,
+  taxLabel = "GST",
 }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   testId: string;
+  /** "GST", "VAT", "Tax" — whatever the rest of the app calls it for this tradie's country. */
+  taxLabel?: string;
 }) {
   return (
     <CheckRow
       checked={checked}
       onChange={onChange}
-      label="The price includes GST"
-      description="Most NZ supplier websites show prices with GST. We take it off before saving. Untick if yours shows it without."
+      label={`The price includes ${taxLabel}`}
+      description={`Most supplier websites show prices with ${taxLabel}. We take it off before saving. Untick if yours shows it without.`}
       testId={testId}
     />
   );

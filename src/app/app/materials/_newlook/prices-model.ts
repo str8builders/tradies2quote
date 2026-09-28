@@ -92,12 +92,14 @@ export function priceSummary(rows: readonly PriceRow[]): string {
   return missing > 0 ? `${saved} · ${missing} with no price yet` : saved;
 }
 
-/** Arrived straight back from "Copy from a supplier's website" (the old page's banner rule). */
-export function cameFromCapture(referer: string | null | undefined): boolean {
-  if (!referer) return false;
-  try {
-    return new URL(referer).pathname === "/app/materials/capture";
-  } catch {
-    return false;
-  }
+function countParam(value: string | undefined): number | null {
+  if (!value || !/^\d{1,5}$/.test(value)) return null;
+  return Number(value);
+}
+
+/** Quick start's counts from its redirect, or null when this isn't that visit. */
+export function quickStartCounts(started?: string, already?: string): { added: number; already: number } | null {
+  const added = countParam(started);
+  if (added === null) return null;
+  return { added, already: countParam(already) ?? 0 };
 }

@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import { headers } from "next/headers";
 import {
   ArrowClockwise,
   Camera,
@@ -22,11 +21,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { kitsEnabled } from "@/lib/kits";
 import { NZ_DEFAULTS } from "@/lib/quote-defaults";
 import { createClient } from "@/lib/supabase/server";
+import { loadAllMaterials } from "@/lib/materials/loadLibrary";
+import { STARTER_MATERIALS } from "../quick-start/_data";
 import type { TopBarData } from "../../_v2/lib/top-bar";
 import { TabTopBar } from "../../_v2/shell/TabTopBar";
 import { ScanBarcodeButton } from "../_components/ScanBarcodeButton";
 import { PricesList } from "./PricesList";
-import { cameFromCapture, toLibraryMaterial, toPriceRow, type MaterialRecord } from "./prices-model";
+import { toLibraryMaterial, toPriceRow, type MaterialRecord } from "./prices-model";
 
 export const PRICES_EXPLAINER = "Materials on a new quote fill in from here. Add a price once and it's remembered.";
 
@@ -38,13 +39,27 @@ const MATERIAL_COLUMNS =
  * /app/materials in the new look: "Your prices". The heading paints at
  * once; the list streams in behind a skeleton, as the old page's does.
  */
-export function PricesScreen({ userId, bar }: { userId: string; bar: TopBarData }) {
+export function PricesScreen({
+  userId,
+  bar,
+  captured = false,
+  quickStart = null,
+}: {
+  userId: string;
+  bar: TopBarData;
+  /** An explicit, success-only signal from createMaterial's own redirect —
+   *  never guessed from the referer (a Cancel and a save both leave from
+   *  the same capture page, so the referer alone can't tell them apart). */
+  captured?: boolean;
+  /** Quick start just ran: what it added and what was already there. */
+  quickStart?: { added: number; already: number } | null;
+}) {
   return (
     <Screen data-testid="prices-screen">
       <div className="mx-auto w-full max-w-xl flex-1 space-y-6 px-4 pt-6 pb-10">
         <TabTopBar data={bar} title="Your prices" description={PRICES_EXPLAINER} />
         <Suspense fallback={<PricesSkeleton />}>
-          <PricesBody userId={userId} />
+          <PricesBody userId={userId} captured={captured} quickStart={quickStart} />
         </Suspense>
       </div>
     </Screen>
@@ -67,17 +82,29 @@ function PricesSkeleton() {
 }
 
 /** The data-driven part (exported for its node test). */
-export async function PricesBody({ userId }: { userId: string }) {
+export async function PricesBody({
+  userId,
+  captured = false,
+  quickStart = null,
+}: {
+  userId: string;
+  captured?: boolean;
+  quickStart?: { added: number; already: number } | null;
+}) {
   const supabase = await createClient();
-  const [materialsResult, profileResult, requestHeaders] = await Promise.all([
-    supabase
-      .from("materials")
-      .select(MATERIAL_COLUMNS)
-      .eq("user_id", userId)
-      .order("usage_count", { ascending: false })
-      .order("name", { ascending: true }),
+  const [materialsResult, profileResult] = await Promise.all([
+    // The whole library, a page at a time (loadAllMaterials) — a plain
+    // `.select()` here silently dropped everything past row 1,000.
+    loadAllMaterials<MaterialRecord>(supabase, userId, {
+      select: MATERIAL_COLUMNS,
+      order: [
+        { column: "usage_count", ascending: false },
+        { column: "name", ascending: true },
+      ],
+    })
+      .then((data) => ({ data, error: null }))
+      .catch((error) => ({ data: null, error })),
     supabase.from("profiles").select("currency").eq("id", userId).maybeSingle(),
-    headers(),
   ]);
 
   if (materialsResult.error) {
@@ -98,13 +125,19 @@ export async function PricesBody({ userId }: { userId: string }) {
   }
 
   const currency = profileResult.data?.currency ?? NZ_DEFAULTS.currency;
-  const materials = ((materialsResult.data ?? []) as MaterialRecord[]).map(toLibraryMaterial);
+  const materials = (materialsResult.data ?? []).map(toLibraryMaterial);
   const rows = materials.map(toPriceRow);
   const empty = rows.length === 0;
-  const fromCapture = cameFromCapture(requestHeaders.get("referer"));
+  const fromCapture = captured;
 
   return (
     <>
+      {quickStart ? (
+        <Callout tone="ok" title={quickStartTitle(quickStart.added)}>
+          {quickStartBody(quickStart)}
+        </Callout>
+      ) : null}
+
       {fromCapture ? (
         <Callout
           tone="ok"
@@ -130,7 +163,7 @@ export async function PricesBody({ userId }: { userId: string }) {
               </ButtonLink>
             }
           >
-            Quick start lists the everyday items for your trade. Put in what you pay and you&apos;re set.
+            Quick start lists {STARTER_MATERIALS.length} everyday building items. Put in what you pay and you&apos;re set.
           </EmptyState>
         </Card>
       ) : null}
@@ -180,7 +213,7 @@ export async function PricesBody({ userId }: { userId: string }) {
                 icon={<LinkSimple weight="duotone" />}
                 iconTone="info"
                 title="Copy from a supplier's website"
-                subtitle="Paste a product link and we save the price."
+                subtitle="Paste a product link and type in the price you see."
               />
             </li>
             <li>
@@ -199,7 +232,7 @@ export async function PricesBody({ userId }: { userId: string }) {
                   icon={<Stack weight="duotone" />}
                   iconTone="tools"
                   title="Kits"
-                  subtitle="Save a standard job once, then add it to a quote in one tap."
+                  subtitle="Save a standard job's lines once, then add them from the job page's Add a kit."
                 />
               </li>
             ) : null}
@@ -208,4 +241,17 @@ export async function PricesBody({ userId }: { userId: string }) {
       </section>
     </>
   );
+}
+
+/** "Added 9 prices" — or, when every item was already there, says so. */
+export function quickStartTitle(added: number): string {
+  if (added === 0) return "Nothing new to add";
+  return `Added ${added} ${added === 1 ? "price" : "prices"}`;
+}
+
+/** What the quick start changed, plainly: never claims an item it skipped. */
+export function quickStartBody({ added, already }: { added: number; already: number }): string {
+  const had = already > 0 ? `${already} ${already === 1 ? "was" : "were"} already in your list.` : "";
+  if (added === 0) return had || "Your list already had these items.";
+  return had ? `${had} Quotes use the new prices instead of an estimate.` : "Quotes use them instead of an estimate.";
 }

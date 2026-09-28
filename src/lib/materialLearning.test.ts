@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { saveMaterialCorrection } from "./materialLearning";
+import { escapeLikePattern, saveMaterialCorrection } from "./materialLearning";
 import type { PublicLineItem } from "./quote-types";
 
 const USER_A = "11111111-2222-3333-4444-555555555555";
@@ -167,6 +167,56 @@ describe("saveMaterialCorrection — user-scoped insert path", () => {
     // We don't trace each step, but the test for "does not overwrite global"
     // below proves the user_id filter is respected.
     expect(m.fromMock).toHaveBeenCalledWith("materials");
+  });
+});
+
+describe("escapeLikePattern", () => {
+  it("escapes the LIKE/ILIKE wildcards and the escape character itself", () => {
+    expect(escapeLikePattern("50% off offcuts")).toBe("50\\% off offcuts");
+    expect(escapeLikePattern("GIB_Aqua 10mm")).toBe("GIB\\_Aqua 10mm");
+    expect(escapeLikePattern("100%_done")).toBe("100\\%\\_done");
+    expect(escapeLikePattern("C:\\stock")).toBe("C:\\\\stock");
+    expect(escapeLikePattern("Plain name")).toBe("Plain name");
+  });
+});
+
+describe("saveMaterialCorrection — ilike wildcard escaping (a name isn't a search pattern)", () => {
+  /** A name containing literal % or _ must match only itself, not act as a wildcard. */
+  function ilikeSpySupabase() {
+    const patterns: string[] = [];
+    const supabase = {
+      from: (table: string) => {
+        if (table === "materials") {
+          return {
+            select: () => ({
+              eq: () => ({
+                ilike: (_col: string, pattern: string) => {
+                  patterns.push(pattern);
+                  return { limit: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) };
+                },
+              }),
+            }),
+            insert: () => ({
+              select: () => ({ single: async () => ({ data: { id: "new-1" }, error: null }) }),
+            }),
+          };
+        }
+        return { insert: async () => ({ data: null, error: null }) };
+      },
+    };
+    return { supabase: supabase as never, patterns };
+  }
+
+  it("a name with a literal % is escaped before the lookup", async () => {
+    const { supabase, patterns } = ilikeSpySupabase();
+    await saveMaterialCorrection(supabase, USER_A, { canonicalName: "50% off offcuts", unit: "each", unitPrice: 5 });
+    expect(patterns).toEqual(["50\\% off offcuts"]);
+  });
+
+  it("a name with a literal _ (e.g. a SKU-style name) is escaped before the lookup", async () => {
+    const { supabase, patterns } = ilikeSpySupabase();
+    await saveMaterialCorrection(supabase, USER_A, { canonicalName: "GIB_Aqua 10mm", unit: "sheet", unitPrice: 20 });
+    expect(patterns).toEqual(["GIB\\_Aqua 10mm"]);
   });
 });
 

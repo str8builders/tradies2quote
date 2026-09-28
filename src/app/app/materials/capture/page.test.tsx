@@ -11,6 +11,8 @@ const env = vi.hoisted(() => ({
   newLook: false,
   user: { id: "user-1" } as { id: string } | null,
   taxRate: 15 as number | null,
+  country: null as string | null,
+  currency: null as string | null,
 }));
 
 vi.mock("@/lib/ui/newLook", () => ({ isNewLookOn: async () => env.newLook }));
@@ -18,7 +20,11 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
     auth: { getUser: async () => ({ data: { user: env.user } }) },
     from: () => ({
-      select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { tax_rate: env.taxRate } }) }) }),
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => ({ data: { tax_rate: env.taxRate, country: env.country, currency: env.currency } }),
+        }),
+      }),
     }),
   }),
 }));
@@ -28,7 +34,13 @@ vi.mock("next/navigation", () => ({
   },
 }));
 vi.mock("../../_components/AppHeader", () => ({ AppHeader: () => null }));
-vi.mock("../actions", () => ({ createMaterial: vi.fn() }));
+// profileTaxFraction runs for real (against this file's own supabase mock)
+// so the tax-rate tests below still exercise the actual country-aware logic;
+// only the write action itself is stubbed.
+vi.mock("../actions", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../actions")>();
+  return { ...actual, createMaterial: vi.fn() };
+});
 
 import CapturePage from "./page";
 import { AppHeader } from "../../_components/AppHeader";
@@ -69,6 +81,8 @@ beforeEach(() => {
   env.newLook = false;
   env.user = { id: "user-1" };
   env.taxRate = 15;
+  env.country = null;
+  env.currency = null;
 });
 
 describe("/app/materials/capture, the new-look switch", () => {
@@ -113,6 +127,14 @@ describe("/app/materials/capture, the new-look switch", () => {
     expect((await formProps())?.taxRate).toBe(0.2);
     env.taxRate = null;
     expect((await formProps())?.taxRate).toBe(0.15);
+  });
+
+  it.each([false, true])("new look %s: a blank rate is the tradie's COUNTRY default, not always NZ's 15 %", async (on) => {
+    env.newLook = on;
+    env.taxRate = null;
+    env.country = "GB";
+    env.currency = "GBP";
+    expect((await formProps())?.taxRate).toBe(0.2);
   });
 
   it("signed out goes to the login page either way", async () => {

@@ -3,6 +3,13 @@ const state = vi.hoisted(() => ({owner: "owner-a", records: new Map<string, Reco
 vi.mock("@sentry/nextjs", () => ({captureException: vi.fn()}));
 vi.mock("next/navigation", () => ({redirect: () => {throw new Error("signed out");}}));
 vi.mock("next/cache", () => ({revalidatePath: vi.fn()}));
+// Trial/plan gate (Finding 12) — writable by default so these replay/idempotency
+// tests are unaffected; the gate itself is covered in actions.scanQuote.test.ts.
+vi.mock("@/lib/subscription", () => ({
+  getSubscriptionStatus: async () => ({ state: "trialing" }),
+  canWrite: () => true,
+}));
+vi.mock("@/lib/native-shell", () => ({ isNativeShellRequest: async () => false }));
 vi.mock("@/lib/supabase/server", () => ({createClient: async () => ({
   auth: {getUser: async () => ({data:{user:{id:state.owner}}})},
   from: (table: string) => {

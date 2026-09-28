@@ -107,6 +107,12 @@ export function scanLinesToItems(lines: ScanQuoteLine[]): ExtractedSupplierItem[
     .filter((i) => i.name.length > 0);
 }
 
+/** The mirrored lines' own ex-GST sum — what the send gate's PHASE 4 check
+ *  will itself add the sourced lines up to. */
+function mirroredLinesSum(lineItems: QuoteLineItem[]): number {
+  return round2(lineItems.reduce((sum, l) => sum + (l.source_line_total ?? l.line_total), 0));
+}
+
 /**
  * The supplier subtotal on the quote's own ex-GST basis.
  *
@@ -117,22 +123,35 @@ export function scanLinesToItems(lines: ScanQuoteLine[]): ExtractedSupplierItem[
  * supplier printed none — which is exactly what the send gate adds up. So
  * per-line cent rounding can't read as a missing line (six $10 incl lines are
  * 6 × $8.70 = $52.20 on the quote, while $60 ÷ 1.15 rounds to $52.17). When it
- * doesn't reconcile, the printed figure is converted directly so the gap stays
- * visible and blocks.
+ * doesn't reconcile AND the tradie hasn't acknowledged the mismatch, the
+ * printed figure is converted directly so the gap stays visible and blocks.
+ *
+ * When the tradie HAS ticked "I've checked these — go ahead anyway"
+ * (`acknowledgedOverride`), the created quote must still be sendable: its
+ * own `supplier_source.subtotal` is set to what the kept lines actually add
+ * up to (never the unreconciled printed figure), so the send gate's own
+ * re-check of subtotal-vs-lines passes immediately. The supplier's printed
+ * figure is never lost — it lives on unconditionally as `source_subtotal`.
  */
 function exGstSupplierSubtotal(
   meta: ScanQuoteMeta,
   validation: QuoteValidationReport,
   lineItems: QuoteLineItem[],
   taxRateFraction: number,
+  acknowledgedOverride: boolean,
 ): number | null {
   if (meta.subtotal == null) return null;
-  if (!meta.gstInclusive) return meta.subtotal;
   const subtotalCheck = validation.summary.find((c) => c.field === "subtotal");
-  if (subtotalCheck?.severity === "ok") {
-    return round2(
-      lineItems.reduce((sum, l) => sum + (l.source_line_total ?? l.line_total), 0),
-    );
+  const reconciled = subtotalCheck?.severity === "ok";
+  if (!meta.gstInclusive) {
+    // Already on the quote's own basis. Only an overridden mismatch swaps it
+    // for the lines' own sum — a reconciled figure needs no swap, and an
+    // unacknowledged mismatch must keep showing (and blocking on) the gap.
+    if (!reconciled && acknowledgedOverride) return mirroredLinesSum(lineItems);
+    return meta.subtotal;
+  }
+  if (reconciled || acknowledgedOverride) {
+    return mirroredLinesSum(lineItems);
   }
   return toExGst(meta.subtotal, true, taxRateFraction);
 }
@@ -172,10 +191,19 @@ function adjustmentItems(meta: ScanQuoteMeta): ExtractedSupplierItem[] {
   return out;
 }
 
+export type BuildScanQuoteOptions = {
+  /** The tradie's explicit "I've checked these — go ahead anyway" override
+   *  of a failed totals check. Passing it through here (rather than only
+   *  gating creation on it at the call site) is what keeps the CREATED
+   *  quote sendable — see exGstSupplierSubtotal. */
+  acknowledge?: boolean;
+};
+
 export function buildScanQuote(
   lines: ScanQuoteLine[],
   meta: ScanQuoteMeta,
   profile: ScanQuoteProfile,
+  options: BuildScanQuoteOptions = {},
 ): { ok: true; value: BuiltScanQuote } | { ok: false; error: string } {
   if (!Array.isArray(lines) || lines.length === 0) {
     return { ok: false, error: "No lines to turn into a quote." };
@@ -231,7 +259,13 @@ export function buildScanQuote(
 
   const supplier_source: SupplierSource = {
     supplier: supplierName,
-    subtotal: exGstSupplierSubtotal(meta, validation, productLines, taxRateFraction),
+    subtotal: exGstSupplierSubtotal(
+      meta,
+      validation,
+      productLines,
+      taxRateFraction,
+      options.acknowledge === true,
+    ),
     gst: meta.gst ?? null,
     total: meta.total ?? null,
     // PHASE 2 — raw printed document totals, EXACTLY as scanned and never

@@ -208,6 +208,49 @@ describe("importSupplierQuoteItems — a scanned quote into the library", () => 
     expect(upserted).toMatchObject({ id: "m9", name: "My joist hangers", default_unit_price: 4.35, sku: "JH190" });
     expect(upserted).not.toHaveProperty("notes");
   });
+
+  describe("unit clobbering on an existing item (Finding: unit defaults must not overwrite a real unit)", () => {
+    it("does NOT touch the saved unit when the scan's unit was only the 'each' default", async () => {
+      env.saved = [{ id: "m1", name: "Decking screws box", sku: null, notes: null }];
+      const res = await importSupplierQuoteItems(
+        [scanned("Decking screws box", 45, { unit: "each", unitDetected: false })],
+        "ITM",
+      );
+      expect(res).toMatchObject({ updated: 1 });
+      const [upserted] = rowsOf(writes("upsert")[0]);
+      expect(upserted).not.toHaveProperty("unit");
+      expect(upserted).toMatchObject({ id: "m1", default_unit_price: 45 });
+    });
+
+    it("still applies a genuinely read/confirmed unit on update", async () => {
+      env.saved = [{ id: "m1", name: "Decking screws box", sku: null, notes: null }];
+      const res = await importSupplierQuoteItems(
+        [scanned("Decking screws box", 45, { unit: "box", unitDetected: true })],
+        "ITM",
+      );
+      expect(res).toMatchObject({ updated: 1 });
+      const [upserted] = rowsOf(writes("upsert")[0]);
+      expect(upserted).toMatchObject({ id: "m1", unit: "box", default_unit_price: 45 });
+    });
+
+    it("a caller that never sets unitDetected keeps the previous (pre-fix) behaviour", async () => {
+      env.saved = [{ id: "m1", name: "Decking screws box", sku: null, notes: null }];
+      const res = await importSupplierQuoteItems([scanned("Decking screws box", 45, { unit: "box" })], "ITM");
+      expect(res).toMatchObject({ updated: 1 });
+      const [upserted] = rowsOf(writes("upsert")[0]);
+      expect(upserted).toMatchObject({ id: "m1", unit: "box" });
+    });
+
+    it("a brand-new item still defaults its unit to 'each' even when unitDetected is false", async () => {
+      env.saved = [];
+      const res = await importSupplierQuoteItems(
+        [scanned("Something new", 45, { unit: "each", unitDetected: false })],
+        "ITM",
+      );
+      expect(res).toMatchObject({ inserted: 1 });
+      expect(rowsOf(writes("insert")[0])[0]).toMatchObject({ name: "Something new", unit: "each" });
+    });
+  });
 });
 
 describe("a library bigger than one page of the API", () => {

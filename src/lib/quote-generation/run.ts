@@ -12,6 +12,7 @@ import {
 } from "@/lib/quote-defaults";
 import { buildQuotePromptParts, type PastQuoteSummary } from "@/lib/quote-prompt";
 import { libraryPriceForLine, matchToLibrary } from "@/lib/materials";
+import { loadAllMaterials } from "@/lib/materials/loadLibrary";
 import {
   canRunCalculator,
   parseTakeoffDescription,
@@ -371,16 +372,36 @@ async function generateAndSaveQuote(g: {
       }
     : NZ_DEFAULTS;
 
-  const { data: libraryRows } = await db
-    .from("materials")
-    .select(
+  // The whole library, a page at a time (loadAllMaterials) — a plain
+  // `.select()` here silently dropped everything past row 1,000, so quote
+  // generation quietly stopped matching against a big library's tail end.
+  // Kept behaviour-identical to the old query on a read failure (silently
+  // proceed with an empty library) — this function's lease/error handling
+  // downstream is unrelated to the library read and shouldn't change.
+  const libraryRows = await loadAllMaterials<{
+    id: string;
+    name: string;
+    unit: string | null;
+    default_unit_price: number | string | null;
+    supplier: string | null;
+    supplier_url: string | null;
+    notes: string | null;
+    usage_count: number | string | null;
+    is_ai_estimated: boolean | null;
+    last_used_at: string | null;
+  }>(db, userId, {
+    select:
       "id, name, unit, default_unit_price, supplier, supplier_url, notes, usage_count, is_ai_estimated, last_used_at",
-    )
-    .eq("user_id", userId)
-    .order("usage_count", { ascending: false })
-    .order("name", { ascending: true });
+    order: [
+      { column: "usage_count", ascending: false },
+      { column: "name", ascending: true },
+    ],
+  }).catch((error) => {
+    console.error("quote generation: reading the library failed", error);
+    return [];
+  });
 
-  const library: LibraryMaterial[] = (libraryRows ?? []).map((r) => ({
+  const library: LibraryMaterial[] = libraryRows.map((r) => ({
     id: r.id,
     name: r.name,
     unit: r.unit,

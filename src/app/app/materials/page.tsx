@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Camera, CheckCircle, Plus, Upload } from "@phosphor-icons/react/dist/ssr";
@@ -15,14 +14,20 @@ import { MaterialsList } from "./_components/MaterialsList";
 import { MaterialsListSkeleton } from "./_components/MaterialsListSkeleton";
 import { ScanBarcodeButton } from "./_components/ScanBarcodeButton";
 import { isNewLookOn } from "@/lib/ui/newLook";
+import { loadAllMaterials } from "@/lib/materials/loadLibrary";
 import { loadTopBarData } from "../_v2/lib/top-bar";
 import { PricesScreen } from "./_newlook/PricesScreen";
+import { quickStartCounts } from "./_newlook/prices-model";
 
 export const metadata: Metadata = {
   title: "Materials",
 };
 
-export default async function MaterialsPage() {
+export default async function MaterialsPage({
+  searchParams = Promise.resolve({}),
+}: {
+  searchParams?: Promise<{ captured?: string; started?: string; already?: string }>;
+} = {}) {
   // Wave 17 — perf — auth runs in the page; the materials query (which
   // can scan hundreds of rows for an established tradie) streams in
   // under a `<Suspense>` so the heading + capture nudge + supplier
@@ -35,8 +40,18 @@ export default async function MaterialsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // An explicit, success-only signal from createMaterial's own redirect —
+  // never guessed from the referer, which is set the same way whether the
+  // tradie saved from the capture form or just hit Cancel.
+  const sp = await searchParams;
+  const captured = sp.captured === "1";
+  // Quick start's own redirect: how many it added, and how many were there.
+  const quickStart = quickStartCounts(sp.started, sp.already);
+
   // Redesign phase 5: the new look is "Your prices". Off: unchanged below.
-  if (await isNewLookOn()) return <PricesScreen userId={user.id} bar={await loadTopBarData()} />;
+  if (await isNewLookOn()) {
+    return <PricesScreen userId={user.id} bar={await loadTopBarData()} captured={captured} quickStart={quickStart} />;
+  }
 
   return (
     <div className="min-h-screen text-white">
@@ -56,7 +71,7 @@ export default async function MaterialsPage() {
           </p>
         </div>
 
-        <CaptureSuccessBanner />
+        <CaptureSuccessBanner captured={captured} />
 
         <section
           data-testid="materials-capture-nudge"
@@ -104,7 +119,7 @@ export default async function MaterialsPage() {
                 Kits &amp; assemblies.
               </h2>
               <p className="mt-2 text-sm text-ink-300">
-                Save standard jobs once, drop them into a quote in one tap.
+                Save a standard job&apos;s lines once, then add them to a quote from the job page&apos;s Add a kit.
               </p>
             </div>
             <Plus size={22} weight="bold" className="shrink-0 text-brand" />
@@ -129,17 +144,37 @@ export default async function MaterialsPage() {
  * swaps to the real number with zero layout shift because
  * `MaterialsListSkeleton` mirrors the row's height.
  */
-async function MaterialsBody({ userId }: { userId: string }) {
+type MaterialsPageRow = {
+  id: string;
+  name: string;
+  unit: string | null;
+  default_unit_price: number | string | null;
+  supplier: string | null;
+  supplier_url: string | null;
+  notes: string | null;
+  usage_count: number | string | null;
+  is_ai_estimated: boolean | null;
+  last_used_at: string | null;
+};
+
+/** Exported for its node test (a Suspense-wrapped async body can't be
+ *  rendered synchronously, so the test calls it directly instead). */
+export async function MaterialsBody({ userId }: { userId: string }) {
   const supabase = await createClient();
-  const [{ data: rows }, { data: profile }] = await Promise.all([
-    supabase
-      .from("materials")
-      .select(
+  const [rows, { data: profile }] = await Promise.all([
+    // The whole library, a page at a time (loadAllMaterials) — a plain
+    // `.select()` here silently dropped everything past row 1,000.
+    loadAllMaterials<MaterialsPageRow>(supabase, userId, {
+      select:
         "id, name, unit, default_unit_price, supplier, supplier_url, notes, usage_count, is_ai_estimated, last_used_at",
-      )
-      .eq("user_id", userId)
-      .order("usage_count", { ascending: false })
-      .order("name", { ascending: true }),
+      order: [
+        { column: "usage_count", ascending: false },
+        { column: "name", ascending: true },
+      ],
+    }).catch((error) => {
+      console.error("materials page: reading the library failed", error);
+      return [] as MaterialsPageRow[];
+    }),
     supabase
       .from("profiles")
       .select("currency")
@@ -149,7 +184,7 @@ async function MaterialsBody({ userId }: { userId: string }) {
 
   const currency = profile?.currency ?? NZ_DEFAULTS.currency;
 
-  const materials: LibraryMaterial[] = (rows ?? []).map((r) => ({
+  const materials: LibraryMaterial[] = rows.map((r) => ({
     id: r.id,
     name: r.name,
     unit: r.unit,
@@ -225,27 +260,15 @@ async function ShareIntoAppNote() {
 }
 
 /**
- * Server component shown only when the user just landed back on
- * /app/materials from the supplier-capture flow. Detects the immediate
- * referrer; if it ends with /app/materials/capture, the new material has
- * just been saved and we show a green success banner with a "Capture
- * another" link. On any subsequent visit (refresh, navigation from
- * elsewhere) the banner disappears — referer changes / clears.
- *
- * No new state, no cookies, no DB read. Pure server-rendered banner
- * that re-uses information the request already carries.
+ * Shown only right after a material was actually saved from the
+ * supplier-capture flow: `captured` comes from createMaterial's own
+ * `?captured=1` redirect, an explicit success-only signal. A referer-based
+ * guess used to show this after Cancel too — Cancel and a save both leave
+ * from the same /app/materials/capture page, so the referer alone can never
+ * tell them apart.
  */
-async function CaptureSuccessBanner() {
-  const h = await headers();
-  const referer = h.get("referer") ?? "";
-  let cameFromCapture = false;
-  try {
-    const path = new URL(referer).pathname;
-    cameFromCapture = path === "/app/materials/capture";
-  } catch {
-    // Malformed or missing referer — banner stays hidden.
-  }
-  if (!cameFromCapture) return null;
+export function CaptureSuccessBanner({ captured }: { captured: boolean }) {
+  if (!captured) return null;
 
   return (
     <div

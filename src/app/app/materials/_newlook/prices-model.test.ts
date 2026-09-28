@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { LibraryMaterial } from "@/lib/quote-types";
 import {
-  cameFromCapture,
   hasPrice,
   priceRowSubtitle,
   priceSummary,
   searchPriceRows,
   toLibraryMaterial,
   toPriceRow,
+  quickStartCounts,
   type MaterialRecord,
 } from "./prices-model";
 
@@ -122,11 +122,23 @@ describe("summary and the capture banner", () => {
       ]),
     ).toBe("3 items saved · 2 with no price yet");
   });
+  // The "price saved" note used to be driven by cameFromCapture (a referer
+  // guess): removed along with the function it tested — a Cancel and a save
+  // both leave from the same capture page, so a referer could never tell
+  // them apart. It's now an explicit `captured` prop from createMaterial's
+  // own `?captured=1` redirect; see PricesScreen.render.test.tsx.
+});
 
-  it("the 'price saved' note shows only straight after the supplier capture page", () => {
-    expect(cameFromCapture("https://tradies2quote.com/app/materials/capture")).toBe(true);
-    expect(cameFromCapture("https://tradies2quote.com/app/materials")).toBe(false);
-    expect(cameFromCapture("not a url")).toBe(false);
-    expect(cameFromCapture(null)).toBe(false);
+describe("quickStartCounts — quick start's redirect", () => {
+  it("reads what was added and what was already there", () => {
+    expect(quickStartCounts("9", "4")).toEqual({ added: 9, already: 4 });
+    expect(quickStartCounts("13", undefined)).toEqual({ added: 13, already: 0 });
+    expect(quickStartCounts("0", "13")).toEqual({ added: 0, already: 13 });
+  });
+  it("is null on any other visit or a hand-made value", () => {
+    expect(quickStartCounts(undefined, "4")).toBeNull();
+    expect(quickStartCounts("lots", undefined)).toBeNull();
+    expect(quickStartCounts("-2", undefined)).toBeNull();
+    expect(quickStartCounts("123456", undefined)).toBeNull();
   });
 });

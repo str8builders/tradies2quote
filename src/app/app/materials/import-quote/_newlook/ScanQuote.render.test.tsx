@@ -30,6 +30,7 @@ function line(patch: Partial<ScanReviewRow> & Pick<ScanReviewRow, "id" | "name">
   return {
     include: true,
     unit: "each",
+    unitDetected: true,
     quantity: "1",
     price: "10",
     sku: null,

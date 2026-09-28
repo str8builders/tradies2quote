@@ -58,6 +58,18 @@ export type SaveCorrectionResult = {
   aliasCreated: boolean;
 };
 
+/**
+ * Escape a plain string for use as a Postgres LIKE/ILIKE pattern: `%` and
+ * `_` are wildcards there (any run of characters / any single character),
+ * and `\` is the escape character itself, so all three must be doubled up
+ * with a leading backslash before the value is otherwise-literal. Without
+ * this, a material named e.g. "50% off offcuts" or "GIB_Aqua" matches
+ * unrelated rows instead of only itself.
+ */
+export function escapeLikePattern(raw: string): string {
+  return raw.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
+
 export async function saveMaterialCorrection(
   supabase: SupabaseClient,
   userId: string,
@@ -80,11 +92,16 @@ export async function saveMaterialCorrection(
   // We deliberately filter user_id = userId so that the lookup never sees
   // global catalogue rows. This prevents an "update" that would otherwise
   // (without RLS) overwrite a global seed row.
+  //
+  // ilike is a case-insensitive EXACT match here, not a search — but % and _
+  // are still LIKE wildcards to Postgres, so a material name that happens to
+  // contain either (a percentage, a SKU with an underscore) must have them
+  // escaped or it silently matches other rows too.
   const { data: existing, error: lookupError } = await supabase
     .from("materials")
     .select("id")
     .eq("user_id", userId)
-    .ilike("name", trimmedName)
+    .ilike("name", escapeLikePattern(trimmedName))
     .limit(1)
     .maybeSingle();
   if (lookupError) {

@@ -35,6 +35,8 @@ export type ScanPage = {
   items: Array<{
     name: string;
     unit: string;
+    /** False when `unit` is only the extraction's "each" default (see quoteExtraction.ts). */
+    unit_detected?: boolean;
     quantity?: number | null;
     pieces?: number | null;
     price: number | null;

@@ -8,11 +8,26 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const env = vi.hoisted(() => ({
   newLook: false,
   user: { id: "user-1" } as { id: string } | null,
+  taxRate: null as number | null,
+  taxLabel: null as string | null,
+  country: null as string | null,
+  currency: null as string | null,
 }));
 
 vi.mock("@/lib/ui/newLook", () => ({ isNewLookOn: async () => env.newLook }));
 vi.mock("@/lib/supabase/server", () => ({
-  createClient: async () => ({ auth: { getUser: async () => ({ data: { user: env.user } }) } }),
+  createClient: async () => ({
+    auth: { getUser: async () => ({ data: { user: env.user } }) },
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => ({
+            data: { tax_rate: env.taxRate, tax_label: env.taxLabel, country: env.country, currency: env.currency },
+          }),
+        }),
+      }),
+    }),
+  }),
 }));
 vi.mock("next/navigation", () => ({
   redirect: (to: string) => {
@@ -51,6 +66,10 @@ const page = async (url?: string) =>
 beforeEach(() => {
   env.newLook = false;
   env.user = { id: "user-1" };
+  env.taxRate = 15;
+  env.taxLabel = null;
+  env.country = null;
+  env.currency = null;
 });
 
 describe("/app/suppliers, the new-look switch", () => {
@@ -59,7 +78,7 @@ describe("/app/suppliers, the new-look switch", () => {
     expect(tree.props.className).toBe("min-h-screen text-white");
     expect(ofType(tree, AppHeader)?.props.context).toBe("Suppliers");
     expect(find(tree, (element) => element.props["data-legacy-body"] === "")).not.toBeNull();
-    expect(ofType(tree, SupplierBrowser)?.props).toEqual({ initialUrl: MITRE });
+    expect(ofType(tree, SupplierBrowser)?.props).toEqual({ initialUrl: MITRE, taxRate: 0.15, taxLabel: "GST" });
     expect(ofType(tree, SuppliersScreen)).toBeNull();
   });
 
@@ -69,7 +88,7 @@ describe("/app/suppliers, the new-look switch", () => {
     env.newLook = true;
     const tree = await page(MITRE);
     expect(tree.type).toBe(SuppliersScreen);
-    expect(tree.props).toEqual({ initialUrl: MITRE });
+    expect(tree.props).toEqual({ initialUrl: MITRE, taxRate: 0.15, taxLabel: "GST" });
     expect(ofType(tree, AppHeader)).toBeNull();
   });
 
@@ -82,6 +101,17 @@ describe("/app/suppliers, the new-look switch", () => {
         expect(target?.props.initialUrl, `${on ? "on" : "off"} ${url}`).toBe("");
       }
     }
+  });
+
+  it.each([false, true])("new look %s: the tradie's own tax rate and label, never a fixed 15% GST", async (on) => {
+    env.newLook = on;
+    env.taxRate = null;
+    env.country = "GB";
+    env.currency = "GBP";
+    const tree = await page(MITRE);
+    const target = on ? tree : ofType(tree, SupplierBrowser);
+    expect(target?.props.taxRate).toBe(0.2);
+    expect(target?.props.taxLabel).toBe("VAT");
   });
 
   it("signed out goes to the login page either way", async () => {

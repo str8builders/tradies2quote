@@ -160,4 +160,45 @@ describe("createMaterial — manual entry GST choice", () => {
     ).rejects.toThrow(/NEXT_REDIRECT/);
     expect(db.inserts[0]).toMatchObject({ default_unit_price: 11.5 });
   });
+
+  it("redirects to plain /app/materials when not saved from the capture form", async () => {
+    await expect(
+      createMaterial({ ok: true }, form({ name: "Hinge", unit: "each", default_unit_price: "11.50" })),
+    ).rejects.toThrow("NEXT_REDIRECT /app/materials");
+  });
+
+  it("redirects with an explicit success signal when saved from the capture form", async () => {
+    await expect(
+      createMaterial(
+        { ok: true },
+        form({ name: "Hinge", unit: "each", default_unit_price: "11.50", source: "capture" }),
+      ),
+    ).rejects.toThrow("NEXT_REDIRECT /app/materials?captured=1");
+  });
+});
+
+describe("createMaterial — case-insensitive name match (Pine 90x45 vs pine 90x45)", () => {
+  function form(fields: Record<string, string>) {
+    const f = new FormData();
+    for (const [k, v] of Object.entries(fields)) f.set(k, v);
+    return f;
+  }
+
+  it("says it's already there (any capitals or spacing) and changes nothing", async () => {
+    db.existing = [{ id: "m1", name: "Pine 90x45" }];
+    await expect(
+      createMaterial({ ok: true }, form({ name: "pine  90X45", unit: "length", default_unit_price: "5" })),
+    ).resolves.toEqual({ error: "You already have \u201cPine 90x45\u201d in your list. Open it to change its price." });
+    expect(db.inserts).toEqual([]);
+    expect(db.updates).toEqual([]);
+  });
+
+  it("still inserts when the name is genuinely new", async () => {
+    db.existing = [{ id: "m1", name: "Pine 90x45" }];
+    await expect(
+      createMaterial({ ok: true }, form({ name: "GIB Standard 10mm", unit: "sheet", default_unit_price: "24" })),
+    ).rejects.toThrow(/NEXT_REDIRECT/);
+    expect(db.updates).toEqual([]);
+    expect(db.inserts[0]).toMatchObject({ name: "GIB Standard 10mm" });
+  });
 });

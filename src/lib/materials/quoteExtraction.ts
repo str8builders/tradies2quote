@@ -22,6 +22,14 @@ export type ExtractedSupplierItem = {
   /** Normalised unit (each, m, m², sheet, length, bag, …). */
   unit: string;
   /**
+   * False when `unit` is only `normaliseUnit`'s "each" default — the model
+   * never actually read a unit off this row. Saving this straight into the
+   * library must never let that default clobber a saved item's real unit;
+   * undefined (a caller that never set it, e.g. the tradie's own reviewed
+   * scan-to-quote lines) is treated as detected.
+   */
+  unit_detected?: boolean;
+  /**
    * Unit price as shown, at full precision (never rounded to the cent —
    * 0.125 × 1000 must stay $125). Negative for a printed discount / credit
    * line. GST handling is decided at review time. Null = not found.
@@ -150,10 +158,16 @@ const UNIT_ALIASES: Record<string, string> = {
   ltr: "L",
 };
 
+/** True when the raw unit value is a real, non-blank string — the model (or
+ *  the tradie) actually gave a unit, as opposed to `normaliseUnit` falling
+ *  back to its "each" default. */
+export function unitWasRead(raw: unknown): boolean {
+  return typeof raw === "string" && raw.trim() !== "";
+}
+
 export function normaliseUnit(raw: unknown): string {
-  if (typeof raw !== "string") return "each";
-  const t = raw.trim().toLowerCase();
-  if (!t) return "each";
+  if (!unitWasRead(raw)) return "each";
+  const t = (raw as string).trim().toLowerCase();
   return UNIT_ALIASES[t] ?? t;
 }
 
@@ -288,6 +302,7 @@ export function parseSupplierQuoteExtraction(raw: unknown): ParseResult {
     }
 
     const unit = normaliseUnit(r.unit);
+    const unit_detected = unitWasRead(r.unit);
     // Prices keep their full precision and their sign: a printed discount or
     // credit is a real line, not a misread to zero out.
     let price = priceC.kind === "number" ? priceC.value : null;
@@ -326,6 +341,7 @@ export function parseSupplierQuoteExtraction(raw: unknown): ParseResult {
     items.push({
       name,
       unit,
+      unit_detected,
       price,
       sku,
       quantity,

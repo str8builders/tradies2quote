@@ -8,7 +8,6 @@ import { fakeSupabase, type FakeOp, type FakeResult } from "@/test/fake-supabase
 
 const env = vi.hoisted(() => ({
   respond: (() => undefined) as (op: FakeOp) => FakeResult,
-  referer: null as string | null,
   db: null as { ops: FakeOp[] } | null,
 }));
 
@@ -18,9 +17,6 @@ vi.mock("@/lib/supabase/server", () => ({
     env.db = db;
     return { from: db.from };
   },
-}));
-vi.mock("next/headers", () => ({
-  headers: async () => new Headers(env.referer ? { referer: env.referer } : {}),
 }));
 // The real button lazy-loads the camera sheet; its first render is only the button.
 vi.mock("../_components/ScanBarcodeButton", () => ({
@@ -58,8 +54,8 @@ function script({ materials = ROWS, error = null as unknown, currency = "NZD" } 
   };
 }
 
-async function body(): Promise<string> {
-  return renderToStaticMarkup((await PricesBody({ userId: "user-1" })) as ReactElement);
+async function body(captured = false): Promise<string> {
+  return renderToStaticMarkup((await PricesBody({ userId: "user-1", captured })) as ReactElement);
 }
 
 /** The opening tag of the element that holds a piece of text or attribute. */
@@ -70,7 +66,6 @@ const tagWith = (html: string, fragment: string) => {
 };
 
 beforeEach(() => {
-  env.referer = null;
   env.db = null;
   script();
 });
@@ -124,13 +119,15 @@ describe("Your prices", () => {
     expect(html).toContain("Search your prices");
   });
 
-  it("an empty library points to Quick start", async () => {
+  it("an empty library points to Quick start, honestly (a fixed list, not 'for your trade')", async () => {
     script({ materials: [] });
     const html = await body();
     expect(html).toContain("No prices yet");
     expect(tagWith(html, 'href="/app/materials/quick-start"')).toContain("bg-ui-brand");
     expect(tagWith(html, 'href="/app/materials/new"')).not.toContain("bg-ui-brand");
     expect(html).not.toContain('data-testid="prices-list"');
+    expect(html).toContain("13 everyday building items");
+    expect(html).not.toContain("for your trade");
   });
 
   it("a failed read says so instead of showing an empty library", async () => {
@@ -148,11 +145,40 @@ describe("Your prices", () => {
     expect(tagWith(html, 'data-testid="scan-barcode-button"')).toContain('data-currency="GBP"');
   });
 
-  it("says the price was saved straight after supplier capture", async () => {
-    env.referer = "https://tradies2quote.com/app/materials/capture";
-    expect(await body()).toContain("Price saved");
-    env.referer = "https://tradies2quote.com/app";
-    expect(await body()).not.toContain("Price saved");
+  it("says the price was saved only on the explicit signal, never guessed from the referer", async () => {
+    // `captured` comes from createMaterial's own `?captured=1` redirect — a
+    // Cancel on the capture form leaves from the same page a save does, so
+    // the referer alone could never tell the two apart (it used to try, and
+    // showed "Price saved" after Cancel too).
+    expect(await body(true)).toContain("Price saved");
+    expect(await body(false)).not.toContain("Price saved");
+  });
+
+  it("reads the whole library, not just the first 1,000 rows", async () => {
+    const big = Array.from({ length: 1200 }, (_, i) => ({
+      id: `m-${i}`,
+      name: `Item ${i}`,
+      unit: "each",
+      default_unit_price: 5,
+      supplier: null,
+      supplier_url: null,
+      notes: null,
+      usage_count: 0,
+      is_ai_estimated: false,
+      last_used_at: null,
+    }));
+    let reads = 0;
+    env.respond = (op) => {
+      if (op.table === "materials") {
+        reads += 1;
+        return { data: reads === 1 ? big.slice(0, 1000) : big.slice(1000) };
+      }
+      if (op.table === "profiles") return { data: { currency: "NZD" } };
+      return undefined;
+    };
+    const html = await body();
+    expect(reads).toBe(2);
+    expect(html).toContain("1200 items saved");
   });
 
   it("kits show up only when switched on", async () => {

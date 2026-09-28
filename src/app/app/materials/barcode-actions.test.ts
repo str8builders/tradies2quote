@@ -24,6 +24,8 @@ const db = vi.hoisted(() => ({
   user: { id: "user-1" } as { id: string } | null,
   rows: [] as Row[],
   taxRate: 15 as number | null,
+  country: null as string | null,
+  currency: null as string | null,
   calls: [] as Call[],
   failNext: null as DbError | null,
   beforeWrite: null as (() => void) | null,
@@ -63,7 +65,8 @@ vi.mock("@/lib/supabase/server", () => ({
           db.failNext = null;
           return { data: null, error };
         }
-        if (table === "profiles") return { data: [{ tax_rate: db.taxRate }], error: null };
+        if (table === "profiles")
+          return { data: [{ tax_rate: db.taxRate, country: db.country, currency: db.currency }], error: null };
         if (call.op === "insert") {
           const row = { id: `new-${++db.nextId}`, category: null, barcode: null, ...call.payload } as Row;
           if (row.barcode !== null && db.rows.some((r) => r.user_id === row.user_id && r.barcode === row.barcode)) {
@@ -113,6 +116,8 @@ vi.mock("@/lib/supabase/server", () => ({
           call.filters.push([key, value]);
           return query;
         },
+        order: () => query,
+        range: () => query,
         maybeSingle: first,
         single: first,
         then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
@@ -148,6 +153,8 @@ beforeEach(() => {
   db.user = { id: "user-1" };
   db.rows = [];
   db.taxRate = 15;
+  db.country = null;
+  db.currency = null;
   db.calls = [];
   db.failNext = null;
   db.beforeWrite = null;
@@ -255,6 +262,21 @@ describe("saveBarcodeMaterialAction — a new product", () => {
       name: "Screws",
       unit: "box",
       price: 11.5,
+      priceIncludesGst: true,
+    });
+    expect(writes()[0].payload).toMatchObject({ default_unit_price: 10 });
+  });
+
+  it("uses the tradie's own country default, not a fixed 15%, when the profile's rate is blank", async () => {
+    // A UK tradie with no tax_rate saved yet: VAT 20%, not NZ's 15%.
+    db.taxRate = null;
+    db.country = "GB";
+    db.currency = "GBP";
+    await saveBarcodeMaterialAction({
+      code: "4006381333931",
+      name: "Screws",
+      unit: "box",
+      price: 12,
       priceIncludesGst: true,
     });
     expect(writes()[0].payload).toMatchObject({ default_unit_price: 10 });

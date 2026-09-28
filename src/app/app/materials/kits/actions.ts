@@ -76,8 +76,19 @@ export async function saveKit(input: SaveKitInput): Promise<SaveKitResult> {
     kitId = data.id;
   }
 
-  // 2) replace its items (delete-then-insert; both RLS-scoped to this user)
-  await supabase.from("kit_items").delete().eq("kit_id", kitId).eq("user_id", user.id);
+  // 2) replace its items — insert the new ones FIRST, and only remove the
+  // previous ones once that succeeds (both RLS-scoped to this user). The
+  // old delete-then-insert wiped the kit's items immediately; if the insert
+  // then failed for any reason, the kit was left with its name saved but
+  // zero items — silent data loss with no way back. This order means a
+  // failed insert leaves the kit exactly as it was before the save.
+  const { data: previous } = await supabase
+    .from("kit_items")
+    .select("id")
+    .eq("kit_id", kitId)
+    .eq("user_id", user.id);
+  const previousIds = (previous ?? []).map((r) => r.id as string);
+
   if (items.length > 0) {
     const rows = items.map((it, idx) => ({
       kit_id: kitId as string,
@@ -90,7 +101,21 @@ export async function saveKit(input: SaveKitInput): Promise<SaveKitResult> {
       position: idx,
     }));
     const { error } = await supabase.from("kit_items").insert(rows);
-    if (error) return { ok: false, error: "Saved the kit, but some lines didn't store." };
+    if (error) return { ok: false, error: "Could not save the kit's items — the previous ones are untouched." };
+  }
+
+  if (previousIds.length > 0) {
+    const { error } = await supabase
+      .from("kit_items")
+      .delete()
+      .eq("kit_id", kitId)
+      .eq("user_id", user.id)
+      .in("id", previousIds);
+    if (error) {
+      // The new items are saved; the old ones are still there too — a
+      // visible duplicate to tidy up, never a silently emptied kit.
+      return { ok: false, error: "Saved the new items, but couldn't clear the old ones. Remove the duplicates by hand." };
+    }
   }
 
   revalidatePath("/app/materials/kits");

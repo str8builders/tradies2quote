@@ -273,6 +273,75 @@ describe("applyMaterialCorrections — change detection", () => {
   });
 });
 
+describe("applyMaterialCorrections — a brand-new line picked from the library (no prior on the quote)", () => {
+  /** A minimal fake supabase supporting the one query this path makes:
+   *  .from("materials").select(...).eq("user_id", ...).in("id", ...) */
+  function libraryFake(rows: Array<{ id: string; name: string; unit: string | null; default_unit_price: number | null }>) {
+    const calls: Array<{ table: string; ids?: string[] }> = [];
+    const client = {
+      from: (table: string) => {
+        const call: { table: string; ids?: string[] } = { table };
+        calls.push(call);
+        const chain = {
+          select: () => chain,
+          eq: () => chain,
+          in: (_col: string, ids: string[]) => {
+            call.ids = ids;
+            return Promise.resolve({ data: rows, error: null });
+          },
+        };
+        return chain;
+      },
+    };
+    return { client, calls };
+  }
+
+  it("added from the library unchanged: not learned as a correction (it wasn't touched)", async () => {
+    const { client, calls } = libraryFake([
+      { id: "lib-1", name: "Joist hanger 190", unit: "each", default_unit_price: 4.2 },
+    ]);
+    const picked = material({ description: "Joist hanger 190", unit: "each", unit_price: 4.2, library_id: "lib-1" });
+    // No prior at all — this is a line the tradie just added this save (e.g. via "Add a kit").
+    const result = await applyMaterialCorrections(client as never, USER_A, [picked], []);
+    expect(saveMaterialCorrection).not.toHaveBeenCalled();
+    expect(result.materialsLearned).toBe(0);
+    expect(calls[0]).toMatchObject({ table: "materials", ids: ["lib-1"] });
+  });
+
+  it("added from the library then tweaked before save: still learned as a correction", async () => {
+    const { client } = libraryFake([{ id: "lib-1", name: "Joist hanger 190", unit: "each", default_unit_price: 4.2 }]);
+    const tweaked = material({ description: "Joist hanger 190", unit: "each", unit_price: 4.75, library_id: "lib-1" });
+    const result = await applyMaterialCorrections(client as never, USER_A, [tweaked], []);
+    expect(saveMaterialCorrection).toHaveBeenCalledWith(
+      client,
+      USER_A,
+      expect.objectContaining({ canonicalName: "Joist hanger 190", unitPrice: 4.75 }),
+    );
+    expect(result.materialsLearned).toBe(1);
+  });
+
+  it("never queries the library for a line that already matched a prior by identity", async () => {
+    const { client, calls } = libraryFake([]);
+    const prior = material({ description: "Stud", unit: "m", unit_price: 4, library_id: "lib-9" });
+    const next = material({ description: "Stud", unit: "m", unit_price: 5, library_id: "lib-9" });
+    await applyMaterialCorrections(client as never, USER_A, [next], [prior]);
+    expect(calls).toEqual([]);
+    expect(saveMaterialCorrection).toHaveBeenCalledTimes(1);
+  });
+
+  it("a library lookup failure never blocks learning — falls back to treating it as a correction", async () => {
+    const client = {
+      from: () => ({
+        select: () => ({ eq: () => ({ in: async () => ({ data: null, error: { message: "denied" } }) }) }),
+      }),
+    };
+    const picked = material({ description: "Joist hanger 190", unit: "each", unit_price: 4.2, library_id: "lib-1" });
+    const result = await applyMaterialCorrections(client as never, USER_A, [picked], []);
+    expect(result.materialsLearned).toBe(1);
+    expect(saveMaterialCorrection).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("applyMaterialCorrections — failure isolation", () => {
   it("a thrown saveMaterialCorrection does NOT propagate to the caller", async () => {
     (saveMaterialCorrection as unknown as ReturnType<typeof vi.fn>).mockRejectedValueOnce(

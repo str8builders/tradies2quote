@@ -31,20 +31,38 @@ import {
  * (useSupplierBrowser) drawn with the kit. Open a supplier, bring a product
  * link back, and the name and price are read, checked and saved to Prices.
  */
-export function SupplierShop({ initialUrl }: { initialUrl: string }) {
-  const b = useSupplierBrowser(initialUrl);
-  return <SupplierShopView b={b} />;
+export function SupplierShop({
+  initialUrl,
+  taxRate = 0.15,
+  taxLabel = "GST",
+}: {
+  initialUrl: string;
+  /** The tradie's own tax rate as a fraction (0.15 = 15%), never a fixed 15%. */
+  taxRate?: number;
+  /** "GST", "VAT", "Tax" — whatever the rest of the app calls it for this tradie's country. */
+  taxLabel?: string;
+}) {
+  const b = useSupplierBrowser(initialUrl, taxRate);
+  return <SupplierShopView b={b} taxRate={taxRate} taxLabel={taxLabel} />;
 }
 
 /** Any state of the supplier browser, drawn. A plain function of the state, so each one renders in tests. */
-export function SupplierShopView({ b }: { b: SupplierBrowserState }) {
+export function SupplierShopView({
+  b,
+  taxRate = 0.15,
+  taxLabel = "GST",
+}: {
+  b: SupplierBrowserState;
+  taxRate?: number;
+  taxLabel?: string;
+}) {
   const { phase } = b;
   return (
     <div className="space-y-6" data-testid="supplier-shop">
       <FindProduct />
       <BringLinkBack b={b} />
       <QueuedLink url={b.loadedUrl} supplier={b.detectedSupplier} />
-      {phase.state === "review" ? <ReviewSheet b={b} phase={phase} /> : null}
+      {phase.state === "review" ? <ReviewSheet b={b} phase={phase} taxRate={taxRate} taxLabel={taxLabel} /> : null}
       {phase.state === "manual" ? <ManualSheet sourceUrl={phase.sourceUrl} onClose={b.closeSheet} /> : null}
       <AddBar b={b} />
     </div>
@@ -240,8 +258,18 @@ function Problem({ message, onDismiss }: { message: string; onDismiss: () => voi
  * Check what was read, then save it: the old sheet's boxes and GST tick
  * (useReviewDraft), so the same price is saved, without GST.
  */
-function ReviewSheet({ b, phase }: { b: SupplierBrowserState; phase: Extract<Phase, { state: "review" }> }) {
-  const { name, setName, unit, setUnit, price, setPrice, priceNum, exGst, canSave } = useReviewDraft(phase);
+function ReviewSheet({
+  b,
+  phase,
+  taxRate,
+  taxLabel,
+}: {
+  b: SupplierBrowserState;
+  phase: Extract<Phase, { state: "review" }>;
+  taxRate: number;
+  taxLabel: string;
+}) {
+  const { name, setName, unit, setUnit, price, setPrice, priceNum, exGst, canSave } = useReviewDraft(phase, taxRate);
   const setGstInclusive = (gstInclusive: boolean) =>
     b.setPhase((p) => (p.state === "review" ? { ...p, gstInclusive } : p));
   return (
@@ -304,7 +332,7 @@ function ReviewSheet({ b, phase }: { b: SupplierBrowserState; phase: Extract<Pha
             data-testid="supplier-review-price"
           />
         </div>
-        <GstTick checked={phase.gstInclusive} onChange={setGstInclusive} testId="supplier-review-gst" />
+        <GstTick checked={phase.gstInclusive} onChange={setGstInclusive} testId="supplier-review-gst" taxLabel={taxLabel} />
         {exGst !== null ? (
           <SavePreview
             saved={exGst}

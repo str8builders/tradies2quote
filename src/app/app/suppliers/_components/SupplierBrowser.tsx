@@ -74,7 +74,7 @@ function normaliseUrl(raw: string): string {
  * Only the markup differs, so the paste, the read and the save behave the
  * same in either.
  */
-export function useSupplierBrowser(initialUrl: string) {
+export function useSupplierBrowser(initialUrl: string, taxRate = 0.15) {
   const [inputUrl, setInputUrl] = useState(initialUrl);
   const [loadedUrl, setLoadedUrl] = useState(initialUrl);
   const [phase, setPhase] = useState<Phase>({ state: "idle" });
@@ -196,21 +196,28 @@ export function useSupplierBrowser(initialUrl: string) {
       gstInclusive: phase.gstInclusive,
     };
     // To the cent, exact half-up (the app's one money rounding rule).
-    const exGstPrice = round2(final.gstInclusive ? final.price / 1.15 : final.price);
+    const exGstPrice = round2(final.gstInclusive ? final.price / (1 + taxRate) : final.price);
     setPhase({ ...phase, saving: true, saveError: null });
-    const result = await saveSupplierMaterial({
-      name: final.name,
-      unit: final.unit,
-      default_unit_price: exGstPrice,
-      supplier: detectedSupplier ?? "",
-      supplier_url: phase.sourceUrl,
-      notes: "Imported via in-app supplier browser.",
-    });
-    if (!result.ok) {
-      setPhase({ ...phase, saving: false, saveError: result.error });
-      return;
+    try {
+      const result = await saveSupplierMaterial({
+        name: final.name,
+        unit: final.unit,
+        default_unit_price: exGstPrice,
+        supplier: detectedSupplier ?? "",
+        supplier_url: phase.sourceUrl,
+        notes: "Imported via in-app supplier browser.",
+      });
+      if (!result.ok) {
+        setPhase({ ...phase, saving: false, saveError: result.error });
+        return;
+      }
+      setPhase({ state: "saved", name: final.name });
+    } catch {
+      // A thrown error (network drop, an unhandled server exception) must
+      // still clear `saving` — otherwise the button spins forever with no
+      // way to retry or even see that it failed.
+      setPhase({ ...phase, saving: false, saveError: "Could not save. Check your connection and try again." });
     }
-    setPhase({ state: "saved", name: final.name });
   };
 
   return {
@@ -222,11 +229,21 @@ export function useSupplierBrowser(initialUrl: string) {
 export type SupplierBrowserState = ReturnType<typeof useSupplierBrowser>;
 
 /** The supplier browser in the old look. */
-export function SupplierBrowser({ initialUrl }: { initialUrl: string }) {
+export function SupplierBrowser({
+  initialUrl,
+  taxRate = 0.15,
+  taxLabel = "GST",
+}: {
+  initialUrl: string;
+  /** The tradie's own tax rate as a fraction (0.15 = 15%), never a fixed 15%. */
+  taxRate?: number;
+  /** "GST", "VAT", "Tax" — whatever the rest of the app calls it for this tradie's country. */
+  taxLabel?: string;
+}) {
   const {
     inputUrl, setInputUrl, loadedUrl, phase, setPhase, detectedSupplier,
     pasteError, handlePasteUrl, onSubmitUrl, onAddToMaterials, closeSheet, onSave,
-  } = useSupplierBrowser(initialUrl);
+  } = useSupplierBrowser(initialUrl, taxRate);
 
   return (
     <main className="mx-auto w-full max-w-3xl px-3 pb-32 pt-4 sm:px-6 sm:pt-8">
@@ -429,6 +446,8 @@ export function SupplierBrowser({ initialUrl }: { initialUrl: string }) {
       {phase.state === "review" && (
         <ReviewSheet
           phase={phase}
+          taxRate={taxRate}
+          taxLabel={taxLabel}
           onCancel={closeSheet}
           onSave={onSave}
           supplierName={detectedSupplier ?? null}
@@ -460,14 +479,14 @@ export function SupplierBrowser({ initialUrl }: { initialUrl: string }) {
  * The review sheet's edits and the ex-GST price they come to, shared by both
  * looks. Starts from what the page read, each time the sheet opens.
  */
-export function useReviewDraft(phase: Extract<Phase, { state: "review" }>) {
+export function useReviewDraft(phase: Extract<Phase, { state: "review" }>, taxRate = 0.15) {
   const [name, setName] = useState(phase.product.name);
   const [unit, setUnit] = useState(phase.product.unit);
   const [price, setPrice] = useState(String(phase.product.price));
   const priceNum = Number(price);
   const validPrice = Number.isFinite(priceNum) && priceNum >= 0;
   const exGst = validPrice
-    ? round2(phase.gstInclusive ? priceNum / 1.15 : priceNum)
+    ? round2(phase.gstInclusive ? priceNum / (1 + taxRate) : priceNum)
     : null;
   const canSave =
     !phase.saving && name.trim().length > 0 && unit.trim().length > 0 && validPrice;
@@ -476,12 +495,16 @@ export function useReviewDraft(phase: Extract<Phase, { state: "review" }>) {
 
 function ReviewSheet({
   phase,
+  taxRate,
+  taxLabel,
   onCancel,
   onSave,
   onUpdate,
   supplierName,
 }: {
   phase: Extract<Phase, { state: "review" }>;
+  taxRate: number;
+  taxLabel: string;
   onCancel: () => void;
   onSave: (override?: {
     name: string;
@@ -493,7 +516,7 @@ function ReviewSheet({
   supplierName: string | null;
 }) {
   const { name, setName, unit, setUnit, price, setPrice, priceNum, exGst, canSave } =
-    useReviewDraft(phase);
+    useReviewDraft(phase, taxRate);
 
   return (
     <div
@@ -579,9 +602,9 @@ function ReviewSheet({
               className="mt-0.5 h-4 w-4 accent-brand"
             />
             <span>
-              Price includes GST, save ex-GST
+              Price includes {taxLabel}, save ex-{taxLabel}
               <span className="block text-xs text-ink-400">
-                Most NZ supplier storefronts display GST-inclusive.
+                Most supplier storefronts display {taxLabel}-inclusive prices.
               </span>
             </span>
           </label>
@@ -592,8 +615,8 @@ function ReviewSheet({
               className="rounded-sm border border-ink-700 bg-ink-800/60 p-2 font-mono text-xs text-ink-200"
             >
               {phase.gstInclusive
-                ? `// $${priceNum.toFixed(2)} inc GST → $${exGst.toFixed(2)} ex GST`
-                : `// $${priceNum.toFixed(2)} ex GST (saved as-is)`}
+                ? `// $${priceNum.toFixed(2)} inc ${taxLabel} → $${exGst.toFixed(2)} ex ${taxLabel}`
+                : `// $${priceNum.toFixed(2)} ex ${taxLabel} (saved as-is)`}
             </div>
           )}
 

@@ -33,9 +33,18 @@ import { bookedDateKey, bookedDayLabel, invoiceState, isPastExpiry, shortDate } 
 import { GeneratingScreen } from "./GeneratingScreen";
 import { JobScreen } from "./JobScreen";
 import type { JobKit } from "./kits";
-import { matchedLibrary } from "./line-sources";
+import { matchedLibrary, type LibraryRow } from "./line-sources";
 import { logJobPageTelemetry } from "./page-telemetry";
 import type { DayNote, JobInvoice, ServerTool } from "./types";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { loadAllMaterials } from "@/lib/materials/loadLibrary";
+
+/** A library row as this page loads it (see the materials query below). */
+type JobLibraryRow = LibraryRow & {
+  unit: string | null;
+  usage_count: number | null;
+  last_used_at: string | null;
+};
 
 /**
  * The tradie's kits for "Add a kit", with what each adds up to (lib/kits).
@@ -127,10 +136,16 @@ export async function JobPageV2({ id }: { id: string }) {
       .maybeSingle(),
     // supplier, supplier_url and is_ai_estimated are for the lines matched to
     // the library (where each price came from), like the classic page loads.
-    supabase
-      .from("materials")
-      .select("id, name, unit, default_unit_price, supplier, supplier_url, is_ai_estimated, usage_count, last_used_at")
-      .eq("user_id", user.id),
+    // Paged: one request returns at most 1,000 rows, and price lists can be
+    // bigger. A failed load leaves the library empty, as before.
+    loadAllMaterials<JobLibraryRow>(supabase as unknown as SupabaseClient, user.id, {
+      select: "id, name, unit, default_unit_price, supplier, supplier_url, is_ai_estimated, usage_count, last_used_at",
+    })
+      .then((data) => ({ data }))
+      .catch((error: unknown) => {
+        console.error("job page library load failed", error);
+        return { data: null as JobLibraryRow[] | null };
+      }),
     isNativeShellRequest(),
     // A quote made from a supplier's quote: the lines as scanned in, so the
     // supplier check can name one taken off since. Only loaded for those.

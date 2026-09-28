@@ -227,7 +227,7 @@ export function KitsManager({ initialKits, currency }: { initialKits: KitWithIte
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-ink-300">
-          Save a job&apos;s worth of lines once, then drop them into a quote in one tap.
+          Save a job&apos;s worth of lines once, then add them to a quote from the job page&apos;s Add a kit.
         </p>
         <button
           type="button"

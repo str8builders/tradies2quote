@@ -11,6 +11,11 @@ export type ScanReviewRow = {
   include: boolean;
   name: string;
   unit: string;
+  /** False when `unit` is only the scan's "each" default, never actually
+   *  read off the quote or confirmed by the tradie (see quoteExtraction.ts
+   *  unit_detected). Saving to the library must not let it overwrite a
+   *  saved item's real unit. Editing the field in review makes it true. */
+  unitDetected: boolean;
   quantity: string; // kept as string for the input; parsed on use
   price: string; // kept as string for the input; parsed on save
   sku: string | null;
@@ -42,6 +47,7 @@ export function buildReviewRows(
       include: it.price !== null && it.price !== 0,
       name: it.name,
       unit: it.unit,
+      unitDetected: it.unit_detected !== false,
       quantity:
         it.quantity != null
           ? String(it.quantity)

@@ -109,3 +109,48 @@ describe("buildScanQuote — server validation compares like with like", () => {
     });
   });
 });
+
+describe("buildScanQuote — the acknowledged-override still produces a sendable quote", () => {
+  // Both lines reconcile individually (60 = 1×60, 40 = 1×40); only the
+  // printed document subtotal (102, not 100) is wrong — a misread header, or
+  // a supplier total the tradie knows is off by a couple of dollars. This is
+  // exactly what the "I've checked these — go ahead anyway" tick is for.
+  const lines: ScanQuoteLine[] = [
+    { name: "A", unit: "each", quantity: 1, price: 60, line_total: 60 },
+    { name: "B", unit: "each", quantity: 1, price: 40, line_total: 40 },
+  ];
+  const meta = { supplier: "ITM", gstInclusive: false, subtotal: 102, total: 102 };
+
+  it("without the acknowledgement: blocks, and keeps the raw printed subtotal (the gap stays visible)", () => {
+    const built = buildScanQuote(lines, meta, NZ);
+    if (!built.ok) throw new Error(built.error);
+    expect(built.value.validation.blocking).toBe(true);
+    expect(built.value.quoteData.supplier_source?.subtotal).toBe(102);
+    expect(supplierBlocks(assessQuoteTakeoffSafety(built.value.quoteData).block_reasons).length).toBeGreaterThan(0);
+  });
+
+  it("with the acknowledgement: supplier_source.subtotal becomes the kept lines' own sum — the created quote is sendable", () => {
+    const built = buildScanQuote(lines, meta, NZ, { acknowledge: true });
+    if (!built.ok) throw new Error(built.error);
+    // The lines' own sum (100), not the unreconciled printed figure (102) —
+    // otherwise the send gate's own re-check of subtotal-vs-lines would
+    // block this quote forever, with no way to fix it (there's no single
+    // bad line to correct).
+    expect(built.value.quoteData.supplier_source?.subtotal).toBe(100);
+    // The supplier's printed figure is never lost — kept for the record.
+    expect(built.value.quoteData.supplier_source?.source_subtotal).toBe(102);
+    expect(supplierBlocks(assessQuoteTakeoffSafety(built.value.quoteData).block_reasons)).toEqual([]);
+  });
+
+  it("acknowledging a quote that already reconciles is a no-op", () => {
+    const clean = buildScanQuote(
+      [{ name: "A", unit: "each", quantity: 1, price: 100, line_total: 100 }],
+      { supplier: "ITM", gstInclusive: false, subtotal: 100 },
+      NZ,
+      { acknowledge: true },
+    );
+    if (!clean.ok) throw new Error(clean.error);
+    expect(clean.value.quoteData.supplier_source?.subtotal).toBe(100);
+    expect(clean.value.validation.blocking).toBe(false);
+  });
+});

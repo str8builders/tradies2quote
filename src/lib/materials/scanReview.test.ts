@@ -46,6 +46,18 @@ describe("buildReviewRows — scanned line totals reach the review screen", () =
     expect(rows[1]).toMatchObject({ price: "-10", include: true, credit: true });
     expect(rows[2]).toMatchObject({ price: "", include: false });
   });
+
+  it("carries unit_detected onto the row so a saved item's unit is never clobbered by the scan default", () => {
+    const rows = buildReviewRows(
+      [
+        { name: "Read off the quote", unit: "box", unit_detected: true, quantity: 1, price: 1, source_line_total: 1, sku: null, confidence: 0.9 },
+        { name: "Never printed", unit: "each", unit_detected: false, quantity: 1, price: 1, source_line_total: 1, sku: null, confidence: 0.9 },
+        { name: "Legacy caller, no flag", unit: "box", quantity: 1, price: 1, source_line_total: 1, sku: null, confidence: 0.9 },
+      ],
+      nextId,
+    );
+    expect(rows.map((r) => r.unitDetected)).toEqual([true, false, true]);
+  });
 });
 
 describe("GST basis note on the review screen", () => {
