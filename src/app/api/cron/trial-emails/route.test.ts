@@ -70,6 +70,23 @@ describe('trial email scheduler safeguards', () => {
     expect((await POST(request())).status).toBe(200);
     expect(mock.send).not.toHaveBeenCalled();
   });
+  it('the free beta\'s last week: one heads-up to a beta user with no plan', async () => {
+    vi.setSystemTime(new Date('2026-10-24T20:00:00Z')); // Sat 25 Oct, 9 am NZDT
+    const end = new Date('2026-10-31T10:59:59.999Z');
+    mock.status.mockResolvedValue({ state: 'paid', betaFreeUntil: end, stripeSubscriptionStatus: null, trialEndsAt: new Date(end.getTime() + 7 * 24 * 3600 * 1000) });
+    expect((await POST(request())).status).toBe(200);
+    const sent = mock.send.mock.calls[0]?.[0] as { idempotencyKey: string; rendered: { subject: string; text: string } };
+    expect(sent.idempotencyKey).toContain('/beta_ending/');
+    expect(sent.rendered.subject).toMatch(/^The free beta ends on Sat,? 31 Oct$/);
+    expect(sent.rendered.text).toMatch(/7 more days free, until Sat,? 7 Nov/);
+    expect(mock.calls).toContain('lifecycle_emails.insert');
+  });
+  it('no beta heads-up to someone already paying', async () => {
+    vi.setSystemTime(new Date('2026-10-24T20:00:00Z'));
+    mock.status.mockResolvedValue({ state: 'paid', betaFreeUntil: new Date('2026-10-31T10:59:59.999Z'), stripeSubscriptionStatus: 'active', trialEndsAt: new Date('2026-11-07T10:59:59.999Z') });
+    expect((await POST(request())).status).toBe(200);
+    expect(mock.send).not.toHaveBeenCalled();
+  });
   it('surfaces DB errors to the scheduler instead of pretending the run succeeded', async () => {
     mock.dbError = true;
     expect((await POST(request())).status).toBe(502); expect(mock.send).not.toHaveBeenCalled();

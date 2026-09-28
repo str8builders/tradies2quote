@@ -14,6 +14,8 @@ import {
   sendTrialEmail,
   trialEndsLabel,
   type EmailKind,
+  betaEndingKind,
+  emailDateLabel,
 } from "@/lib/trial-emails";
 
 export const runtime = "nodejs";
@@ -120,10 +122,14 @@ async function handle(request: NextRequest): Promise<NextResponse> {
       const subscription = await getSubscriptionStatus({
         userId: user.id, signedUpAt: createdAt, email: user.email,
       });
-      if (subscription.state === "paid") continue;
+      // The free beta's last week: one heads-up to everyone it covers, who
+      // otherwise shows as "paid" until it ends and gets no trial emails.
+      const betaKind = betaEndingKind(subscription, now);
+      if (subscription.state === "paid" && !betaKind) continue;
+      // Beta users' trial starts when the beta ends (betaTrialAnchor).
       const trialAnchor = new Date(subscription.trialEndsAt.getTime() - 7 * 24 * 60 * 60 * 1000);
-      if (trialAnchor < minCreatedAt || trialAnchor > maxCreatedAt) continue;
-      const kind = kindForUser(trialAnchor, now);
+      if (!betaKind && (trialAnchor < minCreatedAt || trialAnchor > maxCreatedAt)) continue;
+      const kind: EmailKind | null = betaKind ?? kindForUser(trialAnchor, now);
       if (!kind) continue;
       counters.windowed += 1;
 
@@ -180,6 +186,7 @@ async function handle(request: NextRequest): Promise<NextResponse> {
         calendlyUrl: process.env.TRIAL_CALENDLY_URL || undefined,
         trialEndsLabel: trialEndsLabel(trialAnchor),
         trialEnds: kind === "trial_day_0" ? lastDayWording(trialAnchor, now) : undefined,
+        betaEndsLabel: subscription.betaFreeUntil ? emailDateLabel(subscription.betaFreeUntil) : undefined,
       });
 
       const result = await sendTrialEmail({ to: user.email, rendered,

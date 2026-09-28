@@ -43,7 +43,7 @@ vi.mock("@/lib/supabase/admin", () => ({
   }),
 }));
 
-import { getSubscriptionStatus, parseBetaFreeUntil } from "./subscription";
+import { betaTrialAnchor, getSubscriptionStatus, parseBetaFreeUntil } from "./subscription";
 
 const USER = "11111111-1111-4111-8111-111111111111";
 const OWNER = "22222222-2222-4222-8222-222222222222";
@@ -88,15 +88,38 @@ describe("BETA_FREE_UNTIL is the whole New Zealand day", () => {
     expect(parseBetaFreeUntil(undefined)).toBeNull();
   });
 
-  it("free access lasts all of 31 October in New Zealand, not until 1 pm", async () => {
+  it("free access lasts all of 31 October in New Zealand, then 7 more days as a trial", async () => {
     vi.setSystemTime(new Date("2026-10-31T00:30:00Z")); // 1:30 pm NZDT on the 31st
     expect((await status()).betaFreeUntil).not.toBeNull();
     vi.setSystemTime(new Date("2026-10-31T10:59:00Z")); // 11:59 pm NZDT
     expect((await status()).state).toBe("paid");
-    vi.setSystemTime(new Date("2026-10-31T11:00:00Z")); // midnight: 1 November in NZ
+    // Midnight, 1 November in NZ: nobody is locked out at once — a beta user's
+    // 7-day trial starts when the beta ends.
+    vi.setSystemTime(new Date("2026-10-31T11:00:00Z"));
     const after = await status();
     expect(after.betaFreeUntil).toBeNull();
-    expect(after.state).toBe("expired");
+    expect(after.state).toBe("trialing");
+    expect(after.trialEndsAt.toISOString()).toBe("2026-11-07T10:59:59.999Z");
+    expect(after.trialDaysLeft).toBe(7);
+    vi.setSystemTime(new Date("2026-11-07T11:00:00Z")); // 8 November in NZ
+    expect((await status()).state).toBe("expired");
+  });
+
+  it("someone who signs up after the beta gets the usual 7 days from sign-up", async () => {
+    vi.setSystemTime(new Date("2026-11-12T00:00:00Z"));
+    const joined = new Date("2026-11-10T00:00:00Z");
+    const s = await getSubscriptionStatus({ userId: USER, signedUpAt: joined, email: "new@example.invalid" });
+    expect(s.state).toBe("trialing");
+    expect(s.trialEndsAt.toISOString()).toBe("2026-11-17T00:00:00.000Z");
+  });
+
+  it("the beta's end is the earliest a beta user's trial can start", () => {
+    const end = parseBetaFreeUntil("2026-10-31");
+    const early = new Date("2026-08-01T00:00:00Z");
+    const late = new Date("2026-11-05T00:00:00Z");
+    expect(betaTrialAnchor(early, end)).toEqual(end);
+    expect(betaTrialAnchor(late, end)).toEqual(late);
+    expect(betaTrialAnchor(early, null)).toEqual(early);
   });
 });
 

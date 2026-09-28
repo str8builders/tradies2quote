@@ -90,7 +90,8 @@ describe("TrialBanner, new look: the same banners as ui-token strips", () => {
     expect(link).toContain('href="/app/beta"');
     expect(link).toContain('data-tone="info"');
     expect(link).toContain("bg-ui-info-soft");
-    expect(out).toContain("Free access until <DATE>.");
+    // Beta users' 7-day trial starts when the beta ends.
+    expect(out).toContain("Free access until <DATE>, then 7 more days free.");
     expect(out).toContain("Pre-send checklist");
   });
 

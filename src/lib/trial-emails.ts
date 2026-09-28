@@ -35,14 +35,18 @@ const EMAIL_TIME_ZONE = "Pacific/Auckland";
 /** Plans are priced in NZ dollars only (src/lib/plans.ts). */
 const FROM_PRICE = "NZ$49 a month";
 
-export type EmailKind =
+/** The emails timed from the trial start (see KIND_WINDOWS). */
+export type TrialEmailKind =
   | "onboarding_24h"
   | "onboarding_3day"
   | "trial_minus_2"
   | "trial_day_0"
   | "trial_plus_3";
 
-export const EMAIL_KINDS: readonly EmailKind[] = [
+/** Every lifecycle email, including the one-off week-before-the-beta-ends notice. */
+export type EmailKind = TrialEmailKind | "beta_ending";
+
+export const EMAIL_KINDS: readonly TrialEmailKind[] = [
   "onboarding_24h",
   "onboarding_3day",
   "trial_minus_2",
@@ -62,7 +66,7 @@ const LAST_DAY_HOURS = 26;
  * ([from, until)). The windows follow each other, so a user is in at most one,
  * and each is wider than the longest gap between two daily runs.
  */
-const KIND_WINDOWS: Record<EmailKind, { from: number; until: number }> = {
+const KIND_WINDOWS: Record<TrialEmailKind, { from: number; until: number }> = {
   onboarding_24h: { from: 24, until: 3 * 24 },
   onboarding_3day: { from: 3 * 24, until: 4 * 24 + 2 },
   trial_minus_2: { from: 4 * 24 + 2, until: TRIAL_DAYS * 24 - LAST_DAY_HOURS },
@@ -95,13 +99,41 @@ export function requiresNoQuotes(kind: EmailKind): boolean {
 export function kindForUser(
   signedUpAt: Date,
   now: Date = new Date(),
-): EmailKind | null {
+): TrialEmailKind | null {
   const elapsedHours = (now.getTime() - signedUpAt.getTime()) / HOUR_MS;
   for (const kind of EMAIL_KINDS) {
     const window = KIND_WINDOWS[kind];
     if (elapsedHours >= window.from && elapsedHours < window.until) return kind;
   }
   return null;
+}
+
+/** How long before the free beta ends its one heads-up goes out. */
+export const BETA_ENDING_NOTICE_DAYS = 7;
+
+/**
+ * "beta_ending" when a tradie the free beta covers is in its final week:
+ * not someone already paying, not the owner or an App Store review account,
+ * and not a team member (their team owner hears about billing). The dedup
+ * ledger makes it once per person.
+ */
+export function betaEndingKind(
+  status: {
+    betaFreeUntil: Date | null;
+    stripeSubscriptionStatus: string | null;
+    managedByTeam?: boolean;
+  },
+  now: Date = new Date(),
+): "beta_ending" | null {
+  const end = status.betaFreeUntil;
+  if (!end) return null;
+  const msLeft = end.getTime() - now.getTime();
+  if (msLeft <= 0 || msLeft > BETA_ENDING_NOTICE_DAYS * DAY_MS) return null;
+  if (status.managedByTeam) return null;
+  const billing = status.stripeSubscriptionStatus;
+  if (billing === "owner_bypass" || billing === "review_comp") return null;
+  if (billing === "active" || billing === "trialing" || billing === "past_due") return null;
+  return "beta_ending";
 }
 
 type TemplateArgs = {
@@ -118,6 +150,8 @@ type TemplateArgs = {
    * { day: "today", time: "2:15 pm" } (NZ time). See lastDayWording().
    */
   trialEnds?: { day: string; time: string };
+  /** For the beta-ending email: the beta's last day, e.g. "Fri 31 Oct". */
+  betaEndsLabel?: string;
 };
 
 export interface RenderedEmail {
@@ -138,6 +172,8 @@ export function renderEmail(kind: EmailKind, args: TemplateArgs): RenderedEmail 
       return renderTrialDay0(args);
     case "trial_plus_3":
       return renderTrialPlus3(args);
+    case "beta_ending":
+      return renderBetaEnding(args);
   }
 }
 
@@ -277,16 +313,46 @@ ${btn(settingsUrl, "Reactivate")}
   return { subject, text, html };
 }
 
-export function trialEndsLabel(signedUpAt: Date): string {
-  const end = new Date(signedUpAt.getTime() + TRIAL_DAYS * DAY_MS);
-  // Day-of-week + short date, e.g. "Sun 24 May". en-NZ matches the
-  // primary market; tradies elsewhere see the same compact format.
-  return end.toLocaleDateString("en-NZ", {
+function renderBetaEnding(args: TemplateArgs): RenderedEmail {
+  const betaEnds = args.betaEndsLabel ?? "soon";
+  const subject = `The free beta ends ${args.betaEndsLabel ? `on ${betaEnds}` : "soon"}`;
+  const planUrl = `${args.appUrl}/app/settings`;
+  const text = `Hi ${args.firstName},
+
+Thanks for trying Tradies2Quote in the free beta. The beta ends on ${betaEnds}.
+
+Nothing changes that night: you get 7 more days free, until ${args.trialEndsLabel}. After that, making new quotes needs a plan (from ${FROM_PRICE}). Your quotes, invoices and clients stay yours, and quotes you've already sent keep working for your clients.
+
+No card is on file, so nothing is charged unless you choose a plan:
+
+${planUrl}
+
+— Challis`;
+  const html = shell(`
+<p>Hi ${escapeHtml(args.firstName)},</p>
+<p>Thanks for trying Tradies2Quote in the free beta. The beta ends on <strong>${escapeHtml(betaEnds)}</strong>.</p>
+<p>Nothing changes that night: you get 7 more days free, until <strong>${escapeHtml(args.trialEndsLabel)}</strong>. After that, making new quotes needs a plan (from ${FROM_PRICE}). Your quotes, invoices and clients stay yours, and quotes you've already sent keep working for your clients.</p>
+<p>No card is on file, so nothing is charged unless you choose a plan.</p>
+${btn(planUrl, "See the plans")}
+<p>— Challis</p>
+`);
+  return { subject, text, html };
+}
+
+/** Day-of-week + short date in NZ time, e.g. "Sun 24 May". */
+export function emailDateLabel(at: Date): string {
+  // en-NZ matches the primary market; tradies elsewhere see the same
+  // compact format.
+  return at.toLocaleDateString("en-NZ", {
     weekday: "short",
     day: "numeric",
     month: "short",
     timeZone: EMAIL_TIME_ZONE,
   });
+}
+
+export function trialEndsLabel(signedUpAt: Date): string {
+  return emailDateLabel(new Date(signedUpAt.getTime() + TRIAL_DAYS * DAY_MS));
 }
 
 /** The NZ calendar date of an instant as [year, month, day]. */

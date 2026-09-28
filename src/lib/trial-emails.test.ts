@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  betaEndingKind,
   EMAIL_KINDS,
+  emailDateLabel,
   kindForUser,
   lastDayWording,
   renderEmail,
@@ -124,5 +126,45 @@ describe("what the emails say", () => {
 
   it("the two-day warning names the date instead of guessing the days left", () => {
     expect(renderEmail("trial_minus_2", args).subject).toBe("Your free trial ends Mon 28 Sep");
+  });
+});
+
+describe("the week before the free beta ends", () => {
+  const END = new Date("2026-10-31T10:59:59.999Z"); // 11:59 pm NZDT, Sat 31 Oct
+  const free = { betaFreeUntil: END, stripeSubscriptionStatus: null };
+
+  it("one heads-up in the final 7 days, to beta users with no plan", () => {
+    expect(betaEndingKind(free, new Date("2026-10-24T20:00:00Z"))).toBe("beta_ending"); // Sat 25 Oct, 9 am NZ
+    expect(betaEndingKind(free, new Date("2026-10-31T10:00:00Z"))).toBe("beta_ending"); // the last evening
+    expect(betaEndingKind(free, new Date("2026-10-20T20:00:00Z"))).toBeNull(); // too early
+    expect(betaEndingKind(free, new Date("2026-10-31T11:00:00Z"))).toBeNull(); // over
+    expect(betaEndingKind({ betaFreeUntil: null, stripeSubscriptionStatus: null })).toBeNull();
+  });
+
+  it("never to someone paying, the owner, a review account or a team member", () => {
+    const now = new Date("2026-10-26T20:00:00Z");
+    for (const billing of ["active", "trialing", "past_due", "owner_bypass", "review_comp"]) {
+      expect(betaEndingKind({ betaFreeUntil: END, stripeSubscriptionStatus: billing }, now), billing).toBeNull();
+    }
+    expect(betaEndingKind({ ...free, managedByTeam: true }, now)).toBeNull();
+    // A lapsed or abandoned subscription still counts as not paying.
+    expect(betaEndingKind({ betaFreeUntil: END, stripeSubscriptionStatus: "canceled" }, now)).toBe("beta_ending");
+  });
+
+  it("says the beta's end, the 7 days after it, and that nothing is charged", () => {
+    const email = renderEmail("beta_ending", {
+      firstName: "Mike",
+      appUrl: "https://tradies2quote.com",
+      betaEndsLabel: emailDateLabel(END),
+      trialEndsLabel: trialEndsLabel(END),
+    });
+    expect(emailDateLabel(END)).toMatch(/^Sat,? 31 Oct$/);
+    expect(trialEndsLabel(END)).toMatch(/^Sat,? 7 Nov$/);
+    expect(email.subject).toBe(`The free beta ends on ${emailDateLabel(END)}`);
+    expect(email.text).toContain(`you get 7 more days free, until ${trialEndsLabel(END)}.`);
+    expect(email.text).toContain("NZ$49 a month");
+    expect(email.text).toContain("nothing is charged unless you choose a plan");
+    expect(email.html).toContain("https://tradies2quote.com/app/settings");
+    expect(`${email.text}${email.html}`).not.toMatch(/(?<!NZ)\$49|\/mo\b|tonight/i);
   });
 });

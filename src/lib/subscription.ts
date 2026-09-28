@@ -84,6 +84,17 @@ export function parseBetaFreeUntil(raw: string | null | undefined): Date | null 
   return Number.isNaN(ms) ? null : new Date(ms);
 }
 
+/**
+ * When a tradie's 7-day trial starts. Everyone who joined during the free
+ * beta starts their trial when the beta ends, not when they signed up, so
+ * the end of the beta never locks anyone out at once: each beta user gets
+ * the same 7 days (and the same reminder emails) a new sign-up would.
+ * BETA_FREE_UNTIL therefore stays set after the beta has ended.
+ */
+export function betaTrialAnchor(anchor: Date, betaFreeUntil: Date | null): Date {
+  return betaFreeUntil && betaFreeUntil.getTime() > anchor.getTime() ? betaFreeUntil : anchor;
+}
+
 export type SubscriptionState = "trialing" | "paid" | "expired";
 
 export interface SubscriptionStatus {
@@ -200,8 +211,8 @@ export async function getSubscriptionStatus(args: {
   // BETA_FREE_UNTIL — temporary free-for-all window. Lets the operator
   // invite mates to test without anyone tripping the paywall, and self-
   // expires when the date passes so the paywall comes back without a
-  // manual flip. A plain date is the whole of that NZ day; invalid / past
-  // dates fall through silently to normal billing rules.
+  // manual flip. A plain date is the whole of that NZ day. Keep it set after
+  // the date: it is also when beta users' 7-day trial starts (betaTrialAnchor).
   const betaFreeUntil = parseBetaFreeUntil(process.env.BETA_FREE_UNTIL);
   const betaActive = betaFreeUntil !== null && now.getTime() <= betaFreeUntil.getTime();
 
@@ -210,7 +221,7 @@ export async function getSubscriptionStatus(args: {
   // overridden anyway. The path below re-derives these from
   // profiles.trial_started_at if set.
   const provisionalTrialEndsAt = new Date(
-    signedUpAt.getTime() + TRIAL_DAYS * DAY_MS,
+    betaTrialAnchor(signedUpAt, betaFreeUntil).getTime() + TRIAL_DAYS * DAY_MS,
   );
 
   // Project owner never gets billed. Reports as "paid" so the trial
@@ -285,7 +296,7 @@ export async function getSubscriptionStatus(args: {
   const ownCustomer = managedByTeam ? null : sub?.stripe_customer_id ?? null;
 
   // Derive the real trial anchor.
-  const trialAnchor = trialStartedAt ? new Date(trialStartedAt) : signedUpAt;
+  const trialAnchor = betaTrialAnchor(trialStartedAt ? new Date(trialStartedAt) : signedUpAt, betaFreeUntil);
   const trialEndsAt = new Date(trialAnchor.getTime() + TRIAL_DAYS * DAY_MS);
   const trialMsLeft = trialEndsAt.getTime() - now.getTime();
   const trialDaysLeft = Math.ceil(trialMsLeft / DAY_MS);

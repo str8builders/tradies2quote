@@ -49,7 +49,12 @@ export async function TrialBanner({ look = "old" }: { look?: "new" | "old" } = {
     const endsLabel = sub.betaFreeUntil.toLocaleDateString("en-NZ", {
       day: "numeric",
       month: "short",
+      timeZone: "Pacific/Auckland",
     });
+    // Beta users' 7-day trial starts when the beta ends (betaTrialAnchor);
+    // someone already paying has no trial to come.
+    const paying = ["active", "trialing", "past_due"].includes(sub.stripeSubscriptionStatus ?? "");
+    const then = paying ? "" : ", then 7 more days free";
     if (look === "new") {
       return (
         <NoticeLink
@@ -59,7 +64,7 @@ export async function TrialBanner({ look = "old" }: { look?: "new" | "old" } = {
           icon={<ShieldCheck weight="bold" />}
           action="Pre-send checklist"
         >
-          Free access until {endsLabel}.
+          Free access until {endsLabel}{then}.
         </NoticeLink>
       );
     }
@@ -72,7 +77,7 @@ export async function TrialBanner({ look = "old" }: { look?: "new" | "old" } = {
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2">
           <p className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-200">
             <ShieldCheck size={14} weight="bold" className="text-brand" />
-            Free access active until {endsLabel}
+            Free access active until {endsLabel}{then}
           </p>
           <span className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-brand">
             Pre-send checklist
