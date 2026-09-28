@@ -5,7 +5,9 @@ import Image from "next/image";
 import { ArrowSquareOut } from "@phosphor-icons/react/dist/ssr";
 import { cx } from "@/components/ui/cx";
 import { PRESS, TAP, UI_TEXT } from "@/components/ui/styles";
+import { Capacitor, registerPlugin } from "@capacitor/core";
 import { T2QCAL_LAUNCH_WAIT_MS, calculatorDeepLink, type T2QCALRoute } from "@/lib/calculator-app";
+import { isNativeIOSApp } from "@/lib/native-app";
 
 const APP_STORE_URL = process.env.NEXT_PUBLIC_T2QCAL_APPSTORE_URL ?? "";
 
@@ -14,9 +16,32 @@ const APP_STORE_URL = process.env.NEXT_PUBLIC_T2QCAL_APPSTORE_URL ?? "";
  * app hands custom links to iOS). iOS says nothing when no app answers, so a
  * short timer that the switch away cancels is the only signal: still here
  * after it, T2QCAL isn't installed (App Store page once there is one, else
- * say so). No account data travels in the link; both apps sign in to the
- * same account on their own.
+ * say so). No account data travels in the link: before opening it, the
+ * iPhone app leaves a one-time sign-in code where only the owner's own apps
+ * can read it (offerT2QCALSignIn), so T2QCAL opens signed in to this account.
  */
+const T2QHandoff = registerPlugin<{ offer(options: { code: string; userId: string }): Promise<void> }>("T2QHandoff");
+
+/**
+ * Sign T2QCAL in as this account: a one-time code from the server, left in a
+ * pasteboard only the owner's own apps can read (never in the link). T2QCAL
+ * takes it when it opens. Best-effort and quick: if anything fails, T2QCAL
+ * still opens and offers its own sign-in. Only in the iPhone app.
+ */
+export async function offerT2QCALSignIn(): Promise<boolean> {
+  if (!isNativeIOSApp() || !Capacitor.isPluginAvailable("T2QHandoff")) return false;
+  try {
+    const res = await fetch("/api/t2qcal/handoff", { method: "POST", credentials: "same-origin", signal: AbortSignal.timeout(2500) });
+    if (!res.ok) return false;
+    const { code, userId } = (await res.json()) as { code?: string; userId?: string };
+    if (!code || !userId) return false;
+    await T2QHandoff.offer({ code, userId });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function useT2QCALLaunch(route: T2QCALRoute) {
   const [missing, setMissing] = useState(false);
   const timer = useRef<number | null>(null);
@@ -24,9 +49,10 @@ export function useT2QCALLaunch(route: T2QCALRoute) {
 
   useEffect(() => () => cleanupRef.current(), []);
 
-  const launch = useCallback(() => {
+  const launch = useCallback(async () => {
     setMissing(false);
     cleanupRef.current();
+    await offerT2QCALSignIn();
     const onHide = () => {
       if (document.hidden) cleanup();
     };
@@ -58,7 +84,7 @@ export function T2QCALTile({ className }: { className?: string }) {
   return (
     <button
       type="button"
-      onClick={launch}
+      onClick={() => void launch()}
       data-quick="t2qcal"
       data-testid="launch-t2qcal"
       className={cx(
@@ -88,7 +114,7 @@ export function T2QCALRow() {
   return (
     <button
       type="button"
-      onClick={launch}
+      onClick={() => void launch()}
       data-testid="account-sheet-t2qcal"
       className={cx(
         "ui-focus-ring flex min-h-16 w-full cursor-pointer items-center gap-3 px-4 py-3 text-left text-ui-base hover:bg-ui-surface-2 active:bg-ui-surface-2",

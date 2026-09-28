@@ -7,6 +7,7 @@ class MainViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(T2QLocationPlugin())
         bridge?.registerPluginInstance(T2QChromePlugin())
+        bridge?.registerPluginInstance(T2QHandoffPlugin())
     }
 
     /// The page draws right up under the clock (contentInset "never"), on
@@ -36,3 +37,45 @@ public class T2QChromePlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 }
+
+/// One-tap sign-in into T2QCAL (JS name "T2QHandoff"). The page gets a
+/// one-time code from the server (/api/t2qcal/handoff) and this leaves it in a
+/// named pasteboard: iOS shares a named pasteboard only between apps from the
+/// same developer team, so T2QCAL can read it and no other app can. The code
+/// never goes in the t2qcal:// link, which any app could register.
+/// T2QCAL takes it (and clears it) when it opens; the server accepts it once,
+/// within 60 seconds.
+@objc(T2QHandoffPlugin)
+public class T2QHandoffPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "T2QHandoffPlugin"
+    public let jsName = "T2QHandoff"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "offer", returnType: CAPPluginReturnPromise),
+    ]
+
+    /// Must match T2QCAL's Handoff.pasteboardName.
+    static let pasteboardName = UIPasteboard.Name("com.str8builders.t2qcal-handoff")
+
+    @objc func offer(_ call: CAPPluginCall) {
+        guard let code = call.getString("code"), let userId = call.getString("userId"),
+              !code.isEmpty, !userId.isEmpty else {
+            call.reject("A code and an account are needed.")
+            return
+        }
+        let payload: [String: Any] = ["code": code, "userId": userId, "at": Date().timeIntervalSince1970]
+        guard let data = try? JSONSerialization.data(withJSONObject: payload),
+              let text = String(data: data, encoding: .utf8) else {
+            call.reject("Couldn't write the code.")
+            return
+        }
+        DispatchQueue.main.async {
+            guard let board = UIPasteboard(name: Self.pasteboardName, create: true) else {
+                call.reject("The pasteboard isn't available.")
+                return
+            }
+            board.string = text
+            call.resolve()
+        }
+    }
+}
+

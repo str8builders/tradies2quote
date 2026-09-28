@@ -43,6 +43,7 @@ export function fakeSupabase(respond: (op: FakeOp) => FakeResult) {
       neq: filter("neq"),
       is: filter("is"),
       in: filter("in"),
+      gt: filter("gt"),
       gte: filter("gte"),
       lt: filter("lt"),
       not: filter("not"),
