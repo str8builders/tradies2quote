@@ -82,6 +82,18 @@ export function checkRelease(env, authEnv = {}, now = Date.now()) {
     vapidOK = pair.getPublicKey().equals(Buffer.from(vapidPublic, "base64url"));
   } catch { /* Never echo a private key or crypto error. */ }
   add("web-push-key-pair", vapidOK, "VAPID public and private keys must form the same P-256 pair; preserve existing subscriptions.");
+  // The server signs with VAPID_PUBLIC_KEY if set, else NEXT_PUBLIC_VAPID_PUBLIC_KEY
+  // (src/lib/push.ts's precedence). The client now fetches its subscribe key from
+  // the server at runtime (GET /api/push/public-key) rather than reading its own
+  // copy, so the two can no longer drift apart there — but anything that still
+  // reads NEXT_PUBLIC_VAPID_PUBLIC_KEY directly (inlined into a client bundle at
+  // build time) must see the SAME key the server signs with, or every push to it
+  // is silently rejected (audit finding 3: exactly this drift, undetected here).
+  // Only meaningful when both are explicitly set to different values.
+  const serverPublicKey = env.VAPID_PUBLIC_KEY?.trim();
+  const clientPublicKey = env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim();
+  add("web-push-client-key-matches-server", !serverPublicKey || !clientPublicKey || serverPublicKey === clientPublicKey,
+      "VAPID_PUBLIC_KEY and NEXT_PUBLIC_VAPID_PUBLIC_KEY must be identical when both are set.");
   return {
     configurationReady: checks.every(check => check.status === "configured"),
     checks,

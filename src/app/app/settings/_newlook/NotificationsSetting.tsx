@@ -8,8 +8,9 @@ import { disablePush, enablePush, pushCanToggle, pushStatusText, readPushState, 
 const emptySubscribe = () => () => {};
 
 /**
- * Quote notifications for this phone: a buzz when a client accepts a quote.
- * Web Push in the browser and the Home Screen app, Apple push in the iOS app.
+ * Quote notifications for this phone: a buzz when a client requests a
+ * quote, opens it, sends a message, or accepts it. Web Push in the browser
+ * and the Home Screen app, Apple push in the iOS app.
  */
 export function NotificationsSetting() {
   const native = useSyncExternalStore(emptySubscribe, isNativeIOSApp, () => false);

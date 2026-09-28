@@ -8,15 +8,17 @@ import {
   CircleNotch,
 } from "@phosphor-icons/react";
 
-// Fallback VAPID public key — only used in local dev when NEXT_PUBLIC_VAPID_PUBLIC_KEY
-// isn't injected. Paired with the matching VAPID_PRIVATE_KEY rotated in Vercel
-// after the Stripe-secret-contamination cleanup. If you ever rotate the keypair
-// again, regenerate via `npx web-push generate-vapid-keys` and update BOTH this
-// string AND the Vercel env vars (VAPID_PUBLIC_KEY, NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-// VAPID_PRIVATE_KEY) in the same commit so they stay matched.
-const VAPID_PUBLIC_KEY =
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
-  "BM7pVHs5Nf2CSkOcrXxpaADkS4P4sq-6LjrtQ01bZUtxi0Om1jyja4NXW32CNG0KqwwtFcluG26_61xVT2xdGP0";
+// The browser must subscribe with the public key the server signs with, or
+// every push is refused (403) while the switch says On. The server's key is
+// the one source of truth (src/lib/push.ts, served by /api/push/public-key),
+// so nothing is hard-coded here.
+async function fetchVapidPublicKey(): Promise<string> {
+  const res = await fetch("/api/push/public-key");
+  if (!res.ok) throw new Error(`public-key ${res.status}`);
+  const json = (await res.json()) as { key?: unknown };
+  if (typeof json.key !== "string" || !json.key) throw new Error("public-key missing");
+  return json.key;
+}
 
 /** Convert a base64url VAPID key into the Uint8Array the Push API wants. */
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
@@ -169,9 +171,7 @@ export function PushToggle() {
       await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(
-          VAPID_PUBLIC_KEY,
-        ) as BufferSource,
+        applicationServerKey: urlBase64ToUint8Array(await fetchVapidPublicKey()) as BufferSource,
       });
       const json = sub.toJSON();
       const res = await fetch("/api/push/subscribe", {

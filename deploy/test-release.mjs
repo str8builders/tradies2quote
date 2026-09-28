@@ -71,6 +71,14 @@ test("wrong production origin, nonpositive timeout and unpaired VAPID keys fail"
   const ids=blocked(checkRelease(env,auth));
   for (const id of ["NEXT_PUBLIC_APP_URL","LOCAL_LLM_TIMEOUT_MS","web-push-key-pair"]) assert.ok(ids.includes(id));
 });
+test("a client bundle's own copy of the VAPID public key must match what the server signs with", () => {
+  const {env,auth}=fixture();
+  assert.equal(checkRelease(env,auth).configurationReady,true); // neither fixture sets NEXT_PUBLIC_VAPID_PUBLIC_KEY — nothing to drift
+  env.NEXT_PUBLIC_VAPID_PUBLIC_KEY=env.VAPID_PUBLIC_KEY;
+  assert.equal(checkRelease(env,auth).configurationReady,true); // same value: still fine
+  env.NEXT_PUBLIC_VAPID_PUBLIC_KEY="a-different-key-a-stale-client-bundle-might-have-baked-in";
+  assert.ok(blocked(checkRelease(env,auth)).includes("web-push-client-key-matches-server"));
+});
 test("CLI reports blocked, exits nonzero with an empty environment", () => {
   const result=spawnSync(process.execPath,[resolve(root,"deploy/check-release.mjs")],{env:{},encoding:"utf8"});
   assert.equal(result.status,1); assert.equal(JSON.parse(result.stdout).configurationReady,false);

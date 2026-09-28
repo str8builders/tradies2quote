@@ -2,6 +2,8 @@ import webpush from "web-push";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { adminClient } from "@/lib/supabase/admin";
 import { sendApnsNotification } from "@/lib/apns";
+import { isPushServiceEndpoint } from "@/lib/push-endpoint";
+import { captureError } from "@/lib/observability";
 
 /**
  * Public VAPID key — safe to expose (it's sent to every browser that
@@ -36,19 +38,43 @@ export type PushPayload = {
 };
 
 /**
+ * Delete a dead/rejected subscription and report it ONCE via the internal
+ * error sink (fingerprinted there, so repeats of the same reason collapse
+ * into one grouped row instead of one alert per send) — a prune used to be
+ * completely silent, so a systemic problem (e.g. a key mismatch rejecting
+ * every push) was invisible until a tradie complained (audit finding 3).
+ */
+async function pruneSubscription(
+  admin: SupabaseClient,
+  endpoint: string,
+  reason: string,
+): Promise<void> {
+  await admin.from("push_subscriptions").delete().eq("endpoint", endpoint);
+  captureError(new Error(`push subscription pruned: ${reason}`), {
+    route: "push/prune",
+  });
+}
+
+/**
  * Send a push notification to every device a user has subscribed.
  *
  * Uses the service-role client so it works when the recipient isn't the
  * authenticated caller (e.g. a customer accepting a quote fires a push
  * to the quote owner). Never throws — push is a side benefit, not part
- * of the request's success path. Expired subscriptions (404/410) are
- * pruned so the table stays clean.
+ * of the request's success path. Expired/rejected subscriptions (web:
+ * 403/404/410, APNs: 410/BadDeviceToken) are pruned so the table stays
+ * clean.
+ *
+ * VAPID configuration only gates the WEB branch — an iOS-only shop (APNs
+ * env set, no VAPID keys) must still get APNs sends (previously the whole
+ * function no-opped without VAPID keys, silently dropping every iOS push
+ * too; audit finding 5).
  */
 export async function sendPushToUser(
   userId: string | null | undefined,
   payload: PushPayload,
 ): Promise<void> {
-  if (!userId || !ensureConfigured()) return;
+  if (!userId) return;
   try {
     // The generated Database types don't include push_subscriptions yet,
     // so use a loosely-typed handle for this table (mirrors how the
@@ -72,7 +98,8 @@ export async function sendPushToUser(
 
         // iOS App Store shell — endpoint holds the APNs device token
         // (Wave 46). Sent via APNs HTTP/2; dead tokens are pruned the
-        // same way expired web endpoints are.
+        // same way expired web endpoints are. Independent of VAPID/web-push
+        // configuration — see the doc comment above.
         if (sub.platform === "ios") {
           const result = await sendApnsNotification(sub.endpoint, {
             title: payload.title,
@@ -83,17 +110,34 @@ export async function sendPushToUser(
             !result.ok &&
             (result.status === 410 || result.reason === "BadDeviceToken")
           ) {
-            await admin
-              .from("push_subscriptions")
-              .delete()
-              .eq("endpoint", sub.endpoint);
+            await pruneSubscription(admin, sub.endpoint, `apns ${result.status} ${result.reason}`);
           } else if (!result.ok && result.reason !== "not_configured") {
             console.warn("apns send failed", result.status, result.reason);
+            captureError(new Error(`apns send failed: ${result.status} ${result.reason}`), {
+              route: "push/apns",
+            });
           }
           return;
         }
 
+        // Web push: needs VAPID configured. An APNs-only deployment has no
+        // VAPID keys at all — that's an expected, silent no-op here, not a
+        // failure to report.
+        if (!ensureConfigured()) return;
         if (!sub.p256dh || !sub.auth) return; // malformed web row — skip
+
+        // Re-check the endpoint is still one of the browsers' own push
+        // services before POSTing to it. A CHECK constraint now blocks new
+        // rows with a bad host (see the 20260929 push_subscriptions
+        // migration), but it's NOT VALID against whatever already exists,
+        // and defence-in-depth here costs nothing (audit finding 4 — this
+        // used to trust every row in the table, so an attacker who got a
+        // row past RLS could make the server POST to any https host).
+        if (!isPushServiceEndpoint(sub.endpoint)) {
+          await pruneSubscription(admin, sub.endpoint, "endpoint failed host allow-list");
+          return;
+        }
+
         try {
           await webpush.sendNotification(
             {
@@ -104,18 +148,20 @@ export async function sendPushToUser(
           );
         } catch (e) {
           const code = (e as { statusCode?: number }).statusCode;
-          if (code === 404 || code === 410) {
-            await admin
-              .from("push_subscriptions")
-              .delete()
-              .eq("endpoint", sub.endpoint);
+          if (code === 403 || code === 404 || code === 410) {
+            // 403 = the push service rejected our VAPID signature — the
+            // subscription can never succeed until the browser re-subscribes
+            // with whatever key the server is actually using now.
+            await pruneSubscription(admin, sub.endpoint, `webpush ${code}`);
           } else {
             console.warn("push send failed", code, e);
+            captureError(e, { route: "push/webpush" });
           }
         }
       }),
     );
   } catch (e) {
     console.warn("sendPushToUser failed (non-fatal)", e);
+    captureError(e, { route: "push/sendPushToUser" });
   }
 }

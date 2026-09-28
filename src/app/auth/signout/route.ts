@@ -1,7 +1,41 @@
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { adminClient } from "@/lib/supabase/admin";
 import { publicUrl } from "@/lib/public-origin";
+import { captureError } from "@/lib/observability";
+import { PUSH_SUBSCRIPTION_COOKIE, pushSubscriptionCookieOptions } from "@/lib/push-subscription-cookie";
+
+const ROW_ID_RE = /^[0-9a-f-]{8,64}$/i;
+
+/**
+ * Delete THIS browser/phone's push subscription row, if any (the cookie the
+ * subscribe route set — see push-subscription-cookie.ts). Works for both
+ * Web Push and APNs rows: either way it's the same table, keyed by the same
+ * opaque row id, regardless of which account it was subscribed under.
+ *
+ * Audit finding 1: subscriptions used to survive sign-out, so the next
+ * account signed in on the same device kept getting the previous owner's
+ * pushes. Best-effort and non-blocking — a failure here must never stop
+ * sign-out itself.
+ */
+async function deleteThisDevicesPushSubscription(rowId: string | undefined, userId: string | null): Promise<void> {
+  // Only ever the signing-out account's own row: the cookie is the browser's
+  // to edit, so it must not be able to name someone else's subscription.
+  if (!rowId || !ROW_ID_RE.test(rowId) || !userId) return;
+  try {
+    const admin = adminClient() as unknown as SupabaseClient;
+    const { error } = await admin.from("push_subscriptions").delete().eq("id", rowId).eq("user_id", userId);
+    if (error) {
+      console.error("push subscription cleanup on sign-out failed", error);
+      captureError(error, { route: "auth/signout" });
+    }
+  } catch (e) {
+    console.error("push subscription cleanup on sign-out failed", e);
+    captureError(e, { route: "auth/signout" });
+  }
+}
 
 /**
  * Wave 13.2 — Sign-out route handler.
@@ -33,12 +67,21 @@ export async function POST(req: NextRequest) {
   //    token on Supabase's side so it can't be replayed even if a
   //    cookie leaks. Wrapped in try/catch because a network blip
   //    here shouldn't block local cookie cleanup.
+  let userId: string | null = null;
   try {
     const supabase = await createClient();
+    userId = (await supabase.auth.getUser()).data.user?.id ?? null;
     await supabase.auth.signOut({ scope: "global" });
   } catch {
     /* fall through to cookie wipe */
   }
+
+  const cookieStore = await cookies();
+
+  // 1.5. This browser/phone's push subscription (if any) belongs to the
+  //      account that's signing out — delete it so the next account on
+  //      this device doesn't inherit stale pushes (audit finding 1).
+  await deleteThisDevicesPushSubscription(cookieStore.get(PUSH_SUBSCRIPTION_COOKIE)?.value, userId);
 
   // 2. Build the redirect response and explicitly expire every sb-*
   //    cookie on it. Setting maxAge: 0 + matching path forces the
@@ -47,7 +90,6 @@ export async function POST(req: NextRequest) {
   const url = publicUrl("/login", req);
   const response = NextResponse.redirect(url, 303);
 
-  const cookieStore = await cookies();
   for (const c of cookieStore.getAll()) {
     if (c.name.startsWith("sb-")) {
       response.cookies.set(c.name, "", {
@@ -59,6 +101,7 @@ export async function POST(req: NextRequest) {
       });
     }
   }
+  response.cookies.set(PUSH_SUBSCRIPTION_COOKIE, "", pushSubscriptionCookieOptions(0));
 
   return response;
 }

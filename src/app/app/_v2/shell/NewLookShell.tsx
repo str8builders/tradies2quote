@@ -6,6 +6,7 @@ import { TopProgressBar } from "../../_components/TopProgressBar";
 import { TrialBanner } from "../../_components/TrialBanner";
 import { AppContent } from "./AppContent";
 import { AppNav } from "./AppNav";
+import { PushBridge } from "../../settings/_newlook/PushBridge";
 import { LocationBridge } from "./LocationBridge";
 import { StaleVersionReload } from "./StaleVersionReload";
 import { StatusBarTint } from "./StatusBarTint";
@@ -97,6 +98,7 @@ export function NewLookShell({
         <AppNav />
         <TopProgressBar />
         <LocationBridge />
+        <PushBridge />
         {inApp ? <StatusBarTint outdoor={outdoor} /> : null}
         <StaleVersionReload build={build} />
       </div>
