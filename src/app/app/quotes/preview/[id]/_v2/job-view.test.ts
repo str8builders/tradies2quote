@@ -171,26 +171,42 @@ describe("job view: rail position, next step and words for every status", () => 
     expect(v.locked).toBe(false);
   });
 
-  it("declined and past its expiry: sending again can't work, so start a new quote", () => {
+  it("declined and past its expiry: send it again, and it can be accepted for another 30 days", () => {
+    // The send routes move a declined quote back to sent with a fresh expiry.
     const v = view({ status: "declined", pastExpiry: true });
-    expect(v.banner?.title).toBe("Sam said no");
-    expect(v.next.kind).toBe("new-quote");
+    expect(v.banner).toEqual({
+      tone: "bad",
+      title: "Sam said no",
+      body: "It had run out too. Send it again and Sam can accept it for another 30 days. Change the price or the lines first if they might go ahead with changes.",
+    });
+    expect(v.next).toEqual({ kind: "resend", label: "Send it again" });
+    expect(v.hint).toBe("Next: change it if you like, then send it again.");
+    expect(v.banner?.body).not.toMatch(/won't work|new quote/);
   });
 
   it.each([
     ["expired", false],
     ["sent", true],
     ["viewed", true],
-  ] as const)("%s (past expiry: %s) shows it has run out and offers a new quote", (status, pastExpiry) => {
+  ] as const)("%s (past expiry: %s) shows it has run out and offers to send it again", (status, pastExpiry) => {
     const v = view({ status, pastExpiry, dates: { expiresOn: "12 Sept" } });
     expect(v.position).toBe("Accepted");
     expect(v.banner).toEqual({
       tone: "warn",
       title: "This quote has run out",
-      body: "It ran out on 12 Sept, so Sam can't accept it any more.",
+      body: "It ran out on 12 Sept, so Sam can't accept it any more. Send it again and Sam can accept it for another 30 days.",
     });
-    expect(v.next).toEqual({ kind: "new-quote", label: "Start a new quote" });
+    expect(v.next).toEqual({ kind: "resend", label: "Send it again" });
+    expect(v.hint).toBe("Next: send it again so Sam can accept it.");
     expect(v.stateLabel).toBe("Ran out");
+  });
+
+  it("run out with no name or date still says it plainly", () => {
+    const v = view({ status: "expired", clientFirstName: null });
+    expect(v.banner?.body).toBe(
+      "Your client can't accept it any more. Send it again and your client can accept it for another 30 days.",
+    );
+    expect(v.hint).toBe("Next: send it again so your client can accept it.");
   });
 
   it("past expiry does not change a job that is already accepted or later", () => {

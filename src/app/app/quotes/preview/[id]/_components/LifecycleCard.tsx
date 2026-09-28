@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { isStaleDeployError, reloadForUpdate } from "@/lib/stale-deploy";
 import {
   ArrowRight,
   CheckCircle,
@@ -132,7 +133,15 @@ export function LifecycleCard({
   function run(action: () => Promise<LifecycleResult>) {
     setError(null);
     startTransition(async () => {
-      const res = await action();
+      let res: LifecycleResult;
+      try {
+        res = await action();
+      } catch (e) {
+        // After a deploy the page's actions are gone: reload, don't blame the signal.
+        if (isStaleDeployError(e)) return reloadForUpdate(setError, e);
+        setError("That didn't save. Check your signal and try again.");
+        return;
+      }
       if ("error" in res) setError(res.error);
     });
   }

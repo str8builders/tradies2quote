@@ -6,6 +6,7 @@ import { aiConsentGate } from "@/lib/ai-consent";
 import { prepareImageForAi, UnreadableImageError } from "@/lib/aiImage";
 import { callAnthropic, type AnthropicCallResult } from "@/lib/ai/anthropic";
 import { describeAiError, isAiError } from "@/lib/ai/errors";
+import { isExpectedAiError } from "@/lib/ai/expected-errors";
 import { trackAgentRun, usageSummary } from "@/lib/agent-monitor/track";
 import { canWrite, getSubscriptionStatus } from "@/lib/subscription";
 import { trialEndedResponse } from "@/lib/trial-ended-response";
@@ -214,9 +215,15 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     // Status FIRST so even a truncated log line still says what the
-    // provider returned; the detail stays server-side.
-    console.error(`scan-drawing ${MODEL} failed: ${describeAiError(err)}`);
-    captureError(err, { route: "quotes/scan-drawing" });
+    // provider returned; the detail stays server-side. A timeout, rate limit
+    // or overload (after the client's retries) clears by itself and the
+    // tradie is told to try again: logged, not reported (isExpectedAiError).
+    if (isExpectedAiError(err)) {
+      console.warn(`scan-drawing ${MODEL} busy or slow: ${describeAiError(err)}`);
+    } else {
+      console.error(`scan-drawing ${MODEL} failed: ${describeAiError(err)}`);
+      captureError(err, { route: "quotes/scan-drawing" });
+    }
     await run.fail(err);
     if (isAiError(err) && err.status !== null) {
       return NextResponse.json(

@@ -3,6 +3,7 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react/dist/ssr";
 import type { QuoteData } from "@/lib/quote-types";
+import { chatTime } from "../_v2/dates";
 import { ChatModerationControls } from "./ChatModerationControls";
 import { CustomerChatEmptyV2, CustomerChatThreadV2 } from "./CustomerChatPanelV2";
 
@@ -52,19 +53,8 @@ function extractChatHistory(quoteData: QuoteData | null): ChatHistoryEntry[] {
   });
 }
 
-function formatTime(iso: string): string {
-  try {
-    const d = new Date(iso);
-    return d.toLocaleString("en-NZ", {
-      weekday: "short",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-  } catch {
-    return iso;
-  }
-}
+/** NZ time, not the server's zone (UTC): "Mon 2:15 pm". */
+const formatTime = chatTime;
 
 export function CustomerChatPanel({
   quoteData,

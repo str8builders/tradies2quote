@@ -26,6 +26,13 @@ export function pageErrorMessage(key: string | null | undefined): string | undef
 /** Added after a failed save when the words were put back on screen. */
 export const RESTORED_NOTE = "Your words are still here.";
 
+/** Words kept through a reload or a visit back, put back on screen. */
+export const KEPT_WORDS = "Your words from before are still here";
+/** A recording kept through a reload, being written down again. */
+export const KEPT_RECORDING = "Your recording from before is still here";
+/** Under either: where they came from, and the way out. */
+export const KEPT_DETAIL = "From your last go at a quote. Start fresh clears it.";
+
 // ── Microphone and recording ────────────────────────────────────────────────
 
 export const MIC_UNSUPPORTED = "This browser can't use the microphone. Type the job instead.";

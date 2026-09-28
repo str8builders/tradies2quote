@@ -13,6 +13,8 @@ import {
 import type { QuoteStatus } from "@/lib/quote-types";
 import { isQuoteLocked } from "@/lib/lifecycle/lock";
 import { buildSmsHref, deviceCanSendSms } from "@/lib/smsDeepLink";
+import { reloadForUpdate } from "@/lib/stale-deploy";
+import { saveBeforeSending } from "./save-before-send";
 
 /**
  * Wave 19.10 — sticky bottom action bar.
@@ -154,10 +156,12 @@ export function StickyActionBar({
     setBlockReasons(null);
     if (!acknowledged) setConfirmReasons(null);
     setSendState("saving");
-    const saved = await onSaveBeforeSend();
-    if (!saved) {
-      setErrorMessage("Could not save your latest edits.");
+    // A save that throws resets the button instead of spinning forever.
+    const saved = await saveBeforeSending(onSaveBeforeSend);
+    if (!saved.ok) {
       setSendState("error");
+      if (saved.staleDeploy) return reloadForUpdate(setErrorMessage, saved.staleDeploy);
+      setErrorMessage(saved.message);
       return;
     }
     setSendState("generating");

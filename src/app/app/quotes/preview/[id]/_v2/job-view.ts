@@ -14,6 +14,7 @@
 import type { RailPosition } from "@/components/ui/status-rail";
 import { canTransition } from "@/lib/lifecycle/stages";
 import { isQuoteLocked } from "@/lib/lifecycle/lock";
+import { QUOTE_VALIDITY_DAYS } from "@/lib/quote-expiry";
 import type { QuoteStatus } from "@/lib/quote-types";
 import type { InvoiceStatus } from "@/lib/types/invoice";
 
@@ -22,11 +23,11 @@ export type NextStepKind =
   | "generating"
   /** draft → the send sheet. */
   | "send"
-  /** declined → the send sheet again. */
+  /** declined, or run out → the send sheet again (a fresh link when the old one ran out). */
   | "resend"
   /** sent / viewed → the reminder sheet. */
   | "remind"
-  /** The quote ran out: a fresh quote is the way forward. */
+  /** A fresh quote (not offered at the moment: a quote that ran out is sent again). */
   | "new-quote"
   | "book"
   | "start"
@@ -152,6 +153,14 @@ function sendLabel(first: string | null): string {
   return first ? `Send to ${first}` : "Send the quote";
 }
 
+/**
+ * What sending again does for a quote that ran out: the send routes give it
+ * a fresh expiry (lib/quote-expiry), so the client's link works again.
+ */
+function sendAgainWords(first: string | null): string {
+  return `Send it again and ${who(first)} can accept it for another ${QUOTE_VALIDITY_DAYS} days.`;
+}
+
 /** Whether the owner may record a verbal "yes" from this status. */
 function acceptStep(status: string): SecondaryStep | null {
   return KNOWN.has(status) && canTransition(status as QuoteStatus, "accepted")
@@ -231,20 +240,16 @@ export function jobView(input: JobViewInput): JobView {
   if (status === "declined") {
     return {
       position: "Accepted",
-      hint: expired
-        ? "Next: start a new quote if they want to go ahead."
-        : "Next: change it if you like, then send it again.",
+      hint: "Next: change it if you like, then send it again.",
       stateLabel: "Declined",
       banner: {
         tone: "bad",
         title: `${capital(who(first))} said no`,
         body: expired
-          ? "This quote has also run out, so sending it again won't work. Start a new one if they change their mind."
+          ? `It had run out too. ${sendAgainWords(first)} Change the price or the lines first if they might go ahead with changes.`
           : "If they might go ahead with changes, change the price or the lines, then send it again.",
       },
-      next: expired
-        ? { kind: "new-quote", label: "Start a new quote" }
-        : { kind: "resend", label: "Send it again" },
+      next: { kind: "resend", label: "Send it again" },
       secondary: null,
       locked,
     };
@@ -253,16 +258,18 @@ export function jobView(input: JobViewInput): JobView {
   if (expired) {
     return {
       position: "Accepted",
-      hint: "Next: start a new quote with fresh dates.",
+      hint: `Next: send it again so ${who(first)} can accept it.`,
       stateLabel: "Ran out",
       banner: {
         tone: "warn",
         title: "This quote has run out",
-        body: input.dates?.expiresOn
-          ? `It ran out on ${input.dates.expiresOn}, so ${who(first)} can't accept it any more.`
-          : `${capital(who(first))} can't accept it any more.`,
+        body: `${
+          input.dates?.expiresOn
+            ? `It ran out on ${input.dates.expiresOn}, so ${who(first)} can't accept it any more.`
+            : `${capital(who(first))} can't accept it any more.`
+        } ${sendAgainWords(first)}`,
       },
-      next: { kind: "new-quote", label: "Start a new quote" },
+      next: { kind: "resend", label: "Send it again" },
       secondary: acceptStep(status),
       locked,
     };

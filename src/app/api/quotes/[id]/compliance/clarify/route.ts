@@ -7,6 +7,7 @@ import {
 } from "@/lib/compliance";
 import type { QuoteData } from "@/lib/quote-types";
 import { isQuoteLocked, QUOTE_LOCKED_MESSAGE } from "@/lib/lifecycle/lock";
+import { withStoredChatHistory } from "@/lib/stored-chat-history";
 
 /**
  * Compliance clarification round-trip.
@@ -113,20 +114,24 @@ export async function POST(
   );
 
   // Persist the updated review (and the merged wall context, so a
-  // subsequent round of clarifications builds on the prior one).
-  const updatedQuoteData: QuoteData = {
-    ...quoteData,
-    line_items: review.items as typeof quoteData.line_items,
-    compliance_review: {
-      status: review.status,
-      clarifications: review.clarifications,
-      warnings: review.warnings,
-      citations: review.citations,
-      diagnostics: review.diagnostics,
-      // Stash the answer state so subsequent rounds keep it.
-      context: { wall: mergedWall },
+  // subsequent round of clarifications builds on the prior one). The
+  // customer chat goes back exactly as this request read it from the row.
+  const updatedQuoteData: QuoteData = withStoredChatHistory(
+    {
+      ...quoteData,
+      line_items: review.items as typeof quoteData.line_items,
+      compliance_review: {
+        status: review.status,
+        clarifications: review.clarifications,
+        warnings: review.warnings,
+        citations: review.citations,
+        diagnostics: review.diagnostics,
+        // Stash the answer state so subsequent rounds keep it.
+        context: { wall: mergedWall },
+      },
     },
-  };
+    quote.quote_data,
+  );
 
   const { error: uErr } = await supabase
     .from("quotes")

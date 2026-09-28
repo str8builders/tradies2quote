@@ -4,7 +4,14 @@
  * NZ calendar days, engine-independent words (lib/format-date). Pure.
  */
 
-import { formatNZShortDate, formatShortDayDate, parseDateKey } from "@/lib/format-date";
+import {
+  WEEKDAYS_SHORT,
+  datePartsInZone,
+  formatNZShortDate,
+  formatNZTime,
+  formatShortDayDate,
+  parseDateKey,
+} from "@/lib/format-date";
 import type { InvoiceStatus } from "@/lib/types/invoice";
 import type { JobInvoiceState } from "./job-view";
 
@@ -15,6 +22,16 @@ export function shortDate(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const label = formatNZShortDate(iso);
   return label === "—" ? null : label;
+}
+
+/**
+ * "Mon 2:15 pm": when a customer chat message came in, in NZ time wherever
+ * the server runs (the server's own zone is UTC). "" when unreadable.
+ */
+export function chatTime(iso: string): string {
+  const parts = datePartsInZone(new Date(iso));
+  if (!parts) return "";
+  return `${WEEKDAYS_SHORT[parts.weekday]} ${formatNZTime(iso)}`;
 }
 
 /** The YYYY-MM-DD part of quotes.scheduled_for, when it is a real day. */

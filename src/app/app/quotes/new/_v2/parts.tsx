@@ -148,6 +148,28 @@ export function ScreenHeading({
   );
 }
 
+/**
+ * What was kept from before (a reload, a visit back) and is back on screen,
+ * with the way to clear it and start the quote again.
+ */
+export function KeptNotice({ title, detail, onStartFresh }: { title: string; detail: string; onStartFresh: () => void }) {
+  return (
+    <div data-testid="new-quote-kept">
+      <Callout
+        tone="info"
+        title={title}
+        action={
+          <Button variant="secondary" size="sm" onClick={onStartFresh} data-testid="new-quote-start-fresh">
+            Start fresh
+          </Button>
+        }
+      >
+        {detail}
+      </Callout>
+    </div>
+  );
+}
+
 /** The page's own error (`?error=`), shown until the next try starts. */
 export function PageErrorNotice({ message, restoredNote }: { message: string; restoredNote?: string }) {
   return (

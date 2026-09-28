@@ -6,6 +6,8 @@ import { parseVerificationReport } from "@/lib/agents/verify/report";
 import { logAgentEvent } from "@/lib/agent-monitor/logger";
 import { businessNameForDocuments } from "@/lib/business-name";
 import type { ComplianceLineItem, ComplianceReview } from "@/lib/compliance";
+import { getKitsWithItems, kitTotal, kitsEnabled } from "@/lib/kits";
+import { captureError } from "@/lib/observability";
 import { isQuoteLocked } from "@/lib/lifecycle/lock";
 import { isSupplierLine } from "@/lib/materials/supplierReconcile";
 import { isNativeShellRequest } from "@/lib/native-shell";
@@ -30,9 +32,33 @@ import { TranscriptPanel, type TranscriptPanelData } from "../_components/Transc
 import { bookedDateKey, bookedDayLabel, invoiceState, isPastExpiry, shortDate } from "./dates";
 import { GeneratingScreen } from "./GeneratingScreen";
 import { JobScreen } from "./JobScreen";
+import type { JobKit } from "./kits";
 import { matchedLibrary } from "./line-sources";
 import { logJobPageTelemetry } from "./page-telemetry";
 import type { DayNote, JobInvoice, ServerTool } from "./types";
+
+/**
+ * The tradie's kits for "Add a kit", with what each adds up to (lib/kits).
+ * Null while kits are switched off, which hides the control; a load that
+ * throws hides it too (and is logged) rather than claiming there are none.
+ */
+async function loadJobKits(): Promise<JobKit[] | null> {
+  if (!kitsEnabled()) return null;
+  try {
+    const kits = await getKitsWithItems();
+    return kits.map((kit) => ({
+      id: kit.id,
+      name: kit.name,
+      // Everything saved on the line (a library link included), bar its row id and order.
+      items: kit.items.map(({ id: _id, position: _position, ...item }) => item),
+      total: kitTotal(kit.items),
+    }));
+  } catch (e) {
+    console.error("[job page] kits failed to load", e);
+    captureError(e, { route: "app/quotes/preview/job-page#kits" });
+    return null;
+  }
+}
 
 /**
  * The new-look job page (redesign phase 3), shown instead of the classic
@@ -86,6 +112,9 @@ export async function JobPageV2({ id }: { id: string }) {
     });
   }
 
+  // Started now, awaited below with the rest (own queries, RLS-scoped). A
+  // locked quote can't take new lines, so its kits aren't loaded.
+  const kitsLoad = isQuoteLocked(quote.status) ? Promise.resolve(null) : loadJobKits();
   const fromSupplier = !!quoteData.supplier_source || quoteData.line_items.some(isSupplierLine);
   const [{ data: profile }, { data: invoiceRow }, { data: libraryRows }, nativeShell, snapshotRow] = await Promise.all([
     supabase.from("profiles").select("business_name, email, phone, address").eq("id", user.id).maybeSingle(),
@@ -117,6 +146,7 @@ export async function JobPageV2({ id }: { id: string }) {
 
   // The iPhone app asks for AI consent before a plan photo goes (App Store 5.1.2(i)).
   const needsAiConsent = nativeShell && !(await hasAiConsent(supabase, user.id));
+  const kits = await kitsLoad;
   const snapshotLines = (snapshotRow?.ai_snapshot as QuoteData | null | undefined)?.line_items;
   const supplierImported = Array.isArray(snapshotLines) ? snapshotLines : null;
 
@@ -345,6 +375,7 @@ export async function JobPageV2({ id }: { id: string }) {
       }
       dayNotes={dayNotes}
       serverTools={serverTools}
+      kits={kits}
     />
   );
 }

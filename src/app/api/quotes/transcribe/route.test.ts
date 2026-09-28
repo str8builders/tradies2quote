@@ -9,7 +9,9 @@ import type { NextRequest } from "next/server";
 
 const h = vi.hoisted(() => ({
   capture: [] as Array<[Error, Record<string, unknown>]>,
-  upstream: { status: 400, body: "" },
+  upstream: { status: 400, body: "", headers: {} as Record<string, string> },
+  /** Set to make the upstream call throw instead of answering. */
+  thrown: null as Error | null,
 }));
 
 vi.mock("@/lib/observability", () => ({
@@ -40,7 +42,10 @@ vi.mock("@/lib/transcript/asrHints", () => ({
 }));
 vi.mock("@/lib/fetchTimeout", () => ({
   TIMEOUTS: { transcribe: 1000 },
-  fetchWithTimeout: async () => new Response(h.upstream.body, { status: h.upstream.status }),
+  fetchWithTimeout: async () => {
+    if (h.thrown) throw h.thrown;
+    return new Response(h.upstream.body, { status: h.upstream.status, headers: h.upstream.headers });
+  },
 }));
 
 import { POST } from "./route";
@@ -54,8 +59,10 @@ function audioRequest(): NextRequest {
 describe("POST /api/quotes/transcribe — upstream failures are monitored", () => {
   beforeEach(() => {
     h.capture.length = 0;
+    h.thrown = null;
     vi.stubEnv("OPENAI_API_KEY", "test-key");
     vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
   });
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -63,7 +70,7 @@ describe("POST /api/quotes/transcribe — upstream failures are monitored", () =
   });
 
   it("reports a non-OK response with its status only", async () => {
-    h.upstream = { status: 400, body: '{"error":{"message":"Invalid file for user t@example.com"}}' };
+    h.upstream = { status: 400, body: '{"error":{"message":"Invalid file for user t@example.com"}}', headers: {} };
     const res = await POST(audioRequest());
     expect(res.status).toBe(502);
     expect(h.capture).toHaveLength(1);
@@ -74,9 +81,39 @@ describe("POST /api/quotes/transcribe — upstream failures are monitored", () =
   });
 
   it("does not report a successful transcription", async () => {
-    h.upstream = { status: 200, body: JSON.stringify({ text: "deck for Dave" }) };
+    h.upstream = { status: 200, body: JSON.stringify({ text: "deck for Dave" }), headers: {} };
     const res = await POST(audioRequest());
     expect(res.status).toBe(200);
     expect(h.capture).toHaveLength(0);
+  });
+
+  // A rate limit, an overload or a timeout clears by itself and the tradie is
+  // told to try again: logged as a warning, kept out of the error monitor.
+  it.each([
+    [429, "rate limited"],
+    [529, "overloaded"],
+    [504, "gateway timeout"],
+  ])("does not report a busy service (HTTP %s, %s) after the retries", async (status) => {
+    h.upstream = { status, body: "{}", headers: { "retry-after": "0" } };
+    const res = await POST(audioRequest());
+    expect(res.status).toBe(502);
+    expect(h.capture).toHaveLength(0);
+    expect(console.warn).toHaveBeenCalledWith("Transcription service busy", status, expect.any(String));
+  });
+
+  it("does not report our own time limit running out", async () => {
+    h.thrown = Object.assign(new Error("Timed out after 1000ms"), { name: "FetchTimeoutError" });
+    const res = await POST(audioRequest());
+    expect(res.status).toBe(504);
+    expect((await res.json()).error).toMatch(/took too long/);
+    expect(h.capture).toHaveLength(0);
+  });
+
+  it("still reports an unexpected upstream answer", async () => {
+    h.upstream = { status: 401, body: "{}", headers: {} };
+    const res = await POST(audioRequest());
+    expect(res.status).toBe(502);
+    expect(h.capture).toHaveLength(1);
+    expect(h.capture[0][1]).toEqual({ route: "/api/quotes/transcribe", httpStatus: 401 });
   });
 });

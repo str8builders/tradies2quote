@@ -3,6 +3,7 @@ import type { ScanBarcodeButton } from "@/app/app/materials/_components/ScanBarc
 import type { LibraryMaterial, QuoteData, QuoteLineItem } from "@/lib/quote-types";
 import type { QuoteVideoStatus } from "@/lib/quote-video/status";
 import type { JobInvoiceState, JobViewInput } from "./job-view";
+import type { JobKit } from "./kits";
 
 /** A library item the barcode scanner can add (ScanBarcodeButton's own prop type). */
 export type LibraryPick = NonNullable<ComponentProps<typeof ScanBarcodeButton>["library"]>[number];
@@ -79,4 +80,9 @@ export interface JobScreenProps {
   video: { status: QuoteVideoStatus; version: number; shareText?: string } | null;
   dayNotes: DayNote[];
   serverTools: ServerTool[];
+  /**
+   * The tradie's kits for "Add a kit" (lib/kits getKitsWithItems), or null
+   * while kits are switched off (kitsEnabled), which hides the control.
+   */
+  kits?: JobKit[] | null;
 }

@@ -2,7 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import sharp from "sharp";
 import { NextRequest } from "next/server";
 
-const h = vi.hoisted(() => ({ fetch: vi.fn(), timeouts: [] as number[] }));
+const h = vi.hoisted(() => ({ fetch: vi.fn(), timeouts: [] as number[], capture: vi.fn() }));
 
 vi.mock("next/headers", () => ({
   headers: async () => ({ get: (k: string) => (k.toLowerCase() === "user-agent" ? "Mozilla/5.0 Safari/604.1" : null) }),
@@ -14,7 +14,7 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 vi.mock("@/lib/subscription", () => ({ getSubscriptionStatus: async () => ({ state: "trialing" }), canWrite: () => true }));
 vi.mock("@/lib/rate-limit", () => ({ consumeDailyQuota: () => ({ ok: true }), tooManyRequestsResponse: () => new Response(null, { status: 429 }) }));
-vi.mock("@/lib/observability", () => ({ captureError: vi.fn() }));
+vi.mock("@/lib/observability", () => ({ captureError: h.capture }));
 // Record the per-attempt timeout while keeping the real timeout behaviour.
 vi.mock("@/lib/fetchTimeout", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/lib/fetchTimeout")>();
@@ -60,7 +60,10 @@ beforeEach(() => {
   vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
   vi.stubGlobal("fetch", h.fetch);
   h.fetch.mockReset();
+  h.capture.mockReset();
   h.timeouts = [];
+  vi.spyOn(console, "warn").mockImplementation(() => {});
+  vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
 describe("POST /api/quotes/scan-drawing", () => {
@@ -87,6 +90,9 @@ describe("POST /api/quotes/scan-drawing", () => {
     expect(body.error).toBe("Drawing scan failed. Please try again.");
     expect(JSON.stringify(body)).not.toContain("overloaded_error");
     expect(h.fetch).toHaveBeenCalledTimes(3);
+    // An overload clears by itself: logged as a warning, not reported.
+    expect(h.capture).not.toHaveBeenCalled();
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("busy or slow"));
   });
 
   it("answers 502 with the drawing copy when the reply was cut off", async () => {
@@ -98,10 +104,12 @@ describe("POST /api/quotes/scan-drawing", () => {
     expect(((await res.json()) as { error: string }).error).toMatch(/too detailed/);
   });
 
-  it("does not retry a request error (400)", async () => {
+  it("does not retry a request error (400), and reports it", async () => {
     h.fetch.mockResolvedValue(new Response("{}", { status: 400 }));
     expect((await post()).status).toBe(502);
     expect(h.fetch).toHaveBeenCalledTimes(1);
+    expect(h.capture).toHaveBeenCalledTimes(1);
+    expect(h.capture.mock.calls[0][1]).toEqual({ route: "quotes/scan-drawing" });
   });
 
   it("waits up to the generation timeout for the Opus call, not the 50 s LLM ceiling", async () => {

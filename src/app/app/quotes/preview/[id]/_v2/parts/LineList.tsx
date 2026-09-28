@@ -19,8 +19,8 @@ function Detail({ line, currency }: { line: QuoteLineItem; currency: string }) {
   );
 }
 
-function Trailing({ line, currency }: { line: QuoteLineItem; currency: string }) {
-  const marker = lineMarker(line);
+function Trailing({ line, currency, sizesConfirmed }: { line: QuoteLineItem; currency: string; sizesConfirmed: boolean }) {
+  const marker = lineMarker(line, sizesConfirmed);
   if (marker === "check") return <StatusPill tone="warn">Check this</StatusPill>;
   if (marker === "price") return <StatusPill tone="warn">Needs price</StatusPill>;
   return <Money amount={Number(line.line_total) || 0} currency={currency} />;
@@ -65,11 +65,14 @@ function Provenance({ provenance }: { provenance: LineProvenance }) {
 export function LineList({
   lines,
   currency,
+  sizesConfirmed = false,
   libraryMatches = [],
   onOpen,
 }: {
   lines: readonly QuoteLineItem[];
   currency: string;
+  /** Every drawing size confirmed: the calculator's lines count as checked (the send gate's rule). */
+  sizesConfirmed?: boolean;
   /** The library items the lines are matched to (supplier, product page, estimated or not). */
   libraryMatches?: readonly LineLibraryItem[];
   /** Omit for a locked, read-only quote. */
@@ -101,7 +104,7 @@ export function LineList({
                     <ListRow
                       title={line.description?.trim() || "Untitled line"}
                       subtitle={<Detail line={line} currency={currency} />}
-                      trailing={<Trailing line={line} currency={currency} />}
+                      trailing={<Trailing line={line} currency={currency} sizesConfirmed={sizesConfirmed} />}
                       onClick={onOpen ? () => onOpen(index) : undefined}
                     />
                     {shown ? <Provenance provenance={provenance} /> : null}

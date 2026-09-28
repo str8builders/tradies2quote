@@ -11,6 +11,7 @@ import { CsiGroupedView } from "../../_components/CsiGroupedView";
 import { MaterialsListButton } from "../../_components/MaterialsListButton";
 import { T2QCALWorking, hasT2QCALWorking } from "../../_components/T2QCALWorking";
 import { DayNotes } from "../parts/DayNotes";
+import { plainNote } from "../takeoff-words";
 import { ToolSection } from "../parts/ToolSection";
 import type { DayNote, ServerTool } from "../types";
 import { CopyButton } from "./clipboard";
@@ -107,7 +108,7 @@ export function MoreToolsSheet(props: MoreToolsSheetProps) {
           <ToolSection id="quote-notes" title="Things to check" subtitle={`${props.notes.length} ${props.notes.length === 1 ? "note" : "notes"}`}>
             <ul className="list-disc space-y-1 pl-5">
               {props.notes.map((note, i) => (
-                <li key={`${i}-${note}`}>{note}</li>
+                <li key={`${i}-${note}`}>{plainNote(note, Boolean(props.onMeasurements))}</li>
               ))}
             </ul>
           </ToolSection>

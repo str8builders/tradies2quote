@@ -18,7 +18,7 @@ import {
 } from "@/lib/quote-defaults";
 import type { QuoteClient, QuoteData, QuoteItemType, QuoteLineItem } from "@/lib/quote-types";
 import { formatQuantity } from "@/lib/quantity-display";
-import { isUnpricedLine } from "@/lib/quote-validation";
+import { isQuantityChecked, isUnpricedLine } from "@/lib/quote-validation";
 import { applyLineEdit } from "@/lib/t2qcalLineEdit";
 
 /** Mirrors QuoteEditor.updateItem. */
@@ -61,14 +61,24 @@ export function hasUnconfirmedQuantity(item: QuoteLineItem): boolean {
   return item.type === "material" && item.quantity_source === "ai" && item.quantity_confirmed !== true;
 }
 
+/** Worked out with some guesses, or flagged for a look ("assumed" / "needs_review"). */
+export function isFlaggedLine(item: QuoteLineItem): boolean {
+  return item.takeoff_status === "needs_review" || item.takeoff_status === "assumed";
+}
+
+/**
+ * The quantity still wants the tradie's "The quantity is right": an AI
+ * estimate, or a guessed or flagged line they haven't checked. The send
+ * gate's rule (isQuantityChecked); `sizesConfirmed` is every drawing size
+ * confirmed (drawingSizesConfirmed), which answers the calculator's lines.
+ */
+export function needsQuantityCheck(item: QuoteLineItem, sizesConfirmed = false): boolean {
+  return hasUnconfirmedQuantity(item) || (isFlaggedLine(item) && !isQuantityChecked(item, sizesConfirmed));
+}
+
 /** A line the tradie should look at before sending: guessed, flagged or missing info. */
-export function lineNeedsCheck(item: QuoteLineItem): boolean {
-  return (
-    hasUnconfirmedQuantity(item) ||
-    item.takeoff_status === "blocked" ||
-    item.takeoff_status === "needs_review" ||
-    item.takeoff_status === "assumed"
-  );
+export function lineNeedsCheck(item: QuoteLineItem, sizesConfirmed = false): boolean {
+  return item.takeoff_status === "blocked" || needsQuantityCheck(item, sizesConfirmed);
 }
 
 export type LineMarker = "check" | "price" | null;
@@ -77,8 +87,8 @@ export type LineMarker = "check" | "price" | null;
  * The one plain marker a line card shows. "Check this" wins over "Needs
  * price": an unchecked quantity blocks sending, a $0 line only asks first.
  */
-export function lineMarker(item: QuoteLineItem): LineMarker {
-  if (lineNeedsCheck(item)) return "check";
+export function lineMarker(item: QuoteLineItem, sizesConfirmed = false): LineMarker {
+  if (lineNeedsCheck(item, sizesConfirmed)) return "check";
   if (isUnpricedLine(item)) return "price";
   return null;
 }
@@ -88,8 +98,8 @@ export function unpricedIndexes(lines: readonly QuoteLineItem[]): number[] {
   return lines.flatMap((line, index) => (isUnpricedLine(line) ? [index] : []));
 }
 
-export function checkIndexes(lines: readonly QuoteLineItem[]): number[] {
-  return lines.flatMap((line, index) => (lineNeedsCheck(line) ? [index] : []));
+export function checkIndexes(lines: readonly QuoteLineItem[], sizesConfirmed = false): number[] {
+  return lines.flatMap((line, index) => (lineNeedsCheck(line, sizesConfirmed) ? [index] : []));
 }
 
 export interface LineGroup {
@@ -198,15 +208,15 @@ function numberText(value: unknown): string {
   return Number.isFinite(n) ? formatQuantity(n) : "";
 }
 
-/** The form as the sheet opens on an existing line. */
-export function lineForm(item: QuoteLineItem): LineForm {
+/** The form as the sheet opens on an existing line (`sizesConfirmed`: see needsQuantityCheck). */
+export function lineForm(item: QuoteLineItem, sizesConfirmed = false): LineForm {
   const price = Number(item.unit_price) || 0;
   return {
     description: item.description ?? "",
     quantity: numberText(item.quantity),
     unit: item.unit ?? "",
     price: price > 0 ? String(price) : "",
-    quantityChecked: !hasUnconfirmedQuantity(item),
+    quantityChecked: !needsQuantityCheck(item, sizesConfirmed),
   };
 }
 
@@ -263,11 +273,19 @@ export function unitChangeClearsPrice(original: QuoteLineItem, form: LineForm, o
   );
 }
 
-/** The line after the sheet's Save: the classic edit rules, then the quantity tick. */
-export function applyLineForm(original: QuoteLineItem, form: LineForm, opened: LineForm = lineForm(original)): QuoteLineItem {
+/**
+ * The line after the sheet's Save: the classic edit rules, then the quantity
+ * tick, which answers an AI estimate or a guessed or flagged line alike.
+ */
+export function applyLineForm(
+  original: QuoteLineItem,
+  form: LineForm,
+  opened: LineForm = lineForm(original),
+  sizesConfirmed = false,
+): QuoteLineItem {
   const patch = linePatch(original, form, opened);
   const edited = Object.keys(patch).length > 0 ? updateLine(original, patch) : original;
-  return form.quantityChecked && hasUnconfirmedQuantity(edited) ? confirmLineQuantity(edited) : edited;
+  return form.quantityChecked && needsQuantityCheck(edited, sizesConfirmed) ? confirmLineQuantity(edited) : edited;
 }
 
 export function blankLineForm(type: QuoteItemType): LineForm {

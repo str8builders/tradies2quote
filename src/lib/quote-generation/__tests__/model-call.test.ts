@@ -148,13 +148,14 @@ describe("callQuoteModel — hosted (Anthropic)", () => {
   });
 
   it.each([
-    [new AiError({ kind: "overloaded", provider: "anthropic", status: 529, attempts: 3 }), 503, /busy right now/],
-    [new AiError({ kind: "rate_limited", provider: "anthropic", status: 429, attempts: 3 }), 503, /busy right now/],
-    [new AiError({ kind: "timeout", provider: "anthropic" }), 504, /took too long/],
-    [new AiError({ kind: "refused", provider: "anthropic" }), 422, /declined/],
-    [new AiError({ kind: "auth", provider: "anthropic", status: 401 }), 503, /isn't available/],
-    [new Error("socket hang up"), 502, /Quote generation failed/],
-  ])("does not repair a provider failure (%s)", async (error, status, message) => {
+    [new AiError({ kind: "overloaded", provider: "anthropic", status: 529, attempts: 3 }), 503, /busy right now/, false],
+    [new AiError({ kind: "rate_limited", provider: "anthropic", status: 429, attempts: 3 }), 503, /busy right now/, false],
+    [new AiError({ kind: "timeout", provider: "anthropic" }), 504, /took too long/, false],
+    [new AiError({ kind: "refused", provider: "anthropic" }), 422, /declined/, true],
+    [new AiError({ kind: "auth", provider: "anthropic", status: 401 }), 503, /isn't available/, true],
+    [new AiError({ kind: "unavailable", provider: "anthropic", status: 500, attempts: 3 }), 502, /Quote generation failed/, true],
+    [new Error("socket hang up"), 502, /Quote generation failed/, true],
+  ])("does not repair a provider failure (%s)", async (error, status, message, reported) => {
     h.anthropic.mockRejectedValueOnce(error);
     const out = await call();
     expect(h.anthropic).toHaveBeenCalledTimes(1);
@@ -164,7 +165,14 @@ describe("callQuoteModel — hosted (Anthropic)", () => {
       expect(out.body.error).toMatch(message);
       expect(JSON.stringify(out.body)).not.toMatch(/HTTP|Anthropic|529|socket/);
     }
-    expect(h.capture).toHaveBeenCalledWith(error, { route: "/api/quotes/generate" });
+    // A timeout, rate limit or overload clears by itself: logged, not reported.
+    if (reported) {
+      expect(h.capture).toHaveBeenCalledWith(error, { route: "/api/quotes/generate" });
+      expect(console.error).toHaveBeenCalled();
+    } else {
+      expect(h.capture).not.toHaveBeenCalled();
+      expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("busy or slow"));
+    }
   });
 });
 

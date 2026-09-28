@@ -195,13 +195,15 @@ describe("job page: the next step per status", () => {
     expect(nextButton(out).text).toContain("Send it again");
   });
 
-  it("run out: says so and the big button starts a new quote", () => {
+  it("run out: says so and the big button sends it again (it can then be accepted for another 30 days)", () => {
     const out = screen({ status: "sent", pastExpiry: true, data: quote([LABOUR]), dates: { expiresOn: "12 Sept" } });
     expect(out).toContain("This quote has run out");
-    expect(out).toContain("It ran out on 12 Sept, so Sam can&#x27;t accept it any more.");
+    expect(out).toContain(
+      "It ran out on 12 Sept, so Sam can&#x27;t accept it any more. Send it again and Sam can accept it for another 30 days.",
+    );
     const next = nextButton(out);
-    expect(next.open).toContain('href="/app/quotes/new"');
-    expect(next.text).toContain("Start a new quote");
+    expect(next.open).not.toContain('href="/app/quotes/new"');
+    expect(next.text).toContain("Send it again");
   });
 
   it("says when lines were left out by the review guard (never silent)", () => {

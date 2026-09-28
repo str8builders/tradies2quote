@@ -26,7 +26,8 @@ import { TYPE_PLACEHOLDER, TypeScreen } from "./TypeScreen";
 import { channelChoices } from "./lib/channels";
 import { editDraft, openBox, pickOption, startAsking, type AskStep } from "./lib/clarify";
 import { INITIAL_RECORDER_STATE, type RecorderSnapshot } from "./lib/recorder";
-import type { BackControl } from "./parts";
+import { KEPT_DETAIL, KEPT_RECORDING, KEPT_WORDS } from "./lib/copy";
+import { KeptNotice, type BackControl } from "./parts";
 
 const noop = () => {};
 const step: BackControl = { kind: "step", onBack: noop };
@@ -87,6 +88,22 @@ describe("NewQuoteFlow", () => {
     expect(out).toContain('data-new-quote-screen="type"');
     expect(out).toMatch(/href="\/app"[^>]*>.*Cancel/);
     expect(out).not.toContain('data-testid="choose-type"');
+  });
+});
+
+describe("KeptNotice", () => {
+  it("says what came back from before, with Start fresh at a 48 px tap", () => {
+    for (const title of [KEPT_WORDS, KEPT_RECORDING]) {
+      const out = html(<KeptNotice title={title} detail={KEPT_DETAIL} onStartFresh={noop} />);
+      expect(tag(out, 'data-tone="info"')).toContain("bg-ui-info-soft");
+      expect(out).toContain(title);
+      expect(out).toContain("From your last go at a quote. Start fresh clears it.");
+      const button = tag(out, 'data-testid="new-quote-start-fresh"');
+      expect(button).toContain('data-variant="secondary"');
+      expect(button).toContain("after:-inset-1");
+      expect(out).toContain(">Start fresh<");
+      expect(out).not.toContain('role="alert"');
+    }
   });
 });
 

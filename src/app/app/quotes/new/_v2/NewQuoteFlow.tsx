@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useReducer, useRef, useState, type ReactNode } from "react";
+import { useUnsavedInput } from "@/lib/unsaved-input";
 import { createDraftQuote } from "../actions";
 import { AiConsentModal } from "../_components/AiConsentModal";
 import { requestClarifications } from "../_lib/quote-input";
@@ -12,17 +13,17 @@ import { TalkScreen } from "./TalkScreen";
 import { TypeScreen } from "./TypeScreen";
 import { availableChannels, channelChoices, type ChannelFlags } from "./lib/channels";
 import type { AskStep } from "./lib/clarify";
-import { RESTORED_NOTE, pageErrorMessage } from "./lib/copy";
+import { KEPT_DETAIL, KEPT_RECORDING, KEPT_WORDS, RESTORED_NOTE, pageErrorMessage } from "./lib/copy";
 import {
   activeText,
   backKind,
   flowReducer,
   initialFlowState,
-  writableChannel,
+  wordsToKeep,
   type FlowEvent,
 } from "./lib/flow";
-import { forgetWords, rememberWords, sessionStore, takeWords } from "./lib/saved-job";
-import { PageErrorNotice, type BackControl } from "./parts";
+import { forgetRecording, forgetWords, keepWords, readRecording, readWords, sessionStore } from "./lib/saved-job";
+import { KeptNotice, PageErrorNotice, type BackControl } from "./parts";
 
 export interface NewQuoteFlowProps {
   /** iOS app and no AI consent on record yet: the consent modal comes first. */
@@ -58,18 +59,27 @@ export function NewQuoteFlow({ needsAiConsent, voiceEnabled, scanEnabled, errorK
   const formRef = useRef<HTMLFormElement>(null);
   const transcriptRef = useRef<HTMLInputElement>(null);
 
-  // A failed save remounts this page with ?error=draft-failed: put the words
-  // back. Any other visit drops words left from an earlier attempt.
+  // Whatever this tab kept (a reload after an update, a failed save that
+  // comes back with ?error=draft-failed, a visit back within 30 minutes) is
+  // put back. Browser storage is only readable after hydration, so this
+  // belongs in an effect; nothing is written back until it has run.
   useEffect(() => {
     const storage = sessionStore();
-    if (errorKey !== "draft-failed") {
-      forgetWords(storage);
-      return;
-    }
-    // Browser storage is only readable after hydration, so this belongs in an effect.
-    const saved = takeWords(storage, Date.now());
-    if (saved) dispatch({ type: "restore", channel: saved.channel, text: saved.text });
-  }, [errorKey]);
+    const now = Date.now();
+    const words = readWords(storage, now);
+    dispatch({ type: "loaded", words, recording: !words && readRecording(storage, now) !== null });
+  }, []);
+
+  // The words go into this tab's storage on every change, until the quote
+  // page clears them once the draft exists (saved-job forgetSentJob).
+  useEffect(() => {
+    if (!state.loaded) return;
+    keepWords(sessionStore(), wordsToKeep(state), Date.now(), state.writing === "saving");
+  }, [state]);
+
+  // Coming back to the app after an update doesn't reload the page under
+  // words, a recording or a plan being read (StaleVersionReload).
+  useUnsavedInput(state.screen !== "choose" || wordsToKeep(state) !== null, "new quote");
 
   function go(event: FlowEvent) {
     dispatch(event);
@@ -82,15 +92,23 @@ export function NewQuoteFlow({ needsAiConsent, voiceEnabled, scanEnabled, errorK
     const input = transcriptRef.current;
     if (!form || !input) return;
     input.value = finalText;
+    // Marked as sent before the save goes: the quote page clears them.
+    keepWords(sessionStore(), wordsToKeep(state), Date.now(), true);
     form.requestSubmit();
+  }
+
+  /** Clear what was kept from before and start the quote again. */
+  function startFresh() {
+    const storage = sessionStore();
+    forgetWords(storage);
+    forgetRecording(storage);
+    go({ type: "startFresh" });
   }
 
   async function write() {
     const next = flowReducer(state, { type: "write" });
     if (next === state) return;
-    const channel = writableChannel(state.screen);
     const text = activeText(state);
-    if (channel) rememberWords(sessionStore(), { channel, text, at: Date.now() });
     dispatch({ type: "write" });
     if (next.writing === "saving") {
       submit(next.finalText);
@@ -116,9 +134,12 @@ export function NewQuoteFlow({ needsAiConsent, voiceEnabled, scanEnabled, errorK
   }
 
   const errorMessage = pageErrorMessage(errorKey);
+  const kept = state.restored ? KEPT_WORDS : state.resumedRecording ? KEPT_RECORDING : null;
   const notice =
-    errorMessage && state.writing === "idle" ? (
+    state.writing !== "idle" ? undefined : errorMessage ? (
       <PageErrorNotice message={errorMessage} restoredNote={state.restored ? RESTORED_NOTE : undefined} />
+    ) : kept ? (
+      <KeptNotice title={kept} detail={KEPT_DETAIL} onStartFresh={startFresh} />
     ) : undefined;
   const kind = backKind(state);
   const back: BackControl = kind === "step" ? { kind, onBack: () => go({ type: "back" }) } : { kind };
@@ -138,6 +159,7 @@ export function NewQuoteFlow({ needsAiConsent, voiceEnabled, scanEnabled, errorK
   } else if (state.screen === "talk") {
     screen = (
       <TalkScreen
+        key={state.generation}
         {...common}
         onTranscript={(text) => go({ type: "transcribed", text })}
         onTypeInstead={() => go({ type: "choose", channel: "type" })}
@@ -167,6 +189,7 @@ export function NewQuoteFlow({ needsAiConsent, voiceEnabled, scanEnabled, errorK
   } else if (state.screen === "scan") {
     screen = (
       <ScanScreen
+        key={state.generation}
         {...common}
         scanned={state.texts.scan}
         onScanned={(text) => dispatch({ type: "edit", channel: "scan", text })}

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
 import { SavePdfButton } from "@/app/app/_components/SavePdfButton";
 import { DEFAULT_INVOICE_TERM_DAYS } from "@/lib/invoice-due-date";
+import { isStaleDeployError, reloadForUpdate } from "@/lib/stale-deploy";
 import { createInvoiceFromQuote, markInvoiceSentByHand } from "../../actions";
 import type { JobInvoice } from "../types";
 import { ReasonList } from "./sender-parts";
@@ -254,8 +255,10 @@ export function InvoiceSheet({
     let made: Awaited<ReturnType<typeof createInvoiceFromQuote>>;
     try {
       made = await createInvoiceFromQuote(quoteId);
-    } catch {
-      setError(NO_CONNECTION);
+    } catch (e) {
+      // After an update the old action is gone: load the new version.
+      if (isStaleDeployError(e)) reloadForUpdate(setError, e);
+      else setError(NO_CONNECTION);
       return null;
     }
     if ("error" in made) {
@@ -290,8 +293,12 @@ export function InvoiceSheet({
     let marked: Awaited<ReturnType<typeof markInvoiceSentByHand>>;
     try {
       marked = await markInvoiceSentByHand(invoiceId);
-    } catch {
-      marked = { error: NO_CONNECTION };
+    } catch (e) {
+      setBusy(null);
+      // After an update the old action is gone: load the new version.
+      if (isStaleDeployError(e)) return reloadForUpdate(setError, e);
+      setError(NO_CONNECTION);
+      return;
     }
     setBusy(null);
     if ("error" in marked) {

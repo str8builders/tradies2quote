@@ -15,7 +15,9 @@
  * listens again straight off, a recording that fails to send is kept so
  * "Try again" re-sends it without re-recording, and leaving the page
  * (locking the phone, switching apps) stops the recording and writes down
- * what was said so far instead of losing it.
+ * what was said so far instead of losing it. The kept recording is also
+ * handed to `onKept`, so a copy survives the page being reloaded, and
+ * `resumeKept` writes that copy down again after the reload.
  */
 
 import { MAX_RECORDING_SECONDS, pickMimeType } from "../../_lib/quote-input";
@@ -65,6 +67,8 @@ export type RecorderEvent =
   | { type: "transcribed"; text: string }
   | { type: "failed"; error: string; canResend?: boolean }
   | { type: "resend" }
+  /** A recording kept through a reload is being written down again. */
+  | { type: "restored" }
   | { type: "reset" };
 
 const CAN_START: ReadonlySet<RecorderPhase> = new Set(["idle", "error", "review"]);
@@ -103,6 +107,8 @@ export function recorderReducer(state: RecorderState, event: RecorderEvent): Rec
       return state.phase === "error" && state.canResend
         ? { ...state, phase: "transcribing", error: null }
         : state;
+    case "restored":
+      return state.phase === "idle" ? { ...INITIAL_RECORDER_STATE, phase: "transcribing" } : state;
     case "reset":
       return INITIAL_RECORDER_STATE;
   }
@@ -122,7 +128,20 @@ export interface MediaRecorderLike {
   onstop: ((event: Event) => void) | null;
 }
 
+/** A finished recording, kept until it is written down (or thrown away). */
+export interface KeptAudio {
+  blob: Blob;
+  type: string;
+}
+
 export interface RecorderDeps {
+  /**
+   * Told whenever the kept recording changes: the recording once it stops
+   * (until it's written down), then null once written down, replaced or
+   * thrown away. Not told when the screen simply goes away, so a copy made
+   * here outlives a reload.
+   */
+  onKept?(audio: KeptAudio | null): void;
   /** Undefined when the browser has no microphone API at all. */
   getUserMedia: ((constraints: MediaStreamConstraints) => Promise<MediaStream>) | undefined;
   /** Throws when the browser can't record in any format. */
@@ -154,6 +173,8 @@ export interface VoiceRecorder {
   resend(): void;
   /** Throw everything away and go back to the start. */
   reset(): void;
+  /** Write down a recording kept through a reload (only from the start, while mounted). */
+  resumeKept(audio: KeptAudio): void;
   /** The page was hidden (phone locked, app switched): stop and keep what was said. */
   pageHidden(): void;
   /** Mounted. */
@@ -197,7 +218,14 @@ export function createVoiceRecorder(
   let activeMs = 0;
   let resumedAt: number | null = null;
   let upload: AbortController | null = null;
-  let kept: { blob: Blob; type: string } | null = null;
+  let kept: KeptAudio | null = null;
+
+  /** Keep (or drop) the recording "Try again" re-sends, and say so. */
+  function keep(audio: KeptAudio | null) {
+    if (kept === audio) return;
+    kept = audio;
+    deps.onKept?.(audio);
+  }
 
   /** The state the current snapshot was made from. */
   let published: RecorderState = state;
@@ -262,13 +290,13 @@ export function createVoiceRecorder(
     upload = null;
   }
 
-  async function send(audio: { blob: Blob; type: string }, take: number) {
+  async function send(audio: KeptAudio, take: number) {
     if (audio.blob.size === 0) {
-      kept = null;
+      keep(null);
       dispatch({ type: "failed", error: NO_AUDIO });
       return;
     }
-    kept = audio;
+    keep(audio);
     const controller = new AbortController();
     upload = controller;
     let result: TranscribeResult;
@@ -280,13 +308,13 @@ export function createVoiceRecorder(
     if (upload === controller) upload = null;
     if (take !== session || !attached) return;
     if (result.ok) {
-      kept = null;
+      keep(null);
       dispatch({ type: "transcribed", text: result.transcript });
       transcriptHandler?.(result.transcript);
       return;
     }
     if (result.aborted) return;
-    if (!result.retryable) kept = null;
+    if (!result.retryable) keep(null);
     dispatch({ type: "failed", error: result.error, canResend: result.retryable && kept !== null });
   }
 
@@ -309,7 +337,7 @@ export function createVoiceRecorder(
     if (!CAN_START.has(state.phase)) return;
     abortUpload();
     release();
-    kept = null;
+    keep(null);
     const take = ++session;
     dispatch({ type: "start" });
     if (!deps.getUserMedia) {
@@ -414,12 +442,26 @@ export function createVoiceRecorder(
     void send(kept, take);
   }
 
-  function reset() {
+  /** Let go of everything; the kept copy elsewhere is left alone (the screen went away). */
+  function discard() {
     session += 1;
     abortUpload();
     release();
     kept = null;
     dispatch({ type: "reset" });
+  }
+
+  function reset() {
+    discard();
+    deps.onKept?.(null);
+  }
+
+  function resumeKept(audio: KeptAudio) {
+    if (state.phase !== "idle" || !attached) return;
+    kept = audio;
+    const take = ++session;
+    dispatch({ type: "restored" });
+    void send(audio, take);
   }
 
   return {
@@ -436,6 +478,7 @@ export function createVoiceRecorder(
     restart,
     resend,
     reset,
+    resumeKept,
     pageHidden() {
       if (state.phase === "recording" || state.phase === "paused") finish();
     },
@@ -444,7 +487,7 @@ export function createVoiceRecorder(
     },
     detach() {
       attached = false;
-      reset();
+      discard();
     },
     setTranscriptHandler(handler) {
       transcriptHandler = handler;

@@ -34,8 +34,17 @@ export interface FlowState {
   finalText: string;
   /** The last check, reused if the same words are written up again. */
   checked: { text: string; questions: Clarification[] } | null;
-  /** The words were put back on screen after a failed save. */
+  /** The words were put back on screen (a failed save, a reload, a visit back). */
   restored: boolean;
+  /** A recording from before is being written down again (it was kept through a reload). */
+  resumedRecording: boolean;
+  /**
+   * This tab's backup has been read (after hydration). Until then nothing is
+   * written back, so the empty first render never wipes the words.
+   */
+  loaded: boolean;
+  /** Bumped by "Start fresh": screens with their own state (the recorder, the plan reader) start over. */
+  generation: number;
 }
 
 export type FlowEvent =
@@ -48,7 +57,11 @@ export type FlowEvent =
   | { type: "checked"; text: string; questions: Clarification[] }
   | { type: "answer"; step: AskStep }
   | { type: "leaveQuestions" }
-  | { type: "restore"; channel: Channel; text: string };
+  | { type: "restore"; channel: Channel; text: string }
+  /** The backup was read: the words to put back, or a recording to write down again. */
+  | { type: "loaded"; words: { channel: Channel; text: string } | null; recording: boolean }
+  /** Throw away what was put back and start the quote again. */
+  | { type: "startFresh" };
 
 /**
  * The opening state. `start` opens straight on one way in (Home's "Talk a
@@ -66,6 +79,9 @@ export function initialFlowState(channels: Channel[], start?: Channel | null): F
     finalText: "",
     checked: null,
     restored: false,
+    resumedRecording: false,
+    loaded: false,
+    generation: 0,
   };
 }
 
@@ -79,6 +95,21 @@ export function writableChannel(screen: FlowScreen): Channel | null {
 export function activeText(state: FlowState): string {
   const channel = writableChannel(state.screen);
   return channel ? state.texts[channel] : "";
+}
+
+const KEEP_ORDER: readonly Channel[] = ["talk", "type", "scan"];
+
+/**
+ * The words a reload must not lose: the ones on screen, or (on the choice or
+ * the mic) the words still held for another way in. Null when there are none.
+ */
+export function wordsToKeep(state: FlowState): { channel: Channel; text: string } | null {
+  const current = writableChannel(state.screen);
+  if (current && state.texts[current].trim()) return { channel: current, text: state.texts[current] };
+  for (const channel of KEEP_ORDER) {
+    if (state.texts[channel].trim()) return { channel, text: state.texts[channel] };
+  }
+  return null;
 }
 
 /** "Write my quote" works: a screen with words, enough of them, nothing already going. */
@@ -161,6 +192,20 @@ export function flowReducer(state: FlowState, event: FlowEvent): FlowState {
     }
     case "leaveQuestions":
       return state.writing === "asking" ? { ...state, writing: "idle", ask: null } : state;
+    case "loaded": {
+      if (state.loaded) return state;
+      const loaded = { ...state, loaded: true };
+      if (event.words && event.words.text.trim()) {
+        return flowReducer(loaded, { type: "restore", channel: event.words.channel, text: event.words.text });
+      }
+      if (event.recording && state.channels.includes("talk") && state.writing === "idle") {
+        return { ...loaded, screen: "talk", resumedRecording: true };
+      }
+      return loaded;
+    }
+    case "startFresh":
+      if (state.writing !== "idle") return state;
+      return { ...initialFlowState(state.channels), loaded: state.loaded, generation: state.generation + 1 };
     case "restore": {
       if (state.writing !== "idle" || !event.text.trim()) return state;
       // Plan-photo words were built by the scanner; they come back as typed

@@ -1,4 +1,9 @@
-import type { QuoteData, QuoteLineItem, QuoteStatus } from "./quote-types";
+import type {
+  DimensionConfirmation,
+  QuoteData,
+  QuoteLineItem,
+  QuoteStatus,
+} from "./quote-types";
 import { computeQuoteTotals, moneyEquals, round2 } from "./quote-defaults";
 import {
   classifyLineProvenance,
@@ -80,6 +85,43 @@ export function isUnpricedLine(
     (Number(it.quantity) || 0) > 0 &&
     (it.is_missing_price === true || (Number(it.unit_price) || 0) <= 0)
   );
+}
+
+/**
+ * Every size read off the drawing has been confirmed or corrected by the
+ * tradie (the size check: quote_data.dimension_confirmation, saved by
+ * confirmDimensions). The send gate's hard block on unconfirmed sizes uses
+ * the same per-size flag.
+ */
+export function drawingSizesConfirmed(
+  confirmation: DimensionConfirmation | null | undefined,
+): boolean {
+  const stored = confirmation?.dimensions;
+  const sizes = Array.isArray(stored) ? stored : [];
+  return sizes.length > 0 && sizes.every((size) => size.confirmed === true);
+}
+
+/**
+ * The tradie has checked this line's quantity, so an "assumed" or "flagged
+ * for review" caution on it is answered and no longer asks for the send-time
+ * tick. How a check is recorded:
+ *   - on the line: `quantity_confirmed` — "The quantity is right" ticked
+ *     (job page line sheet, classic editor), or a quantity, unit or name the
+ *     tradie typed (applyLineEdit makes the line theirs);
+ *   - for the lines the calculator worked out from a drawing
+ *     (`is_calculated_takeoff` / quantity_source "calculator"): every size
+ *     read off the drawing confirmed (`sizesConfirmed`,
+ *     drawingSizesConfirmed). A corrected size already rewrites those lines
+ *     as "ok"; confirming the same sizes answers them the same way.
+ * Blocked lines, the evaluator's verdict, $0 lines and labour checks are not
+ * affected.
+ */
+export function isQuantityChecked(
+  item: Pick<QuoteLineItem, "quantity_confirmed" | "is_calculated_takeoff" | "quantity_source">,
+  sizesConfirmed = false,
+): boolean {
+  if (item.quantity_confirmed === true) return true;
+  return sizesConfirmed && (item.is_calculated_takeoff === true || item.quantity_source === "calculator");
 }
 
 function lineLabels(items: QuoteLineItem[], max = 3): string {
@@ -249,10 +291,16 @@ export function assessQuoteTakeoffSafety(
     : [];
 
   const blocked = items.filter((it) => it.takeoff_status === "blocked");
+  // Cautions the tradie has already answered by checking the quantity (see
+  // isQuantityChecked) don't ask again on every send.
+  const sizesConfirmed = drawingSizesConfirmed(quote_data?.dimension_confirmation);
+  const unchecked = (it: QuoteLineItem) => !isQuantityChecked(it, sizesConfirmed);
   const needsReview = items.filter(
-    (it) => it.takeoff_status === "needs_review",
+    (it) => it.takeoff_status === "needs_review" && unchecked(it),
   );
-  const assumed = items.filter((it) => it.takeoff_status === "assumed");
+  const assumed = items.filter(
+    (it) => it.takeoff_status === "assumed" && unchecked(it),
+  );
 
   if (blocked.length > 0) {
     block_reasons.push(

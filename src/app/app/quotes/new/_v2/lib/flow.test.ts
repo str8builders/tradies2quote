@@ -9,6 +9,7 @@ import {
   canWrite,
   flowReducer,
   initialFlowState,
+  wordsToKeep,
   writableChannel,
   type FlowEvent,
   type FlowState,
@@ -151,5 +152,49 @@ describe("after a failed save", () => {
     const noVoice = run(initialFlowState(["type"]), { type: "restore", channel: "talk", text: "Deck" });
     expect(noVoice.screen).toBe("type");
     expect(run(ALL, { type: "restore", channel: "type", text: "   " })).toBe(ALL);
+  });
+});
+
+describe("kept through a reload", () => {
+  it("puts the kept words back once the tab's backup is read", () => {
+    const back = run(ALL, { type: "loaded", words: { channel: "talk", text: "Deck 6 by 4" }, recording: false });
+    expect(back).toMatchObject({ loaded: true, screen: "review", restored: true, resumedRecording: false });
+    expect(back.texts.talk).toBe("Deck 6 by 4");
+    // Read once: a second read changes nothing.
+    expect(run(back, { type: "loaded", words: { channel: "type", text: "Other" }, recording: false })).toBe(back);
+  });
+
+  it("with no words but a kept recording, opens on Talk to write it down", () => {
+    const resumed = run(ALL, { type: "loaded", words: null, recording: true });
+    expect(resumed).toMatchObject({ loaded: true, screen: "talk", resumedRecording: true, restored: false });
+    const noVoice = run(initialFlowState(["type", "scan"]), { type: "loaded", words: null, recording: true });
+    expect(noVoice).toMatchObject({ loaded: true, screen: "choose", resumedRecording: false });
+  });
+
+  it("nothing kept: just ready to keep what comes", () => {
+    expect(run(ALL, { type: "loaded", words: null, recording: false })).toEqual({ ...ALL, loaded: true });
+  });
+
+  it("Start fresh clears what came back and starts the screens over", () => {
+    const back = run(ALL, { type: "loaded", words: { channel: "type", text: TYPED }, recording: false });
+    const fresh = run(back, { type: "startFresh" });
+    expect(fresh).toMatchObject({ screen: "choose", restored: false, loaded: true, generation: 1 });
+    expect(fresh.texts).toEqual({ talk: "", type: "", scan: "" });
+    expect(wordsToKeep(fresh)).toBeNull();
+    // Not while the quote is being started.
+    const saving = run(back, { type: "write" });
+    expect(run(saving, { type: "startFresh" })).toBe(saving);
+  });
+
+  it("keeps the words on screen, or the ones held for another way in", () => {
+    expect(wordsToKeep(ALL)).toBeNull();
+    const typed = run(ALL, { type: "choose", channel: "type" }, { type: "edit", channel: "type", text: TYPED });
+    expect(wordsToKeep(typed)).toEqual({ channel: "type", text: TYPED });
+    // Back on the choice, the typed words are still kept.
+    expect(wordsToKeep(run(typed, { type: "back" }))).toEqual({ channel: "type", text: TYPED });
+    const spoken = run(ALL, { type: "choose", channel: "talk" }, { type: "transcribed", text: "Deck 6 by 4" });
+    expect(wordsToKeep(spoken)).toEqual({ channel: "talk", text: "Deck 6 by 4" });
+    // Say it again throws the spoken words away: nothing left to keep.
+    expect(wordsToKeep(run(spoken, { type: "sayAgain" }))).toBeNull();
   });
 });

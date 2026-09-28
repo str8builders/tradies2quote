@@ -17,6 +17,7 @@ import {
   type AiUsage,
 } from "@/lib/ai/anthropic";
 import { describeAiError, isAiError, type AiErrorKind } from "@/lib/ai/errors";
+import { isExpectedAiError } from "@/lib/ai/expected-errors";
 import { QUOTE_MODEL_OUTPUT_SCHEMA, checkModelQuoteShape } from "./model-output";
 
 /**
@@ -148,8 +149,14 @@ function transportFailure(
   tries: number,
   usage: AiUsage,
 ): QuoteModelResult {
-  console.error(`Quote model (${call.textProvider}) unreachable: ${describeAiError(e)}`);
-  captureError(e, { route: "/api/quotes/generate" });
+  // A timeout, rate limit or overload clears by itself and the tradie is
+  // told to try again: logged, not reported (see isExpectedAiError).
+  if (isExpectedAiError(e)) {
+    console.warn(`Quote model (${call.textProvider}) busy or slow: ${describeAiError(e)}`);
+  } else {
+    console.error(`Quote model (${call.textProvider}) unreachable: ${describeAiError(e)}`);
+    captureError(e, { route: "/api/quotes/generate" });
+  }
   const kind: AiErrorKind | "unknown" = isAiError(e) ? e.kind : "unknown";
   const answer = (status: number, error: string): QuoteModelResult => ({
     ok: false,

@@ -29,6 +29,7 @@ import type {
   QuoteStatus,
 } from "@/lib/quote-types";
 import { assessQuoteTakeoffSafety } from "@/lib/quote-validation";
+import { withStoredChatHistory } from "@/lib/stored-chat-history";
 import {
   checkInvoiceTotals,
   explainInvoiceRpcError,
@@ -103,13 +104,18 @@ export async function saveQuoteChanges(
   const totals = computeQuoteTotals(items, markup_pct, tax_rate);
   const total = totals.total;
 
-  const next: QuoteData = {
-    ...data,
-    line_items: items,
-    markup_pct,
-    tax_rate,
-    ...totals,
-  };
+  // The customer chat is the stored row's, never the page's copy: the page
+  // was loaded before any message the client has sent since.
+  const next: QuoteData = withStoredChatHistory(
+    {
+      ...data,
+      line_items: items,
+      markup_pct,
+      tax_rate,
+      ...totals,
+    },
+    prior,
+  );
 
   // Computed once: drives BOTH the correction-capture stamp below and the
   // Wave-40 eval-loop log further down. Diffed against the frozen AI
@@ -280,9 +286,10 @@ export async function confirmDimensions(
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // Only the chat is read back from the stored quote (see withStoredChatHistory).
   const { data: priorRow } = await supabase
     .from("quotes")
-    .select("status, user_id")
+    .select("status, user_id, chat_history:quote_data->chat_history")
     .eq("id", id)
     .single();
   if (!priorRow || priorRow.user_id !== user.id) {
@@ -312,14 +319,21 @@ export async function confirmDimensions(
   const tax_rate = clampTaxRate(data.tax_rate);
   const totals = computeQuoteTotals(items, markup_pct, tax_rate);
 
-  const next: QuoteData = {
-    ...data,
-    line_items: items,
-    markup_pct,
-    tax_rate,
-    ...totals,
-    dimension_confirmation: result.dimension_confirmation,
-  };
+  // A corrected size re-works the calculator's lines, so the automated check
+  // (which judged the old quantities) no longer applies: drop it rather than
+  // let a stale caution or fail hold up sending. A plain confirmation keeps it.
+  const { takeoff_evaluation: judgedOldLines, ...base } = data;
+  const next: QuoteData = withStoredChatHistory(
+    {
+      ...(result.changed ? base : { ...base, takeoff_evaluation: judgedOldLines }),
+      line_items: items,
+      markup_pct,
+      tax_rate,
+      ...totals,
+      dimension_confirmation: result.dimension_confirmation,
+    },
+    { chat_history: (priorRow as { chat_history?: unknown }).chat_history },
+  );
 
   const { data: updatedRows, error: uErr } = await supabase
     .from("quotes")
@@ -492,6 +506,20 @@ interface PostgresErrorShape {
   message?: string;
 }
 
+/**
+ * The RPC's own refusals that a normal day produces: the move isn't allowed
+ * from the status the quote has now (22023: a second tab or the client
+ * changed it first), the quote is gone (P0002) or the session ended (28000).
+ * Anything else (42501 after the owner check above, a timeout, a missing
+ * function) is unexpected and reported.
+ */
+const EXPECTED_LIFECYCLE_CODES: ReadonlySet<string> = new Set(["22023", "P0002", "28000"]);
+
+function isExpectedLifecycleRefusal(err: unknown): boolean {
+  const code = (err as PostgresErrorShape | null)?.code;
+  return typeof code === "string" && EXPECTED_LIFECYCLE_CODES.has(code);
+}
+
 /** Map Postgres error codes raised by the RPC to plain-English messages. */
 function explainRpcError(err: unknown): { error: string; code?: string } {
   const e = (err ?? {}) as PostgresErrorShape;
@@ -556,8 +584,18 @@ async function transition(
     },
   );
   if (rpcErr) {
-    console.error("transition_quote_lifecycle RPC failed", rpcErr);
-    captureError(rpcErr, { route: "action:transitionQuoteLifecycle" });
+    // The RPC refusing a move is expected (another tab or the client moved
+    // the quote first, it was deleted, the session ended): the tradie gets
+    // plain words and nothing is broken, so it isn't reported.
+    if (isExpectedLifecycleRefusal(rpcErr)) {
+      console.warn("transition_quote_lifecycle refused", {
+        code: (rpcErr as PostgresErrorShape).code,
+        target,
+      });
+    } else {
+      console.error("transition_quote_lifecycle RPC failed", rpcErr);
+      captureError(rpcErr, { route: "action:transitionQuoteLifecycle" });
+    }
     return explainRpcError(rpcErr);
   }
 

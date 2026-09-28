@@ -11,6 +11,7 @@ import {
   Warning,
 } from "@phosphor-icons/react";
 import { isNativeIOSApp } from "@/lib/native-app";
+import { isStaleDeployError, reloadForUpdate } from "@/lib/stale-deploy";
 import { QUOTE_VIDEO_POLL, shouldKeepPolling, type QuoteVideoStatus } from "@/lib/quote-video/status";
 import { getQuoteVideoStatusAction, requestQuoteVideoAction } from "../video-actions";
 
@@ -310,7 +311,8 @@ export function QuoteVideoCard({ quoteId, initialStatus, shareText, view: View =
       const result = await requestQuoteVideoAction(quoteId);
       if (result.ok) setStatus(result.status);
       else setError(result.error);
-    } catch {
+    } catch (e) {
+      if (isStaleDeployError(e)) return reloadForUpdate(setError, e);
       setError("We couldn't start the video. Check your connection and try again.");
     } finally {
       setRequesting(false);

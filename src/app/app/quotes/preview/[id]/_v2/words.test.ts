@@ -11,7 +11,16 @@ import {
   reminderText,
   sameClient,
 } from "./contact";
-import { bookedDateKey, bookedDayLabel, invoiceDaysLate, invoiceState, isPastExpiry, localDateKey, shortDate } from "./dates";
+import {
+  bookedDateKey,
+  bookedDayLabel,
+  chatTime,
+  invoiceDaysLate,
+  invoiceState,
+  isPastExpiry,
+  localDateKey,
+  shortDate,
+} from "./dates";
 import { clientFirstName, jobHeading, realClientName, summaryTitle } from "./job-title";
 import { jobPageLook } from "./look";
 
@@ -136,6 +145,15 @@ describe("dates the job page prints", () => {
     expect(
       invoiceState({ status: "sent", invoice_number: "INV-1", due_date: "2026-09-16T00:00:00.000Z", paid_at: null }, now),
     ).toEqual({ status: "sent", number: "INV-1", dueOn: "16 Sept", daysLate: 9, paidOn: null });
+  });
+
+  it("customer chat times in NZ time, daylight saving included", () => {
+    expect(chatTime("2026-09-21T02:15:00.000Z")).toBe("Mon 2:15 pm");
+    expect(chatTime("2026-09-22T19:40:00.000Z")).toBe("Wed 7:40 am");
+    // Daylight saving started on Sun 27 Sept 2026: 14:00 UTC that day is
+    // 3 am on Monday in NZ (it would be 2 am without it).
+    expect(chatTime("2026-09-27T14:00:00.000Z")).toBe("Mon 3:00 am");
+    expect(chatTime("not a date")).toBe("");
   });
 
   it("local day keys for the date picker", () => {

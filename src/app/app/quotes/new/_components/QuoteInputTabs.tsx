@@ -1,8 +1,12 @@
 "use client";
 
 import { VoiceWaveform } from "./VoiceWaveform";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { createDraftQuote } from "../actions";
+import type { Channel } from "../_v2/lib/channels";
+import { keepWords, readWords, sessionStore } from "../_v2/lib/saved-job";
+import { useVoiceRecorder } from "../_v2/useVoiceRecorder";
+import type { RecorderPhase } from "../_v2/lib/recorder";
 import type { Clarification } from "@/lib/clarifications";
 import {
   ClarificationModal,
@@ -14,15 +18,59 @@ import { TapeMeasureProgress } from "@/app/app/_components/TapeMeasureProgress";
 import { splitTranscript, hasHighlights } from "@/lib/highlightDimensions";
 import { startMicrophoneMeter } from "@/lib/microphone-level";
 import {
-  MAX_RECORDING_SECONDS as MAX_SECONDS,
   MIN_TYPED_LENGTH as MIN_TEXT_LENGTH,
   appendAnswersToTranscript,
-  pickMimeType,
   requestClarifications,
 } from "../_lib/quote-input";
 
 type Tab = "voice" | "type" | "scan";
 type VoiceState = "idle" | "recording" | "processing" | "error";
+
+/** The tabs, their words, and whether this tab's kept words have been read back. */
+export interface TabWords {
+  tab: Tab;
+  texts: Record<Channel, string>;
+  loaded: boolean;
+}
+
+export type TabWordsEvent =
+  | { type: "tab"; tab: Tab }
+  | { type: "text"; channel: Channel; text: string }
+  /** The kept words (lib/saved-job), read after hydration. */
+  | { type: "loaded"; saved: { channel: Channel; text: string } | null; voiceEnabled: boolean };
+
+export function tabWordsReducer(state: TabWords, event: TabWordsEvent): TabWords {
+  switch (event.type) {
+    case "tab":
+      return state.tab === event.tab ? state : { ...state, tab: event.tab };
+    case "text":
+      return state.texts[event.channel] === event.text
+        ? state
+        : { ...state, texts: { ...state.texts, [event.channel]: event.text } };
+    case "loaded": {
+      if (state.loaded) return state;
+      const loaded = { ...state, loaded: true };
+      const saved = event.saved;
+      if (!saved || !saved.text.trim()) return loaded;
+      // Spoken words go back to Voice; plan-scan words come back as typed
+      // words to check, as in the new look.
+      if (saved.channel === "talk" && event.voiceEnabled) {
+        return { ...loaded, tab: "voice", texts: { ...loaded.texts, talk: saved.text } };
+      }
+      return { ...loaded, tab: "type", texts: { ...loaded.texts, type: saved.text } };
+    }
+  }
+}
+
+/** The words a reload must not lose: the active tab's, else any other tab's. */
+export function keptTabWords(state: TabWords): { channel: Channel; text: string } | null {
+  const active: Channel = state.tab === "voice" ? "talk" : state.tab;
+  if (state.texts[active].trim()) return { channel: active, text: state.texts[active] };
+  for (const channel of ["talk", "type", "scan"] as const) {
+    if (state.texts[channel].trim()) return { channel, text: state.texts[channel] };
+  }
+  return null;
+}
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
@@ -54,10 +102,26 @@ export function QuoteInputTabs({
     "type",
     ...(scanEnabled ? (["scan"] as Tab[]) : []),
   ];
-  const [tab, setTab] = useState<Tab>(tabs[0]);
-  const [transcript, setTranscript] = useState<string>("");
-  const [typed, setTyped] = useState<string>("");
-  const [scanned, setScanned] = useState<string>("");
+  const [words, dispatch] = useReducer(tabWordsReducer, tabs[0], (first: Tab) => ({
+    tab: first,
+    texts: { talk: "", type: "", scan: "" },
+    loaded: false,
+  }));
+  const { tab } = words;
+  const transcript = words.texts.talk;
+  const typed = words.texts.type;
+  const scanned = words.texts.scan;
+  const setTab = (next: Tab) => dispatch({ type: "tab", tab: next });
+  const setTranscript = useCallback((text: string) => dispatch({ type: "text", channel: "talk", text }), []);
+  const setTyped = useCallback((text: string) => dispatch({ type: "text", channel: "type", text }), []);
+  const setScanned = useCallback((text: string) => dispatch({ type: "text", channel: "scan", text }), []);
+  // The words are kept in this tab until the draft quote exists (the new
+  // look's backup, lib/saved-job): put back on any load within 30 minutes,
+  // so a failed save or a reload never loses them. Browser storage is only
+  // readable after hydration, so this belongs in an effect.
+  useEffect(() => {
+    dispatch({ type: "loaded", saved: readWords(sessionStore(), Date.now()), voiceEnabled });
+  }, [voiceEnabled]);
   // Local mirror so accepting the modal reveals the tabs instantly (the
   // server routes enforce consent independently, so this is UX only).
   const [consentBlocked, setConsentBlocked] = useState<boolean>(needsAiConsent);
@@ -69,6 +133,15 @@ export function QuoteInputTabs({
   const activeText =
     tab === "voice" ? transcript : tab === "scan" ? scanned : typed;
   const activeMin = tab === "type" ? MIN_TEXT_LENGTH : 1;
+  const kept = keptTabWords(words);
+  const keptChannel = kept?.channel ?? null;
+  const keptText = kept?.text ?? "";
+
+  // On every change, once what was kept has been read back.
+  useEffect(() => {
+    if (!words.loaded) return;
+    keepWords(sessionStore(), keptChannel ? { channel: keptChannel, text: keptText } : null, Date.now());
+  }, [words.loaded, keptChannel, keptText]);
 
   return (
     <div>
@@ -124,7 +197,7 @@ export function QuoteInputTabs({
         )}
       </div>
 
-      <ContinueRow text={activeText} minLength={activeMin} />
+      <ContinueRow text={activeText} minLength={activeMin} kept={kept} />
     </div>
   );
 }
@@ -163,6 +236,21 @@ function TabButton({
   );
 }
 
+/** The classic panel's four looks for the recorder's phases. */
+export function classicVoiceState(phase: RecorderPhase): VoiceState {
+  switch (phase) {
+    case "recording":
+    case "paused":
+      return "recording";
+    case "transcribing":
+      return "processing";
+    case "error":
+      return "error";
+    default:
+      return "idle";
+  }
+}
+
 function VoicePanel({
   transcript,
   setTranscript,
@@ -170,179 +258,40 @@ function VoicePanel({
   transcript: string;
   setTranscript: (s: string) => void;
 }) {
-  const [state, setState] = useState<VoiceState>("idle");
-  const [seconds, setSeconds] = useState<number>(0);
-  const [error, setError] = useState<string>("");
-  const [audioLevel, setAudioLevel] = useState<number | null>(null);
-  const stopMeterRef = useRef<(() => void) | null>(null);
-
-  const activeRef = useRef(true);
-  const requestingRef = useRef(false);
-  const uploadRef = useRef<AbortController | null>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const streamRef = useRef<MediaStream | null>(null);
-  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const stopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
+  // The new look's recorder (_v2/lib/recorder): the same microphone, format,
+  // 3-minute limit and route, plus what the classic panel lacked: a
+  // recording that fails to send is kept and "Try again" sends it again,
+  // hiding the page stops the recording and writes down what was said, and
+  // a recording not yet written down survives a reload.
+  const { recorder, state: rec } = useVoiceRecorder(setTranscript);
+  const state = classicVoiceState(rec.phase);
+  const seconds = rec.seconds;
+  const error = rec.error ?? "";
+  const [meterLevel, setMeterLevel] = useState<number | null>(null);
+  // The waveform follows the open microphone while recording.
   useEffect(() => {
-    activeRef.current = true;
-    return () => {
-      activeRef.current = false;
-      cleanup();
-    };
-  }, []);
+    if (!rec.stream) return;
+    return startMicrophoneMeter(rec.stream, (level) => setMeterLevel(level));
+  }, [rec.stream]);
+  const audioLevel = rec.stream ? meterLevel : null;
 
-  function cleanup() {
-    stopMeterRef.current?.();
-    stopMeterRef.current = null;
-    uploadRef.current?.abort();
-    const recorder = recorderRef.current;
-    if (recorder) {
-      recorder.onstop = null;
-      recorder.ondataavailable = null;
-      if (recorder.state !== "inactive") recorder.stop();
-    }
-    if (tickRef.current) clearInterval(tickRef.current);
-    if (stopTimeoutRef.current) clearTimeout(stopTimeoutRef.current);
-    tickRef.current = null;
-    stopTimeoutRef.current = null;
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-    recorderRef.current = null;
-    chunksRef.current = [];
-  }
-
-  async function startRecording() {
-    if (requestingRef.current || recorderRef.current?.state === "recording") return;
-    setError("");
-    if (typeof navigator === "undefined" || !navigator.mediaDevices) {
-      setError("Microphone access isn't available in this browser.");
-      setState("error");
-      return;
-    }
-    let stream: MediaStream;
-    requestingRef.current = true;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
-      requestingRef.current = false;
-      if (!activeRef.current) return;
-      setError("Microphone permission denied. Allow access and try again.");
-      setState("error");
-      return;
-    }
-    requestingRef.current = false;
-    if (!activeRef.current) { stream.getTracks().forEach((track) => track.stop()); return; }
-    const mimeType = pickMimeType();
-    let recorder: MediaRecorder;
-    try {
-      recorder = mimeType
-        ? new MediaRecorder(stream, { mimeType })
-        : new MediaRecorder(stream);
-    } catch {
-      stream.getTracks().forEach((t) => t.stop());
-      setError("Your browser can't record audio in a supported format.");
-      setState("error");
-      return;
-    }
-
-    chunksRef.current = [];
-    recorder.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
-    };
-    recorder.onstop = () => {
-      stopMeterRef.current?.();
-      stopMeterRef.current = null;
-      const type = recorder.mimeType || "audio/webm";
-      const blob = new Blob(chunksRef.current, { type });
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-      void uploadAudio(blob, type);
-    };
-
-    streamRef.current = stream;
-    recorderRef.current = recorder;
-    try {
-      recorder.start();
-    } catch {
-      cleanup();
-      setState("error");
-      setError("Recording couldn't start. Try again or type the job details.");
-      return;
-    }
-    setAudioLevel(null);
-    stopMeterRef.current = startMicrophoneMeter(stream, (level) => {
-      if (activeRef.current) setAudioLevel(level);
-    });
-    setSeconds(0);
-    setState("recording");
-
-    tickRef.current = setInterval(() => {
-      setSeconds((s) => {
-        const next = s + 1;
-        if (next >= MAX_SECONDS) stopRecording();
-        return next;
-      });
-    }, 1000);
-    stopTimeoutRef.current = setTimeout(stopRecording, MAX_SECONDS * 1000 + 500);
+  function startRecording() {
+    void recorder.start();
   }
 
   function stopRecording() {
-    stopMeterRef.current?.();
-    stopMeterRef.current = null;
-    if (tickRef.current) clearInterval(tickRef.current);
-    if (stopTimeoutRef.current) clearTimeout(stopTimeoutRef.current);
-    tickRef.current = null;
-    stopTimeoutRef.current = null;
-    const r = recorderRef.current;
-    if (r && r.state !== "inactive") {
-      setState("processing");
-      r.stop();
-    }
+    recorder.finish();
   }
 
-  async function uploadAudio(blob: Blob, type: string) {
-    if (!activeRef.current) return;
-    if (blob.size === 0) { setError("No audio was recorded. Try again or type the job details."); setState("error"); return; }
-    uploadRef.current = new AbortController();
-    const ext = type.includes("mp4") ? "m4a" : type.includes("ogg") ? "ogg" : "webm";
-    const form = new FormData();
-    form.append("audio", new File([blob], `recording.${ext}`, { type }));
-    try {
-      const res = await fetch("/api/quotes/transcribe", {
-        method: "POST",
-        body: form,
-        signal: AbortSignal.any([uploadRef.current.signal, AbortSignal.timeout(90_000)]),
-      });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(data.error || `Transcription failed (${res.status}).`);
-        setState("error");
-        return;
-      }
-      const data = (await res.json()) as { transcript?: string };
-      if (!activeRef.current) return;
-      const text = (data.transcript ?? "").trim();
-      if (!text) { setError("No speech was detected. Try again or type the job details."); setState("error"); return; }
-      setTranscript(text);
-      setState("idle");
-    } catch (e) {
-      if (!activeRef.current) return;
-      setError(
-        e instanceof DOMException && e.name === "TimeoutError"
-          ? "Transcription is taking too long. Check your connection and try again."
-          : "Network error. Check your connection and try again.",
-      );
-      setState("error");
-    }
+  /** Try again: send the kept recording again, or start over when there's none. */
+  function retry() {
+    if (rec.canResend) recorder.resend();
+    else recorder.reset();
   }
 
   function reset() {
     setTranscript("");
-    setError("");
-    setState("idle");
-    setSeconds(0);
+    recorder.reset();
   }
 
   return (
@@ -394,7 +343,7 @@ function VoicePanel({
           {state === "error" && (
             <button
               type="button"
-              onClick={reset}
+              onClick={retry}
               className="mt-4 inline-flex min-h-[44px] items-center text-sm font-mono uppercase tracking-[0.2em] text-brand hover:text-brand-300"
             >
               Try again
@@ -587,7 +536,16 @@ function TranscriptReview({
  */
 type ContinueStep = "idle" | "cleaning" | "asking" | "submitting" | "error";
 
-function ContinueRow({ text, minLength }: { text: string; minLength: number }) {
+function ContinueRow({
+  text,
+  minLength,
+  kept,
+}: {
+  text: string;
+  minLength: number;
+  /** The words kept in this tab (lib/saved-job), marked as sent when the save goes. */
+  kept: { channel: Channel; text: string } | null;
+}) {
   const ready = text.trim().length >= minLength;
   const formRef = useRef<HTMLFormElement | null>(null);
   const transcriptInputRef = useRef<HTMLInputElement | null>(null);
@@ -598,6 +556,8 @@ function ContinueRow({ text, minLength }: { text: string; minLength: number }) {
     if (!formRef.current || !transcriptInputRef.current) return;
     transcriptInputRef.current.value = enrichedTranscript;
     setStep("submitting");
+    // Marked as sent: the quote page clears them once the draft exists.
+    keepWords(sessionStore(), kept, Date.now(), true);
     formRef.current.requestSubmit();
   }
 

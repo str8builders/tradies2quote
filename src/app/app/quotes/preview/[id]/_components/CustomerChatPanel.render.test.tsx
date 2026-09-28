@@ -18,6 +18,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: 
 
 import type { QuoteData } from "@/lib/quote-types";
 import { markupRuleBreaks, sourceRuleBreaks } from "@/test/design-rules";
+import { chatTime } from "../_v2/dates";
 import { ChatModerationControls } from "./ChatModerationControls";
 import { ChatModerationControlsV2 } from "./ChatModerationControlsV2";
 import { CustomerChatPanel } from "./CustomerChatPanel";
@@ -54,9 +55,8 @@ const THREAD = [
 ];
 const withChat = (history: unknown[]): QuoteData => ({ ...QUOTE, chat_history: history });
 
-/** The times as the panel prints them here (the words depend on the machine's time zone). */
-const stamp = (iso: string) =>
-  new Date(iso).toLocaleString("en-NZ", { weekday: "short", hour: "numeric", minute: "2-digit", hour12: true });
+/** The times as the panel prints them: NZ time, whatever the machine's time zone. */
+const stamp = (iso: string) => chatTime(iso);
 const render = (el: ReactElement) =>
   AT.reduce((out, iso, i) => out.replaceAll(stamp(iso), `<TIME${i}>`), renderToStaticMarkup(el));
 
@@ -70,6 +70,16 @@ describe("classic look (the default) renders exactly as before", () => {
   it.each(Object.keys(STATES) as Array<keyof typeof STATES>)("%s", async (name) => {
     const out = render(<CustomerChatPanel quoteId="q-1" {...STATES[name]} />);
     await expect(out).toMatchFileSnapshot(`./__snapshots__/CustomerChatPanel.classic.${name}.html`);
+  });
+
+  it("prints each message's time in NZ time, not the server's zone", () => {
+    // 02:15 UTC on Mon 21 Sept is 2:15 pm in NZ; 19:40 UTC on Tue 22 Sept is
+    // 7:40 am on Wed 23 Sept there. The server runs in UTC.
+    for (const look of ["classic", "new"] as const) {
+      const out = renderToStaticMarkup(<CustomerChatPanel quoteId="q-1" {...STATES.thread} look={look} />);
+      expect(out).toContain("Mon 2:15 pm");
+      expect(out).toContain("Wed 7:40 am");
+    }
   });
 
   it("chat is on unless the quote says otherwise", () => {

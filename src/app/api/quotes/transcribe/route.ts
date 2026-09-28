@@ -15,6 +15,7 @@ import { aiModel } from "@/lib/ai/models";
 import { sendWithRetry, type AiHttpResponse } from "@/lib/ai/http";
 import { OPENAI_TRANSCRIPTIONS_URL } from "@/lib/ai/openai";
 import { describeAiError, isAiError } from "@/lib/ai/errors";
+import { isExpectedAiError } from "@/lib/ai/expected-errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -151,14 +152,23 @@ export async function POST(request: NextRequest) {
       timeoutMs: TIMEOUTS.transcribe,
     }));
   } catch (e) {
+    // A timeout, rate limit or overload (after the retries above) clears by
+    // itself, and the tradie is told to try again with the recording still
+    // on their phone: logged, not reported (isExpectedAiError). Anything
+    // else goes to the error monitor.
+    const expected = isExpectedAiError(e);
     if (isAiError(e) && e.status !== null) {
-      console.error("Transcription error", e.status, describeAiError(e));
-      // Report to the internal monitor with the upstream STATUS only — the
-      // provider's error body is not forwarded.
-      captureError(
-        new Error(`Transcription upstream returned HTTP ${e.status}`),
-        { route: "/api/quotes/transcribe", httpStatus: e.status },
-      );
+      if (expected) {
+        console.warn("Transcription service busy", e.status, describeAiError(e));
+      } else {
+        console.error("Transcription error", e.status, describeAiError(e));
+        // Report to the internal monitor with the upstream STATUS only — the
+        // provider's error body is not forwarded.
+        captureError(
+          new Error(`Transcription upstream returned HTTP ${e.status}`),
+          { route: "/api/quotes/transcribe", httpStatus: e.status },
+        );
+      }
       return NextResponse.json(
         { error: "Transcription failed. Please try again." },
         { status: 502 },
@@ -166,8 +176,12 @@ export async function POST(request: NextRequest) {
     }
     // Timeout or network failure — the recording is still on the client,
     // so a clean retryable error beats an opaque platform 500.
-    console.error("Transcription upstream failure", describeAiError(e));
-    captureError(e, { route: "/api/quotes/transcribe" });
+    if (expected) {
+      console.warn("Transcription upstream too slow", describeAiError(e));
+    } else {
+      console.error("Transcription upstream failure", describeAiError(e));
+      captureError(e, { route: "/api/quotes/transcribe" });
+    }
     const timedOut = isAiError(e) && e.kind === "timeout";
     return NextResponse.json(
       {

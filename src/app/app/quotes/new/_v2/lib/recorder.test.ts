@@ -97,6 +97,7 @@ function setup({
   startThrows = false,
   maxSeconds,
   transcribe,
+  onKept,
 }: {
   canPause?: boolean;
   getUserMedia?: RecorderDeps["getUserMedia"] | null;
@@ -104,6 +105,7 @@ function setup({
   startThrows?: boolean;
   maxSeconds?: number;
   transcribe?: RecorderDeps["transcribe"];
+  onKept?: RecorderDeps["onKept"];
 } = {}) {
   let now = 1_000;
   const intervals = new Map<number, () => void>();
@@ -151,6 +153,7 @@ function setup({
       intervals.delete(id as number);
     },
     maxSeconds,
+    onKept,
   };
   const transcripts: string[] = [];
   const recorder = createVoiceRecorder(deps, (text) => transcripts.push(text));
@@ -216,6 +219,15 @@ describe("recorderReducer", () => {
     expect(lost.canResend).toBe(false);
     expect(recorderReducer(lost, { type: "resend" })).toBe(lost);
     expect(recorderReducer(lost, { type: "start" }).phase).toBe("starting");
+  });
+
+  it("a recording kept through a reload is written down again, only from the start", () => {
+    expect(recorderReducer(INITIAL_RECORDER_STATE, { type: "restored" })).toEqual({
+      ...INITIAL_RECORDER_STATE,
+      phase: "transcribing",
+    });
+    const recording = at("recording");
+    expect(recorderReducer(recording, { type: "restored" })).toBe(recording);
   });
 
   it("ignores events that don't fit the phase", () => {
@@ -571,5 +583,83 @@ describe("stop on hide, let go on unmount", () => {
     expect(t.sent[0].signal.aborted).toBe(true);
     await t.sent[0].answer({ ok: false, error: TRANSCRIBE_HICCUP, retryable: true });
     expect(t.state()).toMatchObject({ phase: "idle", error: null, canResend: false });
+  });
+});
+
+// ── A copy that outlives a reload ────────────────────────────────────────────
+
+describe("the kept recording outlives a reload", () => {
+  async function recorded(onKept: RecorderDeps["onKept"], transcribe?: RecorderDeps["transcribe"]) {
+    const t = setup({ onKept, transcribe });
+    await t.recorder.start();
+    t.recorder.finish();
+    t.recorders[0].deliver("three minutes of deck talk");
+    return t;
+  }
+
+  it("hands over the recording the moment it stops, and lets go once it's written down", async () => {
+    const onKept = vi.fn();
+    const t = await recorded(onKept);
+    expect(onKept).toHaveBeenCalledTimes(1);
+    const [kept] = onKept.mock.calls[0];
+    expect(kept.blob).toBe(t.sent[0].blob);
+    expect(kept.type).toBe("audio/webm;codecs=opus");
+    await t.sent[0].answer({ ok: true, transcript: "Deck 6 by 4" });
+    expect(onKept).toHaveBeenLastCalledWith(null);
+  });
+
+  it("keeps it through a failed send and Try again, without handing it over twice", async () => {
+    const onKept = vi.fn();
+    const t = await recorded(onKept);
+    await t.sent[0].answer({ ok: false, error: TRANSCRIBE_OFFLINE, retryable: true });
+    t.recorder.resend();
+    expect(onKept).toHaveBeenCalledTimes(1);
+    await t.sent[1].answer({ ok: false, error: "That recording is too big", retryable: false });
+    expect(onKept).toHaveBeenLastCalledWith(null);
+  });
+
+  it("a new recording or Reset drops it; the screen going away does not", async () => {
+    const onKept = vi.fn();
+    const t = await recorded(onKept);
+    await t.sent[0].answer({ ok: false, error: TRANSCRIBE_OFFLINE, retryable: true });
+    t.recorder.detach();
+    expect(onKept).toHaveBeenCalledTimes(1);
+
+    const again = await recorded(onKept);
+    await again.sent[0].answer({ ok: false, error: TRANSCRIBE_OFFLINE, retryable: true });
+    onKept.mockClear();
+    await again.recorder.start();
+    expect(onKept).toHaveBeenCalledWith(null);
+    onKept.mockClear();
+    again.recorder.reset();
+    expect(onKept).toHaveBeenCalledWith(null);
+  });
+
+  it("after a reload the kept copy is written down again, and Try again still works", async () => {
+    const onKept = vi.fn();
+    const t = setup({ onKept });
+    const blob = new Blob(["kept voice"], { type: "audio/mp4" });
+    t.recorder.resumeKept({ blob, type: "audio/mp4" });
+    expect(t.state().phase).toBe("transcribing");
+    expect(t.sent[0]).toMatchObject({ blob, type: "audio/mp4" });
+    expect(onKept).not.toHaveBeenCalled();
+    await t.sent[0].answer({ ok: false, error: TRANSCRIBE_HICCUP, retryable: true });
+    expect(t.state()).toMatchObject({ phase: "error", canResend: true });
+    t.recorder.resend();
+    await t.sent[1].answer({ ok: true, transcript: "Deck 6 by 4" });
+    expect(t.transcripts).toEqual(["Deck 6 by 4"]);
+    expect(onKept).toHaveBeenLastCalledWith(null);
+  });
+
+  it("only resumes from the start, and not once the screen has gone", async () => {
+    const t = setup();
+    await t.recorder.start();
+    t.recorder.resumeKept({ blob: new Blob(["x"]), type: "audio/webm" });
+    expect(t.state().phase).toBe("recording");
+    expect(t.sent).toHaveLength(0);
+    const gone = setup();
+    gone.recorder.detach();
+    gone.recorder.resumeKept({ blob: new Blob(["x"]), type: "audio/webm" });
+    expect(gone.sent).toHaveLength(0);
   });
 });

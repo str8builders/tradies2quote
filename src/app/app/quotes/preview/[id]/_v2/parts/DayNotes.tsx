@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { TextField } from "@/components/ui/text-field";
 import { addCalendarNote } from "@/app/app/_components/calendar-notes-actions";
 import { formatShortDayDate } from "@/lib/format-date";
+import { isStaleDeployError, reloadForUpdate } from "@/lib/stale-deploy";
 import type { DayNote } from "../types";
 
 /** Longest note the calendar keeps (calendar-notes-actions trims to this). */
@@ -29,7 +30,17 @@ export function DayNotes({ day, notes }: { day: string; notes: DayNote[] }) {
     if (!body || busy) return;
     setBusy(true);
     setError(null);
-    const result = await addCalendarNote(day, body);
+    let result: Awaited<ReturnType<typeof addCalendarNote>>;
+    try {
+      result = await addCalendarNote(day, body);
+    } catch (e) {
+      // Never leave the button on "Adding…". After an update the old
+      // action is gone: load the new version.
+      setBusy(false);
+      if (isStaleDeployError(e)) return reloadForUpdate(setError, e);
+      setError("That note didn't save. Check your signal and try again.");
+      return;
+    }
     setBusy(false);
     if ("error" in result) {
       setError(result.error);

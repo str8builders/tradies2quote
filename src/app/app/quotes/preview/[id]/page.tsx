@@ -30,6 +30,7 @@ import { VoiceCleanupAgent } from "../../../_components/agents/VoiceCleanupAgent
 import { ForgottenCostsAgent } from "../../../_components/agents/ForgottenCostsAgent";
 import { VerificationPanel } from "../../../_components/agents/VerificationPanel";
 import { parseVerificationReport } from "@/lib/agents/verify/report";
+import { ForgetNewQuoteWords } from "./_components/ForgetNewQuoteWords";
 import { QuoteGenerator } from "./_components/QuoteGenerator";
 import { QuoteEditor } from "./_components/QuoteEditor";
 import { guardQuoteForReview } from "@/lib/reviewGuard";
@@ -361,6 +362,8 @@ export default async function QuotePreviewPage({
   return (
     <div className="min-h-screen text-white">
       <AppHeader context={headerNumber} />
+      {/* The draft exists now: the new-quote page's kept words can go. */}
+      <ForgetNewQuoteWords />
 
       <main
         data-legacy-body=""

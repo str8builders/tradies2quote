@@ -17,6 +17,7 @@ import { formatCurrency } from "@/lib/quote-defaults";
 import type { QuoteData, QuoteStatus } from "@/lib/quote-types";
 import type { InvoiceStatus, InvoiceSummary } from "@/lib/types/invoice";
 import { runInvoiceAgent } from "@/lib/agents/invoice";
+import { isStaleDeployError, reloadForUpdate } from "@/lib/stale-deploy";
 import { createInvoiceFromQuote, markInvoicePaid } from "../actions";
 import { SavePdfButton } from "@/app/app/_components/SavePdfButton";
 
@@ -67,8 +68,13 @@ export function InvoiceDraftCard({
   function handleCreate() {
     setError(null);
     startTransition(async () => {
-      const res = await createInvoiceFromQuote(quoteId);
-      if ("error" in res) setError(res.error);
+      try {
+        const res = await createInvoiceFromQuote(quoteId);
+        if ("error" in res) setError(res.error);
+      } catch (e) {
+        if (isStaleDeployError(e)) return reloadForUpdate(setError, e);
+        setError("Network error. Please try again.");
+      }
     });
   }
 
@@ -168,7 +174,16 @@ function ExistingInvoiceBody({ invoice }: { invoice: InvoiceSummary }) {
   async function handleMarkPaid() {
     setActionError(null);
     setPaidState("saving");
-    const res = await markInvoicePaid(invoice.id);
+    let res: Awaited<ReturnType<typeof markInvoicePaid>>;
+    try {
+      res = await markInvoicePaid(invoice.id);
+    } catch (e) {
+      // Never leave the button on "Marking…".
+      setPaidState("error");
+      if (isStaleDeployError(e)) return reloadForUpdate(setActionError, e);
+      setActionError("Network error. Please try again.");
+      return;
+    }
     if ("error" in res) {
       setActionError(res.error);
       setPaidState("error");

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { Trash } from "@phosphor-icons/react/dist/ssr";
+import { Ruler, Trash } from "@phosphor-icons/react/dist/ssr";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
@@ -12,20 +12,22 @@ import { NumberField, TextField } from "@/components/ui/text-field";
 import { Toggle } from "@/components/ui/toggle";
 import { round2 } from "@/lib/quote-defaults";
 import type { QuoteItemType, QuoteLineItem } from "@/lib/quote-types";
-import { blockedLineGuide } from "@/lib/takeoff/blockedLineGuide";
 import {
   applyLineForm,
   blankLine,
   blankLineForm,
   hasUnconfirmedQuantity,
+  isFlaggedLine,
   lineForm,
   lineFormProblem,
   linesEqual,
+  needsQuantityCheck,
   newLineFromForm,
   unitChangeClearsPrice,
   type LineForm,
 } from "../lines";
 import { priceUnitLabel } from "../price-steps";
+import { blockedLineHelp } from "../takeoff-words";
 
 const TYPES = [
   { value: "material", label: "Material" },
@@ -44,6 +46,13 @@ export type LineSheetMode = { kind: "edit"; index: number; line: QuoteLineItem }
 export interface LineSheetProps {
   mode: LineSheetMode;
   currency: string;
+  /**
+   * Every size read off the drawing is confirmed (drawingSizesConfirmed):
+   * the calculator's lines count as checked, as the send gate counts them.
+   */
+  sizesConfirmed?: boolean;
+  /** A wall job: the measurements sheet works a blocked wall line out again. */
+  onMeasurements?: () => void;
   onSave: (line: QuoteLineItem) => Promise<{ ok: true } | { error: string }>;
   onDelete?: () => Promise<{ ok: true } | { error: string }>;
   onClose: () => void;
@@ -54,10 +63,21 @@ export interface LineSheetProps {
  * or add a new one. Saving goes through the classic edit rules and the
  * classic save action, so totals, versions and library learning match.
  */
-export function LineSheet({ mode, currency, onSave, onDelete, onClose }: LineSheetProps) {
+export function LineSheet({
+  mode,
+  currency,
+  sizesConfirmed = false,
+  onMeasurements,
+  onSave,
+  onDelete,
+  onClose,
+}: LineSheetProps) {
   const original = mode.kind === "edit" ? mode.line : null;
   const [type, setType] = useState<QuoteItemType>(original?.type ?? "material");
-  const opened = useMemo(() => (original ? lineForm(original) : blankLineForm(type)), [original, type]);
+  const opened = useMemo(
+    () => (original ? lineForm(original, sizesConfirmed) : blankLineForm(type)),
+    [original, type, sizesConfirmed],
+  );
   const [form, setForm] = useState<LineForm>(opened);
   const [busy, setBusy] = useState<"save" | "delete" | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -81,7 +101,7 @@ export function LineSheet({ mode, currency, onSave, onDelete, onClose }: LineShe
   async function save() {
     setTried(true);
     if (problem) return;
-    const next = original ? applyLineForm(original, form, opened) : newLineFromForm(type, form);
+    const next = original ? applyLineForm(original, form, opened, sizesConfirmed) : newLineFromForm(type, form);
     if (original && linesEqual(next, original)) {
       onClose();
       return;
@@ -104,7 +124,11 @@ export function LineSheet({ mode, currency, onSave, onDelete, onClose }: LineShe
 
   const aiQuantity = original ? hasUnconfirmedQuantity(original) : false;
   const blocked = original?.takeoff_status === "blocked";
-  const flagged = original?.takeoff_status === "needs_review" || original?.takeoff_status === "assumed";
+  // "The quantity is right" for an AI estimate, or a guessed or flagged line
+  // not checked yet: ticking it answers the send-time check for this line.
+  const toCheck = original ? needsQuantityCheck(original, sizesConfirmed) : false;
+  const flagged = original ? isFlaggedLine(original) && toCheck : false;
+  const help = blocked ? blockedLineHelp(original?.description, Boolean(onMeasurements)) : null;
 
   return (
     <BottomSheet
@@ -119,9 +143,25 @@ export function LineSheet({ mode, currency, onSave, onDelete, onClose }: LineShe
       }
     >
       <div className="space-y-5">
-        {blocked ? (
-          <Callout tone="warn" title="This line needs a size">
-            {blockedLineGuide(original?.description)}
+        {help ? (
+          <Callout
+            tone="warn"
+            title="This line needs a size"
+            action={
+              help.measure && onMeasurements ? (
+                <Button
+                  variant="secondary"
+                  fullWidth
+                  icon={<Ruler weight="bold" />}
+                  data-testid="job-line-measurements"
+                  onClick={onMeasurements}
+                >
+                  Change the measurements
+                </Button>
+              ) : undefined
+            }
+          >
+            {help.text}
           </Callout>
         ) : null}
         {flagged && original?.takeoff_flags?.length ? (
@@ -160,12 +200,16 @@ export function LineSheet({ mode, currency, onSave, onDelete, onClose }: LineShe
             autoComplete="off"
           />
         </div>
-        {aiQuantity ? (
+        {toCheck ? (
           <Toggle
             checked={form.quantityChecked}
             onChange={(value) => set({ quantityChecked: value })}
             label="The quantity is right"
-            description="We estimated it. Check it before the quote goes."
+            description={
+              aiQuantity
+                ? "We estimated it. Check it before the quote goes."
+                : "It was worked out with some guesses. Check it before the quote goes."
+            }
           />
         ) : null}
         <NumberField

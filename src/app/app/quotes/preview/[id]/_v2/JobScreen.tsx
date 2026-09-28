@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, CheckCircle, DotsThreeOutline, Plus, Ruler, Toolbox } from "@phosphor-icons/react/dist/ssr";
+import { Camera, CheckCircle, DotsThreeOutline, Package, Plus, Ruler, Toolbox } from "@phosphor-icons/react/dist/ssr";
 import { BottomActionBar } from "@/components/ui/bottom-action-bar";
 import { Button, ButtonLink, buttonClasses } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
@@ -22,7 +22,10 @@ import { canTransition } from "@/lib/lifecycle/stages";
 import { scannedMaterialLine } from "@/lib/materials/barcodeLine";
 import { isSupplierLine, supplierMismatches } from "@/lib/materials/supplierReconcile";
 import type { DimensionConfirmation, QuoteClient, QuoteData, QuoteLineItem, QuoteStatus } from "@/lib/quote-types";
+import { drawingSizesConfirmed } from "@/lib/quote-validation";
 import { libraryMaterials, takeoffKind } from "@/lib/takeoffLines";
+import { useUnsavedInput } from "@/lib/unsaved-input";
+import { ForgetNewQuoteWords } from "../_components/ForgetNewQuoteWords";
 import { QuoteVideoCard } from "../_components/QuoteVideoCard";
 import {
   acceptQuote,
@@ -38,6 +41,7 @@ import {
 import { migrateLegacyContact } from "./contact";
 import { clientFirstName, jobHeading } from "./job-title";
 import { jobView, type JobView } from "./job-view";
+import { kitAddedMessage, kitLines, type JobKit } from "./kits";
 import { checkIndexes, saveErrorMessage, unpricedIndexes, withLines } from "./lines";
 import { ClientCard } from "./parts/ClientCard";
 import { InvoiceCard } from "./parts/InvoiceCard";
@@ -50,6 +54,7 @@ import { draftBlocker, sentMessage, type SendChannel } from "./send-flow";
 import { AddFromPlanSheet, planAddedMessage } from "./sheets/AddFromPlanSheet";
 import { ClientSheet } from "./sheets/ClientSheet";
 import { InvoiceSheet, sendInvoiceEmail } from "./sheets/InvoiceSheet";
+import { KitSheet } from "./sheets/KitSheet";
 import { LineSheet } from "./sheets/LineSheet";
 import { MeasurementsSheet } from "./sheets/MeasurementsSheet";
 import { MoreToolsSheet } from "./sheets/MoreToolsSheet";
@@ -63,6 +68,7 @@ import { TermsSheet } from "./sheets/TermsSheet";
 import { TermsCard } from "./parts/TermsCard";
 import { AmountLine, BookSheet, ConfirmSheet, type StepResult } from "./sheets/StepSheets";
 import { sizesErrorMessage, sizesSavedMessage, withSizes } from "./sizes";
+import { actionThrew, NO_CONNECTION } from "./stale";
 import type { JobScreenProps } from "./types";
 
 type Sheet =
@@ -79,6 +85,7 @@ type Sheet =
   | { kind: "price"; startAt?: number }
   | { kind: "line"; index: number }
   | { kind: "new-line" }
+  | { kind: "kits" }
   | { kind: "client" }
   | { kind: "sizes" }
   | { kind: "terms" }
@@ -169,6 +176,9 @@ function JobScreenInner(props: JobScreenProps) {
   const [edits, setEdits] = useState<Partial<QuoteData>>({});
   const [saving, setSaving] = useState(false);
   const [sheet, setSheet] = useState<Sheet | null>(null);
+  // An open sheet (what's typed in it) or a save on its way would be lost to
+  // an update reload on coming back to the app: hold that reload off.
+  useUnsavedInput(sheet !== null || saving, "job page sheet");
 
   // A fresh server render (after a step, a refresh, or a change made from
   // More tools such as a compliance answer) brings the stored lines and
@@ -220,9 +230,11 @@ function JobScreenInner(props: JobScreenProps) {
   const heading = jobHeading({ summary: current.job_summary, clientName: client.name, quoteNumber: props.quoteNumber });
   const currency = current.currency || "NZD";
   const unpriced = unpricedIndexes(current.line_items);
-  const checks = checkIndexes(current.line_items);
   const dims = current.dimension_confirmation;
   const sizesToCheck = !!dims?.required && (dims.dimensions ?? []).some((d) => !d.confirmed);
+  // Confirmed drawing sizes answer the calculator's lines, as the send gate does.
+  const sizesConfirmed = drawingSizesConfirmed(dims);
+  const checks = checkIndexes(current.line_items, sizesConfirmed);
   // A quote made from a supplier's quote must still match it to be sent.
   const supplierOff = supplierMismatches(current);
   const supplierTitle = supplierCheckTitle(supplierOff);
@@ -230,8 +242,24 @@ function JobScreenInner(props: JobScreenProps) {
   // A wall worked out from measurements: they can be changed here, and a
   // failed quantity check re-run on the new lines.
   const wallTakeoff = takeoffKind(current) === "wall";
+  // "Add a kit" shows only while kits are switched on (props.kits is null otherwise).
+  const kits = props.kits ?? null;
+  // The add buttons sit two to a row on wider screens; an odd last one spans both.
+  const addButtons = 3 + (kits ? 1 : 0) + (wallTakeoff ? 1 : 0);
   const checkFailed = current.takeoff_evaluation?.status === "fail";
   const canDecline = (["draft", "sent", "viewed"] as string[]).includes(status) && canTransition(status as QuoteStatus, "declined");
+
+  /**
+   * A server action that threw. After an update the old actions are gone:
+   * the new version loads (the sheet says so). Otherwise it's the connection.
+   */
+  function threw(e: unknown, offline: string): { error: string } {
+    return actionThrew(e, offline, (message) => {
+      // It couldn't reload (it only just did): close the sheet so this shows.
+      setSheet(null);
+      toast.show(message, { tone: "bad" });
+    });
+  }
 
   /** Save lines and client through the classic save action (optimistic, rolled back on failure). */
   async function commit(nextLines: QuoteLineItem[], nextClient: QuoteClient = client, learn = true): Promise<SaveOutcome> {
@@ -241,15 +269,18 @@ function JobScreenInner(props: JobScreenProps) {
     setLines(nextLines);
     setClient(nextClient);
     let result: Awaited<ReturnType<typeof saveQuoteChanges>>;
+    let thrown: { error: string } | null = null;
     try {
       result = await saveQuoteChanges(quoteId, withLines(data, nextLines, nextClient), saveOptionsFor(learn));
-    } catch {
+    } catch (e) {
+      thrown = threw(e, saveErrorMessage("network", QUOTE_LOCKED_MESSAGE));
       result = { error: "network" };
     }
     setSaving(false);
     if ("error" in result) {
       setLines(before.lines);
       setClient(before.client);
+      if (thrown) return thrown;
       if (result.error === QUOTE_LOCKED_MESSAGE) router.refresh();
       return { error: saveErrorMessage(result.error, QUOTE_LOCKED_MESSAGE) };
     }
@@ -276,10 +307,12 @@ function JobScreenInner(props: JobScreenProps) {
     setEdits(nextEdits);
     setSizes(nextSizes);
     let result: Awaited<ReturnType<typeof saveQuoteChanges>>;
+    let thrown: { error: string } | null = null;
     try {
       const next = withEdits(withSizes(props.data, nextSizes), nextEdits);
       result = await saveQuoteChanges(quoteId, withLines(next, nextLines, client), saveOptionsFor(false));
-    } catch {
+    } catch (e) {
+      thrown = threw(e, saveErrorMessage("network", QUOTE_LOCKED_MESSAGE));
       result = { error: "network" };
     }
     setSaving(false);
@@ -287,6 +320,7 @@ function JobScreenInner(props: JobScreenProps) {
       setLines(before.lines);
       setEdits(before.edits);
       setSizes(before.sizes);
+      if (thrown) return thrown;
       if (result.error === QUOTE_LOCKED_MESSAGE) router.refresh();
       return { error: saveErrorMessage(result.error, QUOTE_LOCKED_MESSAGE) };
     }
@@ -317,15 +351,18 @@ function JobScreenInner(props: JobScreenProps) {
       setSizes(preview.dimension_confirmation);
     }
     let result: Awaited<ReturnType<typeof confirmDimensions>>;
+    let thrown: { error: string } | null = null;
     try {
       result = await confirmDimensions(quoteId, current, edits);
-    } catch {
+    } catch (e) {
+      thrown = threw(e, sizesErrorMessage("network"));
       result = { error: "network" };
     }
     setSaving(false);
     if ("error" in result) {
       setLines(before.lines);
       setSizes(before.sizes);
+      if (thrown) return thrown;
       if (result.error === QUOTE_LOCKED_MESSAGE) router.refresh();
       return { error: sizesErrorMessage(result.error) };
     }
@@ -338,12 +375,24 @@ function JobScreenInner(props: JobScreenProps) {
     setSheet(null);
   }
 
+  /** Every line of a kit onto the quote, through the usual save; kit prices don't teach the library. */
+  async function addKit(kit: JobKit): Promise<SaveOutcome> {
+    const added = kitLines(kit);
+    if (added.length === 0) return { error: "That kit has no lines yet." };
+    const result = await commit([...lines, ...added], client, false);
+    if ("ok" in result) {
+      setSheet(null);
+      toast.show(kitAddedMessage(kit, added.length));
+    }
+    return result;
+  }
+
   async function step(run: () => Promise<LifecycleResult>, done: string): Promise<StepResult> {
     let result: LifecycleResult;
     try {
       result = await run();
-    } catch {
-      return { error: "No connection. Check your signal and try again." };
+    } catch (e) {
+      return threw(e, NO_CONNECTION);
     }
     if ("error" in result) return { error: result.error };
     setSheet(null);
@@ -429,6 +478,7 @@ function JobScreenInner(props: JobScreenProps) {
 
   return (
     <Screen height="fill" data-job-screen="" data-status={status} className="flex-1">
+      <ForgetNewQuoteWords />
       <JobTopBar
         title={heading.title}
         subtitle={heading.subtitle}
@@ -542,6 +592,7 @@ function JobScreenInner(props: JobScreenProps) {
           {current.line_items.length > 0 ? (
             <LineList
               lines={current.line_items}
+              sizesConfirmed={sizesConfirmed}
               currency={currency}
               libraryMatches={props.libraryMatches}
               onOpen={locked ? undefined : (index) => setSheet({ kind: "line", index })}
@@ -556,6 +607,17 @@ function JobScreenInner(props: JobScreenProps) {
               <Button variant="secondary" fullWidth icon={<Plus weight="bold" />} onClick={() => setSheet({ kind: "new-line" })}>
                 Add a line
               </Button>
+              {kits ? (
+                <Button
+                  variant="secondary"
+                  fullWidth
+                  icon={<Package weight="bold" />}
+                  data-testid="job-kits-open"
+                  onClick={() => setSheet({ kind: "kits" })}
+                >
+                  Add a kit
+                </Button>
+              ) : null}
               <ScanBarcodeButton
                 look="new"
                 mode="quote"
@@ -574,7 +636,7 @@ function JobScreenInner(props: JobScreenProps) {
                 fullWidth
                 icon={<Camera weight="bold" />}
                 data-testid="job-plan-photo-open"
-                className={wallTakeoff ? undefined : "sm:col-span-2"}
+                className={addButtons % 2 === 1 && !wallTakeoff ? "sm:col-span-2" : undefined}
                 onClick={() => setSheet({ kind: "plan-photo" })}
               >
                 Add from a plan photo
@@ -585,6 +647,7 @@ function JobScreenInner(props: JobScreenProps) {
                   fullWidth
                   icon={<Ruler weight="bold" />}
                   data-testid="job-measurements-open"
+                  className={addButtons % 2 === 1 ? "sm:col-span-2" : undefined}
                   onClick={() => setSheet({ kind: "measurements" })}
                 >
                   Change the measurements
@@ -640,7 +703,7 @@ function JobScreenInner(props: JobScreenProps) {
           description={props.description}
           hasBusinessName={props.hasBusinessName}
           smsEnabled={props.smsEnabled}
-          mode={status === "declined" ? "resend" : "send"}
+          mode={view.next.kind === "resend" ? "resend" : "send"}
           publicLink={props.publicLink}
           saveFirst={saveFirst}
           onSent={() => router.refresh()}
@@ -779,8 +842,8 @@ function JobScreenInner(props: JobScreenProps) {
             let result: Awaited<ReturnType<typeof markInvoicePaid>>;
             try {
               result = await markInvoicePaid(invoice.id);
-            } catch {
-              return { error: "No connection. Check your signal and try again." };
+            } catch (e) {
+              return threw(e, NO_CONNECTION);
             }
             if ("error" in result) return { error: result.error };
             setSheet(null);
@@ -814,6 +877,8 @@ function JobScreenInner(props: JobScreenProps) {
           key={sheet.index}
           mode={{ kind: "edit", index: sheet.index, line: lines[sheet.index] }}
           currency={currency}
+          sizesConfirmed={sizesConfirmed}
+          onMeasurements={wallTakeoff ? () => setSheet({ kind: "measurements" }) : undefined}
           onSave={async (line) => {
             const result = await commit(lines.map((l, i) => (i === sheet.index ? line : l)));
             if ("ok" in result) {
@@ -832,6 +897,10 @@ function JobScreenInner(props: JobScreenProps) {
           }}
           onClose={close}
         />
+      ) : null}
+
+      {sheet?.kind === "kits" && kits ? (
+        <KitSheet kits={kits} currency={currency} onAdd={addKit} onClose={close} />
       ) : null}
 
       {sheet?.kind === "new-line" ? (

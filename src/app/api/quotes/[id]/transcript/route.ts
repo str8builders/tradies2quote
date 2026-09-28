@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { QuoteData } from "@/lib/quote-types";
 import { isQuoteLocked, QUOTE_LOCKED_MESSAGE } from "@/lib/lifecycle/lock";
+import { withStoredChatHistory } from "@/lib/stored-chat-history";
 
 /**
  * Edit the cleaned transcript without regenerating the quote.
@@ -80,13 +81,17 @@ export async function POST(
   }
 
   const existing = (quoteData.transcript ?? null) as Record<string, unknown> | null;
-  const updated: QuoteData = {
-    ...quoteData,
-    transcript: {
-      ...(existing ?? {}),
-      cleaned,
+  // The customer chat goes back exactly as this request read it from the row.
+  const updated: QuoteData = withStoredChatHistory(
+    {
+      ...quoteData,
+      transcript: {
+        ...(existing ?? {}),
+        cleaned,
+      },
     },
-  };
+    quote.quote_data,
+  );
 
   const { error: uErr } = await supabase
     .from("quotes")

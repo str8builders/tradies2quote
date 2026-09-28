@@ -2,6 +2,7 @@ import { Screen } from "@/components/ui/screen";
 import { StatusRail } from "@/components/ui/status-rail";
 import { GeneratingPanel } from "./parts/GeneratingPanel";
 import { JobTopBar } from "./parts/JobTopBar";
+import { ForgetNewQuoteWords } from "../_components/ForgetNewQuoteWords";
 import { jobView } from "./job-view";
 
 /**
@@ -13,6 +14,8 @@ export function GeneratingScreen({ quoteId, quoteNumber }: { quoteId: string; qu
   const view = jobView({ status: "draft", generated: false, clientFirstName: null, pastExpiry: false, invoice: null });
   return (
     <Screen height="fill" data-job-screen="">
+      {/* The draft exists now: the new-quote page's kept words can go. */}
+      <ForgetNewQuoteWords />
       <JobTopBar title="New quote" subtitle={`Quote ${quoteNumber}`} />
       <div className="group/generating mx-auto w-full max-w-xl flex-1 space-y-5 px-4 pt-5 pb-8">
         <div className="space-y-3">

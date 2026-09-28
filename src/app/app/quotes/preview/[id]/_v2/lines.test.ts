@@ -14,6 +14,7 @@ import {
   lineFormProblem,
   lineMarker,
   linePatch,
+  needsQuantityCheck,
   newLineFromForm,
   quantityText,
   saveErrorMessage,
@@ -123,6 +124,24 @@ describe("markers: one plain word per line", () => {
     expect(lineMarker(line({ quantity_source: "ai", quantity_confirmed: true }))).toBeNull();
   });
 
+  it("a checked quantity clears Check this, as it clears the send-time tick", () => {
+    // Generation writes AI material lines as assumed AND ai/unconfirmed.
+    const ai = line({ quantity_source: "ai", quantity_confirmed: false, takeoff_status: "assumed" });
+    expect(lineMarker(ai)).toBe("check");
+    expect(lineMarker({ ...ai, quantity_confirmed: true })).toBeNull();
+    const calc = line({ is_calculated_takeoff: true, quantity_source: "calculator", takeoff_status: "needs_review" });
+    expect(lineMarker(calc)).toBe("check");
+    expect(lineMarker({ ...calc, quantity_confirmed: true })).toBeNull();
+    // Every drawing size confirmed answers the calculator's lines, not a line typed in by hand.
+    expect(lineMarker(calc, true)).toBeNull();
+    expect(lineMarker(line({ takeoff_status: "assumed" }), true)).toBe("check");
+    // A blocked line still needs its size.
+    expect(lineMarker(line({ takeoff_status: "blocked", quantity: 0, quantity_confirmed: true }), true)).toBe("check");
+    expect(checkIndexes([ai, { ...ai, quantity_confirmed: true }, calc], true)).toEqual([0]);
+    expect(needsQuantityCheck(calc)).toBe(true);
+    expect(needsQuantityCheck(calc, true)).toBe(false);
+  });
+
   it("index helpers agree with the gate's unpriced rule", () => {
     const lines = [line(), line({ unit_price: 0 }), line({ type: "labour", unit_price: 0 }), line({ quantity: 0, unit_price: 0 })];
     expect(unpricedIndexes(lines)).toEqual(lines.flatMap((l, i) => (isUnpricedLine(l) ? [i] : [])));
@@ -228,6 +247,18 @@ describe("the edit sheet form", () => {
 
   it("no change means the same line back", () => {
     expect(applyLineForm(line(), lineForm(line()))).toEqual(line());
+  });
+
+  it("a guessed or flagged line opens unticked, and ticking it records the check", () => {
+    const calc = line({ is_calculated_takeoff: true, quantity_source: "calculator", takeoff_status: "assumed" });
+    expect(lineForm(calc).quantityChecked).toBe(false);
+    expect(lineForm(calc, true).quantityChecked).toBe(true);
+    expect(applyLineForm(calc, lineForm(calc))).toEqual(calc);
+    const ticked = applyLineForm(calc, { ...lineForm(calc), quantityChecked: true });
+    expect(ticked).toMatchObject({ quantity: 28, quantity_confirmed: true, quantity_source: "calculator", takeoff_status: "assumed" });
+    expect(lineMarker(ticked)).toBeNull();
+    // Already answered by the confirmed sizes: nothing to record.
+    expect(applyLineForm(calc, lineForm(calc, true), lineForm(calc, true), true)).toEqual(calc);
   });
 
   it("ticking 'The quantity is right' confirms an estimate without changing it", () => {

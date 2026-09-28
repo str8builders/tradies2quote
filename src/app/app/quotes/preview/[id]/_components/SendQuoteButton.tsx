@@ -16,6 +16,8 @@ import type { QuoteStatus } from "@/lib/quote-types";
 import { SavePdfButton } from "@/app/app/_components/SavePdfButton";
 import { BusinessSettingsLink } from "@/app/app/_components/BusinessSettingsLink";
 import { BUSINESS_NAME_REQUIRED } from "@/lib/business-name";
+import { reloadForUpdate } from "@/lib/stale-deploy";
+import { saveBeforeSending } from "./save-before-send";
 
 type Props = {
   quoteId: string;
@@ -96,10 +98,12 @@ export function SendQuoteButton({
     if (!acknowledged) setConfirmReasons(null);
     if (onSaveBeforeSend) {
       setState("saving");
-      const saved = await onSaveBeforeSend();
-      if (!saved) {
-        setErrorMessage("Could not save your latest edits.");
+      // A save that throws resets the button instead of spinning forever.
+      const saved = await saveBeforeSending(onSaveBeforeSend);
+      if (!saved.ok) {
         setState("error");
+        if (saved.staleDeploy) return reloadForUpdate(setErrorMessage, saved.staleDeploy);
+        setErrorMessage(saved.message);
         return;
       }
     }
