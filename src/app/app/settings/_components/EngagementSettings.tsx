@@ -80,7 +80,7 @@ export function EngagementSettings({ initial, show }: Props) {
           <ToggleRow
             icon={<ChatCircleDots size={18} weight="fill" className="text-brand" />}
             title="Auto follow-up on quotes"
-            desc="Nudge the client at day 2 and day 5 if a sent quote hasn't been accepted."
+            desc="Email the client a reminder at day 2 and day 5 if a quote you emailed hasn't been accepted."
             checked={autoFollowup}
             onChange={setAutoFollowup}
           />

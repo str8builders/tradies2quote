@@ -187,7 +187,7 @@ export function RatesForm({
           {engagement.show.followups ? (
             <Toggle
               label="Chase quotes for me"
-              description="If a sent quote isn't accepted, we remind the client after 2 days and again after 5."
+              description="If a quote you emailed isn't accepted, we email the client a reminder after 2 days and again after 5."
               checked={follow.values.autoFollowup}
               onChange={(next) => follow.set("autoFollowup", next)}
             />

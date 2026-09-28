@@ -127,6 +127,16 @@ describe("engagement emails", () => {
     expect(names).not.toContain("Cara");
   });
 
+  it("covers every emailed quote, not only ones from the request form, sent in the last 14 days", async () => {
+    await POST(request());
+    const followupQuery = mock.queries.find((q) => q.table === "quotes" && q.calls.some(([m, a]) => m === "in" && a[0] === "status"));
+    const reviewQuery = mock.queries.find((q) => q.table === "quotes" && q.calls.some(([m, a]) => m === "eq" && a[1] === "completed"));
+    for (const query of [followupQuery, reviewQuery]) {
+      expect(query?.calls.some(([m, a]) => m === "not" && a[0] === "client_id")).toBe(false);
+    }
+    expect(followupQuery?.calls).toContainEqual(["gte", ["sent_at", new Date(NOW.getTime() - 14 * 24 * 3600 * 1000).toISOString()]]);
+  });
+
   it("review requests go to the newest address the quote was sent to", async () => {
     await POST(request());
     expect(mock.review).toHaveBeenCalledTimes(1);

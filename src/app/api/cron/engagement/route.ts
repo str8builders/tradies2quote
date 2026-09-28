@@ -35,7 +35,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /**
  * The client's name and email as written on the quote itself (not the
  * clients row linked by quotes.client_id, which the public request form
- * links loosely: see engagementRecipient).
+ * links loosely: see engagementRecipient). Every emailed quote qualifies,
+ * however it was made — voice, typed, scanned or from the request form.
  */
 const QUOTE_CLIENT_COLUMNS =
   "client_name:quote_data->client->>name, client_email:quote_data->client->>email, client_contact:quote_data->client->>contact";
@@ -113,8 +114,7 @@ async function handle(request: NextRequest): Promise<NextResponse> {
           .eq("user_id", s.user_id)
           .eq("status", "completed")
           .is("deleted_at", null)
-          .gte("completed_at", since)
-          .not("client_id", "is", null);
+          .gte("completed_at", since);
 
         if (quotesError) throw quotesError;
         for (const q of quotes ?? []) {
@@ -166,6 +166,7 @@ async function handle(request: NextRequest): Promise<NextResponse> {
     // link would only reach "not found" or "expired".
     if (followupsOn) {
       const twoDaysAgo = new Date(now - 2 * DAY_MS).toISOString();
+      const fourteenDaysAgo = new Date(now - 14 * DAY_MS).toISOString();
       const nowIso = new Date(now).toISOString();
       for (const s of settings) {
         if (!s.auto_followup_enabled) continue;
@@ -176,9 +177,11 @@ async function handle(request: NextRequest): Promise<NextResponse> {
           .in("status", ["sent", "viewed"])
           .is("deleted_at", null)
           .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
-          .not("client_id", "is", null)
           .not("public_token", "is", null)
-          .lte("sent_at", twoDaysAgo);
+          .lte("sent_at", twoDaysAgo)
+          // Only quotes still worth chasing: switching follow-ups on never
+          // sends a burst of reminders about old quotes.
+          .gte("sent_at", fourteenDaysAgo);
 
         if (quotesError) throw quotesError;
         for (const q of quotes ?? []) {
