@@ -101,8 +101,13 @@ async function runClaimed(setId: string, deps: JobDeps): Promise<JobOutcome> {
     if (!isPdf(bytes)) throw new PlanSetError("That file isn't a PDF. Upload the plans as the PDF the designer sent.");
     try {
       pdf = await deps.open(bytes);
-    } catch {
-      throw new PlanSetError("The PDF couldn't be opened. If it has a password, save a copy without one and upload that.");
+    } catch (e) {
+      // Blame the file only when pdf.js says it's the file; anything else is
+      // ours, so it is logged and the tradie is told to try again.
+      const why = e instanceof Error ? e.message : String(e);
+      if (/password/i.test(why)) throw new PlanSetError("The PDF has a password. Save a copy without one and upload that.");
+      if (/invalid pdf|corrupt|damaged/i.test(why)) throw new PlanSetError("The PDF looks damaged. Save it again from the program that made it and upload that.");
+      throw e;
     }
     const total = pdf.pageCount;
     if (total > MAX_SET_PAGES) throw new PlanSetError(`That PDF has ${total} pages; the most is ${MAX_SET_PAGES}. Upload the drawings on their own.`);
@@ -146,7 +151,10 @@ async function runClaimed(setId: string, deps: JobDeps): Promise<JobOutcome> {
     return "done";
   } catch (e) {
     const message = e instanceof PlanSetError ? e.message : "Something went wrong reading these plans. Try again, and if it happens again, tell us.";
-    if (!(e instanceof PlanSetError)) captureError(e, { route: "plansets/job" });
+    if (!(e instanceof PlanSetError)) {
+      console.error("[plansets/job]", e);
+      captureError(e, { route: "plansets/job" });
+    }
     await db.from("plan_sets").update({ status: "failed", error: message, step: null, lease_at: null, updated_at: new Date(now()).toISOString() }).eq("id", setId);
     return "failed";
   } finally {

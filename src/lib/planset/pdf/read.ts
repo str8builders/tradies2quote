@@ -4,14 +4,14 @@ import "server-only";
 //
 // The reading itself is read-core.mjs (plain JS). On the server it runs in a
 // worker thread (read-worker.mjs, started by path at runtime so the bundler
-// never touches pdf.js): pdf.js parses on whatever thread calls it, and a
-// heavy A1 engineer's sheet stalled that thread for 1.8 s — on the web
+// never touches pdf.js — see openInWorker): pdf.js parses on whatever
+// thread calls it, and a heavy A1 engineer's sheet stalled that thread for
+// 1.8 s — on the web
 // server's main thread that freezes every other request. Tests read inline.
 // ─────────────────────────────────────────────────────────────────────────
 
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { Worker } from "node:worker_threads";
 import type { SheetRaw } from "../types";
 
 export type OpenPlanPdf = {
@@ -48,6 +48,11 @@ type WorkerReply =
   | { type: "error"; id?: number; message: string };
 
 function openInWorker(bytes: Uint8Array): Promise<OpenPlanPdf> {
+  // worker_threads is fetched at runtime on purpose. Turbopack rewrites any
+  // `new Worker(…)` it can see into a bundled worker (a turbopackIgnore
+  // comment doesn't stop it), and the bundled pdf.js then looks for
+  // pdf.worker.mjs beside the chunk — every open failed on the live server.
+  const { Worker } = process.getBuiltinModule("node:worker_threads");
   const worker = new Worker(path.join(process.cwd(), HERE, "read-worker.mjs"));
   const pending = new Map<number, { resolve: (s: SheetRaw) => void; reject: (e: Error) => void }>();
   let nextId = 1;
