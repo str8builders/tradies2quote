@@ -111,7 +111,10 @@ export const MIN_PROOF_DIMENSIONS = 5;
  * A sheet can have several (a 1:100 plan with 1:10 details).
  */
 export function proveScales(dims: readonly Dimension[], textById: (id: number) => TextItem | undefined): ScaleProof[] {
-  const matched = dims.filter((d) => d.ratio && !d.approx && d.ratio > 0.5 && d.ratio < 5000);
+  // "±" means "check on site", not "drawn wrong": the drawn line is still
+  // exact, so approximate dimensions still prove the scale. Full-size (1:1–1:4)
+  // "proofs" are title-block numbers meeting lines by chance, not drawings.
+  const matched = dims.filter((d) => d.ratio && d.ratio >= 4.5 && d.ratio < 5000);
   const sorted = [...matched].sort((a, b) => a.ratio! - b.ratio!);
   const clusters: Dimension[][] = [];
   for (const d of sorted) {
@@ -272,4 +275,50 @@ class SegmentGrid {
     }
     return [...seen];
   }
+}
+
+// ── Scale bars ───────────────────────────────────────────────────────────
+
+/**
+ * A drawn scale bar — "0 1 2 3 4 5 m" — proves a scale too: evenly spaced
+ * numbers starting at 0 on one line, stepping evenly. Real mm per page mm =
+ * (step in real mm) ÷ (spacing in page mm). The unit comes from an "m"/"mm"
+ * printed with the bar; without one, metres are assumed only for steps of
+ * 1–10 (a bar in mm would print 1000, 2000 …).
+ */
+export function proveScaleBar(text: readonly TextItem[]): ScaleProof | null {
+  const nums = text.filter((t) => /^\d{1,3}(\.\d)?$/.test(t.s.trim()) && isHorizontal(t.angle));
+  const rows = new Map<number, TextItem[]>();
+  for (const t of nums) {
+    const key = Math.round(t.y * 2) / 2;
+    const row = [...rows.entries()].find(([y]) => Math.abs(y - key) <= 0.6);
+    if (row) row[1].push(t);
+    else rows.set(key, [t]);
+  }
+  for (const row of rows.values()) {
+    if (row.length < 4) continue;
+    const sorted = [...row].sort((a, b) => a.x - b.x);
+    // Longest run from "0" with a constant value step and constant spacing.
+    const zero = sorted.findIndex((t) => Number(t.s) === 0);
+    if (zero < 0) continue;
+    const run = sorted.slice(zero);
+    const step = Number(run[1]?.s) - Number(run[0].s);
+    if (!(step > 0)) continue;
+    const centres = run.map((t) => textCentre(t)[0]);
+    let n = 1;
+    while (n < run.length && Math.abs(Number(run[n].s) - Number(run[n - 1].s) - step) < 1e-9) n++;
+    if (n < 4) continue;
+    const gaps = centres.slice(1, n).map((c, i) => c - centres[i]);
+    const spacing = gaps.reduce((s, g) => s + g, 0) / gaps.length;
+    if (!(spacing > 1) || gaps.some((g) => Math.abs(g - spacing) / spacing > 0.04)) continue;
+    const last = run[n - 1];
+    const unitText = text.find((t) => Math.abs(t.y - last.y) <= 1 && t.x > last.x && t.x - last.x < spacing * 1.5 && /^(m|mm|metres?|meters?)$/i.test(t.s.trim()));
+    const unitMm = unitText ? (/^mm$/i.test(unitText.s.trim()) ? 1 : 1000) : step <= 10 ? 1000 : 1;
+    const ratio = (step * unitMm) / spacing;
+    if (ratio < 4.5 || ratio > 5000) continue;
+    const std = STANDARD_RATIOS.find((r) => Math.abs(ratio - r) / r <= 0.01);
+    const xs = run.slice(0, n).map((t) => t.x);
+    return { ratio: std ?? round3(ratio), count: n, share: 1, region: [Math.min(...xs), last.y - 5, Math.max(...xs), last.y + 1] };
+  }
+  return null;
 }

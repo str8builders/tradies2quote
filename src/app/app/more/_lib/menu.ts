@@ -25,6 +25,7 @@ export type MoreItemId =
   | "feedback"
   | "privacy"
   | "terms"
+  | "drawings"
   | "agents"
   | "debug"
   | "monitor"
@@ -93,6 +94,7 @@ const OWNER: MoreGroup = {
   id: "owner",
   title: "Owner only",
   items: [
+    { id: "drawings", label: "Read drawings", caption: "Upload a consented drawing set", href: "/app/drawings" },
     { id: "agents", label: "Agents", caption: "The agent panel", href: "/app/agents" },
     { id: "debug", label: "Debug", caption: "Diagnostics", href: "/app/debug" },
     { id: "monitor", label: "Agent monitor", caption: "Live runs and events", href: "/app/agents/monitor" },
@@ -125,6 +127,7 @@ export const MORE_TONE: Readonly<Record<MoreItemId, IconTone>> = {
   feedback: "neutral",
   privacy: "neutral",
   terms: "neutral",
+  drawings: "brand",
   agents: "brand",
   debug: "brand",
   monitor: "brand",

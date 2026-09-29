@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Segment, TextItem } from "../types";
-import { buildChains, checkChains, proveScales, readDimensions } from "./dimensions";
+import { buildChains, checkChains, proveScaleBar, proveScales, readDimensions } from "./dimensions";
 
 let nextId = 0;
 const label = (s: string, x: number, y: number, angle = 0): TextItem => ({ id: nextId++, s, x, y, angle, h: 2.5, w: s.length * 1.4 });
@@ -78,5 +78,19 @@ describe("chains", () => {
     const dims = readDimensions(sheet);
     const checks = checkChains(buildChains(dims), dims);
     expect(checks[0]).toMatchObject({ ok: false, differenceMm: -200 });
+  });
+});
+
+describe("proveScaleBar", () => {
+  it("reads a 0–5 m bar at 1:100", () => {
+    nextId = 0;
+    const text = ["0", "1", "2", "3", "4", "5"].map((s, i) => label(s, 100 + i * 10 - 0.7, 200));
+    text.push(label("M", 152, 200));
+    expect(proveScaleBar(text)).toMatchObject({ ratio: 100, count: 6 });
+  });
+  it("ignores numbers that aren't a bar", () => {
+    nextId = 0;
+    const text = ["0", "1", "5", "3"].map((s, i) => label(s, 100 + i * 10, 200));
+    expect(proveScaleBar(text)).toBeNull();
   });
 });

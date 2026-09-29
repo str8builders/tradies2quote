@@ -35,6 +35,7 @@ describe("More menu (data)", () => {
 
   it("owner tools for the owner only", () => {
     expect(moreMenu({ isOwner: true }).owner?.items.map((i) => i.href)).toEqual([
+      "/app/drawings",
       "/app/agents",
       "/app/debug",
       "/app/agents/monitor",
@@ -80,7 +81,7 @@ describe("More menu (data)", () => {
     ]);
     expect(JSON.stringify(accountMenuSections())).not.toContain("/t2qcal");
     expect(ownerMenu(false)).toBeNull();
-    expect(ownerMenu(true)?.items).toHaveLength(4);
+    expect(ownerMenu(true)?.items).toHaveLength(5);
   });
 });
 

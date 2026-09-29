@@ -139,6 +139,8 @@ export interface AnthropicCallOptions extends RetryOptions {
   /** `max_tokens` handling: throw (default) or hand back `truncated: true`. */
   onTruncated?: "error" | "return";
   url?: string;
+  /** Extra request headers, e.g. `anthropic-beta` for a beta feature. */
+  headers?: Record<string, string>;
 }
 
 export interface AnthropicCallResult {
@@ -166,7 +168,7 @@ export async function callAnthropic(
     url: opts.url ?? ANTHROPIC_MESSAGES_URL,
     init: {
       method: "POST",
-      headers: anthropicHeaders(opts.apiKey),
+      headers: { ...anthropicHeaders(opts.apiKey), ...opts.headers },
       body: JSON.stringify(opts.body),
     },
     timeoutMs: opts.timeoutMs,

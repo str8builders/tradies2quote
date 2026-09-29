@@ -71,6 +71,17 @@ describe("openPlanPdf", () => {
     await pdf.close();
   });
 
+  it("reads the same on a worker thread (how the server runs it)", async () => {
+    const bytes = await samplePdf();
+    const pdf = await openPlanPdf(bytes, { thread: true });
+    expect(pdf.pageCount).toBe(2);
+    const [one, two] = await Promise.all([pdf.readPage(1), pdf.readPage(2)]);
+    expect(one.text.find((t) => t.s === "6,470")).toMatchObject({ angle: 0 });
+    expect(two.rotate).toBe(90);
+    await pdf.close();
+    await expect(openPlanPdf(new TextEncoder().encode("not a pdf"), { thread: true })).rejects.toThrow(/Couldn't read the PDF/);
+  });
+
   it("does not consume the caller's bytes", async () => {
     const bytes = await samplePdf();
     const before = bytes.length;
