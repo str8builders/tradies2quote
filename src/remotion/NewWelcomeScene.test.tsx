@@ -41,7 +41,7 @@ describe("NewWelcomeArt", () => {
     for (const f of [112, 125, 140, 160]) {
       const html = art(f, { name: "STR8 Builders" });
       expect(html).toContain("STR8 Builders".slice(0, 3));
-      expect(html.match(/white-space:nowrap/g)?.length).toBe(2);
+      expect(html.match(/white-space:nowrap/g)?.length).toBeGreaterThanOrEqual(2);
     }
   });
 

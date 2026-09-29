@@ -266,13 +266,14 @@ export function NewWelcomeArt({ frame, fps, greeting, name, today, calm = false 
         <TypedLine text={tail} shown={tailShown.length} caret={shown > greetingText.length && caret} size={fitFontSize(tail, name ? 72 : 44)} color={ORANGE_TEXT} />
       </div>
 
-      <div style={{ position: "absolute", left: 0, right: 0, top: 1110, display: "flex", justifyContent: "center", gap: 20, fontFamily: SANS, fontSize: 28, fontWeight: 700, color: TEXT }}>
+      {/* One line each, both on screen: the longest date ("Wednesday 30 September") used to wrap and run off the edges. */}
+      <div style={{ position: "absolute", left: 24, right: 24, top: 1110, display: "flex", justifyContent: "center", gap: 14, fontFamily: SANS, fontSize: 24, fontWeight: 700, color: TEXT, whiteSpace: "nowrap" }}>
         {[
           { text: today, dot: "#58A6FF", p: chipA },
           { text: "Ready to quote", dot: HIVIS, p: chipB },
         ].map(({ text, dot, p }) => (
-          <span key={text} style={{ display: "inline-flex", alignItems: "center", gap: 14, padding: "14px 24px", borderRadius: 999, background: "#1B1B1A", border: "2px solid #34332F", transform: `translateY(${(1 - p) * 60}px) scale(${0.8 + 0.2 * Math.min(1, p)})`, opacity: Math.min(1, p * 1.5) }}>
-            <span style={{ width: 16, height: 16, borderRadius: 8, background: dot }} />
+          <span key={text} style={{ display: "inline-flex", alignItems: "center", gap: 12, padding: "12px 20px", borderRadius: 999, background: "#1B1B1A", border: "2px solid #34332F", transform: `translateY(${(1 - p) * 60}px) scale(${0.8 + 0.2 * Math.min(1, p)})`, opacity: Math.min(1, p * 1.5) }}>
+            <span style={{ width: 14, height: 14, borderRadius: 7, background: dot, flexShrink: 0 }} />
             {text}
           </span>
         ))}
