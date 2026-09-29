@@ -31,10 +31,21 @@ Owner-only (`planReaderAllowed`) until the real-plan evals pass.
 | Set | `finish.ts` | register, borrowed scales, model (`model/assemble.ts`), AI reading (`interpret/*`) |
 | Review | `/app/drawings/{id}` | summary, plan with walls/openings drawn on it, questions + RFIs, materials |
 | Answers | `POST /api/plansets/{id}/answers` → `model/answers.ts` | corrections become status "tradie" |
-| Quote | `POST /api/plansets/{id}/quote` → `takeoff/toQuote.ts` | a draft quote of calculator lines |
+| Quote | **Quote breakdown** button (every tab) → `POST /api/plansets/{id}/quote` → `takeoff/toQuote.ts` | a draft quote of calculator lines, each with its trade as `section` |
 
 Tables: `plan_sets` (status, register, model, answers), `plan_set_sheets`
 (per-page facts). Migrations `20260930_plan_sets*.sql`.
+
+**Quote breakdown.** Each quote line carries its trade (`QuoteLineItem.section`:
+Slab, Framing, Lintels, Roofing, Cladding, Joinery, Insulation, Linings,
+Finishing, in build order). `lib/quote-sections.ts` splits a group's lines by
+section with subtotals, the same way on the job page (`_v2/lines.ts`), the
+client's page (`PublicQuoteSummary`) and the PDF (`pdf-generator.ts`); lines
+added by hand go last under "Other materials", and quotes without sections show
+as before. The client's page gets `section` from `get_quote_by_token`
+(migration `20260930_quote_line_sections.sql`, which also counts it in
+`quote_customer_content` for versioning and the acceptance lock; rollback file
+beside it).
 
 ## Tested on
 

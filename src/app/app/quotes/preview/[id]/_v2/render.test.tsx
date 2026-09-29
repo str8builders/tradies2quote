@@ -256,6 +256,29 @@ describe("line cards", () => {
     expect(out).toContain("Needs price");
     expect(out).toContain("Check this");
     expect(out).not.toMatch(/From your library|T2Q estimate|Calculated takeoff/);
+    expect(out).not.toContain("data-section=");
+  });
+
+  it("a quote from a plan set reads as a breakdown: a heading and subtotal per trade", () => {
+    const out = html(
+      createElement(LineList, {
+        lines: [
+          { ...DECKING, description: "90x45 SG8 Studs", section: "Framing" },
+          { ...DECKING, description: "10mm GIB Board", section: "Linings", line_total: 900 },
+          { ...DECKING, description: "90x45 SG8 Plates", section: "Framing", line_total: 300 },
+          { ...DECKING, description: "Added by hand", line_total: 50 },
+        ],
+        currency: "NZD",
+      }),
+    );
+    const order = ["Framing", "Linings", "Other materials"].map((t) => out.indexOf(`data-section="${t}"`));
+    expect(order.every((at, i) => at > 0 && (i === 0 || at > order[i - 1]))).toBe(true);
+    expect(out).toMatch(/<h4[^>]*>Framing<\/h4>/);
+    expect(out).toContain("$1,812.00");
+    // Plates keeps its own index, so tapping it still opens the right line.
+    const framing = out.slice(out.indexOf('data-section="Framing"'), out.indexOf('data-section="Linings"'));
+    expect(framing).toContain('data-line-index="0"');
+    expect(framing).toContain('data-line-index="2"');
   });
 });
 

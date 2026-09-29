@@ -163,6 +163,25 @@ describe("grouping and wording", () => {
     expect(groups[1].rows.map((r) => r.index)).toEqual([0, 3]);
     expect(groups[1].subtotal).toBe(2318.4);
     expect(groupLines([line()]).map((g) => g.title)).toEqual(["Materials"]);
+    expect(groups.every((g) => g.sections === null)).toBe(true);
+  });
+
+  it("splits materials from a plan set into their trades, keeping each line's index", () => {
+    const lines = [
+      line({ description: "Studs", line_total: 3914, section: "Framing" }),
+      line({ type: "labour", description: "Labour", quantity: 3, unit: "day", unit_price: 560, line_total: 1680 }),
+      line({ description: "GIB", line_total: 1500, section: "Linings" }),
+      line({ description: "Plates", line_total: 480, section: "Framing" }),
+      line({ description: "Skip bin", line_total: 350 }),
+    ];
+    const materials = groupLines(lines).find((g) => g.type === "material")!;
+    expect(materials.subtotal).toBe(6244);
+    expect(materials.sections?.map((s) => [s.title, s.rows.map((r) => r.index), s.subtotal])).toEqual([
+      ["Framing", [0, 3], 4394],
+      ["Linings", [2], 1500],
+      ["Other materials", [4], 350],
+    ]);
+    expect(groupLines(lines).find((g) => g.type === "labour")!.sections).toBeNull();
   });
 
   it("says the quantity with its unit", () => {

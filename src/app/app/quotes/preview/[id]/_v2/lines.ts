@@ -18,6 +18,7 @@ import {
 } from "@/lib/quote-defaults";
 import type { QuoteClient, QuoteData, QuoteItemType, QuoteLineItem } from "@/lib/quote-types";
 import { formatQuantity } from "@/lib/quantity-display";
+import { lineSections, otherSectionTitle } from "@/lib/quote-sections";
 import { isQuantityChecked, isUnpricedLine } from "@/lib/quote-validation";
 import { applyLineEdit } from "@/lib/t2qcalLineEdit";
 
@@ -102,11 +103,18 @@ export function checkIndexes(lines: readonly QuoteLineItem[], sizesConfirmed = f
   return lines.flatMap((line, index) => (lineNeedsCheck(line, sizesConfirmed) ? [index] : []));
 }
 
+export type LineRow = { line: QuoteLineItem; index: number };
+
 export interface LineGroup {
   type: QuoteItemType;
   title: string;
-  rows: Array<{ line: QuoteLineItem; index: number }>;
+  rows: LineRow[];
   subtotal: number;
+  /**
+   * The group's trade sections (Framing, Linings…) with their subtotals, when
+   * its lines carry them (a quote from a plan set); null for a plain list.
+   */
+  sections: Array<{ title: string; rows: LineRow[]; subtotal: number }> | null;
 }
 
 const GROUPS: ReadonlyArray<{ type: QuoteItemType; title: string }> = [
@@ -121,7 +129,8 @@ export function groupLines(lines: readonly QuoteLineItem[]): LineGroup[] {
     const rows = lines.flatMap((line, index) => (line.type === type ? [{ line, index }] : []));
     if (rows.length === 0) return [];
     const subtotal = round2(rows.reduce((sum, { line }) => sum + (Number(line.line_total) || 0), 0));
-    return [{ type, title, rows, subtotal }];
+    const sections = lineSections(rows, (row) => row.line, otherSectionTitle(type));
+    return [{ type, title, rows, subtotal, sections: sections?.map((s) => ({ title: s.title, rows: s.items, subtotal: s.subtotal })) ?? null }];
   });
 }
 

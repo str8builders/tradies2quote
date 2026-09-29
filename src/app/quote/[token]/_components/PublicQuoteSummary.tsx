@@ -9,6 +9,7 @@ import {
 } from "@/lib/quote-defaults";
 import type { PublicQuotePayload, PublicLineItem } from "@/lib/quote-types";
 import { formatQuantity, formatUnitPrice } from "@/lib/quantity-display";
+import { lineSections, otherSectionTitle } from "@/lib/quote-sections";
 import { mailtoHref, telHref } from "./contact-links";
 
 type Props = {
@@ -197,27 +198,50 @@ function Section({
   currency: string;
 }) {
   if (items.length === 0) return null;
+  // A quote from a plan set: each trade's lines under its own heading and
+  // subtotal (lib/quote-sections — the same split as the PDF).
+  const sections = lineSections(items, (it) => it, otherSectionTitle(items[0].type));
   return (
     <section className="t2q-card-pro p-5 sm:p-6">
       <h3 className="font-display text-base uppercase tracking-tight text-brand">
         {title}
       </h3>
-      <ul className="mt-3 divide-y divide-ink-700">
-        {items.map((it, i) => (
-          <li key={i} className="flex items-baseline justify-between gap-3 py-2.5">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm text-white">{it.description}</p>
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-400">
-                {formatQuantity(it.quantity, it.unit_price)} {it.unit} · {formatUnitPrice(it.unit_price, currency)}
+      {sections ? (
+        sections.map((section) => (
+          <div key={section.title} data-section={section.title} className="mt-4">
+            <div className="flex items-baseline justify-between gap-3 border-b border-ink-600 pb-1.5">
+              <h4 className="text-sm font-semibold text-white">{section.title}</h4>
+              <p className="shrink-0 font-mono text-sm font-semibold tabular-nums text-white">
+                {formatCurrency(section.subtotal, currency)}
               </p>
             </div>
-            <p className="shrink-0 font-mono text-sm tabular-nums text-white">
-              {formatCurrency(it.line_total, currency)}
-            </p>
-          </li>
-        ))}
-      </ul>
+            <Lines items={section.items} currency={currency} />
+          </div>
+        ))
+      ) : (
+        <Lines items={items} currency={currency} className="mt-3" />
+      )}
     </section>
+  );
+}
+
+function Lines({ items, currency, className }: { items: PublicLineItem[]; currency: string; className?: string }) {
+  return (
+    <ul className={className ? `${className} divide-y divide-ink-700` : "divide-y divide-ink-700"}>
+      {items.map((it, i) => (
+        <li key={i} className="flex items-baseline justify-between gap-3 py-2.5">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm text-white">{it.description}</p>
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-400">
+              {formatQuantity(it.quantity, it.unit_price)} {it.unit} · {formatUnitPrice(it.unit_price, currency)}
+            </p>
+          </div>
+          <p className="shrink-0 font-mono text-sm tabular-nums text-white">
+            {formatCurrency(it.line_total, currency)}
+          </p>
+        </li>
+      ))}
+    </ul>
   );
 }
 

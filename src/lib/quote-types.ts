@@ -56,6 +56,13 @@ export type QuoteLineItem = {
   is_missing_price?: boolean;
   is_calculated_takeoff?: boolean;
   formula?: string;
+  /**
+   * Trade section on the quote (Framing, Linings, Joinery…): shown as a
+   * heading with its own subtotal on the job page, the client's page and
+   * the PDF (lib/quote-sections). Set by the plan-set reader; absent on
+   * other quotes, which show as a plain list.
+   */
+  section?: string | null;
   price_match_key?: string;
   /** Stage 4 — where the unit_price came from. */
   price_source?: PriceSource;
@@ -286,6 +293,8 @@ export type PublicLineItem = {
   unit: string;
   unit_price: number;
   line_total: number;
+  /** Trade section (get_quote_by_token passes it through); null or absent on most quotes. */
+  section?: string | null;
 };
 
 export type PublicQuotePayload = {

@@ -13,13 +13,15 @@ import { SummaryTab } from "./SummaryTab";
 import { QuestionsTab } from "./QuestionsTab";
 import { MaterialsTab } from "./MaterialsTab";
 import { SheetViewer } from "./SheetViewer";
+import { QuoteBreakdownBar } from "./QuoteBreakdownBar";
 
 type Tab = "summary" | "plan" | "questions" | "materials";
 
 /**
  * One plan set: while it's being read, what it's doing (it carries on if
  * the tradie leaves); when read, the summary, the plan with what goes
- * where drawn on it, the questions, and the materials.
+ * where drawn on it, the questions, and the materials — with the Quote
+ * breakdown button at the thumb on every tab.
  */
 export function PlanSetScreen({ id, name }: { id: string; name: string }) {
   const [view, setView] = useState<PlanSetView | null>(null);
@@ -113,6 +115,14 @@ export function PlanSetScreen({ id, name }: { id: string; name: string }) {
           </>
         ) : null}
       </div>
+      {view?.model && !working && view.status !== "failed" ? (
+        <QuoteBreakdownBar
+          setId={id}
+          view={view}
+          onShowQuestions={tab === "materials" ? undefined : () => setTab("materials")}
+          showRemake={tab === "materials"}
+        />
+      ) : null}
     </Screen>
   );
 }

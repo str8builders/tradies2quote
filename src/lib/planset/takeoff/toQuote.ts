@@ -5,13 +5,15 @@
 // a price only comes from the tradie's own library on an exact, unit-
 // compatible match (libraryPriceForLine); otherwise the line is $0 and
 // marked missing a price, so the quote can't go out with a guess in it.
+// Each line carries its trade as the quote `section`, in build order, so
+// the quote reads as a breakdown: Framing, Lintels, … each with a subtotal.
 // ─────────────────────────────────────────────────────────────────────────
 
 import { libraryPriceForLine } from "@/lib/materials";
 import { round2 } from "@/lib/quote-defaults";
 import { computeQuoteTotals } from "@/lib/materials/estimateToQuote";
 import type { LibraryMaterial, QuoteData, QuoteLineItem } from "@/lib/quote-types";
-import type { PlanTakeoff, PlanTakeoffLine } from "./fromModel";
+import { TAKEOFF_ORDER, type PlanTakeoff, type PlanTakeoffLine } from "./fromModel";
 
 export function planQuoteLine(line: PlanTakeoffLine, library: LibraryMaterial[]): QuoteLineItem {
   const priced = libraryPriceForLine({ description: line.name, unit: line.unit }, library);
@@ -29,13 +31,16 @@ export function planQuoteLine(line: PlanTakeoffLine, library: LibraryMaterial[])
     is_calculated_takeoff: true,
     quantity_source: "calculator",
     formula: line.notes ? `${line.formula} ${line.notes}` : line.formula,
+    section: line.group,
     price_match_key: line.priceMatchKey,
     takeoff_status: line.status,
   };
 }
 
+/** The quote lines, section by section in build order (stable within a section). */
 export function planQuoteLines(t: PlanTakeoff, library: LibraryMaterial[]): QuoteLineItem[] {
-  return t.lines.map((l) => planQuoteLine(l, library));
+  const rank = (l: PlanTakeoffLine) => TAKEOFF_ORDER.indexOf(l.group);
+  return [...t.lines].sort((a, b) => rank(a) - rank(b)).map((l) => planQuoteLine(l, library));
 }
 
 export type QuoteProfileBits = { currency: string; taxLabel: string; taxRate: number; markupPct: number };

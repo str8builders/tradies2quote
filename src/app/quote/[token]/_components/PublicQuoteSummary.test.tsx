@@ -64,6 +64,38 @@ describe("the client's quote page", () => {
   });
 });
 
+describe("a quote from a plan set", () => {
+  it("shows each trade under its own heading and subtotal, adding up to the materials subtotal", () => {
+    const html = render(
+      payload({
+        line_items: [
+          { type: "material", description: "90x45 SG8 Studs", quantity: 412, unit: "each", unit_price: 10, line_total: 4120, section: "Framing" },
+          { type: "material", description: "10mm GIB Board", quantity: 100, unit: "sheets", unit_price: 25, line_total: 2500, section: "Linings" },
+          { type: "material", description: "90x45 SG8 Plates", quantity: 60, unit: "lengths", unit_price: 30, line_total: 1800, section: "Framing" },
+          { type: "material", description: "Skip bin", quantity: 1, unit: "each", unit_price: 400, line_total: 400, section: null },
+          { type: "labour", description: "Frame the house", quantity: 10, unit: "day", unit_price: 600, line_total: 6000 },
+        ],
+        materials_subtotal: 8820, labour_subtotal: 6000, markup_amount: 882,
+        subtotal_before_tax: 15702, tax_amount: 2355.3, total: 18057.3,
+      }),
+    );
+    const text = html.replace(/<[^>]*>/g, " ");
+    // 10% markup folded in: Framing $5,920 → $6,512, Linings $2,750, the skip bin $440.
+    expect(text).toMatch(/Framing\s+\$6,512\.00/);
+    expect(text).toMatch(/Linings\s+\$2,750\.00/);
+    expect(text).toMatch(/Other materials\s+\$440\.00/);
+    expect(text).toMatch(/Materials subtotal\s+\$9,702\.00/);
+    const order = ["Framing", "Linings", "Other materials"].map((t) => html.indexOf(`data-section="${t}"`));
+    expect(order[0]).toBeGreaterThan(-1);
+    expect(order[0] < order[1] && order[1] < order[2]).toBe(true);
+    expect(html).not.toContain('data-section="Other labour"');
+  });
+
+  it("a quote without sections shows the plain list", () => {
+    expect(render(payload())).not.toContain("data-section=");
+  });
+});
+
 describe("contact links", () => {
   it("dials the digits, keeping a leading +", () => {
     expect(telHref("021 555 0101")).toBe("tel:0215550101");

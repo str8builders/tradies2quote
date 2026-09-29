@@ -133,3 +133,33 @@ describe("quote PDF — valid until", () => {
     expect(await renderQuote(quote(), undefined)).not.toContain("Valid until 01 Oct 2026");
   });
 });
+
+describe("quote PDF — a quote from a plan set reads as a breakdown", () => {
+  const sectioned: QuoteLineItem[] = [
+    { type: "material", description: "90x45 SG8 Studs", quantity: 412, unit: "each", unit_price: 10, line_total: 4120, section: "Framing" },
+    { type: "material", description: "90x45 SG8 Plates", quantity: 60, unit: "lengths", unit_price: 30, line_total: 1800, section: "Framing" },
+    { type: "material", description: "10mm GIB Board", quantity: 100, unit: "sheets", unit_price: 25, line_total: 2500, section: "Linings" },
+    { type: "material", description: "Skip bin", quantity: 1, unit: "each", unit_price: 400, line_total: 400 },
+    { type: "labour", description: "Frame the house", quantity: 10, unit: "day", unit_price: 600, line_total: 6000 },
+  ];
+
+  it("prints each trade under its heading with a subtotal that includes the folded-in markup", async () => {
+    const texts = await renderQuote(quote({}, sectioned, 10, 15));
+    const at = (t: string) => texts.indexOf(t);
+    // Framing $5,920 + 10% = $6,512; Linings $2,750; hand-added lines last under Other materials.
+    expect(at("Framing")).toBeGreaterThan(-1);
+    expect(texts[at("Framing") + 1]).toBe("$6,512.00");
+    expect(texts[at("Linings") + 1]).toBe("$2,750.00");
+    expect(texts[at("Other materials") + 1]).toBe("$440.00");
+    expect(at("Framing")).toBeLessThan(at("Linings"));
+    expect(at("Linings")).toBeLessThan(at("Other materials"));
+    expect(at("Other materials")).toBeLessThan(at("Skip bin"));
+    // Labour lines carry no section, so the labour table is a plain list.
+    expect(texts).not.toContain("Other labour");
+  });
+
+  it("a quote without sections prints as it always has", async () => {
+    const texts = await renderQuote(quote());
+    expect(texts).not.toContain("Other materials");
+  });
+});

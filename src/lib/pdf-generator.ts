@@ -11,6 +11,7 @@ import type { QuoteData, QuoteLineItem, QuoteProfile } from "./quote-types";
 import { drawPdfLogo, type PdfLogo } from "./pdf-logo";
 import { BUSINESS_NAME_REQUIRED, businessNameForDocuments } from "./business-name";
 import { pdfParagraphs, pdfText } from "./pdf-text";
+import { lineSections, otherSectionTitle } from "./quote-sections";
 import { quoteDataForClient } from "./quote-client-view";
 import { documentValidUntil } from "./quote-expiry";
 
@@ -281,7 +282,16 @@ export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> 
     drawRule(y);
     y -= 12;
 
-    for (const it of items) {
+    const continueTable = () => {
+      page = pdf.addPage([PAGE_W, PAGE_H]);
+      y = TOP;
+      drawHeaderRow(y);
+      y -= 4;
+      drawRule(y);
+      y -= 12;
+    };
+
+    const drawItem = (it: QuoteLineItem) => {
       const columns = [
         { text: pdfText(it.description || ""), x: COL_DESC_X, width: 222, right: false },
         { text: pdfText(`${formatQuantity(it.quantity, it.unit_price)} ${it.unit ?? ""}`.trim()), x: COL_QTY_X, width: 94, right: false },
@@ -301,14 +311,6 @@ export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> 
         ? { ...column, size: 9, lines: ["See below"] } : column);
       const bodyLines = Math.max(1, ...visible.map(column => column.lines.length));
       const rowHeight = bodyLines * 13 + details.length * 12 + 6;
-      const continueTable = () => {
-        page = pdf.addPage([PAGE_W, PAGE_H]);
-        y = TOP;
-        drawHeaderRow(y);
-        y -= 4;
-        drawRule(y);
-        y -= 12;
-      };
       // Keep normal rows together; very long descriptions continue onto as
       // many pages as needed without losing the quantity on the first part.
       if (rowHeight <= TOP - BOTTOM_MIN - 16 && y - rowHeight < BOTTOM_MIN) continueTable();
@@ -331,6 +333,25 @@ export async function generateQuotePdf(args: GenerateArgs): Promise<Uint8Array> 
         y -= 12;
       }
       y -= 6;
+    };
+
+    // Trade sections (a quote from a plan set): each trade's lines under a
+    // heading with its subtotal — the same split as the client's page.
+    const sections = lineSections(items, (it) => it, otherSectionTitle(items[0].type));
+    if (!sections) {
+      for (const it of items) drawItem(it);
+    } else {
+      for (const section of sections) {
+        // Never leave a heading alone at the foot of a page.
+        if (y - 34 < BOTTOM_MIN) continueTable();
+        const title = pdfText(section.title);
+        const subtotal = pdfText(formatCurrency(section.subtotal, quote.currency));
+        page.drawText(title, { x: COL_DESC_X, y, font: bold, size: 10, color: INK });
+        page.drawText(subtotal, { x: COL_TOTAL_X - bold.widthOfTextAtSize(subtotal, 10), y, font: bold, size: 10, color: INK });
+        y -= 16;
+        for (const it of section.items) drawItem(it);
+        y -= 4;
+      }
     }
     y -= 6;
   }

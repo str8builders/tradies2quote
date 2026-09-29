@@ -7,7 +7,7 @@
  * pattern Stage 5 uses for `compliance_review`:
  *
  *   1. Type-level: `PublicQuotePayload` declares no transcript field.
- *      `PublicLineItem` declares its exact 6 customer-facing keys.
+ *      `PublicLineItem` declares its exact customer-facing keys (6 + trade section).
  *      A type-level assertion below proves transcript field names
  *      don't appear in either.
  *
@@ -51,14 +51,16 @@ describe("Stage 6 transcript privacy", () => {
     expectTypeOf<Leak>().toEqualTypeOf<never>();
   });
 
-  it("type-level: PublicLineItem still has its exact 6 customer-facing keys", () => {
+  it("type-level: PublicLineItem still has its exact customer-facing keys (6 plus the trade section)", () => {
     type Expected =
       | "type"
       | "description"
       | "quantity"
       | "unit"
       | "unit_price"
-      | "line_total";
+      | "line_total"
+      // The trade heading (Framing, Linings…) — shown to the client on purpose.
+      | "section";
     expectTypeOf<keyof PublicLineItem>().toEqualTypeOf<Expected>();
   });
 

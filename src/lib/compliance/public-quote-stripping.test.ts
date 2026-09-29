@@ -10,7 +10,7 @@
  *      assertion. We re-assert here for the new fields specifically.
  *
  *   2. Construction: the Supabase RPC `get_quote_by_token` projects only
- *      the 6 customer-facing fields when shaping the public payload, so
+ *      the customer-facing fields (6 + trade section) when shaping the public payload, so
  *      the database never returns the compliance metadata to the
  *      `/quote/[token]` page. (Tested live in Phase F's
  *      "no matcher leaks" smoke test, which already validates this for
@@ -53,14 +53,16 @@ describe("PublicLineItem strips Stage-5 compliance fields (test 11)", () => {
     expectTypeOf<Leak>().toEqualTypeOf<never>();
   });
 
-  it("type-level: PublicLineItem still has its exact 6 customer-facing keys", () => {
+  it("type-level: PublicLineItem still has its exact customer-facing keys (6 plus the trade section)", () => {
     type ExpectedPublicKeys =
       | "type"
       | "description"
       | "quantity"
       | "unit"
       | "unit_price"
-      | "line_total";
+      | "line_total"
+      // The trade heading (Framing, Linings…) — shown to the client on purpose.
+      | "section";
     type Actual = keyof PublicLineItem;
     expectTypeOf<Actual>().toEqualTypeOf<ExpectedPublicKeys>();
   });

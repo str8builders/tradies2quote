@@ -733,7 +733,9 @@ describe("safelyEnrichLineItemsWithCatalogue — diagnostics never expose intern
       | "quantity"
       | "unit"
       | "unit_price"
-      | "line_total";
+      | "line_total"
+      // The trade heading (Framing, Linings…) — shown to the client on purpose.
+      | "section";
     type _AssertNoDiagnosticsLeak = keyof PublicLineItem extends ExpectedKeys
       ? true
       : false;
@@ -758,7 +760,7 @@ describe("safelyEnrichLineItemsWithCatalogue — diagnostics never expose intern
 
 describe("public payload contract — internal fields hidden (Stage 4.3 regression)", () => {
   /**
-   * Type-level proof that `PublicLineItem` exposes EXACTLY the 6 customer-
+   * Type-level proof that `PublicLineItem` exposes EXACTLY the 6 (+ trade section) customer-
    * facing columns. If a future change adds (or accidentally exposes) any
    * of the Stage 4 internal fields — material_id, library_id,
    * price_match_key, price_source, price_confidence, is_missing_price,
@@ -772,13 +774,15 @@ describe("public payload contract — internal fields hidden (Stage 4.3 regressi
     | "quantity"
     | "unit"
     | "unit_price"
-    | "line_total";
+    | "line_total"
+    // The trade heading (Framing, Linings…) — shown to the client on purpose.
+    | "section";
 
   type ActualKeys = keyof PublicLineItem;
   type _AssertNoExtra = ActualKeys extends ExpectedKeys ? true : false;
   type _AssertCovers = ExpectedKeys extends ActualKeys ? true : false;
 
-  it("PublicLineItem exposes exactly 6 customer-facing fields", () => {
+  it("PublicLineItem exposes exactly its customer-facing fields (6 plus the trade section)", () => {
     // Static checks (compile-time):
     const _checkExtra: _AssertNoExtra = true;
     const _checkCovers: _AssertCovers = true;

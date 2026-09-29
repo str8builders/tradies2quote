@@ -22,6 +22,9 @@ import type { Question } from "../model/types";
 
 export type TakeoffGroup = "Framing" | "Linings" | "Insulation" | "Finishing" | "Joinery" | "Lintels" | "Cladding" | "Roofing" | "Slab";
 
+/** The groups in build order: how the list and the quote's sections run. */
+export const TAKEOFF_ORDER: readonly TakeoffGroup[] = ["Slab", "Framing", "Lintels", "Roofing", "Cladding", "Joinery", "Insulation", "Linings", "Finishing"];
+
 export type PlanTakeoffLine = {
   id: string;
   group: TakeoffGroup;
