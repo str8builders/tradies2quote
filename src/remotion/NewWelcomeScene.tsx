@@ -156,6 +156,38 @@ function Sparks({ frame, at }: { frame: number; at: number }) {
   );
 }
 
+/** Width the greeting lines may use (the composition less 40 px each side). */
+const LINE_WIDTH = NEW_WELCOME_WIDTH - 80;
+
+/**
+ * A font size at which the WHOLE line fits on one line, worked out before
+ * typing starts (Archivo Black's advance widths, a little generous). A long
+ * business name ("STR8 Builders") used to fill the line exactly, so the
+ * blinking caret pushed it over and it jumped between one and two lines.
+ */
+export function fitFontSize(text: string, max: number): number {
+  let em = 0;
+  for (const ch of text) em += /[MW]/.test(ch) ? 1.05 : /[A-Z0-9]/.test(ch) ? 0.8 : /[mw]/.test(ch) ? 1.0 : /[a-z]/.test(ch) ? 0.66 : ch === " " ? 0.32 : 0.4;
+  return Math.max(28, Math.min(max, Math.floor(LINE_WIDTH / Math.max(em, 1))));
+}
+
+/**
+ * A line that types in without moving: the whole text is laid out from the
+ * first frame (untyped letters hidden, not missing), so a centred line never
+ * slides as it grows, and the caret takes no room, so blinking can't reflow.
+ */
+function TypedLine({ text, shown, caret, size, color }: { text: string; shown: number; caret: boolean; size: number; color?: string }) {
+  return (
+    <div style={{ whiteSpace: "nowrap", fontSize: size, color }}>
+      {text.slice(0, shown)}
+      <span style={{ display: "inline-block", width: 0, position: "relative" }}>
+        <span style={{ position: "absolute", left: 0, bottom: "-0.1em", color: ORANGE, visibility: caret ? "visible" : "hidden" }}>|</span>
+      </span>
+      <span style={{ visibility: "hidden" }}>{text.slice(shown)}</span>
+    </div>
+  );
+}
+
 /** One frame of the welcome (also the poster). */
 export function NewWelcomeArt({ frame, fps, greeting, name, today, calm = false }: NewWelcomeProps & { frame: number; fps: number }) {
   const s = (from: number, damping: number, stiffness: number) => spring({ frame: frame - from, fps, config: { damping, stiffness } });
@@ -229,12 +261,9 @@ export function NewWelcomeArt({ frame, fps, greeting, name, today, calm = false 
         </>
       )}
 
-      <div style={{ position: "absolute", left: 40, right: 40, top: 900, textAlign: "center", fontFamily: DISPLAY, fontSize: 64, lineHeight: 1.1, color: TEXT }}>
-        <div>{headShown}{shown <= greetingText.length && caret ? <span style={{ color: ORANGE }}>|</span> : null}</div>
-        <div style={{ color: ORANGE_TEXT, fontSize: name ? 72 : 44 }}>
-          {tailShown}
-          {shown > greetingText.length && caret ? <span style={{ color: ORANGE }}>|</span> : null}
-        </div>
+      <div style={{ position: "absolute", left: 40, right: 40, top: 900, textAlign: "center", fontFamily: DISPLAY, lineHeight: 1.1, color: TEXT }}>
+        <TypedLine text={greetingText} shown={headShown.length} caret={shown <= greetingText.length && caret} size={fitFontSize(greetingText, 64)} />
+        <TypedLine text={tail} shown={tailShown.length} caret={shown > greetingText.length && caret} size={fitFontSize(tail, name ? 72 : 44)} color={ORANGE_TEXT} />
       </div>
 
       <div style={{ position: "absolute", left: 0, right: 0, top: 1110, display: "flex", justifyContent: "center", gap: 20, fontFamily: SANS, fontSize: 28, fontWeight: 700, color: TEXT }}>
