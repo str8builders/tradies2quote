@@ -32,7 +32,16 @@ export const STATUS_LABEL: Record<PlanSetStatus, { tone: "ok" | "warn" | "bad" |
  * so far. The PDF goes straight to private storage; the server reads it in
  * the background, so the tradie can leave and come back.
  */
-export function PlansHome({ sets, needsConsent }: { sets: PlanSetListItem[]; needsConsent: boolean }) {
+export function PlansHome({
+  sets,
+  needsConsent,
+  back = { href: HOME_PATH, label: "Home" },
+}: {
+  sets: PlanSetListItem[];
+  needsConsent: boolean;
+  /** Where the top bar's Back goes: Home, or New quote when opened from there. */
+  back?: { href: string; label: string };
+}) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -86,7 +95,7 @@ export function PlansHome({ sets, needsConsent }: { sets: PlanSetListItem[]; nee
 
   return (
     <Screen data-testid="plans-home">
-      <TopBar title="Read drawings" back={{ href: HOME_PATH, label: "Home" }} safeArea={false} />
+      <TopBar title="Read drawings" back={back} safeArea={false} />
       <div className="mx-auto w-full max-w-xl flex-1 space-y-6 px-4 pt-5 pb-10">
         <Card padding="lg" className="space-y-4">
           <div className="flex items-start gap-3">

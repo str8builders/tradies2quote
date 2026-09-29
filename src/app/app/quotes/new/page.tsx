@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isNativeShellRequest } from "@/lib/native-shell";
 import { hasAiConsent } from "@/lib/ai-consent";
 import { isNewLookOn } from "@/lib/ui/newLook";
+import { planReaderAllowed } from "@/lib/planreader/flag";
 import { AppHeader } from "../../_components/AppHeader";
 import { QuoteInputTabs } from "./_components/QuoteInputTabs";
 import { NewQuoteFlow } from "./_v2/NewQuoteFlow";
@@ -77,6 +78,7 @@ export default async function NewQuotePage({
         needsAiConsent={needsAiConsent}
         voiceEnabled={voiceEnabled}
         scanEnabled={scanEnabled}
+        drawingsEnabled={planReaderAllowed(user.email)}
       />
     );
   }

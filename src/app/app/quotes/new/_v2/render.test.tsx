@@ -83,6 +83,11 @@ describe("NewQuoteFlow", () => {
     expect(noVoice).toContain('data-testid="choose-scan"');
   });
 
+  it("offers the full set of plans only to whoever may use the drawing reader", () => {
+    expect(flow()).not.toContain('data-testid="choose-drawings"');
+    expect(flow({ drawingsEnabled: true })).toContain('data-testid="choose-drawings"');
+  });
+
   it("with typing as the only way in, opens straight on it", () => {
     const out = flow({ voiceEnabled: false, scanEnabled: false });
     expect(out).toContain('data-new-quote-screen="type"');
@@ -131,6 +136,27 @@ describe("ChooseScreen", () => {
     expect(tag(out, 'data-testid="choose-talk"')).toContain("border-ui-brand");
     expect(tag(out, 'data-testid="choose-type"')).toContain("border-ui-line");
     expect(out).toContain("What&#x27;s the job?");
+    expect(out).not.toContain('data-testid="choose-drawings"');
+  });
+
+  it("the full set of plans comes last, as a link to the drawing reader that brings Back here", () => {
+    const out = html(
+      <ChooseScreen
+        choices={channelChoices({ voiceEnabled: true, scanEnabled: true })}
+        onChoose={noop}
+        drawings
+        back={{ kind: "cancel" }}
+        focusOnArrival={false}
+      />,
+    );
+    const link = tag(out, 'data-testid="choose-drawings"');
+    expect(link.startsWith("<a ")).toBe(true);
+    expect(link).toContain('href="/app/drawings?from=quote"');
+    expect(link).toContain("min-h-20");
+    expect(link).toContain("border-ui-line");
+    expect(out).toContain(">Full set of plans</span>");
+    expect(out).toContain(">Upload the whole set and we&#x27;ll list the materials.</span>");
+    expect(out.indexOf('data-testid="choose-scan"')).toBeLessThan(out.indexOf('data-testid="choose-drawings"'));
   });
 });
 

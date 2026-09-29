@@ -32,6 +32,8 @@ export interface NewQuoteFlowProps {
   voiceEnabled: boolean;
   /** The drawing reader is configured (Photo of a plan is offered). */
   scanEnabled: boolean;
+  /** This tradie may use the plan-set reader (Full set of plans is offered). */
+  drawingsEnabled?: boolean;
   /** `?error=` from a failed `createDraftQuote`. */
   errorKey?: string;
   /** `?start=talk`: open straight on the mic (Home's "Talk a quote"). */
@@ -45,7 +47,7 @@ export interface NewQuoteFlowProps {
  * the plan reader, the clean-up questions, and `createDraftQuote`, which
  * saves the words and opens the quote page where QuoteGenerator writes it.
  */
-export function NewQuoteFlow({ needsAiConsent, voiceEnabled, scanEnabled, errorKey, start }: NewQuoteFlowProps) {
+export function NewQuoteFlow({ needsAiConsent, voiceEnabled, scanEnabled, drawingsEnabled = false, errorKey, start }: NewQuoteFlowProps) {
   const [state, dispatch] = useReducer(
     flowReducer,
     { voiceEnabled, scanEnabled } satisfies ChannelFlags,
@@ -203,6 +205,7 @@ export function NewQuoteFlow({ needsAiConsent, voiceEnabled, scanEnabled, errorK
         {...common}
         choices={channelChoices({ voiceEnabled, scanEnabled })}
         onChoose={(channel) => go({ type: "choose", channel })}
+        drawings={drawingsEnabled}
       />
     );
   }

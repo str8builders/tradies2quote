@@ -51,6 +51,7 @@ vi.mock("./_v2/NewQuoteFlow", () => ({
     createElement("div", { "data-testid": "new-flow", "data-props": JSON.stringify(props) }),
 }));
 
+import { OWNER_EMAIL } from "@/lib/owner";
 import NewQuotePage from "./page";
 
 const USER = { id: "u-1", email: "tradie@example.test", created_at: "2026-09-01T00:00:00Z" };
@@ -121,7 +122,13 @@ describe("switch on: the new look, behind the same gates", () => {
     // <AppHeader> becomes a second "Cancel / New quote" bar (and a second h1) in the new look.
     expect(html).not.toContain('data-testid="app-header"');
     expect(html).toMatch(/^<div data-testid="new-flow" data-props="[^"]*"><\/div>$/);
-    expect(newFlowProps(html)).toEqual({ needsAiConsent: false, voiceEnabled: true, scanEnabled: true, start: null });
+    expect(newFlowProps(html)).toEqual({
+      needsAiConsent: false,
+      voiceEnabled: true,
+      scanEnabled: true,
+      drawingsEnabled: false,
+      start: null,
+    });
   });
 
   it("no second top bar with a page error either", async () => {
@@ -146,6 +153,15 @@ describe("switch on: the new look, behind the same gates", () => {
     expect(newFlowProps(await render())).toMatchObject({ voiceEnabled: false, scanEnabled: true });
     vi.stubEnv("ANTHROPIC_API_KEY", "");
     expect(newFlowProps(await render())).toMatchObject({ voiceEnabled: false, scanEnabled: false });
+  });
+
+  it("offers the full set of plans to the owner, or to everyone once the reader is switched on", async () => {
+    expect(newFlowProps(await render()).drawingsEnabled).toBe(false);
+    state.user = { ...USER, email: OWNER_EMAIL };
+    expect(newFlowProps(await render()).drawingsEnabled).toBe(true);
+    state.user = USER;
+    vi.stubEnv("PLAN_READER_ENABLED", "true");
+    expect(newFlowProps(await render()).drawingsEnabled).toBe(true);
   });
 
   it("an expired trial still goes to the upgrade page first", async () => {

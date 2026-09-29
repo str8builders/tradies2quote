@@ -47,6 +47,17 @@ export function channelChoices(flags: ChannelFlags): ChannelChoice[] {
   }));
 }
 
+/**
+ * Not a channel: a whole drawing set is read on its own page over a few
+ * minutes, and its materials go into a quote from there. Offered to whoever
+ * may use the plan-set reader (planReaderAllowed), after the ways in.
+ */
+export const DRAWINGS_CHOICE = {
+  href: "/app/drawings?from=quote",
+  title: "Full set of plans",
+  line: "Upload the whole set and we'll list the materials.",
+} as const;
+
 export function channelTitle(channel: Channel): string {
   return COPY[channel].title;
 }

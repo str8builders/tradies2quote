@@ -15,7 +15,8 @@ export const dynamic = "force-dynamic";
  * /app/drawings — upload a whole consented plan set; the list of sets read so
  * far. Owner-only while the reader is proven on real plans (404 otherwise).
  */
-export default async function PlansPage() {
+export default async function PlansPage({ searchParams }: { searchParams: Promise<{ from?: string | string[] }> }) {
+  const { from } = await searchParams;
   const { user } = await getCachedAuthUser();
   if (!user) redirect("/login");
   if (!planReaderAllowed(user.email)) notFound();
@@ -30,5 +31,13 @@ export default async function PlansPage() {
     hasAiConsent(supabase, user.id),
   ]);
   // Guideline 5.1.2(i): in the iPhone app, ask before anything goes to the AI.
-  return <PlansHome sets={(data ?? []) as unknown as PlanSetListItem[]} needsConsent={nativeShell && !consented} />;
+  // Opened from New quote's "Full set of plans": Back goes back there.
+  const fromQuote = (Array.isArray(from) ? from[0] : from) === "quote";
+  return (
+    <PlansHome
+      sets={(data ?? []) as unknown as PlanSetListItem[]}
+      needsConsent={nativeShell && !consented}
+      back={fromQuote ? { href: "/app/quotes/new", label: "New quote" } : undefined}
+    />
+  );
 }
