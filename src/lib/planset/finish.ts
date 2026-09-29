@@ -13,8 +13,10 @@ import { openPlanPdf, type OpenPlanPdf } from "./pdf/read";
 import { alignSheets } from "./measure/align";
 
 import { buildRegister, type Register } from "./sheet/register";
+import { classifySheet } from "./sheet/classify";
 import { PLAN_KINDS, readSheetWalls, type SheetFacts } from "./sheetFacts";
 import { assembleModel } from "./model/assemble";
+import { placeOpenings } from "./model/openings";
 import type { BuildingModel } from "./model/types";
 import { interpretPlanSet } from "./interpret/run";
 
@@ -154,6 +156,23 @@ export async function finishPlanSet(input: FinishInput): Promise<FinishResult> {
   await input.progress("Reading the notes, sections and consent papers");
   const ai = await interpretPlanSet({ facts, pdf: input.pdf, model, register });
   model = ai.model;
+  // Windows/doors read off a scanned schedule: find them on the plans too.
+  const placedFlags = placeOpenings(
+    model.openings,
+    facts.filter((f) => !f.document).map((f) => ({ page: f.page, marks: f.marks, text: f.text, walls: f.walls ? { ratio: f.walls.ratio, lines: f.walls.lines } : null })),
+  );
+  if (placedFlags.length) model = { ...model, flags: [...model.flags, ...placedFlags] };
+
+  // Scanned pages have no text title block: use what the two reads agreed they are.
+  for (const [page, sheet] of Object.entries(ai.sheetTitles)) {
+    const f = facts.find((x) => x.page === Number(page));
+    if (!f) continue;
+    f.title = { ...f.title, sheetId: f.title.sheetId ?? (sheet.id || null), title: f.title.title ?? (sheet.title || null), scaleNotes: sheet.scale ? [...f.title.scaleNotes, sheet.scale] : f.title.scaleNotes };
+    if (f.kind === "other" && f.title.title) {
+      f.kind = classifySheet({ title: f.title.title, indexName: null, sheet: asRaw(f), document: f.document }).kind;
+    }
+    changed.add(f.page);
+  }
 
   const sheetUpdates: SheetUpdate[] = facts
     .filter((f) => changed.has(f.page))

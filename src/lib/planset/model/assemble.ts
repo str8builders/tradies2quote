@@ -209,7 +209,13 @@ export function assembleModel(facts: readonly SheetFacts[], register: Register):
       flags.push({ id: `draft-${f.page}`, level: "check", topic: "draft", message: `${name} is marked as a draft. Make sure you're pricing the consented version.`, evidence: [{ page: f.page, method: "text" }] });
     }
     if (f.unreadable) {
-      flags.push({ id: `unreadable-${f.page}`, level: "check", topic: "unreadable", message: `${name} has no readable text (a scan or text drawn as shapes). Nothing was read off it.`, evidence: [{ page: f.page, method: "text" }] });
+      flags.push({
+        id: `unreadable-${f.page}`,
+        level: "info",
+        topic: "unreadable",
+        message: `${name} is a scan or photo (no text to read directly). Two AIs read it separately and only what both read the same way is kept; nothing is measured off it.`,
+        evidence: [{ page: f.page, method: "text" }],
+      });
     }
     if (f.dimensions.approx > 0 && (f.kind === "floor_plan" || f.kind === "dimension_plan")) {
       flags.push({ id: `approx-${f.page}`, level: "info", topic: "approximate", message: `${name} marks ${f.dimensions.approx} dimension${f.dimensions.approx === 1 ? "" : "s"} as approximate (±). Check those on site.`, evidence: [{ page: f.page, method: "text" }] });

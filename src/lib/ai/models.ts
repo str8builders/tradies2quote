@@ -30,6 +30,8 @@ export type AiModelRole =
   | "planReader"
   /** Whole plan-set reader: notes, sections and consent papers (PDF, cited). */
   | "planSet"
+  /** Whole plan-set reader: the second, independent read of a scanned page. */
+  | "planSetCheck"
   /** Supplier quote / invoice photo reader (vision). */
   | "supplierQuote"
   /** Photo / plan agent on OpenAI vision. */
@@ -52,6 +54,7 @@ export const AI_MODEL_DEFAULTS: Readonly<Record<AiModelRole, string>> = {
   drawingScan: "claude-opus-4-8",
   planReader: "claude-opus-4-8",
   planSet: "claude-opus-5-5",
+  planSetCheck: "claude-sonnet-5-5",
   supplierQuote: "claude-sonnet-5",
   photoPlan: "gpt-4o-mini",
   openaiDefault: "gpt-4o-mini",
@@ -71,6 +74,7 @@ export const AI_MODEL_ENV: Readonly<Record<AiModelRole, readonly string[]>> = {
   drawingScan: ["AI_MODEL_DRAWING_SCAN"],
   planReader: ["AI_MODEL_PLAN_READER"],
   planSet: ["AI_MODEL_PLAN_SET"],
+  planSetCheck: ["AI_MODEL_PLAN_SET_CHECK"],
   supplierQuote: ["AI_MODEL_SUPPLIER_QUOTE"],
   photoPlan: ["AI_MODEL_PHOTO_PLAN"],
   openaiDefault: ["AI_MODEL_OPENAI_DEFAULT"],

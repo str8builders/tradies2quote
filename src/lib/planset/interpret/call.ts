@@ -20,19 +20,28 @@ export type SheetCall = {
   prompt: string;
 };
 
-export type SheetCallResult = { reading: SheetReading; usage: AiUsage; truncated: boolean; model: string };
+export type SheetCallResult = { reading: SheetReading; json: unknown; usage: AiUsage; truncated: boolean; model: string };
 
-export async function readSheetWithAi(call: SheetCall, opts: { apiKey?: string | null; fetchImpl?: typeof fetch } = {}): Promise<SheetCallResult> {
+export type SheetCallOptions = {
+  apiKey?: string | null;
+  fetchImpl?: typeof fetch;
+  /** Default: the planSet model (Claude Opus 5.5). */
+  model?: string;
+  system?: string;
+  schema?: Record<string, unknown>;
+};
+
+export async function readSheetWithAi(call: SheetCall, opts: SheetCallOptions = {}): Promise<SheetCallResult> {
   const reply = await callAnthropic({
     apiKey: opts.apiKey ?? process.env.ANTHROPIC_API_KEY,
     fetchImpl: opts.fetchImpl,
     headers: { "anthropic-beta": "server-side-fallback-2026-07-01" },
     body: {
-      model: aiModel("planSet"),
+      model: opts.model ?? aiModel("planSet"),
       max_tokens: 16000,
-      system: SYSTEM_PROMPT,
+      system: opts.system ?? SYSTEM_PROMPT,
       fallbacks: "default",
-      output_config: { effort: "high", format: { type: "json_schema", schema: SHEET_READING_SCHEMA } },
+      output_config: { effort: "high", format: { type: "json_schema", schema: opts.schema ?? SHEET_READING_SCHEMA } },
       messages: [{ role: "user", content: [pdfDocumentBlock(call.pdf), { type: "text", text: call.prompt }] }],
     },
     timeoutMs: SHEET_READ_TIMEOUT_MS,
@@ -40,12 +49,14 @@ export async function readSheetWithAi(call: SheetCall, opts: { apiKey?: string |
     onTruncated: "return",
   });
   let reading: SheetReading = EMPTY_READING;
+  let json: unknown = null;
   if (!reply.truncated) {
     try {
-      reading = { ...EMPTY_READING, ...(JSON.parse(reply.text) as Partial<SheetReading>) };
+      json = JSON.parse(reply.text);
+      reading = { ...EMPTY_READING, ...(json as Partial<SheetReading>) };
     } catch {
       reading = EMPTY_READING;
     }
   }
-  return { reading, usage: reply.usage, truncated: reply.truncated, model: reply.model };
+  return { reading, json, usage: reply.usage, truncated: reply.truncated, model: reply.model };
 }

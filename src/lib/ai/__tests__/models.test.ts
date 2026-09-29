@@ -11,6 +11,7 @@ describe("AI model config", () => {
       drawingScan: "claude-opus-4-8",
       planReader: "claude-opus-4-8",
       planSet: "claude-opus-5-5",
+      planSetCheck: "claude-sonnet-5-5",
       supplierQuote: "claude-sonnet-5",
       photoPlan: "gpt-4o-mini",
       openaiDefault: "gpt-4o-mini",

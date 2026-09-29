@@ -153,6 +153,45 @@ export function readOpenings(schedules: readonly (Schedule & { page: number })[]
   return { openings, flags };
 }
 
+/**
+ * Openings added later (read off a scanned schedule) get the same treatment:
+ * find their marks on the plan sheets, pair them with wall gaps (best pairs
+ * first, gaps already used by other openings excluded) and check the width.
+ */
+export function placeOpenings(openings: ModelOpening[], sheets: readonly OpeningSheet[]): Flag[] {
+  const flags: Flag[] = [];
+  const planSheets = sheets.filter((s) => s.walls);
+  const taken = new Set<string>(openings.filter((o) => o.wall).map((o) => `${o.planPage}:${o.wall!.line}:${o.wall!.x}:${o.wall!.y}`));
+  const candidates: Array<Candidate & { sheet: OpeningSheet }> = [];
+  openings.forEach((o, idx) => {
+    if (o.wall || o.planPage) return;
+    for (const s of planSheets) {
+      const m = s.marks.find((mk) => mk.id === o.mark);
+      if (!m) continue;
+      o.planPage = s.page;
+      o.evidence.push({ page: s.page, text: [m.textId], method: "text" });
+      if (m.spec && !o.lintel) o.lintel = m.spec;
+      for (const c of gapCandidates(idx, m, s, o.widthMm)) candidates.push({ ...c, sheet: s });
+      break;
+    }
+  });
+  const done = new Set<number>();
+  for (const c of candidates.sort((a, b) => a.score - b.score)) {
+    const key = `${c.sheet.page}:${c.line.id}:${c.x}:${c.y}`;
+    if (done.has(c.idx) || taken.has(key)) continue;
+    done.add(c.idx);
+    taken.add(key);
+    const o = openings[c.idx];
+    o.wall = { line: c.line.id, external: c.line.external, gapWidthMm: c.widthMm, x: c.x, y: c.y };
+    const tolerance = o.kind === "door" ? DOOR_TOLERANCE_MM : SIZE_TOLERANCE_MM;
+    o.sizeCheck = o.widthMm == null ? "unchecked" : Math.abs(c.widthMm - o.widthMm) <= tolerance ? "ok" : "differs";
+    if (o.sizeCheck === "differs") {
+      flags.push({ id: `opening-size-${o.mark}`, level: "check", topic: "opening", message: `${o.mark}: the schedule says ${o.widthMm} wide, the gap drawn in the wall measures ${c.widthMm}.`, evidence: o.evidence, rfi: `${o.mark}: schedule width ${o.widthMm} mm vs ${c.widthMm} mm drawn — which is right?` });
+    }
+  }
+  return flags;
+}
+
 /** Gaps narrower than this are wall junctions, not openings (real mm). */
 const MIN_OPENING_MM = 400;
 /** A door schedule often gives the frame and the plan the leaf: allow more. */

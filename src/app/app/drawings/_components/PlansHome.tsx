@@ -14,6 +14,7 @@ import { TopBar } from "@/components/ui/top-bar";
 import { HOME_PATH } from "@/app/app/_v2/lib/app-nav";
 import { AiConsentModal } from "@/app/app/quotes/new/_components/AiConsentModal";
 import { createClient } from "@/lib/supabase/client";
+import { planFileProblem, setName } from "@/lib/planset/combine";
 import type { PlanSetListItem, PlanSetStatus } from "@/lib/planset/api-types";
 
 const MAX_BYTES = 50 * 1024 * 1024;
@@ -37,31 +38,37 @@ export function PlansHome({ sets, needsConsent }: { sets: PlanSetListItem[]; nee
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [askConsent, setAskConsent] = useState(false);
-  const [pending, setPending] = useState<File | null>(null);
+  const [pending, setPending] = useState<File[] | null>(null);
   // Asked once in the iPhone app; after "Allow" the upload carries on.
   const consented = useRef(!needsConsent);
 
-  async function upload(file: File) {
+  async function upload(files: File[]) {
     setError(null);
-    if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") return setError("Choose the plans as a PDF.");
-    if (file.size > MAX_BYTES) return setError("That PDF is bigger than 50 MB. Split it into two files and upload each.");
+    if (!files.length) return;
+    const problems = files.map(planFileProblem).filter((p): p is string => !!p);
+    if (problems.length) return setError(problems.join(" "));
     if (!consented.current) {
-      setPending(file);
+      setPending(files);
       setAskConsent(true);
       return;
     }
     try {
+      setBusy(files.length === 1 ? "Getting it ready…" : `Putting ${files.length} files together…`);
+      // Photos and several files become one PDF here; a single PDF goes up as it is.
+      const { planUploadFile } = await import("@/lib/planset/combine-client");
+      const file = await planUploadFile(files, (step) => setBusy(step));
+      if (file.size > MAX_BYTES) throw new Error("Together that's bigger than 50 MB. Upload the drawings in two lots.");
       setBusy("Starting the upload…");
-      const res = await fetch("/api/plansets", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ original_filename: file.name, byte_size: file.size }) });
+      const res = await fetch("/api/plansets", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ original_filename: setName(files.map((f) => f.name)), byte_size: file.size }) });
       const body = (await res.json().catch(() => ({}))) as { id?: string; upload?: { path: string; token: string }; error?: string; message?: string };
       if (res.status === 403 && body.error === "ai_consent_required") {
-        setPending(file);
+        setPending(files);
         setAskConsent(true);
         setBusy(null);
         return;
       }
       if (!res.ok || !body.id || !body.upload) throw new Error(body.message || body.error || "Couldn't start the upload.");
-      setBusy(`Uploading ${file.name}…`);
+      setBusy(files.length === 1 ? `Uploading ${files[0].name}…` : `Uploading ${files.length} files…`);
       const up = await createClient().storage.from("plan-uploads").uploadToSignedUrl(body.upload.path, body.upload.token, file, { contentType: "application/pdf" });
       if (up.error) throw new Error("The upload didn't finish. Check your connection and try again.");
       setBusy("Starting to read…");
@@ -85,27 +92,29 @@ export function PlansHome({ sets, needsConsent }: { sets: PlanSetListItem[]; nee
           <div className="flex items-start gap-3">
             <FilePdf weight="duotone" className="mt-0.5 shrink-0 text-[1.75rem] text-ui-brand-text" aria-hidden="true" />
             <div className="space-y-1">
-              <h2 className="text-ui-lg font-semibold text-ui-text">Upload the whole plan set</h2>
+              <h2 className="text-ui-lg font-semibold text-ui-text">Upload the plans</h2>
               <p className="text-ui-sm text-ui-muted">
-                The consented PDF from the designer — drawings, engineer&apos;s sheets and consent papers. It reads every sheet,
-                checks the dimensions two ways, and lists what goes where and the materials. Up to 50 MB.
+                Any plan files: the consented PDF set, the engineer&apos;s PDF too, scans, or photos of paper plans (JPG, PNG, HEIC).
+                Pick several at once and they&apos;re read as one set. It reads every sheet, checks the dimensions two ways, and lists
+                what goes where and the materials. Up to 50 MB in all.
               </p>
             </div>
           </div>
           <input
             ref={input}
             type="file"
-            accept="application/pdf,.pdf"
+            accept="application/pdf,.pdf,image/*,.heic,.heif,.dwg,.dxf"
+            multiple
             className="sr-only"
             data-testid="plans-file"
             onChange={(e) => {
-              const f = e.target.files?.[0];
+              const picked = Array.from(e.target.files ?? []);
               e.target.value = "";
-              if (f) void upload(f);
+              void upload(picked);
             }}
           />
           <Button fullWidth loading={!!busy} disabled={!!busy} onClick={() => input.current?.click()}>
-            <UploadSimple weight="bold" aria-hidden="true" /> {busy ?? "Choose the plans PDF"}
+            <UploadSimple weight="bold" aria-hidden="true" /> {busy ?? "Choose the plan files"}
           </Button>
           {error ? <Callout tone="bad">{error}</Callout> : null}
         </Card>

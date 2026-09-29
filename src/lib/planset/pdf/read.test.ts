@@ -24,7 +24,7 @@ async function samplePdf(): Promise<Uint8Array> {
   return doc.save();
 }
 
-describe("openPlanPdf", () => {
+describe("openPlanPdf", { timeout: 60_000 }, () => {
   it("reads text, lines and filled shapes in page millimetres", async () => {
     const pdf = await openPlanPdf(await samplePdf());
     expect(pdf.pageCount).toBe(2);

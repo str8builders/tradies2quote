@@ -10,6 +10,7 @@ import type { Evidence } from "../types";
 import type { BuildingModel, Fact, Flag } from "../model/types";
 import type { SheetReading } from "./schema";
 import { numbersIn } from "./verify";
+import { sameText } from "./scan";
 
 export type SheetReadingAt = {
   /** Evidence for an item: the page(s) and text ids it cites. */
@@ -19,13 +20,23 @@ export type SheetReadingAt = {
   reading: SheetReading;
 };
 
-/** Topics where two different values mean something is wrong. */
-const SINGLE_VALUED = new Set(["stud_spacing", "insulation_walls", "insulation_ceiling", "insulation_floor", "slab_thickness"]);
+/**
+ * Topics where two different values mean something is wrong. (Stud spacing
+ * isn't one: plans give bands and wall types — load-bearing, internal,
+ * external — and studSpacingFor() picks the band that fits.)
+ */
+const SINGLE_VALUED = new Set(["insulation_walls", "insulation_ceiling", "insulation_floor", "slab_thickness"]);
+
+/** Heights a building can have (mm): anything outside is a misread, not a fact. */
+const PLAUSIBLE_MM: Record<string, [number, number]> = { stud_height: [1800, 6000], ceiling_height: [1800, 9000] };
 
 const key = (s: string) => s.toLowerCase().replace(/[^a-z0-9.]+/g, " ").trim();
 
 function addFact(list: Fact<string>[], value: string, evidence: Evidence[]): void {
-  const existing = list.find((f) => key(f.value) === key(value));
+  // "Wall R2.8 Ecoinsulation" and "R2.8 Ecoinsulation" are one fact: same
+  // numbers, mostly the same words. Keep the fuller wording.
+  const existing = list.find((f) => key(f.value) === key(value) || sameText(f.value, value));
+  if (existing && value.length > existing.value.length) existing.value = value;
   if (existing) {
     existing.evidence.push(...evidence);
     if (new Set(existing.evidence.map((e) => e.page)).size > 1) existing.status = "checked";
@@ -97,6 +108,8 @@ export function mergeReadings(model: BuildingModel, readings: readonly SheetRead
     const { reading } = r;
     for (const s of reading.specs) addFact((out.specs[s.topic] ??= []), s.value, r.evidence(s.text_ids));
     for (const h of reading.heights) {
+      const band = PLAUSIBLE_MM[h.kind];
+      if (band && (h.mm < band[0] || h.mm > band[1])) continue;
       const entry = { value: Math.round(h.mm), evidence: r.evidence(h.text_ids), where: h.where || r.name };
       if (h.kind === "stud_height") studs.push(entry);
       if (h.kind === "ceiling_height") ceilings.push(entry);

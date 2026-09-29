@@ -66,3 +66,31 @@ describe("mergeReadings", () => {
     expect(m.consent.inspections[0]).toMatchObject({ value: "Preline - standard" });
   });
 });
+
+describe("mergeReadings — misreads", () => {
+  it("drops a stud height no building has, and doesn't call stud-spacing bands a clash", () => {
+    const m = mergeReadings(base, [
+      at(3, "A00.2", {
+        heights: [{ kind: "stud_height", mm: 2, where: "notes", text_ids: [1] }],
+        specs: [
+          { topic: "stud_spacing", value: "Loadbearing: studs up to 2.4m at 600mm ctrs", text_ids: [2] },
+          { topic: "stud_spacing", value: "Non loadbearing internal: up to 3.3m at 400mm ctrs", text_ids: [3] },
+        ],
+      }),
+    ]);
+    expect(m.heights.studMm).toBeNull();
+    expect(m.flags.some((f) => f.id === "spec-stud_spacing")).toBe(false);
+  });
+});
+
+describe("mergeReadings — same thing, different words", () => {
+  it("treats one spec worded two ways as one fact, not a clash", () => {
+    const m = mergeReadings(base, [
+      at(2, "A00.1", { specs: [{ topic: "insulation_walls", value: "Wall R2.8 Ecoinsulation", text_ids: [4] }] }),
+      at(37, "A45.3", { specs: [{ topic: "insulation_walls", value: "R2.8 Ecoinsulation", text_ids: [9] }] }),
+    ]);
+    expect(m.specs.insulation_walls).toHaveLength(1);
+    expect(m.specs.insulation_walls[0]).toMatchObject({ value: "Wall R2.8 Ecoinsulation", status: "checked" });
+    expect(m.flags.some((f) => f.id === "spec-insulation_walls")).toBe(false);
+  });
+});
