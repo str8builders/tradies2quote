@@ -260,7 +260,9 @@ export default async function PublicQuotePage({
 function PageShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-ink-900 text-white">
-      <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
+      {/* pb-28: the chat's "Ask about this quote" button floats bottom-right;
+          room under the last card keeps it off the accept controls. */}
+      <main className="mx-auto max-w-3xl px-4 pt-10 pb-28 sm:px-6 sm:pt-14">
         <div className="mb-6 flex items-center gap-2">
           <span className="font-display text-xl uppercase tracking-tight">
             tradies<span className="text-brand">2</span>Quote

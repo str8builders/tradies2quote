@@ -487,7 +487,10 @@ function JobScreenInner(props: JobScreenProps) {
         }
       />
 
-      <div className="mx-auto w-full max-w-xl flex-1 space-y-6 px-4 pt-5 pb-8">
+      {/* pb-24: room under the last button, so the bottom bar can't cover it
+          even if an iPhone lifts the bar after its keyboard goes (the scroll
+          lock waits for the keyboard; this is the backstop). */}
+      <div className="mx-auto w-full max-w-xl flex-1 space-y-6 px-4 pt-5 pb-24">
         <section aria-label="Where this job is up to" className="space-y-3">
           <StatusRail position={view.position} />
           <p aria-live="polite" data-testid="job-hint" className="text-ui-base text-ui-text">

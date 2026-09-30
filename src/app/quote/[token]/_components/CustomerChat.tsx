@@ -1,19 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
-  ChatCircle,
-  PaperPlaneRight,
+  ArrowUp,
+  ChatCircleDots,
+  ShieldCheck,
   X,
 } from "@phosphor-icons/react";
+import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 
 /**
  * CustomerChat — Wave 36 — "The Quote That Sells Itself".
  *
- * A floating chat bubble that lives at the bottom-right of the
- * public quote view. The tradie's customer (no T2Q account) opens
- * the quote, taps the bubble, and gets an AI sales assistant that
- * knows the quote, the tradie's pricing rules, and what's negotiable.
+ * A chat on the public quote view. The tradie's customer (no T2Q account)
+ * opens the quote, taps "Ask about this quote", and gets an AI assistant
+ * that knows the quote, the tradie's pricing rules, and what's negotiable.
  *
  * Architecture:
  *   - This is a pure client component.
@@ -24,15 +25,22 @@ import {
  *   - History also lives in component state for instant rendering.
  *
  * UX notes:
- *   - Bubble is brand-orange, bottom-right, above the iOS home indicator.
- *   - Opens a full-screen sheet on mobile (<sm), centered panel on sm+.
- *   - First-load fetches no history — the customer always starts a
- *     fresh conversation. Past chats are still persisted so the tradie
- *     can see them; the customer doesn't need to revisit them.
+ *   - Launcher: a labelled pill, bottom-right, above the iOS home indicator.
+ *   - Opens as a bottom sheet on phones, a floating panel on sm+.
+ *   - The first message says who the assistant speaks for; a few ready
+ *     questions help the customer start. On phones the keyboard stays down
+ *     until they tap the box, so those stay in view.
+ *   - First load fetches no history — the customer always starts a fresh
+ *     conversation. Past chats are still persisted so the tradie can see
+ *     them; the customer doesn't need to revisit them.
  *   - Polite fallback if the agent fails. Customer never sees a 500.
+ *   - Kept for App Review: the AI notice (5.1.2) and the Report control (1.2).
  */
 
 const TOKEN_KEY_PREFIX = "t2q-chat-seen-";
+
+/** The API's own limit (route MAX_MESSAGE_LEN). */
+const MAX_MESSAGE_LENGTH = 1000;
 
 type Message = {
   role: "customer" | "assistant";
@@ -48,39 +56,55 @@ type Props = {
   clientName: string | null;
 };
 
+/** Questions customers ask most, one tap to send. */
+export const STARTER_QUESTIONS = [
+  "What's included in the price?",
+  "When could you start?",
+  "Could anything change the price?",
+  "How do I accept the quote?",
+] as const;
+
+/** "SB" for "STR8 BUILDERS"; null when there's no usable name. */
+export function initialsOf(name: string | null): string | null {
+  const words = (name ?? "").split(/\s+/).filter((w) => /^[\p{L}\p{N}]/u.test(w));
+  const letters = words.slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
+  return letters || null;
+}
+
+/** The assistant's first message: who it speaks for, and what to ask. */
+export function welcomeMessage(businessName: string | null, clientName: string | null): string {
+  const tradie = businessName?.trim() || "the team";
+  const first = clientName?.trim().split(/\s+/)[0];
+  const greeting = first ? `Hi ${first}, I'm` : "Hi, I'm";
+  return `${greeting} the quote assistant for ${tradie}. Ask me anything about this quote: what's included, timing, options or the terms. If I can't answer, I'll pass your question on to ${tradie}.`;
+}
+
 export function CustomerChat({ token, businessName, clientName }: Props) {
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(() => [
+    { role: "assistant", content: welcomeMessage(businessName, clientName) },
+  ]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasSeenWelcome, setHasSeenWelcome] = useState(false);
   const [hintVisible, setHintVisible] = useState(false);
   const [reportState, setReportState] = useState<"idle" | "sending" | "sent">(
     "idle",
   );
 
+  const titleId = useId();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const launcherRef = useRef<HTMLButtonElement | null>(null);
+  const tradie = businessName?.trim() || null;
+  const initials = initialsOf(tradie);
 
-  // First-load: drop a friendly welcome message into the chat so the
-  // customer immediately sees the bot can talk. Won't re-show on
-  // subsequent opens within the same session.
-  useEffect(() => {
-    if (hasSeenWelcome) return;
-    const tradie = businessName ?? "the team";
-    const name = clientName ? clientName.split(" ")[0] : "there";
-    const welcome: Message = {
-      role: "assistant",
-      content: `Hi ${name}! I'm the T2Q assistant for ${tradie}. Ask me anything about this quote — line items, alternatives, timing, terms — and I'll answer using the actual numbers above. If I can't answer, I'll flag it for ${tradie} directly.`,
-    };
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time welcome seed gated by hasSeenWelcome
-    setMessages([welcome]);
-    setHasSeenWelcome(true);
-  }, [hasSeenWelcome, businessName, clientName]);
+  // The page behind stays put while the chat is open (and, on iPhone, comes
+  // back in place once the keyboard has gone).
+  useBodyScrollLock(open);
 
-  // Tiny hint bubble that nudges customers to tap the chat. Shows on
-  // first page load only, then fades after 8s.
+  // Tiny hint that nudges customers to open the chat. Shows on the first
+  // page load only, then fades after 9s.
   useEffect(() => {
     try {
       if (window.sessionStorage.getItem(`${TOKEN_KEY_PREFIX}${token}`))
@@ -96,37 +120,66 @@ export function CustomerChat({ token, businessName, clientName }: Props) {
     };
   }, [token]);
 
-  // Auto-scroll to the bottom whenever a new message lands.
+  // Keep the newest message in view.
   useEffect(() => {
     if (!scrollRef.current) return;
     scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, sending]);
+  }, [messages, sending, error, open]);
 
-  // Auto-focus the input when the sheet opens.
+  // On open: remember it for this quote, and focus the box on a computer
+  // (on a phone the keyboard would cover the welcome and the questions).
   useEffect(() => {
-    if (open) {
-      try {
-        window.sessionStorage.setItem(`${TOKEN_KEY_PREFIX}${token}`, "1");
-      } catch {
-        /* private mode */
-      }
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- hide hint when chat opens
-      setHintVisible(false);
-      // Defer so the sheet has time to mount + animate.
-      const t = setTimeout(() => inputRef.current?.focus(), 100);
-      return () => clearTimeout(t);
+    if (!open) return;
+    try {
+      window.sessionStorage.setItem(`${TOKEN_KEY_PREFIX}${token}`, "1");
+    } catch {
+      /* private mode */
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hide hint when chat opens
+    setHintVisible(false);
+    const finePointer = window.matchMedia?.("(pointer: fine)").matches ?? false;
+    const t = setTimeout(() => {
+      if (finePointer) inputRef.current?.focus();
+    }, 100);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("keydown", onKey);
+    };
   }, [open, token]);
 
-  async function sendMessage() {
-    const trimmed = input.trim();
+  // The box grows with what's typed, up to about five lines.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
+  }, [input, open]);
+
+  // Closed: focus goes back to the button that opened it (no scroll: the
+  // page is being put back where it was).
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (wasOpen.current && !open) launcherRef.current?.focus({ preventScroll: true });
+    wasOpen.current = open;
+  }, [open]);
+
+  function close() {
+    setOpen(false);
+  }
+
+  /** Send what's in the box, or one of the ready questions. */
+  async function sendMessage(question?: string) {
+    const trimmed = (question ?? input).trim();
     if (!trimmed || sending) return;
     setError(null);
 
     const customerMsg: Message = { role: "customer", content: trimmed };
-    const nextMessages = [...messages, customerMsg];
-    setMessages(nextMessages);
-    setInput("");
+    setMessages((prev) => [...prev, customerMsg]);
+    if (question === undefined) setInput("");
     setSending(true);
 
     try {
@@ -147,15 +200,14 @@ export function CustomerChat({ token, businessName, clientName }: Props) {
       if (!res.ok) {
         setError(
           data.message ??
-            "Sorry — couldn't reach the assistant. Try again in a moment.",
+            "Sorry, the assistant couldn't be reached. Try again in a moment.",
         );
-        setSending(false);
         return;
       }
-      const reply = data.reply ?? "Thanks — I'll pass that on.";
+      const reply = data.reply ?? "Thanks, I'll pass that on.";
       setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
     } catch {
-      setError("Network error. Check your connection and try again.");
+      setError("No connection. Check your internet and try again.");
     } finally {
       setSending(false);
     }
@@ -165,7 +217,7 @@ export function CustomerChat({ token, businessName, clientName }: Props) {
     // Enter sends; shift+enter inserts a newline.
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      sendMessage();
+      void sendMessage();
     }
   }
 
@@ -193,111 +245,138 @@ export function CustomerChat({ token, businessName, clientName }: Props) {
       setReportState("sent");
     } catch {
       setReportState("idle");
-      setError("Couldn't send the report — try again.");
+      setError("Couldn't send the report. Try again.");
     }
   }
 
+  const showStarters =
+    !sending && !error && messages.every((m) => m.role === "assistant");
+
   return (
     <>
-      {/* Floating launcher pinned bottom-right. Above the home indicator
-          on iOS via the safe-area inset. */}
+      {/* Launcher, bottom-right, clear of the iOS home indicator. */}
       <div
-        className="fixed z-40 right-4 bottom-4 sm:right-6 sm:bottom-6"
-        style={{
-          paddingBottom: "env(safe-area-inset-bottom)",
-        }}
+        className="fixed right-4 bottom-4 z-40 flex flex-col items-end sm:right-6 sm:bottom-6"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        {hintVisible && !open && (
+        {!open && hintVisible && (
           <div
             data-testid="customer-chat-hint"
-            className="mb-2 ml-auto max-w-[16rem] rounded-sm border border-brand/40 bg-ink-950/95 px-3 py-2 text-right shadow-lg backdrop-blur-sm"
+            className="mb-3 max-w-[16.5rem] rounded-2xl border border-white/10 bg-ink-950/95 px-4 py-3 text-left shadow-[0_18px_40px_-16px_rgba(0,0,0,0.9)] backdrop-blur"
           >
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-brand">
-              {"// got a question?"}
+            <p className="text-sm font-semibold text-white">
+              Questions about this quote?
             </p>
-            <p className="mt-0.5 text-xs text-ink-200">
-              Tap to chat about this quote.
+            <p className="mt-0.5 text-sm leading-snug text-ink-300">
+              Ask here and get an answer in seconds.
             </p>
           </div>
         )}
+        {/* Hidden while the chat is open (it would show through the fade). */}
         <button
+          ref={launcherRef}
+          hidden={open}
           type="button"
           onClick={() => setOpen(true)}
           data-testid="customer-chat-launcher"
-          aria-label="Open chat about this quote"
-          className="inline-flex h-14 w-14 items-center justify-center rounded-full border-2 border-ink-900 bg-brand text-ink-900 shadow-[0_10px_30px_-8px_rgba(255,95,21,0.6)] transition-transform hover:scale-105"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          className="inline-flex h-12 items-center gap-2 rounded-full bg-brand pr-5 pl-4 text-[15px] font-semibold text-ink-950 shadow-[0_14px_34px_-12px_rgba(255,95,21,0.75)] ring-1 ring-black/10 transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white motion-reduce:transition-none motion-reduce:hover:translate-y-0"
         >
-          <ChatCircle size={26} weight="fill" />
+          <ChatCircleDots size={22} weight="fill" aria-hidden="true" />
+          Ask about this quote
         </button>
       </div>
 
-      {/* Full-screen sheet on mobile, panel on sm+.
-          `overflow-hidden` on the backdrop is the real fix for the
-          Send-button-off-screen bug: `fixed inset-0` anchors the
-          backdrop to the visible viewport, and `overflow-hidden`
-          forces every descendant (the sheet, the footer, the flex
-          row, the Send button) to fit inside it. Previously the
-          sheet's `max-w-[min(28rem,100vw)]` could resolve wider than
-          the visible viewport on iOS when document-width exceeded
-          viewport-width (PDF iframe, wide tables, etc.), and the
-          Send button would land off the right edge. */}
+      {/* Bottom sheet on phones, floating panel on sm+. `overflow-hidden`
+          on the backdrop keeps every descendant (the composer and its Send
+          button included) inside the visible viewport on iOS, even when the
+          page itself is wider (PDF iframe, wide tables). */}
       {open && (
         <div
           data-testid="customer-chat-sheet"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Chat about this quote"
-          className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden bg-black/70 backdrop-blur-sm sm:items-end sm:justify-end sm:p-6"
-          onClick={() => setOpen(false)}
+          className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden bg-black/60 backdrop-blur-[2px] animate-ui-fade-in motion-reduce:animate-none sm:justify-end sm:p-6"
+          onClick={close}
         >
-          <div
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
             onClick={(e) => e.stopPropagation()}
-            // w-full + max-w-md scoped to the backdrop (which is exactly
-            // viewport-sized thanks to fixed inset-0 + overflow-hidden
-            // above), so the sheet never exceeds visible width. No
-            // more 100vw arithmetic that the iOS quirk can mess with.
-            className="flex h-[88vh] w-full max-w-md flex-col overflow-hidden overflow-x-hidden rounded-t-2xl border border-ink-700 bg-ink-950 shadow-2xl sm:h-[80vh] sm:rounded-2xl"
+            className="flex h-[min(88dvh,46rem)] w-full max-w-md flex-col overflow-hidden rounded-t-[1.75rem] border border-white/10 bg-ink-950 shadow-[0_-18px_60px_-20px_rgba(0,0,0,0.9)] animate-ui-sheet-in motion-reduce:animate-none sm:h-[min(80dvh,46rem)] sm:rounded-[1.75rem]"
           >
-            {/* Header */}
-            <header className="flex items-start justify-between gap-3 border-b border-ink-700 bg-ink-950 px-5 py-4">
+            <div aria-hidden="true" className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-white/15 sm:hidden" />
+
+            {/* Who's answering */}
+            <header className="flex items-center gap-3 px-5 pt-3 pb-4 sm:pt-5">
+              <Avatar initials={initials} size="lg" />
               <div className="min-w-0 flex-1">
-                <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-brand">
-                  {"// t2q · chat about this quote"}
-                </p>
-                <h2 className="mt-0.5 font-display text-base uppercase tracking-tight text-white sm:text-lg">
-                  T2Q
+                <h2
+                  id={titleId}
+                  className="ui-title truncate text-[17px] leading-tight text-white"
+                >
+                  {tradie ?? "Quote assistant"}
                 </h2>
-                <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-400">
-                  {businessName
-                    ? `${businessName} · answers in seconds · won't change pricing without the tradie`
-                    : "Answers in seconds · won't change pricing without the tradie"}
+                <p className="mt-0.5 flex items-center gap-1.5 text-[13px] text-ink-300">
+                  <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  {tradie ? "Quote assistant · replies in seconds" : "Replies in seconds"}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={close}
                 aria-label="Close chat"
                 data-testid="customer-chat-close"
-                className="-mr-1 -mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-400 hover:text-white"
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/5 text-ink-200 hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-brand"
               >
-                <X size={16} weight="bold" />
+                <X size={18} weight="bold" aria-hidden="true" />
               </button>
             </header>
 
-            {/* Message list */}
+            <p className="mx-5 flex items-start gap-2 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5 text-[13px] leading-snug text-ink-300">
+              <ShieldCheck size={16} weight="fill" aria-hidden="true" className="mt-px shrink-0 text-brand" />
+              <span>
+                Answers come from this quote. Any change to the price is up to{" "}
+                {tradie ?? "the tradie"}.
+              </span>
+            </p>
+
+            {/* Messages */}
             <div
               ref={scrollRef}
               data-testid="customer-chat-messages"
-              className="flex-1 space-y-3 overflow-y-auto overflow-x-hidden bg-ink-900 px-4 py-4"
+              aria-live="polite"
+              className="flex-1 space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-4"
             >
               {messages.map((m, i) => (
-                <Bubble key={i} role={m.role} content={m.content} />
+                <Bubble
+                  key={i}
+                  role={m.role}
+                  content={m.content}
+                  initials={initials}
+                  withAvatar={m.role === "assistant" && messages[i - 1]?.role !== "assistant"}
+                />
               ))}
-              {sending && <TypingBubble />}
+              {showStarters && (
+                <div className="flex flex-wrap gap-2 pt-1 pl-10" data-testid="customer-chat-starters">
+                  {STARTER_QUESTIONS.map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      onClick={() => void sendMessage(q)}
+                      className="rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-2 text-left text-sm text-ink-100 hover:border-brand/60 hover:text-white focus-visible:outline-2 focus-visible:outline-brand"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {sending && <TypingBubble initials={initials} />}
               {error && (
                 <p
+                  role="alert"
                   data-testid="customer-chat-error"
-                  className="rounded-sm border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300"
+                  className="ml-10 rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-sm leading-snug text-red-200"
                 >
                   {error}
                 </p>
@@ -305,100 +384,127 @@ export function CustomerChat({ token, businessName, clientName }: Props) {
             </div>
 
             {/* Composer */}
-            <footer className="border-t border-ink-700 bg-ink-950 px-3 py-3 pb-[max(env(safe-area-inset-bottom),12px)]">
-              {/* `min-w-0` on the inner flex AND the textarea is the
-                  classic flexbox-shrink fix: without it, the textarea's
-                  intrinsic min-content (sized to the long placeholder
-                  string) pushes the 44px Send button off-screen on
-                  narrow phones. With it, the textarea collapses to fill
-                  whatever's left after the button takes its 44px. */}
-              <div className="flex min-w-0 items-end gap-2">
+            <footer className="border-t border-white/5 px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]">
+              {/* `min-w-0` on the row AND the textarea: without it the
+                  textarea's min-content (the long placeholder) can push the
+                  Send button off-screen on narrow phones. */}
+              <div className="flex min-w-0 items-end gap-2 rounded-2xl border border-white/10 bg-ink-900 p-1.5 pl-4 focus-within:border-brand/60">
+                <label htmlFor={`${titleId}-input`} className="sr-only">
+                  Your question
+                </label>
                 <textarea
+                  id={`${titleId}-input`}
                   ref={inputRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={onKeyDown}
-                  placeholder="Ask anything about this quote…"
+                  placeholder="Ask a question about this quote"
                   data-testid="customer-chat-input"
                   rows={1}
-                  className="min-h-[44px] max-h-32 min-w-0 flex-1 resize-none rounded-sm border border-ink-600 bg-ink-900 px-3 py-2.5 text-sm text-white placeholder:text-ink-500 outline-none focus:border-brand"
+                  maxLength={MAX_MESSAGE_LENGTH}
+                  enterKeyHint="send"
+                  className="max-h-[8.25rem] min-h-10 min-w-0 flex-1 resize-none bg-transparent py-2 text-base leading-6 text-white outline-none placeholder:text-ink-500"
                 />
                 <button
                   type="button"
-                  onClick={sendMessage}
+                  // Keep the focus (and the phone's keyboard) in the box, as a chat should.
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => void sendMessage()}
                   disabled={!input.trim() || sending}
                   data-testid="customer-chat-send"
                   aria-label="Send message"
-                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-sm bg-brand text-ink-900 hover:bg-hivis disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand text-ink-950 hover:bg-brand/90 focus-visible:outline-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-ink-500"
                 >
-                  <PaperPlaneRight size={18} weight="bold" />
+                  <ArrowUp size={18} weight="bold" aria-hidden="true" />
                 </button>
               </div>
-              <div className="mt-2 flex items-center justify-between gap-2">
+              <div className="mt-2 flex items-start justify-between gap-3 px-1">
                 {/* 5.1.2 AI disclosure — the customer must know they're
                     talking to an AI and that messages are processed by our
                     AI provider + shared with the tradie. */}
-                <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-ink-500">
-                  {"// ai assistant · answers may contain mistakes · the tradie sees this chat"}
+                <p className="text-xs leading-snug text-ink-500">
+                  AI assistant, so answers can be wrong. {tradie ?? "The tradie"} can
+                  read this chat.
                 </p>
                 <button
                   type="button"
                   onClick={reportChat}
                   disabled={reportState !== "idle"}
                   data-testid="customer-chat-report"
-                  className="shrink-0 font-mono text-[9px] uppercase tracking-[0.2em] text-ink-500 underline underline-offset-2 hover:text-red-300 disabled:no-underline disabled:opacity-70"
+                  className="shrink-0 text-xs text-ink-400 underline underline-offset-2 hover:text-red-300 disabled:no-underline disabled:opacity-70"
                 >
                   {reportState === "sent"
-                    ? "Reported ✓"
+                    ? "Reported"
                     : reportState === "sending"
                       ? "Reporting…"
                       : "Report"}
                 </button>
               </div>
             </footer>
-          </div>
+          </section>
         </div>
       )}
     </>
   );
 }
 
-function Bubble({ role, content }: Message) {
+function Avatar({ initials, size }: { initials: string | null; size: "lg" | "sm" }) {
+  const box = size === "lg" ? "h-11 w-11 text-[15px]" : "h-7 w-7 text-[11px]";
+  return (
+    <span
+      aria-hidden="true"
+      className={`relative inline-flex shrink-0 items-center justify-center rounded-full bg-linear-to-br from-brand to-[#c2410c] font-bold tracking-tight text-ink-950 ${box}`}
+    >
+      {initials ?? <ChatCircleDots size={size === "lg" ? 20 : 14} weight="fill" />}
+      {size === "lg" ? (
+        <span className="absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full border-2 border-ink-950 bg-emerald-400" />
+      ) : null}
+    </span>
+  );
+}
+
+function Bubble({
+  role,
+  content,
+  initials,
+  withAvatar,
+}: Message & { initials: string | null; withAvatar: boolean }) {
   const isCustomer = role === "customer";
   return (
     <div
       data-testid={`customer-chat-bubble-${role}`}
-      className={`flex ${isCustomer ? "justify-end" : "justify-start"}`}
+      className={`flex items-end gap-2 ${isCustomer ? "justify-end" : "justify-start"}`}
     >
+      {!isCustomer ? (
+        withAvatar ? <Avatar initials={initials} size="sm" /> : <span aria-hidden="true" className="w-7 shrink-0" />
+      ) : null}
       <div
         className={[
-          // Wave 38 — break-words on the bubble itself; without it a
-          // long URL or unbroken-string in a customer message can blow
-          // the bubble past 85% width, pushing the chat body wider,
-          // pushing the sheet wider, pushing the Send button off
-          // screen on narrow iPhones. min-w-0 lets the bubble shrink
-          // under flex pressure; break-words wraps mid-token when
-          // there's no whitespace to break on.
-          "max-w-[85%] min-w-0 whitespace-pre-wrap break-words rounded-md px-3 py-2 text-sm",
+          // Wave 38 — break-words on the bubble itself; without it a long
+          // URL or unbroken string can blow the bubble past 85% width,
+          // pushing the chat wider and the Send button off screen on
+          // narrow iPhones. min-w-0 lets the bubble shrink under flex
+          // pressure; break-words wraps mid-token when there's no
+          // whitespace to break on.
+          "max-w-[85%] min-w-0 rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed break-words whitespace-pre-wrap",
           isCustomer
-            ? "bg-brand text-ink-900"
-            : "bg-ink-800 text-ink-100 border border-ink-700",
+            ? "rounded-br-md bg-brand text-ink-950"
+            : "rounded-bl-md border border-white/5 bg-ink-800 text-ink-100",
         ].join(" ")}
       >
+        <span className="sr-only">{isCustomer ? "You: " : "Assistant: "}</span>
         {content}
       </div>
     </div>
   );
 }
 
-function TypingBubble() {
+function TypingBubble({ initials }: { initials: string | null }) {
   return (
-    <div
-      data-testid="customer-chat-typing"
-      className="flex justify-start"
-      aria-label="Assistant is typing"
-    >
-      <div className="inline-flex items-center gap-1.5 rounded-md border border-ink-700 bg-ink-800 px-3 py-2.5">
+    <div data-testid="customer-chat-typing" className="flex items-end gap-2">
+      <Avatar initials={initials} size="sm" />
+      <div className="inline-flex items-center gap-1.5 rounded-2xl rounded-bl-md border border-white/5 bg-ink-800 px-4 py-3.5">
+        <span className="sr-only">The assistant is typing</span>
         <Dot delay="0ms" />
         <Dot delay="160ms" />
         <Dot delay="320ms" />
@@ -411,7 +517,7 @@ function Dot({ delay }: { delay: string }) {
   return (
     <span
       aria-hidden="true"
-      className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-ink-300"
+      className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-ink-300 motion-reduce:animate-none"
       style={{ animationDelay: delay }}
     />
   );
