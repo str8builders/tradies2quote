@@ -80,6 +80,34 @@ describe("planTakeoff", () => {
     expect(planTakeoff(applyAnswers(m, {})).lines.find((l) => l.group === "Joinery")).toMatchObject({ status: "ok" });
   });
 
+  it("with no lintel plan, a size-to-confirm lintel for each window and outside door the plans leave unsized", () => {
+    const m = model();
+    m.lintels = [];
+    m.openings = [
+      m.openings[0], // W01, outside wall, no lintel given
+      m.openings[1], // D01, inside wall — left out even without its printed lintel
+      { ...m.openings[1], mark: "D02", widthMm: 2400, lintel: null, wall: { line: 1, external: true, gapWidthMm: 2400, x: 1, y: 11 } },
+      { ...m.openings[0], mark: "W02", widthMm: 600, wall: null, sizeCheck: "unchecked" },
+      { ...m.openings[0], mark: "W03", lintel: "140 x 90 SG8" },
+    ];
+    m.openings[1] = { ...m.openings[1], lintel: null };
+    const t = planTakeoff(applyAnswers(m, {}));
+    const toSize = t.lines.filter((l) => l.id.startsWith("lintel-to-size-"));
+    expect(toSize.map((l) => [l.name, l.quantity, l.status])).toEqual([
+      ["Lintel over W01 (1,200 wide) — size to confirm", 1, "needs_review"],
+      ["Lintel over D02 (2,400 wide) — size to confirm", 1, "needs_review"],
+      ["Lintel over W02 (600 wide) — size to confirm", 1, "needs_review"],
+    ]);
+    expect(toSize[0].formula).toBe("The plans don't give a lintel for window W01 (1,200 wide). Size it from NZS 3604 or the engineer's design, then price it.");
+    expect(t.lines.find((l) => l.name === "Lintel 140 x 90 SG8")).toMatchObject({ quantity: 1 });
+    expect(t.assumptions.some((a) => a.includes('"size to confirm" line for each window and outside door'))).toBe(true);
+  });
+
+  it("a set with a lintel plan gets no size-to-confirm lintels", () => {
+    const t = planTakeoff(applyAnswers(model(), {}));
+    expect(t.lines.some((l) => l.id.startsWith("lintel-to-size-"))).toBe(false);
+  });
+
   it("works out areas for ceilings, cladding and roofing, in m²", () => {
     const t = planTakeoff(applyAnswers(model(), {}));
     expect(t.lines.find((l) => l.id === "ceiling-lining")).toMatchObject({ quantity: 88, unit: "m²" });

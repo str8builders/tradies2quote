@@ -293,6 +293,34 @@ export function planTakeoff(m: EffectiveModel): PlanTakeoff {
     });
   }
 
+  // ── Lintels the plans don't size: a line per window and outside door for
+  // the tradie to size (NZS 3604 or the engineer) and price, so none is
+  // forgotten. Only with no lintel plan at all: a lintel plan's marks are
+  // counted above even where one isn't matched to its opening. Inside doors
+  // are left out — most sit in walls that carry no load. ──
+  if (!m.lintels.length) {
+    const unsized = m.openings.filter((o) => !o.lintel && (o.kind === "window" ? !o.wall || o.wall.external : o.wall?.external === true));
+    for (const o of unsized) {
+      const wide = o.widthMm ? ` (${o.widthMm.toLocaleString("en-NZ")} wide)` : "";
+      lines.push({
+        id: `lintel-to-size-${o.mark}`,
+        group: "Lintels",
+        name: `Lintel over ${o.mark}${wide} — size to confirm`,
+        quantity: o.count,
+        unit: "each",
+        formula: `The plans don't give a lintel for ${o.kind === "window" ? "window" : "door"} ${o.mark}${wide}. Size it from NZS 3604 or the engineer's design, then price it.`,
+        status: "needs_review",
+        notes: "Length: the opening's width plus bearing at each end.",
+        evidence: o.evidence,
+      });
+    }
+    if (unsized.length) {
+      assumptions.push(
+        `The plans don't size ${unsized.length === 1 ? "a lintel" : "the lintels"}, so there's a "size to confirm" line for each window and outside door. Inside doors aren't included — add a lintel where an inside wall carries load.`,
+      );
+    }
+  }
+
   // ── Ceilings (area) ── In an alteration priced from entered NEW walls,
   // the whole-house area isn't the new work: only an area the tradie gave.
   const onlyTyped = m.renovation === "enter";
