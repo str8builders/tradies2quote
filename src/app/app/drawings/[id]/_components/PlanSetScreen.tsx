@@ -108,7 +108,7 @@ export function PlanSetScreen({ id, name }: { id: string; name: string }) {
                 { value: "materials", label: "Materials" },
               ]}
             />
-            {tab === "summary" ? <SummaryTab view={view} onShow={openOnPlan} onSaved={load} /> : null}
+            {tab === "summary" ? <SummaryTab view={view} onShow={openOnPlan} onSaved={load} onReadAgain={retry} /> : null}
             {tab === "plan" ? <SheetViewer setId={id} sheets={view.sheets} model={view.model} focus={focus} /> : null}
             {tab === "questions" ? <QuestionsTab setId={id} view={view} onSaved={load} onShow={openOnPlan} /> : null}
             {tab === "materials" ? <MaterialsTab setId={id} view={view} onSaved={load} /> : null}

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { BuildingModel, Fact } from "../model/types";
 import type { WallLine } from "../measure/walls";
 import { applyAnswers } from "../model/answers";
+import { PLAN_SIZE_SOURCE } from "../model/planSizes";
 import { planTakeoff, studSpacingFor } from "./fromModel";
 
 const f = <T>(value: T): Fact<T> => ({ value, status: "read", evidence: [{ page: 13, method: "geometry" }] });
@@ -57,6 +58,26 @@ describe("planTakeoff", () => {
     expect(t.lines.find((l) => l.id === "lintel-150x90 hy90 H1.2")).toMatchObject({ quantity: 2 });
     expect(t.lines.find((l) => l.id === "lintel-2/240x45 SG8")).toMatchObject({ quantity: 1 });
     expect(t.byOthers).toEqual(["Trusses by supplier"]);
+  });
+
+  it("a window read from the size printed on the plan: its size, glazing and lintel, marked for checking when no gap confirms it", () => {
+    const m = model();
+    m.openings = [
+      {
+        mark: "W1", kind: "window", widthMm: 600, heightMm: 800, sillMm: null, headMm: null, count: 1,
+        fields: { source: PLAN_SIZE_SOURCE, size: "800h x 600w", glazing: "Safety Glass" },
+        schedulePage: null, planPage: 15, wall: null, lintel: "140 x 90 SG8", sizeCheck: "unchecked", evidence: [],
+      },
+    ];
+    m.lintels = [];
+    const t = planTakeoff(applyAnswers(m, {}));
+    const joinery = t.lines.find((l) => l.group === "Joinery")!;
+    expect(joinery).toMatchObject({ name: "Window W1 — 600 × 800 (Safety Glass)", quantity: 1, status: "needs_review" });
+    expect(joinery.formula).toBe('Size printed on the plan beside it: "800h x 600w" (these plans have no window schedule); there\'s no gap in the measured walls to check the width against.');
+    expect(t.lines.find((l) => l.group === "Lintels")).toMatchObject({ name: "Lintel 140 x 90 SG8", quantity: 1, formula: "Lintels specified as 140 x 90 SG8 on the plans: over W1 (600 wide)." });
+    // Matched to a gap, the same window is "from the plans".
+    m.openings[0] = { ...m.openings[0], sizeCheck: "ok", wall: { line: 0, external: true, gapWidthMm: 600, x: 1, y: 10 } };
+    expect(planTakeoff(applyAnswers(m, {})).lines.find((l) => l.group === "Joinery")).toMatchObject({ status: "ok" });
   });
 
   it("works out areas for ceilings, cladding and roofing, in m²", () => {

@@ -17,6 +17,7 @@ import { classifySheet } from "./sheet/classify";
 import { PLAN_KINDS, readSheetWalls, type SheetFacts } from "./sheetFacts";
 import { assembleModel } from "./model/assemble";
 import { placeOpenings } from "./model/openings";
+import { withPlanSizes } from "./model/planSizes";
 import type { BuildingModel } from "./model/types";
 import { interpretPlanSet } from "./interpret/run";
 
@@ -162,6 +163,9 @@ export async function finishPlanSet(input: FinishInput): Promise<FinishResult> {
     facts.filter((f) => !f.document).map((f) => ({ page: f.page, marks: f.marks, text: f.text, walls: f.walls ? { ratio: f.walls.ratio, lines: f.walls.lines } : null })),
   );
   if (placedFlags.length) model = { ...model, flags: [...model.flags, ...placedFlags] };
+  // No window or door schedule at all (small additions often have none):
+  // the sizes printed on the plan itself, checked against its wall gaps.
+  model = withPlanSizes(model, facts);
 
   // Scanned pages have no text title block: use what the two reads agreed they are.
   for (const [page, sheet] of Object.entries(ai.sheetTitles)) {

@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
 import { Card } from "@/components/ui/card";
 import type { PlanSetView } from "@/lib/planset/api-types";
+import { PLAN_SIZE_SOURCE } from "@/lib/planset/model/planSizes";
 import { FactRow, FactStatusPill, firstEvidence } from "./parts";
 
 const m = (mm: number | string) => `${(Number(mm) / 1000).toLocaleString("en-NZ", { maximumFractionDigits: 2 })} m`;
@@ -36,8 +39,20 @@ const SPEC_LABEL: Record<string, string> = {
 };
 
 /** What the plans say about the building, fact by fact, each with how sure it is and where it came from. */
-export function SummaryTab({ view, onShow, onSaved }: { view: PlanSetView; onShow: (page: number, text?: number[]) => void; onSaved: () => void }) {
+export function SummaryTab({
+  view,
+  onShow,
+  onSaved,
+  onReadAgain,
+}: {
+  view: PlanSetView;
+  onShow: (page: number, text?: number[]) => void;
+  onSaved: () => void;
+  /** Read the set again with the newest reader (answers are kept). */
+  onReadAgain?: () => Promise<void>;
+}) {
   const model = view.model!;
+  const [rereading, setRereading] = useState(false);
   const w = model.walls;
   const windows = model.openings.filter((o) => o.kind === "window");
   const doors = model.openings.filter((o) => o.kind === "door");
@@ -87,6 +102,7 @@ export function SummaryTab({ view, onShow, onSaved }: { view: PlanSetView; onSho
                     {o.kind === "window" ? "Window" : "Door"}
                     {o.wall ? (o.wall.external ? " · outside wall" : " · inside wall") : ""}
                     {o.lintel ? ` · lintel ${o.lintel}` : ""}
+                    {o.fields.source === PLAN_SIZE_SOURCE ? " · size printed on the plan" : ""}
                     {o.sizeCheck === "ok" ? " · matches the gap on the plan" : o.sizeCheck === "differs" ? ` · gap drawn ${o.wall?.gapWidthMm} wide` : ""}
                   </p>
                 </div>
@@ -184,6 +200,26 @@ export function SummaryTab({ view, onShow, onSaved }: { view: PlanSetView; onSho
         {model.sheets.drawings} drawings and {model.sheets.documents} consent pages read; scale proven on {model.sheets.provenScale}.
         {model.ai.skipped ? ` Notes weren't read: ${model.ai.skipped}` : ` The AI read ${model.ai.sheetsRead} sheets of notes; ${model.ai.itemsDropped} answers it couldn't back up with the plan's own text were left out.`}
       </p>
+
+      {onReadAgain ? (
+        <Card padding="md" className="space-y-3" data-testid="planset-read-again">
+          <p className="text-ui-sm text-ui-muted">
+            The reader keeps getting better. Reading these plans again takes a few minutes and uses the AI again; your answers stay.
+          </p>
+          <Button
+            variant="secondary"
+            fullWidth
+            loading={rereading}
+            disabled={rereading}
+            onClick={() => {
+              setRereading(true);
+              void onReadAgain().finally(() => setRereading(false));
+            }}
+          >
+            Read these plans again
+          </Button>
+        </Card>
+      ) : null}
     </div>
   );
 }

@@ -19,6 +19,7 @@ import { roofAreaFromPitch } from "@/lib/takeoff/normalise";
 import type { Evidence } from "../types";
 import type { EffectiveModel } from "../model/answers";
 import type { Question } from "../model/types";
+import { PLAN_SIZE_SOURCE } from "../model/planSizes";
 
 export type TakeoffGroup = "Framing" | "Linings" | "Insulation" | "Finishing" | "Joinery" | "Lintels" | "Cladding" | "Roofing" | "Slab";
 
@@ -239,17 +240,22 @@ export function planTakeoff(m: EffectiveModel): PlanTakeoff {
   if (whole.warnings.length) assumptions.push(...whole.warnings);
   assumptions.push(`Wall linings and insulation: ${WASTE}% waste, 1.2 × 2.4 m sheets.`);
 
-  // ── Joinery: straight from the schedules ──
+  // ── Joinery: straight from the schedules — or, with none, the sizes
+  // printed on the plan (checked against the wall gap where there is one) ──
   for (const o of m.openings) {
+    const fromPlan = o.fields.source === PLAN_SIZE_SOURCE;
     const size = o.widthMm && o.heightMm ? `${o.widthMm} × ${o.heightMm}` : "size not in the schedule";
+    const glazing = fromPlan && o.fields.glazing ? ` (${o.fields.glazing})` : "";
     lines.push({
       id: `joinery-${o.mark}`,
       group: "Joinery",
-      name: `${o.kind === "window" ? "Window" : "Door"} ${o.mark} — ${size}`,
+      name: `${o.kind === "window" ? "Window" : "Door"} ${o.mark} — ${size}${glazing}`,
       quantity: o.count,
       unit: "each",
-      formula: `From the ${o.kind} schedule${o.planPage ? `, placed on the plan` : ""}${o.sizeCheck === "ok" ? "; its width matches the gap drawn in the wall" : ""}.`,
-      status: o.widthMm && o.heightMm && o.sizeCheck !== "differs" ? "ok" : "needs_review",
+      formula: fromPlan
+        ? `Size printed on the plan beside it: "${o.fields.size}" (these plans have no ${o.kind} schedule)${o.sizeCheck === "ok" ? "; its width matches the gap drawn in the wall" : "; there's no gap in the measured walls to check the width against"}.`
+        : `From the ${o.kind} schedule${o.planPage ? `, placed on the plan` : ""}${o.sizeCheck === "ok" ? "; its width matches the gap drawn in the wall" : ""}.`,
+      status: o.widthMm && o.heightMm && o.sizeCheck !== "differs" && !(fromPlan && o.sizeCheck !== "ok") ? "ok" : "needs_review",
       notes: "Joinery supplier to confirm sizes on site.",
       evidence: o.evidence,
     });
