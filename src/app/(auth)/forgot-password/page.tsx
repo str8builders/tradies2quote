@@ -9,6 +9,7 @@ import {
   FormNotice,
   SubmitButton,
 } from "../_components/AuthCard";
+import { AuthTextSize } from "../_components/AuthTextSize";
 
 export const metadata: Metadata = {
   title: "Forgot password",
@@ -58,7 +59,7 @@ export default async function ForgotPasswordPage({
             title="Reset your password"
             subtitle="Enter your email and we'll send you a reset link."
           >
-            <form action={forgotPasswordAction} className="space-y-4">
+            <form action={forgotPasswordAction} className="space-y-5">
               <FormNotice message={message} />
               <FormError message={error} />
               <FormField
@@ -70,14 +71,14 @@ export default async function ForgotPasswordPage({
               <SubmitButton>Send reset link</SubmitButton>
             </form>
 
-            <p className="mt-6 text-center text-sm">
-              <Link
-                href="/login"
-                className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink-300 hover:text-white"
-              >
+            <p className="mt-4">
+              <Link href="/login" data-auth-link="quiet">
                 ← Back to sign in
               </Link>
             </p>
+            <div className="mt-8">
+              <AuthTextSize />
+            </div>
           </AuthCard>
         </div>
       </main>

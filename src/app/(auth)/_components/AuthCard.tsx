@@ -1,8 +1,13 @@
+import type { ReactNode } from "react";
+import { AuthField, type AuthFieldProps } from "./AuthField";
 import { PendingSubmit } from "./PendingSubmit";
+
 /**
  * Auth-form primitives shared by the simpler `/forgot-password` and
  * `/reset-password` pages. The marquee `/login` and `/signup` pages have
- * their own bespoke split-screen shell and do NOT use these primitives.
+ * their own bespoke split-screen shell and do NOT use these primitives, but
+ * they share <AuthField>, <AuthBanner> and the data-auth-* look in
+ * redesign.css ("Sign-in pages"): plain, big, high-contrast type.
  *
  * Originally these components used semantic tokens (`bg-surface`,
  * `text-ink`, `accent`) that aren't declared in our Tailwind v4 `@theme`
@@ -17,74 +22,62 @@ export function AuthCard({
 }: {
   title: string;
   subtitle?: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div className="border border-ink-600 bg-ink-800 rounded-sm p-6 sm:p-8 t2q-shadow-brutal">
-      <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-brand mb-2">
+      <div data-auth-eyebrow className="font-mono uppercase text-brand mb-2">
         {"// account"}
       </div>
       <h1 className="font-display text-3xl sm:text-4xl uppercase tracking-tighter leading-[0.95] text-white">
         {title}
       </h1>
       {subtitle ? (
-        <p className="mt-3 text-sm text-ink-300">{subtitle}</p>
+        <p data-auth-lead className="mt-3">
+          {subtitle}
+        </p>
       ) : null}
       <div className="mt-6">{children}</div>
     </div>
   );
 }
 
-export function FormField({
-  label,
-  name,
-  type = "text",
-  autoComplete,
-  required = true,
-  defaultValue,
-}: {
-  label: string;
-  name: string;
-  type?: string;
-  autoComplete?: string;
-  required?: boolean;
-  defaultValue?: string;
-}) {
-  return (
-    <label className="block">
-      <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink-400">
-        {label}
-      </span>
-      <input
-        name={name}
-        type={type}
-        required={required}
-        autoComplete={autoComplete}
-        defaultValue={defaultValue}
-        className="mt-1 block w-full h-12 px-3 bg-ink-900 border border-ink-600 text-white outline-none focus:border-brand rounded-sm"
-      />
-    </label>
-  );
+export function FormField(props: Omit<AuthFieldProps, "type"> & { type?: string }) {
+  const type = props.type === "password" || props.type === "email" ? props.type : "text";
+  return <AuthField {...props} type={type} />;
 }
 
-export function SubmitButton({ children }: { children: React.ReactNode }) {
+export function SubmitButton({ children }: { children: ReactNode }) {
   return <PendingSubmit>{children}</PendingSubmit>;
+}
+
+/**
+ * A message above a form. An error is announced at once (role="alert"), a
+ * notice politely (role="status"). Plain words at reading size, in a box with
+ * a coloured edge, never colour alone.
+ */
+export function AuthBanner({
+  kind,
+  children,
+  testId,
+}: {
+  kind: "error" | "notice";
+  children: ReactNode;
+  testId?: string;
+}) {
+  return (
+    <div role={kind === "error" ? "alert" : "status"} data-auth-banner={kind} data-testid={testId}>
+      {children}
+    </div>
+  );
 }
 
 export function FormError({ message }: { message?: string }) {
   if (!message) return null;
-  return (
-    <div className="border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300 rounded-sm">
-      {message}
-    </div>
-  );
+  return <AuthBanner kind="error">{message}</AuthBanner>;
 }
 
 export function FormNotice({ message }: { message?: string }) {
   if (!message) return null;
-  return (
-    <div className="border border-hivis/40 bg-hivis/10 px-3 py-2 text-sm text-hivis rounded-sm">
-      {message}
-    </div>
-  );
+  return <AuthBanner kind="notice">{message}</AuthBanner>;
 }

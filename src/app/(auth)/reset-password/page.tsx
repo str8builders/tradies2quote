@@ -9,6 +9,7 @@ import {
   FormField,
   SubmitButton,
 } from "../_components/AuthCard";
+import { AuthTextSize } from "../_components/AuthTextSize";
 import { createClient } from "@/lib/supabase/server";
 import { currentPasswordRequired } from "@/lib/auth/password-change";
 
@@ -78,7 +79,7 @@ export default async function ResetPasswordPage({
             title="Set a new password"
             subtitle="Choose a strong password you don't use elsewhere."
           >
-            <form action={resetPasswordAction} className="space-y-4">
+            <form action={resetPasswordAction} className="space-y-5">
               <FormError message={error} />
               {needsCurrent ? (
                 <>
@@ -88,12 +89,9 @@ export default async function ResetPasswordPage({
                     type="password"
                     autoComplete="current-password"
                   />
-                  <p className="text-xs text-ink-400">
+                  <p data-auth-note>
                     Forgot it?{" "}
-                    <Link
-                      href="/forgot-password"
-                      className="inline-flex min-h-11 items-center text-brand hover:text-hivis"
-                    >
+                    <Link href="/forgot-password" data-auth-link>
                       Get a reset link by email
                     </Link>
                   </p>
@@ -104,6 +102,7 @@ export default async function ResetPasswordPage({
                 name="password"
                 type="password"
                 autoComplete="new-password"
+                hint="At least 8 characters."
               />
               <FormField
                 label="Confirm password"
@@ -111,9 +110,11 @@ export default async function ResetPasswordPage({
                 type="password"
                 autoComplete="new-password"
               />
-              <p className="text-xs text-ink-400">At least 8 characters.</p>
               <SubmitButton>Update password</SubmitButton>
             </form>
+            <div className="mt-8">
+              <AuthTextSize />
+            </div>
           </AuthCard>
         </div>
       </main>

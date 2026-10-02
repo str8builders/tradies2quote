@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AuthSplitShell } from "../../_components/auth/AuthSplitShell";
 import { AuthMarketingPanel } from "../../_components/auth/AuthMarketingPanel";
+import { AuthTextSize } from "../_components/AuthTextSize";
 import { LoginForm } from "./_components/LoginForm";
 import { isNativeShellRequest } from "@/lib/native-shell";
 import { NativeTrackingStop } from "@/app/_components/NativeTrackingStop";
@@ -40,16 +41,19 @@ export default async function LoginPage({
       visual={<AuthMarketingPanel kind="signin" />}
       form={
         <>
-          <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-brand mb-3">
+          <div data-auth-eyebrow className="font-mono uppercase text-brand mb-3">
             {"// sign in"}
           </div>
           <h1 className="font-display text-4xl sm:text-5xl uppercase tracking-tighter leading-[0.95]">
             Welcome <span className="text-brand">back.</span>
           </h1>
-          <p className="text-ink-300 mt-3">Pick up where you left off.</p>
+          <p data-auth-lead className="mt-3">Pick up where you left off.</p>
 
           <div className="mt-8">
             <LoginForm next={next} error={error} message={message} native={native} />
+          </div>
+          <div className="mt-10">
+            <AuthTextSize />
           </div>
           {/* iPhone app: nobody is signed in here (after sign-out, an expired
               session or account deletion), so stop location tracking and

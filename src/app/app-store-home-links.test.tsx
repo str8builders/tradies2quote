@@ -9,6 +9,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({ native: false }));
 vi.mock("@/lib/native-shell", () => ({ isNativeShellRequest: async () => h.native }));
 vi.mock("@/app/(auth)/forgot-password/actions", () => ({ forgotPasswordAction: vi.fn() }));
+// The Text size control reads a cookie, which a page rendered outside a request cannot.
+vi.mock("./(auth)/_components/AuthTextSize", () => ({ AuthTextSize: () => null }));
 
 import HelpPage from "./help/page";
 import ForgotPasswordPage from "./(auth)/forgot-password/page";

@@ -3,23 +3,20 @@ import { PendingSubmit } from "../../_components/PendingSubmit";
 import { rememberEmail, restoreEmailInto } from "../../_components/remembered-email";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import {
-  ArrowRight,
-  Envelope,
-  Eye,
-  EyeSlash,
-  Lock,
-} from "@phosphor-icons/react";
+import { useEffect, useRef } from "react";
+import { ArrowRight, Envelope, Lock } from "@phosphor-icons/react";
 import { Magnetic } from "../../../_components/landing/Magnetic";
+import { AuthBanner } from "../../_components/AuthCard";
+import { AuthField } from "../../_components/AuthField";
 import { signupAction } from "../actions";
 
 /**
  * Client-side form for /signup.
  *
- * Owns the password show/hide toggle and the magnetic CTA wrap. Submits
- * to the unchanged Supabase `signupAction` server action with `email` +
- * `password` only — those are the only fields the action reads today.
+ * Owns the magnetic CTA wrap (the password's Show / Hide button lives in
+ * <AuthField>). Submits to the unchanged Supabase `signupAction` server action
+ * with `email` + `password` only — those are the only fields the action reads
+ * today.
  *
  * The Emergent visual design also includes decorative fields for "Your
  * name", "Business name", and a "Trade" selector. Those are intentionally
@@ -27,6 +24,9 @@ import { signupAction } from "../actions";
  * Wire them up in `actions.ts` first (e.g. into Supabase
  * `user_metadata.full_name` / `business_name` / `trade`) and then add
  * the visual fields back as a follow-up.
+ *
+ * Plain, big, high-contrast type for older eyes and bright sun: see
+ * redesign.css, "Sign-in pages".
  */
 type Props = {
   error?: string;
@@ -39,7 +39,6 @@ type Props = {
 };
 
 export function SignupForm({ error, next, native = false }: Props) {
-  const [show, setShow] = useState(false);
   const emailRef = useRef<HTMLInputElement>(null);
   // After a reload (an update landed mid-sign-up) or a failed attempt, the
   // email typed a moment ago comes back. Never the password.
@@ -54,127 +53,58 @@ export function SignupForm({ error, next, native = false }: Props) {
         rememberEmail(new FormData(e.currentTarget).get("email"));
         (window as unknown as { uw?: (e: string) => void }).uw?.("signup");
       }}
-      className="space-y-4"
+      className="space-y-5"
       data-testid="signup-form"
     >
       <input type="hidden" name="next" value={next ?? "/app"} />
-      {error && (
-        <div
-          role="alert"
-          className="border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300 rounded-sm"
-          data-testid="signup-error"
-        >
+      {error ? (
+        <AuthBanner kind="error" testId="signup-error">
           {error}
-        </div>
-      )}
+        </AuthBanner>
+      ) : null}
 
-      <Field
-        icon={Envelope}
+      <AuthField
+        icon={<Envelope aria-hidden="true" size={22} weight="bold" className="text-brand shrink-0" />}
         label="Email"
         name="email"
         type="email"
         autoComplete="email"
-        required
         testId="signup-email"
         inputRef={emailRef}
       />
-      <Field
-        icon={Lock}
+      <AuthField
+        icon={<Lock aria-hidden="true" size={22} weight="bold" className="text-brand shrink-0" />}
         label="Password"
         name="password"
-        type={show ? "text" : "password"}
+        type="password"
         autoComplete="new-password"
-        required
         testId="signup-password"
-        right={
-          <button
-            type="button"
-            onClick={() => setShow((s) => !s)}
-            aria-label={show ? "Hide password" : "Show password"}
-            className="text-ink-400 hover:text-white"
-            data-testid="signup-password-toggle"
-          >
-            {show ? (
-              <EyeSlash size={16} weight="bold" />
-            ) : (
-              <Eye size={16} weight="bold" />
-            )}
-          </button>
-        }
+        toggleTestId="signup-password-toggle"
+        hint="At least 8 characters."
       />
-      <p className="text-xs text-ink-400">At least 8 characters.</p>
 
-      <Magnetic strength={0.18} className="w-full">
+      <Magnetic strength={0.18} fill>
         <PendingSubmit data-testid="signup-submit" pendingLabel="Creating your account…">
-          {native ? "Create account" : "Start 7-day trial"} <ArrowRight size={20} weight="bold" />
+          {native ? "Create account" : "Start 7-day trial"} <ArrowRight aria-hidden="true" size={22} weight="bold" />
         </PendingSubmit>
       </Magnetic>
 
-      <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-ink-500">
+      <p data-auth-fine>
         {native
           ? "By creating an account you agree to our terms and privacy policy"
           : "By signing up you agree to our terms · no card needed"}
       </p>
 
-      <div className="text-sm text-ink-400">
+      <p data-auth-note>
         Already on it?{" "}
         <Link
           href={`/login?next=${encodeURIComponent(next ?? "/app")}`}
-          className="text-brand hover:text-hivis font-semibold"
+          data-auth-link
           data-testid="signup-to-login"
         >
           Sign in to your account
         </Link>
-      </div>
+      </p>
     </form>
-  );
-}
-
-type FieldProps = {
-  icon: React.ComponentType<{
-    size?: number;
-    weight?: "bold" | "regular" | "fill";
-    className?: string;
-  }>;
-  label: string;
-  name: string;
-  type?: string;
-  autoComplete?: string;
-  required?: boolean;
-  testId?: string;
-  right?: React.ReactNode;
-  inputRef?: React.Ref<HTMLInputElement>;
-};
-
-function Field({
-  icon: Icon,
-  label,
-  name,
-  type = "text",
-  autoComplete,
-  required,
-  testId,
-  right,
-  inputRef,
-}: FieldProps) {
-  return (
-    <label className="block">
-      <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-ink-400">
-        {label}
-      </span>
-      <span className="mt-1 flex items-center gap-2 h-12 px-3 bg-ink-800 border border-ink-600 focus-within:border-brand rounded-sm">
-        <Icon size={16} weight="bold" className="text-brand shrink-0" />
-        <input
-          ref={inputRef}
-          name={name}
-          type={type}
-          autoComplete={autoComplete}
-          required={required}
-          data-testid={testId}
-          className="flex-1 bg-transparent outline-none text-white"
-        />
-        {right}
-      </span>
-    </label>
   );
 }
