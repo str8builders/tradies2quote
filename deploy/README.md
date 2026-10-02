@@ -61,6 +61,15 @@ compose file and an empty-database rebuild are not this release procedure.
    routes, quote creation/reopen, public quote view and PDF output. The health
    endpoint alone only proves that the Next.js process answers.
 
+The quote video worker (`t2q-video.service`, `deploy/t2q-video.service`) runs the
+app's TypeScript straight from `/srv/t2q/app` under Node's type stripping, so it
+is not covered by the web build. After every activation restart it and read its
+journal: `systemctl restart t2q-video`, then `journalctl -u t2q-video --since "-60 sec"`
+should show `browser.ready`, `bundle.ready` and `worker.start`, with no
+`worker.failed`. Files the worker reaches (`src/lib/quote-video/{sample,constants,worker}.ts`
+and what they import) must import neighbours with a `.ts` extension and never
+through the `@/` alias; `src/lib/quote-video/worker-imports.test.ts` checks that.
+
 Read-only local checks (Node 22+):
 
 ```sh
