@@ -156,6 +156,8 @@ describe("the Weather impact sheet", () => {
     expect(out).toContain('href="/app/weather"');
     expect(out).toContain("Full weather");
     expect(out).toContain("Advisory only");
+    // The forecast's licence (CC BY 4.0) asks for the credit.
+    expect(out).toMatch(/data-testid="weather-credit"[^>]*>Weather data by Open-Meteo\.com \(CC BY 4\.0\)</);
   });
 
   it("your trade's better window, when it has one", () => {

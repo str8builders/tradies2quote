@@ -28,6 +28,7 @@ import {
   type WeatherImpactStatus,
   type WeatherImpactTrade,
 } from "@/lib/weather-impact";
+import { OPEN_METEO_CREDIT, OPEN_METEO_SOURCE } from "@/lib/open-meteo-endpoint";
 
 // ── Job-location-first contract (P0 weather slice) ─────────────────────────
 // The server (page.tsx) resolves WHICH location the weather is for — the
@@ -630,6 +631,12 @@ export function WeatherImpactClient({
           <p className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 text-xs leading-relaxed text-ink-400">
             {result.advisory}
           </p>
+          {/* Live weather's licence (CC BY 4.0) asks for this credit. */}
+          {weather.source === OPEN_METEO_SOURCE ? (
+            <p className="px-1 text-xs text-ink-400" data-testid="weather-credit">
+              {OPEN_METEO_CREDIT}
+            </p>
+          ) : null}
         </div>
       </section>
     </div>

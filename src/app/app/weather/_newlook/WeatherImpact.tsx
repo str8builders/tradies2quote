@@ -21,6 +21,7 @@ import { StatusPill } from "@/components/ui/status-pill";
 import { TAP } from "@/components/ui/styles";
 import { TextField } from "@/components/ui/text-field";
 import { Toggle } from "@/components/ui/toggle";
+import { OPEN_METEO_CREDIT, OPEN_METEO_SOURCE } from "@/lib/open-meteo-endpoint";
 import { ALL_CLEAR_REASON, TRADE_OPTIONS } from "@/lib/weather-impact/config";
 import { NO_THRESHOLDS_REASON } from "@/lib/weather-impact/evaluate";
 import type { WeatherDailyForecast, WeatherImpactStatus, WeatherImpactTrade } from "@/lib/weather-impact/types";
@@ -148,6 +149,12 @@ export function WeatherImpactView(props: ViewProps) {
       <Site w={w} />
       <Conditions w={w} />
       <p className="px-1 text-ui-sm text-ui-muted">{w.result.advisory}</p>
+      {/* Live weather's licence (CC BY 4.0) asks for this credit. */}
+      {w.weather.source === OPEN_METEO_SOURCE ? (
+        <p className="px-1 text-ui-xs text-ui-muted" data-testid="weather-credit">
+          {OPEN_METEO_CREDIT}
+        </p>
+      ) : null}
     </div>
   );
 }

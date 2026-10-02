@@ -9,8 +9,7 @@
 
 import "server-only";
 import type { ForecastHour, ForecastSnapshot, WeatherAlert } from "./types";
-
-const FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
+import { openMeteoUrl } from "@/lib/open-meteo-endpoint";
 
 interface OpenMeteoHourly {
   time?: string[];
@@ -65,7 +64,7 @@ export async function fetchForecastForWindow(args: FetchForecastArgs): Promise<F
     ].join(","),
   });
 
-  const res = await doFetch(`${FORECAST_URL}?${params}`, { signal: args.signal });
+  const res = await doFetch(openMeteoUrl("forecast", params), { signal: args.signal });
   if (!res.ok) {
     throw new Error(`Weather provider returned ${res.status}`);
   }

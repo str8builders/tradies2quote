@@ -12,6 +12,7 @@ import { StatusPill } from "@/components/ui/status-pill";
 import { cx } from "@/components/ui/cx";
 import { TAP } from "@/components/ui/styles";
 import { WEATHER_IMPACT_ADVISORY } from "@/lib/weather-impact/config";
+import { OPEN_METEO_CREDIT } from "@/lib/open-meteo-endpoint";
 import type { WeatherImpactTrade } from "@/lib/weather-impact/types";
 import { WeatherIcon } from "./weather-icons";
 import {
@@ -193,6 +194,10 @@ function Ready({
       ) : null}
 
       <p className="px-1 text-ui-sm text-ui-muted">{WEATHER_IMPACT_ADVISORY}</p>
+      {/* The forecast's licence (CC BY 4.0) asks for this credit. */}
+      <p className="px-1 text-ui-xs text-ui-muted" data-testid="weather-credit">
+        {OPEN_METEO_CREDIT}
+      </p>
     </div>
   );
 }

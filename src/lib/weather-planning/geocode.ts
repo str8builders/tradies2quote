@@ -7,8 +7,7 @@
 // system never fabricates a location.
 
 import "server-only";
-
-const GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search";
+import { openMeteoUrl } from "@/lib/open-meteo-endpoint";
 
 export interface GeocodeResult {
   latitude: number;
@@ -78,7 +77,7 @@ export async function geocodeAddress(args: GeocodeArgs): Promise<GeocodeResult |
       if (withCountry && countryCode) params.set("countryCode", countryCode);
       let res: Response;
       try {
-        res = await doFetch(`${GEOCODE_URL}?${params}`, { signal: args.signal });
+        res = await doFetch(openMeteoUrl("geocoding", params), { signal: args.signal });
       } catch {
         continue;
       }

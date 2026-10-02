@@ -203,6 +203,8 @@ describe("/app/weather in the new look", () => {
     expect(conditions).not.toContain("deg C");
     expect(out).toContain('data-testid="weather-device-location"');
     expect(out).toContain("Advisory only");
+    // Typed-in conditions aren't Open-Meteo's: no credit.
+    expect(out).not.toContain("weather-credit");
   });
 
   it("no jobs with a client address yet: says how to get one there, and manual entry still works", () => {
@@ -262,6 +264,8 @@ describe("/app/weather in the new look", () => {
     expect(conditions).toContain('value="38"');
     expect(out).not.toContain('role="alert"');
     expect(out).not.toContain("weather-loading");
+    // Live weather's licence (CC BY 4.0) asks for the credit.
+    expect(out).toMatch(/data-testid="weather-credit"[^>]*>Weather data by Open-Meteo\.com \(CC BY 4\.0\)</);
   });
 
   it("your trade: every trade as a chip with a big tap area, yours picked, and the call follows it", () => {

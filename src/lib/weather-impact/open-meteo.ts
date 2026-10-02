@@ -1,4 +1,5 @@
 import type { WeatherDailyForecast, WeatherForecastWindow, WeatherImpactInput } from "./types";
+import { OPEN_METEO_SOURCE, openMeteoUrl } from "@/lib/open-meteo-endpoint";
 
 interface OpenMeteoResponse {
   /** IANA zone the lat/lon resolved to — requested via `timezone=auto` below. */
@@ -83,7 +84,7 @@ export async function fetchOpenMeteoWeather({
     ].join(","),
   });
 
-  const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, {
+  const response = await fetch(openMeteoUrl("forecast", params), {
     signal,
   });
   if (!response.ok) {
@@ -108,7 +109,7 @@ export function normalizeOpenMeteo(data: OpenMeteoResponse): WeatherImpactInput 
     observedAt: current.time ?? null,
     timezone: data.timezone ?? null,
     utcOffsetSeconds: data.utc_offset_seconds ?? null,
-    source: "Open-Meteo",
+    source: OPEN_METEO_SOURCE,
     summary: weatherCodeSummary(current.weather_code),
     condition: current.weather_code == null ? null : codeCondition(current.weather_code),
     rainProbabilityPct: valueAt(hourly.precipitation_probability, currentHourIndex),
