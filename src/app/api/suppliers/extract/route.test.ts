@@ -55,6 +55,9 @@ vi.mock("@/lib/llm/local-chat", async (importOriginal) => {
   };
 });
 vi.mock("@/lib/observability", () => ({ captureError: vi.fn() }));
+// The AI consent gate (App Store 5.1.2(i)): open unless a test closes it.
+const consent = vi.hoisted(() => ({ block: null as Response | null }));
+vi.mock("@/lib/ai-consent", () => ({ aiConsentGate: async () => consent.block }));
 // The page fetch goes through the SSRF-safe helper; keep its URL checks real
 // and stub only the network read.
 const pageFetch = vi.hoisted(() => ({ get: vi.fn() }));
@@ -89,6 +92,24 @@ describe("POST /api/suppliers/extract", () => {
     mock.local.mockClear();
     pageFetch.get.mockReset();
     pageFetch.get.mockResolvedValue({ ok: true, status: 200, url: "https://supplier.example/product/pine-90x45", text: PAGE_HTML });
+  });
+
+  it("in the iPhone app without the AI 'I agree': refused, and nothing is fetched or sent to the AI", async () => {
+    const { NextResponse } = await import("next/server");
+    consent.block = NextResponse.json(
+      { error: "ai_consent_required", message: "Turn on AI features to use voice, scan and quote generation." },
+      { status: 403 },
+    );
+    try {
+      const res = await post();
+      expect(res.status).toBe(403);
+      expect(((await res.json()) as { message: string }).message).toMatch(/Turn on AI features/);
+      expect(pageFetch.get).not.toHaveBeenCalled();
+      expect(mock.structured).not.toHaveBeenCalled();
+      expect(mock.local).not.toHaveBeenCalled();
+    } finally {
+      consent.block = null;
+    }
   });
 
   it("refuses internal addresses before fetching anything (SSRF)", async () => {

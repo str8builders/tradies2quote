@@ -55,8 +55,8 @@ export const LEGAL: LegalConfig = {
   privacyEmail: "privacy@tradies2quote.com",
   lastUpdated: "2026-07-18",
   lastUpdatedDisplay: "18 July 2026",
-  // Cookies section: names the UptimeWatch analytics host and what it
-  // collects, and points at the footer's "Cookie settings" withdrawal control.
-  privacyLastUpdated: "2026-10-02",
-  privacyLastUpdatedDisplay: "2 October 2026",
+  // 3 Oct 2026: the iPhone app's contact picker, calendar sheet, Lock Screen
+  // timer, feedback and device keys; display choices in the cookies section.
+  privacyLastUpdated: "2026-10-03",
+  privacyLastUpdatedDisplay: "3 October 2026",
 };

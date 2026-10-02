@@ -120,7 +120,22 @@ export default function PrivacyPage() {
             <strong>4. Technical information</strong> — IP address, browser
             and device type, basic usage events (e.g. &ldquo;quote
             generated&rdquo;, &ldquo;PDF exported&rdquo;), and error logs.
-            We use this to keep the service running and to spot problems.
+            We use this to keep the service running and to spot problems. In
+            the iPhone app this also includes the push notification token
+            (only if you turn notifications on) and a random key the app
+            uses to send your route while you&apos;re clocked in.
+          </p>
+          <p>
+            <strong>In the iPhone app</strong> — &ldquo;Choose from my
+            contacts&rdquo; on a job opens iOS&apos;s own contact picker: we
+            receive only the one contact you tap (saved as that job&apos;s
+            client) and never read your address book. &ldquo;Add to my
+            calendar&rdquo; opens iOS&apos;s own New Event sheet; we never read
+            your calendar. While you&apos;re clocked in, the app shows a
+            &ldquo;Clocked in&rdquo; timer on your Lock Screen and Dynamic
+            Island; it is made on your phone and shows only the time you
+            started, never a client or job. &ldquo;Send feedback&rdquo; sends
+            what you write to us so we can reply and fix things.
           </p>
           <p>
             We do <strong>not</strong> collect payment card details
@@ -495,8 +510,9 @@ export default function PrivacyPage() {
         <LegalSection id="cookies" number={num("cookies")} title="Cookies">
           <p>
             We use a small number of essential cookies. They keep you
-            signed in, remember your theme preference, and protect against
-            cross-site request forgery. Without them, the app cannot
+            signed in, remember your display choices on this device (theme,
+            outdoor mode and text size), and protect against cross-site
+            request forgery. Without them, the app cannot
             function.
           </p>
           <p>

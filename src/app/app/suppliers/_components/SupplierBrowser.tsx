@@ -147,10 +147,13 @@ export function useSupplierBrowser(initialUrl: string, taxRate = 0.15) {
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as {
           error?: string;
+          message?: string;
         } | null;
+        // A refusal with a sentence for people (the AI consent gate) shows that
+        // sentence, never its code ("ai_consent_required").
         setPhase({
           state: "error",
-          message: data?.error ?? "Extraction failed. Try again.",
+          message: data?.message ?? data?.error ?? "Extraction failed. Try again.",
         });
         return;
       }

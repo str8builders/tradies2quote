@@ -1,6 +1,61 @@
 # Tradies2Quote — App Store readiness plan & checklist
 
-Last updated: 2026-07-18 (compliance-fix pass; supersedes the 2026-07-10 audit notes)
+Last updated: 2026-10-03 (playbook audit below; the older sections are kept as history)
+
+## Playbook audit — 3 October 2026
+
+Checked against the App Store Compliance Playbook (github.com/mjmirza/app-store-compliance,
+updated 2 October 2026): its pre-submission checklist, Apple rejection map, cross-platform
+(Capacitor) rules and 2026 changes. Its scripts were read, not run. The submission pack
+(APP_STORE_REVIEW_NOTES.md) carries the answers; `src/lib/app-store-pack.test.ts` keeps the
+pack, the app's labels and the privacy manifest in step.
+
+**Passes (checked in the code or the built binary):**
+- 4.2 not a thin wrapper: native location module, Live Activity, quick actions, contact
+  picker, New Event sheet, haptics, share sheet and Files, push, offline screen.
+- No `UIWebView` in any binary (ITMS-90809); Capacitor.framework and Cordova.framework ship
+  their own privacy manifests; the app manifest declares UserDefaults (CA92.1) and file
+  timestamps (C617.1), which our plugins and the Filesystem plugin use.
+- 5.1.1(v) in-app account deletion; 5.1.1(i) privacy policy in the app and on sign-in; 4.8
+  no third-party login; 2.5.4 no background modes; specific purpose strings; push permission
+  asked only from the switch, never at launch; calendar needs no permission on iOS 17+.
+- 3.1.3(f): no purchase, price, plan, trial or purchase link in the app (server-enforced).
+- 1.2 customer chat: filter on both sides, report (24 h), turn chat off, zero-tolerance terms,
+  published contact.
+- 2.3.10: no Android or other-store wording reaches the app (the Guide's install steps and the
+  materials share tip are hidden there).
+- 4.5.3 (8 June 2026): the Live Activity is user-started and tied to a real, time-bound shift.
+- Reviewer AI quota: 150 quotes a day, enough for review.
+
+**Fixed on 3 October 2026:**
+- 5.1.2(i): supplier price-page reading (`/api/suppliers/extract`) now refuses AI until the
+  person's "I agree", like every other AI route; the consent sheet now names client details
+  among what is sent (consent version bumped, so app users are asked once more).
+- Privacy declaration (the playbook's second "stops most rejections" check): the manifest and
+  the label table now also declare Contacts (the picked contact), Coarse Location (weather),
+  Device ID (push token, upload key), Emails or Text Messages (quote emails, client chat) and
+  Customer Support (feedback); the privacy policy describes the contact picker, calendar
+  sheet, Lock Screen timer, feedback and device keys.
+- Content rights (5.2): Open-Meteo's free API is for non-commercial use. The app now uses its
+  paid hosts as soon as `OPEN_METEO_API_KEY` is set on the server, and shows the CC BY 4.0
+  credit under the forecast.
+- Review notes rebuilt on the playbook's template: external services, regions, the Live
+  Activity, Text size, native list for 4.2, and the 2026 App Store Connect questions (social
+  media declaration, new age rating bands, content rights, contact phone in +64 format).
+
+**Owner only (App Store Connect or money):**
+- Apple Developer Program enrolment (two to six weeks in 2026) and every agreement update.
+- The demo account (sign-up needs the emailed confirmation link) and the seed; sign in with it
+  on the TestFlight build the day you submit.
+- Open-Meteo's paid API key (or turn weather off).
+- App Store Connect answers: social media (No), the age rating questionnaire, content rights,
+  privacy labels (section 3 of the pack), App Review phone in +64 format, availability.
+- Availability: New Zealand and Australia first. The US needs the Texas age-assurance law
+  handled (Declared Age Range API, in force); the EU needs DSA trader status and the EU AI Act
+  notice. Neither is built.
+- A screen recording of the review steps on a real iPhone (recommended).
+- iPhone Duo (ships 23 October 2026): no App Review rule yet; build with Xcode 27.1 later to
+  draw under its status bar and cameras.
 
 ## STATUS UPDATE 2026-07-18 — full audit-fix pass (43 findings closed)
 

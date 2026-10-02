@@ -3,6 +3,7 @@ import { captureError } from "@/lib/observability";
 import { safeGetText, UnsafeUrlError, assertSafeUrl } from "@/lib/net/safeFetch";
 import { parseModelJsonObject } from "@/lib/modelJson";
 import { createClient } from "@/lib/supabase/server";
+import { aiConsentGate } from "@/lib/ai-consent";
 import { isOwnerEmail } from "@/lib/owner";
 import { round2 } from "@/lib/quote-defaults";
 import {
@@ -173,6 +174,12 @@ export async function POST(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  // App Store 5.1.2(i): in the iPhone app, nothing goes to the AI provider
+  // (the page's text goes to Claude) before the person's "I agree", like
+  // every other AI route. The website is unaffected.
+  const consentBlock = await aiConsentGate(supabase, user.id);
+  if (consentBlock) return consentBlock;
 
   // Owner bypass — lets the owner dogfood + stress-test without
   // tripping their own cap. Mirrors how /app/agents + /app/debug

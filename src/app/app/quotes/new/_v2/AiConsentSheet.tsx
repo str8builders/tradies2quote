@@ -93,7 +93,8 @@ export function AiConsentSheet({ pending, error, onAccept, onDecline }: AiConsen
           </li>
         </ul>
         <p className="text-ui-muted">
-          They process it only to return the result and don&apos;t use it to train their models. Full detail is
+          That includes anything about your client in it, such as their name or address. They process it only to
+          return the result and don&apos;t use it to train their models. Full detail is
           in our{" "}
           <a
             href="/privacy"

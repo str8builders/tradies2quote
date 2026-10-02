@@ -23,7 +23,9 @@ import { isNativeShellRequest } from "@/lib/native-shell";
 
 // v2: the disclosure changed from "local Qwen, nothing sent out" to naming
 // Anthropic and OpenAI, which production actually uses — so re-ask.
-export const AI_CONSENT_VERSION = "2026-09-anthropic-openai-v2";
+// v3 (3 Oct 2026): it now says client details in what you send (name,
+// address) go too — the personal data types 5.1.2(i) asks to name — so re-ask.
+export const AI_CONSENT_VERSION = "2026-10-client-details-v3";
 
 /** True if the user has an on-record AI-processing consent. */
 export async function hasAiConsent(
