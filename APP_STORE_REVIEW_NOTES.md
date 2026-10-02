@@ -35,40 +35,41 @@ WHAT IT IS
 Tradies2Quote helps tradespeople quote, invoice and keep a timesheet. Describe a job by voice, typing or a photo of a plan; AI drafts the quote (materials, labour, GST) to check and send.
 
 GETTING AROUND
-Tabs: Home, Jobs, New (+), Prices, Timesheet. Your photo (top left) opens the menu: Your profile, Business details, Rates and quotes, Payments, Your QR code, Clients, Calendar, Team, Help, Take the tour, Send feedback, Privacy policy, Terms, Outdoor mode, Sign out. The weather (top right) opens "Weather impact". Team and Terms templates are team-plan features, off on this account. A short tour runs on first sign-in.
+Tabs: Home, Jobs, New (+), Prices, Timesheet. Your photo (top left) opens the menu: Your profile, Rates and quotes, Your QR code, Clients, Calendar, Team, Help, Send feedback, Privacy policy, Terms, Outdoor mode, Sign out. Team and Terms templates are team-plan features, off here.
 
 TRY IT
-1. Jobs: open a job. More tools (the ... button) > "Download the PDF" opens the iOS share sheet (Save to Files, Mail).
-2. New (+): the AI consent screen first (below). Then Talk (microphone prompt), Type, or Photo of a plan (camera or photo library) > Write my quote.
-3. Prices: "Scan a supplier quote" (photo or PDF) and "Import a price list" (CSV, Excel, PDF or photo) read prices into the list.
-4. Timesheet: tap the Last week arrow for a week of hours across three clients. "Job location" on a day shows the site on a map. "Invoice this week" bills a client's hours.
-5. Start work, wait a minute or more, then Finish work (set Break to None). The hours land on today.
-6. Location: the gear on the Start work card. The sheet says what is kept. Turn on "Use my location for work" > Save: iOS asks for While Using. Turn on "Automatic clock-in at jobs" > Save: iOS asks for Always. The demo's job sites are in Tauranga, NZ, so arrival notifications only fire there.
-7. Weather (top right) > "Use my location": iOS asks for While Using.
-8. Photo > Your QR code: the code clients scan to send a job request. Share opens the iOS share sheet (Print, Save Image, AirDrop).
-9. Delete account: photo > Your profile > "Delete my account" (bottom) > type DELETE > "Delete forever". You land on the sign-in screen. The demo account is only signed out, so you can sign in again.
+1. Press and hold the Home Screen icon: New quote, Timesheet, Jobs and Scan a supplier quote open that screen.
+2. Jobs > open a draft job > Client card > Edit > "Choose from my contacts" opens the iOS contact picker (it sees only the contact tapped).
+3. Jobs > Booked > open the job > More tools (...) > "Your phone's calendar" > "Add to my calendar" opens the iOS New Event sheet.
+4. Any job > More tools > "Download the PDF" opens the iOS share sheet (Save to Files, Mail).
+5. New (+): AI consent first (below). Then Talk (microphone prompt), Type, or Photo of a plan (camera or photo library) > Write my quote.
+6. Prices: "Scan a supplier quote" (photo or PDF) and "Import a price list" (CSV, Excel, PDF or photo) read prices into the list.
+7. Timesheet: the Last week arrow shows a week of hours across three clients. "Job location" on a day shows the site on a map.
+8. Start work, wait a minute or more, then Finish work (set Break to None). The hours land on today.
+9. Location: the gear on the Start work card > "Use my location for work" > Save: iOS asks While Using. "Automatic clock-in at jobs" > Save: iOS asks Always.
+10. Weather (top right) > "Use my location": iOS asks for While Using.
+11. Photo > Your QR code: the code clients scan to send a job request. Share opens the iOS share sheet (Print, Save Image, AirDrop).
+12. Delete account: photo > Your profile > "Delete my account" (bottom) > type DELETE > "Delete forever". You land on the sign-in screen; the demo account is only signed out.
 
 LOCATION
-Off until the person turns it on in the Timesheet. No background location mode. Automatic clock-in uses iOS region monitoring (up to 18 job sites), only in the person's work hours. Travel kilometres: precise updates while the app is open; significant-change updates in the background, only while clocked in with Always. Route points are deleted after 90 days. Weather rounds the location to about 1 km and doesn't save it.
+Off until turned on in the Timesheet. No background location mode. Automatic clock-in uses iOS region monitoring (up to 18 job sites), only in work hours. Travel kilometres: precise updates while the app is open; significant-change updates in the background, only while clocked in with Always. Route points are deleted after 90 days. Weather rounds the location to about 1 km and doesn't save it.
 
 AI CONSENT (5.1.2(i))
-Before anything is sent to AI the app names the providers (Anthropic, OpenAI) and asks: "I agree — continue" or "Not now". Until then the server refuses AI requests from the app. Withdraw any time: Your profile > AI features.
+Before anything is sent to AI the app names the providers (Anthropic, OpenAI) and asks: "I agree — continue" or "Not now". Until then the server refuses AI requests from the app. Withdraw: Your profile > AI features.
 
 BUSINESS MODEL (3.1.3(f))
-The app is free: no in-app purchases, prices, plans, trials, upgrade prompts or purchase links. The server recognises the app and leaves them out of every page it sends.
+The app is free: no in-app purchases, prices, plans, trials, upgrade prompts or purchase links. The server leaves them out of every page it sends the app.
 
 NATIVE FEATURES
-Location module (job-site arrival and leaving notifications, travel kilometres while clocked in); push notifications (Your profile > Quote notifications); share sheet and Files; offline screen; microphone and camera.
+Location module (job-site arrival and leaving notifications, travel kilometres while clocked in); push notifications (Your profile > Quote notifications); Home Screen quick actions; iOS contact picker and New Event sheet (the app never reads your contacts or calendar); haptics; share sheet and Files; offline screen; microphone and camera.
 
 PRIVACY
-Photo menu > Privacy policy and Terms (also on the sign-in and sign-up screens). No advertising, analytics tools, tracking or cookie banner. The app keeps the person's own quote history and AI-run log to run the service (declared as Product Interaction).
+Photo menu > Privacy policy and Terms (also on sign-in and sign-up). No advertising, analytics tools, tracking or cookie banner. The app keeps the person's quote history and AI-run log to run the service (declared as Product Interaction).
 
 CUSTOMER CHAT (1.2)
 On a sent job, More tools > Customer chat: the client's AI chat about the quote, labelled as AI. Both sides go through a content filter; "Report chat" (reviewed within 24 hours) and "Turn chat off" are there.
 
 SIGN-IN (4.8): our own email and password accounts only.
-
-Support: support@tradies2quote.com
 ```
 
 ---
@@ -152,6 +153,13 @@ Only the owner can do the first two; everything after them waits on them.
 4. Confirm `Info.plist` still has no `UIBackgroundModes` location entry (the
    notes above say none is used) and that both location purpose strings
    (While Using, Always) read as intended.
+4b. On the TestFlight build, on a real iPhone: press and hold the icon (four
+   quick actions open New quote, Timesheet, Jobs and Scan a supplier quote);
+   Client details > "Choose from my contacts" (no permission prompt); the
+   booked demo job > More tools > "Add to my calendar" (iOS 17 and later: no
+   prompt; iOS 15 and 16 ask once for calendar access, using
+   NSCalendarsUsageDescription). Haptics (recording, send, clock in or out)
+   can only be felt on a device. Tested so far on the iOS 26.5 simulator.
 5. Run the demo seed on the VPS (Section 1). Then, ON THE BUILT BINARY: sign
    in with the demo account and walk steps 1–9 of the notes, including the
    While Using and Always prompts, Start/Finish work, and a new quote (proves
@@ -178,8 +186,10 @@ Reply with (short version): the app's core flows are built on device
 capabilities — microphone dictation, camera plan and supplier-quote scanning,
 a native location module (clocking in and out with pins, job-site region
 monitoring for automatic clock-in with arrival notifications, travel
-kilometres), native share/save, push, and offline handling; the binary
-carries native code for each. The web view renders a product whose
-processing is server-side AI. Offer a screen recording of the voice→quote
+kilometres), Home Screen quick actions (New quote, Timesheet, Jobs, Scan a
+supplier quote), the iOS contact picker for client details, the iOS New Event
+sheet for booked jobs, haptics, native share/save, push, and offline
+handling; the binary carries native code for each (ios/App/App: the T2Q*
+plugins). The web view renders a product whose processing is server-side AI. Offer a screen recording of the voice→quote
 and Timesheet flows. Do not resubmit unchanged without replying — the reply
 text is what reviewers weigh.

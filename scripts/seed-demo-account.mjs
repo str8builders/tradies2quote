@@ -475,6 +475,20 @@ async function main() {
     console.log(`quote[${want.status}]: seeded — "${want.job.slice(0, 40)}…"`);
   }
 
+  // The scheduled job needs a day: the job page offers "Add to my calendar"
+  // (iPhone app) for a booked job, and the review notes send the reviewer there.
+  // A day three days ahead in NZ, set only when the job has none.
+  const bookedDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Pacific/Auckland", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(Date.now() + 3 * 864e5));
+  const { data: booked, error: bookedError } = await admin
+    .from("quotes")
+    .update({ scheduled_for: bookedDay })
+    .eq("user_id", uid)
+    .eq("status", "scheduled")
+    .is("scheduled_for", null)
+    .select("id");
+  if (bookedError) throw bookedError;
+  console.log(`scheduled job day: ${(booked ?? []).length ? `set to ${bookedDay}` : "already has one — untouched"}`);
+
   // 4. Invoice — at least one, drafted off a completed quote.
   const { data: invoices } = await admin
     .from("invoices")
