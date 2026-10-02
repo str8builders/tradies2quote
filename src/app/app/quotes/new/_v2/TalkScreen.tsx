@@ -14,6 +14,7 @@ import { Callout } from "@/components/ui/callout";
 import { cx } from "@/components/ui/cx";
 import { PRESS, TAP } from "@/components/ui/styles";
 import { primeMicrophoneMeter, releasePrimedMeter } from "@/lib/microphone-level";
+import { haptic } from "@/lib/native/haptics";
 import { MicLevelBars } from "./MicLevelBars";
 import { formatClock, micButtonLabel, talkStatus } from "./lib/copy";
 import type { RecorderSnapshot } from "./lib/recorder";
@@ -180,8 +181,13 @@ export function TalkScreen({ back, notice, focusOnArrival, onTranscript, onTypeI
   const onMic = () => {
     // Inside the tap: iPhones only let the level meter's audio start here.
     primeMicrophoneMeter();
-    if (state.phase === "recording" || state.phase === "paused") recorder.togglePause();
-    else void recorder.start();
+    if (state.phase === "recording" || state.phase === "paused") {
+      haptic("tap");
+      recorder.togglePause();
+    } else {
+      haptic("heavy");
+      void recorder.start();
+    }
   };
   return (
     <TalkView
@@ -190,7 +196,10 @@ export function TalkScreen({ back, notice, focusOnArrival, onTranscript, onTypeI
       notice={notice}
       focusOnArrival={focusOnArrival}
       onMic={onMic}
-      onDone={recorder.finish}
+      onDone={() => {
+        haptic("success");
+        recorder.finish();
+      }}
       onStartAgain={() => {
         primeMicrophoneMeter();
         void recorder.restart();

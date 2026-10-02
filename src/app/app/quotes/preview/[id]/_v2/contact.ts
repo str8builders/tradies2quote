@@ -38,6 +38,21 @@ export function clientForm(client: QuoteClient): ClientForm {
   };
 }
 
+/**
+ * What a contact picked from the phone fills in: only the boxes it has
+ * something for (the rest stay as they were). A contact with no personal name
+ * (a business) gives its company name.
+ */
+export function contactToClientPatch(contact: { name: string; company: string; phone: string; email: string; address: string }): Partial<ClientForm> {
+  const patch: Partial<ClientForm> = {};
+  const name = contact.name.trim() || contact.company.trim();
+  if (name) patch.name = name;
+  if (contact.phone.trim()) patch.phone = contact.phone.trim();
+  if (contact.email.trim()) patch.email = contact.email.trim();
+  if (contact.address.trim()) patch.address = contact.address.trim();
+  return patch;
+}
+
 /** Empty boxes are stored as null, the way the classic editor stores them. */
 export function clientFromForm(base: QuoteClient, form: ClientForm): QuoteClient {
   const orNull = (value: string) => (value.trim() ? value.trim() : null);

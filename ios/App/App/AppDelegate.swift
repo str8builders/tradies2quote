@@ -49,6 +49,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
 
+    // Home Screen quick actions (press and hold the icon). iOS calls this after
+    // launch too when the action is what opened the app. The page picks the
+    // action up with T2QShortcuts.consume() (T2QShortcutsPlugin.swift).
+    func application(_ application: UIApplication, performActionFor shortcutItem: UIApplicationShortcutItem, completionHandler: @escaping (Bool) -> Void) {
+        completionHandler(T2QShortcuts.shared.handle(shortcutItem))
+    }
+
     // APNs registration forwarding — @capacitor/push-notifications listens
     // on NotificationCenter for these two (see the plugin's iOS docs);
     // without them the JS `registration` event never fires.

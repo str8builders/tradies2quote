@@ -36,8 +36,45 @@
 	<string>When you start or finish work, Tradies2Quote pins where you are (for example "At the Hemi Walker job") on your timesheet and works out your travel kilometres while you're clocked in. It also shows the weather where you are.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Only if you turn on automatic clock-in in the Timesheet: Tradies2Quote starts and stops your hours when you arrive at and leave a job, during your work hours, even with the app closed, and keeps rough travel kilometres while you're clocked in. If you work for a business on Tradies2Quote, its owner sees your hours and where you clocked in.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>So you can add a booked job to your calendar. Tradies2Quote only adds the job you choose, and never reads your calendar.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypeCompose</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>New quote</string>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.str8builders.tradies2quote.new-quote</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypeTime</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Timesheet</string>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.str8builders.tradies2quote.timesheet</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypeTask</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Jobs</string>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.str8builders.tradies2quote.jobs</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypeCapturePhoto</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Scan a supplier quote</string>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.str8builders.tradies2quote.supplier-quote</string>
+		</dict>
+	</array>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
 	<key>UIRequiredDeviceCapabilities</key>

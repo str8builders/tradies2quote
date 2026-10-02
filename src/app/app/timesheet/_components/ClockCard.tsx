@@ -31,6 +31,7 @@ import {
 import { BREAK_CHOICES } from "@/lib/timesheet/hours";
 import { announceLocationChanged } from "../../_v2/shell/LocationBridge";
 import { StaticSiteMap } from "../../_v2/ui/StaticSiteMap";
+import { haptic } from "@/lib/native/haptics";
 import { clockIn, clockOut, pinJobSite } from "../location-actions";
 import type { LocationState } from "../_lib/location-types";
 import type { TimesheetClient } from "../_lib/types";
@@ -121,6 +122,7 @@ export function ClockCard({
         const fix = on ? await currentFix() : null;
         const result = await clockIn({ fix, source: "tap" });
         if (!result.ok) return setError(result.error);
+        haptic("success");
         done();
       } catch (e) {
         if (isStaleDeployError(e)) return reloadForUpdate(setError, e);
@@ -382,6 +384,7 @@ export function FinishForm({
           clientId: clientId || here?.clientId || null,
         });
         if (!result.ok) return setError(result.error);
+        haptic("success");
         onClose();
         onDone();
       } catch (e) {

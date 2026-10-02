@@ -10,6 +10,8 @@ import type { QuoteLineItem } from "@/lib/quote-types";
 import { CsiGroupedView } from "../../_components/CsiGroupedView";
 import { MaterialsListButton } from "../../_components/MaterialsListButton";
 import { T2QCALWorking, hasT2QCALWorking } from "../../_components/T2QCALWorking";
+import type { CalendarJob } from "@/lib/native/calendar";
+import { AddToCalendarTool } from "../parts/AddToCalendarTool";
 import { DayNotes } from "../parts/DayNotes";
 import { plainNote } from "../takeoff-words";
 import { ToolSection } from "../parts/ToolSection";
@@ -30,6 +32,8 @@ export interface MoreToolsSheetProps {
   /** quote_data.notes: things the tradie should check. */
   notes: string[];
   bookedDate: string | null;
+  /** What goes on the phone's calendar for a booked job (the iPhone app offers it). */
+  calendarEvent?: Omit<CalendarJob, "date"> | null;
   dayNotes: DayNote[];
   serverTools: ServerTool[];
   /** "They said no" is offered while the owner may still decline. */
@@ -97,6 +101,8 @@ export function MoreToolsSheet(props: MoreToolsSheetProps) {
             <MaterialsListButton items={lines} jobSummary={props.jobSummary} look="new" />
           </ToolSection>
         ) : null}
+
+        {props.bookedDate && props.calendarEvent ? <AddToCalendarTool job={{ ...props.calendarEvent, date: props.bookedDate }} /> : null}
 
         {props.bookedDate ? (
           <ToolSection id="day-notes" title="Notes for the job day">

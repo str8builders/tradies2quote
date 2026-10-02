@@ -1026,6 +1026,11 @@ function JobScreenInner(props: JobScreenProps) {
           jobSummary={current.job_summary ?? null}
           notes={Array.isArray(current.notes) ? current.notes : []}
           bookedDate={props.bookedDate}
+          calendarEvent={{
+            title: heading.title,
+            location: client.address,
+            notes: [heading.subtitle ? `For ${heading.subtitle}` : null, `Quote ${props.quoteNumber}`].filter(Boolean).join("\n"),
+          }}
           dayNotes={props.dayNotes}
           serverTools={props.serverTools}
           onDecline={canDecline ? () => setSheet({ kind: "decline" }) : undefined}

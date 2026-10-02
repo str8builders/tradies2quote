@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { haptic } from "@/lib/native/haptics";
 import { readSendResponse, type SendChannel, type SendFix } from "../send-flow";
 
 export type SenderState =
@@ -53,6 +54,7 @@ export function useQuoteSender({
       switch (outcome.kind) {
         case "sent":
           setState({ phase: "idle" });
+          haptic("success");
           onSent(channel, "route");
           return;
         case "device":

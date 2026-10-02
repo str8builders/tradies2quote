@@ -9,6 +9,10 @@
 /* Begin PBXBuildFile section */
 		T2QMAIN000000000000000001 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = T2QMAIN000000000000000002 /* MainViewController.swift */; };
 		T2QLOC0000000000000000001 /* T2QLocationPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = T2QLOC0000000000000000002 /* T2QLocationPlugin.swift */; };
+		T2QSHRT000000000000000001 /* T2QShortcutsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = T2QSHRT000000000000000002 /* T2QShortcutsPlugin.swift */; };
+		T2QCALE000000000000000001 /* T2QCalendarPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = T2QCALE000000000000000002 /* T2QCalendarPlugin.swift */; };
+		T2QCONT000000000000000001 /* T2QContactsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = T2QCONT000000000000000002 /* T2QContactsPlugin.swift */; };
+		T2QHAPT000000000000000001 /* T2QHapticsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = T2QHAPT000000000000000002 /* T2QHapticsPlugin.swift */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
@@ -23,6 +27,10 @@
 /* Begin PBXFileReference section */
 		T2QMAIN000000000000000002 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		T2QLOC0000000000000000002 /* T2QLocationPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T2QLocationPlugin.swift; sourceTree = "<group>"; };
+		T2QSHRT000000000000000002 /* T2QShortcutsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T2QShortcutsPlugin.swift; sourceTree = "<group>"; };
+		T2QCALE000000000000000002 /* T2QCalendarPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T2QCalendarPlugin.swift; sourceTree = "<group>"; };
+		T2QCONT000000000000000002 /* T2QContactsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T2QContactsPlugin.swift; sourceTree = "<group>"; };
+		T2QHAPT000000000000000002 /* T2QHapticsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T2QHapticsPlugin.swift; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -73,6 +81,10 @@
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				T2QMAIN000000000000000002 /* MainViewController.swift */,
 				T2QLOC0000000000000000002 /* T2QLocationPlugin.swift */,
+				T2QSHRT000000000000000002 /* T2QShortcutsPlugin.swift */,
+				T2QCALE000000000000000002 /* T2QCalendarPlugin.swift */,
+				T2QCONT000000000000000002 /* T2QContactsPlugin.swift */,
+				T2QHAPT000000000000000002 /* T2QHapticsPlugin.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				7A1ENTS0000000000000003 /* App.entitlements */,
@@ -170,6 +182,10 @@
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				T2QMAIN000000000000000001 /* MainViewController.swift in Sources */,
 				T2QLOC0000000000000000001 /* T2QLocationPlugin.swift in Sources */,
+				T2QSHRT000000000000000001 /* T2QShortcutsPlugin.swift in Sources */,
+				T2QCALE000000000000000001 /* T2QCalendarPlugin.swift in Sources */,
+				T2QCONT000000000000000001 /* T2QContactsPlugin.swift in Sources */,
+				T2QHAPT000000000000000001 /* T2QHapticsPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

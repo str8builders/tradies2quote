@@ -8,6 +8,7 @@ import { AppContent } from "./AppContent";
 import { AppNav } from "./AppNav";
 import { PushBridge } from "../../settings/_newlook/PushBridge";
 import { LocationBridge } from "./LocationBridge";
+import { NativeShortcutsBridge } from "./NativeShortcutsBridge";
 import { StaleVersionReload } from "./StaleVersionReload";
 import { StatusBarTint } from "./StatusBarTint";
 
@@ -99,6 +100,7 @@ export function NewLookShell({
         <TopProgressBar />
         <LocationBridge />
         <PushBridge />
+        <NativeShortcutsBridge />
         {inApp ? <StatusBarTint outdoor={outdoor} /> : null}
         <StaleVersionReload build={build} />
       </div>

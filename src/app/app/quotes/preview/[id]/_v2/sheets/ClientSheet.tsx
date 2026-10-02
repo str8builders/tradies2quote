@@ -8,6 +8,7 @@ import { cx } from "@/components/ui/cx";
 import { TextField } from "@/components/ui/text-field";
 import type { QuoteClient } from "@/lib/quote-types";
 import { clientForm, clientFormProblem, clientFromForm, sameClient, type ClientForm } from "../contact";
+import { ChooseContactButton } from "./ChooseContactButton";
 
 type SavedClient = QuoteClient & { id: string };
 
@@ -73,6 +74,7 @@ export function ClientSheet({ client, onSave, onClose }: ClientSheetProps) {
       }
     >
       <div className="space-y-5">
+        <ChooseContactButton onPick={set} />
         {saved.length > 0 ? (
           <div>
             <label htmlFor={pickId} className="mb-2 block text-ui-base font-semibold text-ui-text">
