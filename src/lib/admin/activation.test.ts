@@ -4,11 +4,14 @@ import { isOwnerEmail } from "@/lib/owner";
 import {
   STUCK_LIST_LIMIT,
   buildActivation,
+  excludedSentence,
+  isConfirmed,
   isSentQuote,
   isWonQuote,
   type ActivationProfile,
   type ActivationQuote,
   type ActivationUser,
+  type InternalKind,
 } from "./activation";
 
 const NOW = new Date("2026-10-03T00:00:00.000Z");
@@ -16,7 +19,8 @@ const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
 const ago = (ms: number) => new Date(NOW.getTime() - ms);
 const iso = (ms: number) => ago(ms).toISOString();
-const isInternal = (email: string | null) => isOwnerEmail(email) || isCompedEmail(email);
+const internalKind = (email: string | null): InternalKind | null =>
+  isOwnerEmail(email) ? "owner" : isCompedEmail(email) ? "review" : null;
 
 const user = (id: string, email: string | null, signedUpAgo: number): ActivationUser => ({ id, email, createdAt: ago(signedUpAgo) });
 const quote = (userId: string, createdAgo: number, over: Partial<ActivationQuote> = {}): ActivationQuote => ({
@@ -82,11 +86,11 @@ describe("buildActivation", () => {
     quote("ghost", DAY),
   ];
 
-  const result = buildActivation({ users, profiles, quotes, now: NOW, isInternal });
+  const result = buildActivation({ users, profiles, quotes, now: NOW, internalKind });
   const count = (id: string) => result.steps.find((s) => s.id === id)?.count;
 
-  it("leaves out the owner and the review demo, and says how many", () => {
-    expect(result.excluded).toBe(2);
+  it("leaves out the owner and the review demo, and names them", () => {
+    expect(result.excluded).toEqual({ internal: ["owner", "review"], teamWorkers: 0 });
     expect(count("signed-up")).toBe(7);
   });
 
@@ -98,7 +102,7 @@ describe("buildActivation", () => {
   });
 
   it("gives each step's share of everyone who signed up", () => {
-    expect(result.steps.map((s) => s.id)).toEqual(["signed-up", "business", "quote", "sent", "won"]);
+    expect(result.steps.map((s) => s.id)).toEqual(["signed-up", "confirmed", "business", "quote", "sent", "won"]);
     expect(result.steps[0].share).toBe(1);
     expect(result.steps.find((s) => s.id === "quote")?.share).toBeCloseTo(3 / 7, 5);
   });
@@ -107,6 +111,11 @@ describe("buildActivation", () => {
     expect(result.activeThisWeek).toBe(3); // a (yesterday), b (3 days ago), h (3 hours ago)
     // a: 12 h, b: 48 h, h: 45 h -> sorted 12, 45, 48 -> 45
     expect(result.medianHoursToFirstQuote).toBe(45);
+  });
+
+  it("everyone made before confirmation dates were kept counts as confirmed", () => {
+    expect(count("confirmed")).toBe(7);
+    expect(result.unconfirmed).toEqual([]);
   });
 
   it("names who signed up over a day ago and never quoted, longest wait first", () => {
@@ -129,8 +138,8 @@ describe("buildActivation", () => {
 
 describe("buildActivation: edges", () => {
   it("no customers: every step is zero, with no NaN", () => {
-    const result = buildActivation({ users: [user("owner", "challis836@gmail.com", DAY)], profiles: [], quotes: [], now: NOW, isInternal });
-    expect(result.excluded).toBe(1);
+    const result = buildActivation({ users: [user("owner", "challis836@gmail.com", DAY)], profiles: [], quotes: [], now: NOW, internalKind });
+    expect(result.excluded).toEqual({ internal: ["owner"], teamWorkers: 0 });
     expect(result.steps.every((s) => s.count === 0 && s.share === 0)).toBe(true);
     expect(result.medianHoursToFirstQuote).toBeNull();
     expect(result.activeThisWeek).toBe(0);
@@ -142,7 +151,7 @@ describe("buildActivation: edges", () => {
       profiles: [],
       quotes: [quote("a", 5 * DAY, { status: "viewed" })],
       now: NOW,
-      isInternal,
+      internalKind,
     });
     expect(result.steps.find((s) => s.id === "sent")?.count).toBe(1);
     expect(result.quotedNotSent).toEqual([]);
@@ -150,7 +159,7 @@ describe("buildActivation: edges", () => {
 
   it("each 'stopped here' list stops at ten, longest wait first", () => {
     const many = Array.from({ length: 15 }, (_, i) => user(`u${i}`, `u${i}@x.nz`, (i + 2) * DAY));
-    const result = buildActivation({ users: many, profiles: [], quotes: [], now: NOW, isInternal });
+    const result = buildActivation({ users: many, profiles: [], quotes: [], now: NOW, internalKind });
     expect(result.stuckNoQuote).toHaveLength(STUCK_LIST_LIMIT);
     expect(result.stuckNoQuote[0].days).toBe(16);
     expect(result.stuckNoQuote[9].days).toBe(7);
@@ -162,8 +171,68 @@ describe("buildActivation: edges", () => {
       profiles: [],
       quotes: [quote("a", 10 * DAY - 2 * HOUR), quote("b", 10 * DAY - 5 * HOUR)],
       now: NOW,
-      isInternal,
+      internalKind,
     });
     expect(result.medianHoursToFirstQuote).toBe(3.5);
+  });
+});
+
+describe("confirming the email", () => {
+  it("is a step of its own, and the people stuck before it get their own list", () => {
+    const signedUp = (id: string, email: string, ago: number, confirmed: boolean): ActivationUser => ({
+      ...user(id, email, ago),
+      confirmedAt: confirmed ? ago_(ago - HOUR) : null,
+    });
+    const ago_ = (ms: number) => new Date(NOW.getTime() - ms);
+    const result = buildActivation({
+      users: [
+        signedUp("p", "p@never.nz", 4 * DAY, false),
+        signedUp("q", "q@fresh.nz", 3 * HOUR, false),
+        signedUp("r", "r@ok.nz", 6 * DAY, true),
+        signedUp("s", "s@quoted.nz", 6 * DAY, true),
+      ],
+      profiles: [],
+      quotes: [quote("s", 5 * DAY, { status: "sent", sent_at: iso(5 * DAY) })],
+      now: NOW,
+      internalKind,
+    });
+    expect(result.steps.find((s) => s.id === "confirmed")?.count).toBe(2);
+    // Unconfirmed over a day: their own list, not "never made a quote".
+    expect(result.unconfirmed).toEqual([{ email: "p@never.nz", days: 4, quotes: 0 }]);
+    expect(result.stuckNoQuote).toEqual([{ email: "r@ok.nz", days: 6, quotes: 0 }]);
+  });
+
+  it("only a missing date (an older account) counts as confirmed, never an explicit null", () => {
+    expect(isConfirmed({ confirmedAt: undefined })).toBe(true);
+    expect(isConfirmed({ confirmedAt: new Date() })).toBe(true);
+    expect(isConfirmed({ confirmedAt: null })).toBe(false);
+  });
+});
+
+describe("team workers", () => {
+  it("are left out of the funnel and counted separately", () => {
+    const result = buildActivation({
+      users: [user("boss", "boss@builders.nz", 9 * DAY), user("w1", "w1@crew.nz", 8 * DAY), user("w2", "w2@crew.nz", 8 * DAY)],
+      profiles: [],
+      quotes: [quote("boss", 7 * DAY)],
+      teamMemberIds: new Set(["w1", "w2"]),
+      now: NOW,
+      internalKind,
+    });
+    expect(result.steps.find((s) => s.id === "signed-up")?.count).toBe(1);
+    expect(result.stuckNoQuote).toEqual([]);
+    expect(result.excluded).toEqual({ internal: [], teamWorkers: 2 });
+  });
+});
+
+describe("excludedSentence", () => {
+  it("names exactly what was left out", () => {
+    expect(excludedSentence({ internal: [], teamWorkers: 0 })).toBe("");
+    expect(excludedSentence({ internal: ["owner"], teamWorkers: 0 })).toBe("your own account");
+    expect(excludedSentence({ internal: ["owner", "review"], teamWorkers: 0 })).toBe("your own account and the App Review demo account");
+    expect(excludedSentence({ internal: ["owner"], teamWorkers: 1 })).toBe("your own account and 1 team worker");
+    expect(excludedSentence({ internal: ["owner", "review"], teamWorkers: 3 })).toBe(
+      "your own account, the App Review demo account and 3 team workers",
+    );
   });
 });

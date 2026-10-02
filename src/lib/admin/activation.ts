@@ -1,12 +1,16 @@
 /**
  * Activation: how far each person who signed up got.
  *
- * Signing up is not using the app. This follows everyone down five steps (set
- * up the business, made a quote, sent one, had one accepted) and names the
- * people who stopped, so the owner can reach out to them. Pure: the overview
- * fetches the rows and passes them in, so every rule here is testable without
- * a database. Internal accounts (the owner, the App Review demo) are left out
- * so they don't make the funnel look better than it is.
+ * Signing up is not using the app. This follows everyone down the steps
+ * (confirmed their email, set up the business, made a quote, sent one, had one
+ * accepted) and names the people who stopped, so the owner can reach out to
+ * them. Pure: the overview fetches the rows and passes them in, so every rule
+ * here is testable without a database.
+ *
+ * Left out, and counted separately so the funnel isn't flattered or dragged
+ * down: internal accounts (the owner, the App Review demo) and team workers
+ * (people who joined someone else's team to log hours; they aren't meant to
+ * quote).
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -27,6 +31,8 @@ export interface ActivationUser {
   id: string;
   email: string | null;
   createdAt: Date;
+  /** When they confirmed their email (sign-up sends a link); null until they do. */
+  confirmedAt?: Date | null;
 }
 
 export interface ActivationProfile {
@@ -42,7 +48,7 @@ export interface ActivationQuote {
   accepted_at: string | null;
 }
 
-export type ActivationStepId = "signed-up" | "business" | "quote" | "sent" | "won";
+export type ActivationStepId = "signed-up" | "confirmed" | "business" | "quote" | "sent" | "won";
 
 export interface ActivationStep {
   id: ActivationStepId;
@@ -59,18 +65,30 @@ export interface StuckPerson {
   quotes: number;
 }
 
+/** Which internal account an address is: the owner's own, or the App Review demo. */
+export type InternalKind = "owner" | "review";
+
+export interface ActivationExclusions {
+  /** Internal accounts found among the sign-ups, in a fixed order (owner first). */
+  internal: InternalKind[];
+  /** People who joined someone else's team (they log hours; quoting isn't their job). */
+  teamWorkers: number;
+}
+
 export interface ActivationSection {
   steps: ActivationStep[];
   /** People who made a quote in the last 7 days. */
   activeThisWeek: number;
   /** Median hours from signing up to the first quote, among those who made one. */
   medianHoursToFirstQuote: number | null;
-  /** Signed up over a day ago and never made a quote, longest wait first. */
+  /** Signed up over a day ago and never confirmed their email, longest wait first. */
+  unconfirmed: StuckPerson[];
+  /** Confirmed (or signed up before confirmation was tracked) over a day ago, no quote yet, longest wait first. */
   stuckNoQuote: StuckPerson[];
   /** Made a quote over a day ago but never sent one, longest wait first. */
   quotedNotSent: StuckPerson[];
-  /** Internal accounts left out of every number above. */
-  excluded: number;
+  /** Who was left out of every number above. */
+  excluded: ActivationExclusions;
   error: string | null;
 }
 
@@ -78,18 +96,21 @@ export interface ActivationInput {
   users: readonly ActivationUser[];
   profiles: readonly ActivationProfile[];
   quotes: readonly ActivationQuote[];
+  /** User ids in team_members: people who joined someone else's team. */
+  teamMemberIds?: ReadonlySet<string>;
   now: Date;
-  /** True for accounts that aren't customers (the owner, the review demo). */
-  isInternal: (email: string | null) => boolean;
+  /** The owner's own account, the App Review demo, or null for a customer. */
+  internalKind: (email: string | null) => InternalKind | null;
 }
 
 export const EMPTY_ACTIVATION: ActivationSection = {
   steps: [],
   activeThisWeek: 0,
   medianHoursToFirstQuote: null,
+  unconfirmed: [],
   stuckNoQuote: [],
   quotedNotSent: [],
-  excluded: 0,
+  excluded: { internal: [], teamWorkers: 0 },
   error: null,
 };
 
@@ -99,6 +120,13 @@ export const isSentQuote = (q: Pick<ActivationQuote, "status" | "sent_at">): boo
 export const isWonQuote = (q: Pick<ActivationQuote, "status" | "accepted_at">): boolean =>
   Boolean(q.accepted_at) || WON_STATUSES.has(q.status ?? "");
 
+/**
+ * Confirmed their email. Accounts made before confirmations were tracked have
+ * no date at all (undefined, not null): they could only have got in by
+ * confirming, so they count as confirmed.
+ */
+export const isConfirmed = (u: Pick<ActivationUser, "confirmedAt">): boolean => u.confirmedAt !== null;
+
 function median(values: number[]): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);
@@ -106,9 +134,16 @@ function median(values: number[]): number | null {
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
-export function buildActivation({ users, profiles, quotes, now, isInternal }: ActivationInput): ActivationSection {
-  const customers = users.filter((u) => !isInternal(u.email));
-  const excluded = users.length - customers.length;
+export function buildActivation({ users, profiles, quotes, teamMemberIds, now, internalKind }: ActivationInput): ActivationSection {
+  const internal = new Set<InternalKind>();
+  let teamWorkers = 0;
+  const customers: ActivationUser[] = [];
+  for (const user of users) {
+    const kind = internalKind(user.email);
+    if (kind) internal.add(kind);
+    else if (teamMemberIds?.has(user.id)) teamWorkers += 1;
+    else customers.push(user);
+  }
   const ids = new Set(customers.map((u) => u.id));
 
   const businessSet = new Set(profiles.filter((p) => ids.has(p.id) && p.business_name?.trim()).map((p) => p.id));
@@ -123,11 +158,13 @@ export function buildActivation({ users, profiles, quotes, now, isInternal }: Ac
 
   const nowMs = now.getTime();
   const weekAgo = nowMs - 7 * DAY_MS;
+  let confirmedCount = 0;
   let madeQuote = 0;
   let sentQuote = 0;
   let wonQuote = 0;
   let activeThisWeek = 0;
   const hoursToFirst: number[] = [];
+  const unconfirmed: StuckPerson[] = [];
   const stuckNoQuote: StuckPerson[] = [];
   const quotedNotSent: StuckPerson[] = [];
 
@@ -135,10 +172,13 @@ export function buildActivation({ users, profiles, quotes, now, isInternal }: Ac
     const label = user.email ?? "(no email)";
     const list = byUser.get(user.id) ?? [];
     const signedUpMs = user.createdAt.getTime();
+    const confirmed = isConfirmed(user);
+    if (confirmed) confirmedCount += 1;
 
     if (list.length === 0) {
       if (nowMs - signedUpMs >= GRACE_MS) {
-        stuckNoQuote.push({ email: label, days: Math.floor((nowMs - signedUpMs) / DAY_MS), quotes: 0 });
+        const person = { email: label, days: Math.floor((nowMs - signedUpMs) / DAY_MS), quotes: 0 };
+        (confirmed ? stuckNoQuote : unconfirmed).push(person);
       }
       continue;
     }
@@ -167,10 +207,12 @@ export function buildActivation({ users, profiles, quotes, now, isInternal }: Ac
 
   const longestFirst = (a: StuckPerson, b: StuckPerson) => b.days - a.days || a.email.localeCompare(b.email);
   const hours = median(hoursToFirst);
+  const order: InternalKind[] = ["owner", "review"];
 
   return {
     steps: [
       step("signed-up", "Signed up", total),
+      step("confirmed", "Confirmed their email", confirmedCount),
       step("business", "Set up their business", businessSet.size),
       step("quote", "Made a quote", madeQuote),
       step("sent", "Sent a quote", sentQuote),
@@ -178,9 +220,20 @@ export function buildActivation({ users, profiles, quotes, now, isInternal }: Ac
     ],
     activeThisWeek,
     medianHoursToFirstQuote: hours === null ? null : Math.round(hours * 10) / 10,
+    unconfirmed: unconfirmed.sort(longestFirst).slice(0, STUCK_LIST_LIMIT),
     stuckNoQuote: stuckNoQuote.sort(longestFirst).slice(0, STUCK_LIST_LIMIT),
     quotedNotSent: quotedNotSent.sort(longestFirst).slice(0, STUCK_LIST_LIMIT),
-    excluded,
+    excluded: { internal: order.filter((k) => internal.has(k)), teamWorkers },
     error: null,
   };
+}
+
+/** "your own account, the App Review demo account and 2 team workers" (empty when nothing was left out). */
+export function excludedSentence({ internal, teamWorkers }: ActivationExclusions): string {
+  const parts: string[] = [];
+  if (internal.includes("owner")) parts.push("your own account");
+  if (internal.includes("review")) parts.push("the App Review demo account");
+  if (teamWorkers > 0) parts.push(teamWorkers === 1 ? "1 team worker" : `${teamWorkers} team workers`);
+  if (parts.length <= 1) return parts.join("");
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 }

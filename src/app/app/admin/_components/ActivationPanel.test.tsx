@@ -6,6 +6,7 @@ import { ActivationPanel, formatDays, formatHours } from "./ActivationPanel";
 const section: ActivationSection = {
   steps: [
     { id: "signed-up", label: "Signed up", count: 8, share: 1 },
+    { id: "confirmed", label: "Confirmed their email", count: 7, share: 0.875 },
     { id: "business", label: "Set up their business", count: 6, share: 0.75 },
     { id: "quote", label: "Made a quote", count: 4, share: 0.5 },
     { id: "sent", label: "Sent a quote", count: 2, share: 0.25 },
@@ -13,12 +14,13 @@ const section: ActivationSection = {
   ],
   activeThisWeek: 3,
   medianHoursToFirstQuote: 3.2,
+  unconfirmed: [{ email: "x@nolink.nz", days: 5, quotes: 0 }],
   stuckNoQuote: [
     { email: "e@old.nz", days: 20, quotes: 0 },
     { email: "c@plumbing.nz", days: 1, quotes: 0 },
   ],
   quotedNotSent: [{ email: "b@sparky.nz", days: 3, quotes: 2 }],
-  excluded: 2,
+  excluded: { internal: ["owner", "review"], teamWorkers: 1 },
   error: null,
 };
 
@@ -27,7 +29,7 @@ describe("<ActivationPanel>", () => {
 
   it("shows every step with its count and share, in order", () => {
     const steps = [...html.matchAll(/data-step="([a-z-]+)"/g)].map((m) => m[1]);
-    expect(steps).toEqual(["signed-up", "business", "quote", "sent", "won"]);
+    expect(steps).toEqual(["signed-up", "confirmed", "business", "quote", "sent", "won"]);
     expect(html).toContain("Signed up");
     expect(html).toContain("100%");
     expect(html).toContain("75%");
@@ -40,6 +42,9 @@ describe("<ActivationPanel>", () => {
   });
 
   it("names who stopped where, with how long", () => {
+    expect(html).toContain('data-testid="activation-unconfirmed"');
+    expect(html).toContain("x@nolink.nz");
+    expect(html).toContain("signed up, never confirmed their email");
     expect(html).toContain("e@old.nz");
     expect(html).toContain("20 days since signing up");
     expect(html).toContain("1 day since signing up");
@@ -53,13 +58,18 @@ describe("<ActivationPanel>", () => {
     expect(html).toContain("3.2 h");
   });
 
-  it("says how many internal accounts were left out", () => {
-    expect(html).toContain("Not counted: 2 internal accounts");
+  it("says exactly what was left out", () => {
+    expect(html).toContain("Not counted: your own account, the App Review demo account and 1 team worker.");
   });
 
   it("a clear list says so in words", () => {
-    const clear = renderToStaticMarkup(<ActivationPanel activation={{ ...section, stuckNoQuote: [], quotedNotSent: [], excluded: 0 }} />);
-    expect(clear).toContain("Everyone who signed up over a day ago has made a quote.");
+    const clear = renderToStaticMarkup(
+      <ActivationPanel
+        activation={{ ...section, unconfirmed: [], stuckNoQuote: [], quotedNotSent: [], excluded: { internal: [], teamWorkers: 0 } }}
+      />,
+    );
+    expect(clear).not.toContain('data-testid="activation-unconfirmed"');
+    expect(clear).toContain("Everyone who confirmed over a day ago has made a quote.");
     expect(clear).toContain("Everyone who made a quote has sent one.");
     expect(clear).not.toContain("Not counted");
   });
@@ -69,7 +79,7 @@ describe("<ActivationPanel>", () => {
     const none = renderToStaticMarkup(
       <ActivationPanel activation={{ ...section, steps: section.steps.map((s) => ({ ...s, count: 0, share: 0 })) }} />,
     );
-    expect(none).toContain("No customers yet");
+    expect(none).toContain("No customers yet. Not counted: your own account, the App Review demo account and 1 team worker.");
     expect(none).not.toContain("data-step");
   });
 });

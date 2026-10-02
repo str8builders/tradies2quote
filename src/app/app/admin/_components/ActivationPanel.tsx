@@ -1,11 +1,11 @@
 import { WarningCircle } from "@phosphor-icons/react/dist/ssr";
-import type { ActivationSection, StuckPerson } from "@/lib/admin/activation";
+import { excludedSentence, type ActivationSection, type StuckPerson } from "@/lib/admin/activation";
 
 /**
- * The owner's activation view: how far each person who signed up got (set up
- * the business, made a quote, sent it, had it accepted), and who stopped
- * where, so a message from you can reach them. Read-only. The numbers are
- * built by src/lib/admin/activation.ts.
+ * The owner's activation view: how far each person who signed up got
+ * (confirmed their email, set up the business, made a quote, sent it, had it
+ * accepted), and who stopped where, so a message from you can reach them.
+ * Read-only. The numbers are built by src/lib/admin/activation.ts.
  */
 
 export function formatDays(days: number): string {
@@ -81,10 +81,11 @@ export function ActivationPanel({ activation: a }: { activation: ActivationSecti
     );
   }
   const signedUp = a.steps[0]?.count ?? 0;
+  const left = excludedSentence(a.excluded);
   if (signedUp === 0) {
     return (
       <div className="rounded-lg border border-ink-700/50 bg-ink-900/30 px-4 py-3 text-sm text-ink-400">
-        No customers yet. Your own and the App Review accounts aren&apos;t counted.
+        No customers yet.{left ? ` Not counted: ${left}.` : ""}
       </div>
     );
   }
@@ -112,11 +113,20 @@ export function ActivationPanel({ activation: a }: { activation: ActivationSecti
         <Tile label="Time to first quote" value={formatHours(a.medianHoursToFirstQuote)} hint="median, from signing up" />
       </div>
 
+      {a.unconfirmed.length > 0 ? (
+        <StuckList
+          testId="activation-unconfirmed"
+          title="signed up, never confirmed their email"
+          people={a.unconfirmed}
+          empty=""
+          since="since signing up"
+        />
+      ) : null}
       <StuckList
         testId="activation-no-quote"
-        title="signed up, never made a quote"
+        title="confirmed, never made a quote"
         people={a.stuckNoQuote}
-        empty="Everyone who signed up over a day ago has made a quote."
+        empty="Everyone who confirmed over a day ago has made a quote."
         since="since signing up"
       />
       <StuckList
@@ -127,11 +137,7 @@ export function ActivationPanel({ activation: a }: { activation: ActivationSecti
         since="since the first"
       />
 
-      {a.excluded > 0 ? (
-        <p className="text-xs text-ink-500">
-          Not counted: {a.excluded === 1 ? "1 internal account" : `${a.excluded} internal accounts`} (yours and the App Review demo).
-        </p>
-      ) : null}
+      {left ? <p className="text-xs text-ink-500">Not counted: {left}.</p> : null}
     </div>
   );
 }

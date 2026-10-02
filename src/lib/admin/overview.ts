@@ -113,6 +113,8 @@ async function listAllUsers(
         id: u.id,
         email: u.email ?? null,
         createdAt: u.created_at ? new Date(u.created_at) : new Date(0),
+        // Sign-up sends a confirmation link; null until it's used.
+        confirmedAt: u.email_confirmed_at ? new Date(u.email_confirmed_at) : null,
       });
     }
     if (data.users.length < perPage) break;
@@ -248,21 +250,42 @@ async function listActivationQuotes(admin: ReturnType<typeof adminClient>): Prom
   return out;
 }
 
+/** People who joined someone else's team (the team owner isn't a member row). */
+async function listTeamMemberIds(admin: ReturnType<typeof adminClient>): Promise<Set<string>> {
+  const out = new Set<string>();
+  const pageSize = 1000;
+  for (let page = 0; page < 20; page += 1) {
+    // team_members (migration 20260913_teams_and_plans) isn't in the
+    // generated types yet: cast the name, narrow the rows by hand below.
+    const { data, error } = await admin
+      .from("team_members" as never)
+      .select("user_id")
+      .range(page * pageSize, page * pageSize + pageSize - 1);
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as unknown as { user_id: string }[];
+    for (const row of rows) out.add(row.user_id);
+    if (rows.length < pageSize) break;
+  }
+  return out;
+}
+
 async function buildActivationSection(users: () => Promise<UserRow[]>, now: Date): Promise<ActivationSection> {
   try {
     const admin = adminClient();
-    const [userRows, profileRes, quotes] = await Promise.all([
+    const [userRows, profileRes, quotes, teamMemberIds] = await Promise.all([
       users(),
       admin.from("profiles").select("id, business_name"),
       listActivationQuotes(admin),
+      listTeamMemberIds(admin),
     ]);
     if (profileRes.error) throw new Error(profileRes.error.message);
     return buildActivation({
       users: userRows,
       profiles: profileRes.data ?? [],
       quotes,
+      teamMemberIds,
       now,
-      isInternal: (email) => isOwnerEmail(email) || isCompedEmail(email),
+      internalKind: (email) => (isOwnerEmail(email) ? "owner" : isCompedEmail(email) ? "review" : null),
     });
   } catch (err) {
     return {
