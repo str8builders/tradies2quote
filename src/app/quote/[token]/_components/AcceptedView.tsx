@@ -1,5 +1,3 @@
-"use client";
-
 import { CheckCircle } from "@phosphor-icons/react/dist/ssr";
 import { formatCurrency, formatIssueDate } from "@/lib/quote-defaults";
 import type { PublicQuotePayload } from "@/lib/quote-types";

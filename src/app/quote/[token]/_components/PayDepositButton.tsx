@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatCurrency } from "@/lib/quote-defaults";
 
 /**
  * Deposit button on the public quote page. Renders below the accepted view
@@ -22,10 +23,8 @@ export function PayDepositButton({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const amountLabel = new Intl.NumberFormat("en-NZ", {
-    style: "currency",
-    currency: currency || "NZD",
-  }).format(amountCents / 100);
+  // Same text on the server and in every browser (Intl currency output differs between ICU builds).
+  const amountLabel = formatCurrency(amountCents / 100, currency || "NZD");
 
   if (paid) {
     return (

@@ -5,6 +5,8 @@
  * zone. Pure: every "now" is passed in.
  */
 
+import { MONTHS_SHORT, WEEKDAYS_SHORT, datePartsInZone } from "@/lib/format-date";
+
 function partsOf(at: number, timeZone: string): Record<string, number> {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
@@ -82,14 +84,17 @@ export function defaultFinish(startedAt: string, timeZone: string): string {
   return `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
 }
 
-/** "Sat 26 Sept": the day a shift started, in the business's time zone. */
+/**
+ * "Sat 26 Sept": the day a shift started, in the business's time zone. The
+ * words are spelled here (format-date.ts), not by Intl: the clock card is
+ * rendered on the server and again in the phone's browser, and engines
+ * disagree on "Sept" vs "Sep" (React error #418).
+ */
 export function shiftDay(startedAt: string, timeZone: string): string {
   try {
-    const parts = new Intl.DateTimeFormat("en-NZ", { weekday: "short", day: "numeric", month: "short", timeZone }).formatToParts(
-      new Date(startedAt),
-    );
-    const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-    return `${get("weekday")} ${get("day")} ${get("month")}`;
+    const parts = datePartsInZone(new Date(startedAt), timeZone);
+    if (!parts) return "that day";
+    return `${WEEKDAYS_SHORT[parts.weekday]} ${parts.day} ${MONTHS_SHORT[parts.month - 1]}`;
   } catch {
     return "that day";
   }

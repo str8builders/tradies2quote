@@ -42,6 +42,6 @@ describe("a shift that started on an earlier day", () => {
   });
 
   it("names the day the way the app does", () => {
-    expect(shiftDay(STARTED, NZ)).toMatch(/^Sat 26 Sep/);
+    expect(shiftDay(STARTED, NZ)).toBe("Sat 26 Sept"); // spelled in code: iPhone WebKit says "Sep", the server "Sept"
   });
 });

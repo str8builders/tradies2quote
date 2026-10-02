@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   MAX_MARKUP_PCT,
   MAX_TAX_RATE,
@@ -7,6 +7,7 @@ import {
   clampTaxRate,
   computeQuoteTotals,
   formatCurrency,
+  formatIssueDate,
   gstInclusiveBreakdown,
   moneyEquals,
   resolveTaxLabel,
@@ -243,6 +244,26 @@ describe("formatCurrency", () => {
   it("handles non-finite input as $0.00", () => {
     expect(formatCurrency(Number.NaN, "NZD")).toBe("$0.00");
   });
+
+  it("spells the symbol itself for the currencies the app offers, and negative amounts with a minus", () => {
+    expect(formatCurrency(1234.5, "AUD")).toBe("$1,234.50");
+    expect(formatCurrency(1234.5, "GBP")).toBe("£1,234.50");
+    expect(formatCurrency(1234.5, "USD")).toBe("$1,234.50");
+    expect(formatCurrency(-12.5, "NZD")).toBe("-$12.50");
+    expect(formatCurrency(-0.001, "NZD")).toBe("$0.00");
+  });
+
+  it("writes a currency it doesn't know as its code, the same in every browser, and never throws", () => {
+    expect(formatCurrency(1234.5, "CHF")).toBe("CHF 1,234.50");
+    expect(formatCurrency(1234.5, "chf")).toBe("CHF 1,234.50");
+    expect(formatCurrency(1234.5, "")).toBe("1,234.50");
+    expect(formatCurrency(1234.5, "not a code")).toBe("1,234.50");
+  });
+
+  it("keeps the fractions of a cent a rate needs when asked", () => {
+    expect(formatCurrency(0.125, "NZD", 20)).toBe("$0.125");
+    expect(formatCurrency(1100.123456, "NZD", 20)).toBe("$1,100.123456");
+  });
 });
 
 // ─── moneyEquals ─────────────────────────────────────────────────────────
@@ -462,5 +483,43 @@ describe("tax label / rate defaults by business country", () => {
     expect(resolveTaxRate(12.5, "UK")).toBe(12.5);
     expect(resolveTaxRate(0, "UK")).toBe(0);
     expect(resolveTaxRate(155, "NZ")).toBe(MAX_TAX_RATE);
+  });
+});
+
+// ─── formatIssueDate ─────────────────────────────────────────────────────
+// Rendered by client components that the server also renders (the public
+// quote page above all): any difference in the words is React error #418.
+describe("formatIssueDate", () => {
+  const originalZone = process.env.TZ;
+  afterEach(() => {
+    if (originalZone === undefined) delete process.env.TZ;
+    else process.env.TZ = originalZone;
+  });
+
+  it("is the NZ calendar day, two-digit day, en-NZ month words (Sept, not Sep)", () => {
+    expect(formatIssueDate("2026-10-02T12:00:00Z")).toBe("03 Oct 2026");
+    expect(formatIssueDate("2026-09-15T12:00:00Z")).toBe("16 Sept 2026");
+    expect(formatIssueDate("2026-01-15T12:00:00Z")).toBe("16 Jan 2026");
+    expect(formatIssueDate(new Date("2026-06-30T20:00:00Z"))).toBe("01 Jul 2026");
+  });
+
+  it("moves to the next NZ day at NZ midnight, in winter time and in daylight saving", () => {
+    expect(formatIssueDate("2026-06-30T11:59:00Z")).toBe("30 Jun 2026"); // 23:59 NZST
+    expect(formatIssueDate("2026-06-30T12:00:00Z")).toBe("01 Jul 2026"); // 00:00 NZST
+    expect(formatIssueDate("2026-12-31T10:59:00Z")).toBe("31 Dec 2026"); // 23:59 NZDT
+    expect(formatIssueDate("2026-12-31T11:00:00Z")).toBe("01 Jan 2027"); // 00:00 NZDT
+  });
+
+  it("gives the same words whatever time zone the server or the visitor is in", () => {
+    const instants = ["2026-09-15T12:00:00Z", "2026-12-31T10:59:00Z", "2026-12-31T11:00:00Z", "2027-03-31T10:30:00Z", "2026-09-26T13:59:00Z", "2026-09-26T14:00:00Z"];
+    const nz = instants.map((i) => formatIssueDate(i));
+    for (const zone of ["UTC", "America/Los_Angeles", "Asia/Kolkata", "Pacific/Kiritimati", "Pacific/Pago_Pago", "Europe/London"]) {
+      process.env.TZ = zone;
+      expect(instants.map((i) => formatIssueDate(i)), zone).toEqual(nz);
+    }
+  });
+
+  it("is a dash, not a crash, for something that isn't a date", () => {
+    expect(formatIssueDate("not a date")).toBe("—");
   });
 });

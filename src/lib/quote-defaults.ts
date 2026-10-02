@@ -1,3 +1,4 @@
+import { MONTHS_SHORT, NZ_TIME_ZONE, datePartsInZone } from "./format-date";
 import type { QuoteProfile } from "./quote-types";
 
 /**
@@ -118,14 +119,6 @@ export function resolveTaxRate(
   );
 }
 
-const CURRENCY_LOCALE: Record<string, string> = {
-  NZD: "en-NZ",
-  AUD: "en-AU",
-  GBP: "en-GB",
-  USD: "en-US",
-  CAD: "en-CA",
-};
-
 const CURRENCY_SYMBOL: Record<string, string> = { NZD: "$", AUD: "$", USD: "$", CAD: "$", GBP: "£", EUR: "€" };
 
 /**
@@ -133,17 +126,14 @@ const CURRENCY_SYMBOL: Record<string, string> = { NZD: "$", AUD: "$", USD: "$", 
  * Intl currency output differs between ICU builds (symbol, spacing), which
  * made client components trip React hydration error #418; the digits and
  * grouping are the only Intl part every engine agrees on, so the symbol is
- * spelled here. Unknown codes keep the Intl fallback.
+ * spelled here. A code we don't know is written as its code ("CHF 1,234.50").
  */
 export function formatCurrency(amount: number, currency: string, maximumFractionDigits = 2): string {
   const safe = Number.isFinite(amount) ? amount : 0;
-  const symbol = CURRENCY_SYMBOL[currency];
-  if (!symbol) {
-    const locale = CURRENCY_LOCALE[currency] ?? "en-NZ";
-    return new Intl.NumberFormat(locale, { style: "currency", currency, minimumFractionDigits: 2, maximumFractionDigits }).format(safe);
-  }
-  const digits = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: Math.max(2, maximumFractionDigits) }).format(Math.abs(safe));
-  const negative = safe < 0 && digits !== new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: Math.max(2, maximumFractionDigits) }).format(0);
+  const symbol = CURRENCY_SYMBOL[currency] ?? (/^[A-Za-z]{3}$/.test(currency) ? `${currency.toUpperCase()} ` : "");
+  const digitsOf = (n: number) => new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: Math.max(2, maximumFractionDigits) }).format(n);
+  const digits = digitsOf(Math.abs(safe));
+  const negative = safe < 0 && digits !== digitsOf(0);
   return `${negative ? "-" : ""}${symbol}${digits}`;
 }
 
@@ -153,18 +143,22 @@ export function quoteNumber(id: string, createdAt: string | Date): string {
   return `Q-${year}-${short}`;
 }
 
-// IMPORTANT: pin the timeZone. Without it, Intl formats in the runtime's local
-// zone — so the server (UTC on Vercel) and a NZ visitor's browser turn the same
-// timestamp into different calendar days near a day boundary. When this runs in a
-// client component (QuotesListClient) that's a hydration mismatch (React #418).
-// Pinning to Pacific/Auckland makes SSR and client identical AND shows NZ dates.
+// IMPORTANT: this runs in client components that are also rendered on the
+// server (the public quote page, the quote editor, the quotes list), so the
+// words must be identical on the server and in every browser, whatever its
+// language, time zone or ICU build:
+//   - the zone is pinned to Pacific/Auckland: otherwise a UTC server and a
+//     visitor's browser put the same instant on different calendar days
+//     near midnight, and show NZ dates only by luck;
+//   - the month is spelled here (en-NZ names, "Sept") rather than by Intl:
+//     engines disagree on the abbreviation ("Sept" vs "Sep"), and React
+//     reports every difference as hydration error #418.
+// Intl is only asked for numeric day, month and year parts, which every
+// engine agrees on (src/lib/format-date.ts).
 export function formatIssueDate(d: string | Date): string {
-  return new Intl.DateTimeFormat("en-NZ", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    timeZone: "Pacific/Auckland",
-  }).format(new Date(d));
+  const parts = datePartsInZone(new Date(d), NZ_TIME_ZONE);
+  if (!parts) return "—";
+  return `${String(parts.day).padStart(2, "0")} ${MONTHS_SHORT[parts.month - 1]} ${parts.year}`;
 }
 
 export function validUntilDate(createdAt: string | Date, days = 30): Date {

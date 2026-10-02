@@ -1,5 +1,3 @@
-"use client";
-
 import { ArrowSquareOut, EnvelopeSimple, FileText, Phone } from "@phosphor-icons/react/dist/ssr";
 import type { Icon } from "@phosphor-icons/react";
 import {

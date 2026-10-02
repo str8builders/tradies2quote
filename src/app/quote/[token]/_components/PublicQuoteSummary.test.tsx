@@ -64,6 +64,16 @@ describe("the client's quote page", () => {
   });
 });
 
+describe("the dates", () => {
+  // iPhone WebKit abbreviates September "Sep", Node and Chrome "Sept": a date spelled by the engine made the
+  // server's text differ from the phone's, and React reported hydration error #418 on every September quote.
+  it("are spelled in code (NZ day, en-NZ words), identical on the server and in any browser", () => {
+    const text = render(payload({ created_at: "2026-09-15T11:59:00Z", expires_at: "2026-10-15T11:59:00Z" })).replace(/<[^>]*>/g, " ");
+    expect(text).toMatch(/Issued\s+15 Sept 2026/);
+    expect(text).toMatch(/Valid until\s+16 Oct 2026/);
+  });
+});
+
 describe("a quote from a plan set", () => {
   it("shows each trade under its own heading and subtotal, adding up to the materials subtotal", () => {
     const html = render(
