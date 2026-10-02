@@ -9,6 +9,7 @@ import { AppContent } from "./AppContent";
 import { AppNav } from "./AppNav";
 import { PushBridge } from "../../settings/_newlook/PushBridge";
 import { LocationBridge } from "./LocationBridge";
+import { PhoneTextSize } from "@/app/_components/PhoneTextSize";
 import { NativeShortcutsBridge } from "./NativeShortcutsBridge";
 import { StaleVersionReload } from "./StaleVersionReload";
 import { StatusBarTint } from "./StatusBarTint";
@@ -104,6 +105,7 @@ export function NewLookShell({
         <AppNav />
         <TopProgressBar />
         <LocationBridge />
+        <PhoneTextSize />
         <PushBridge />
         <NativeShortcutsBridge />
         {inApp ? <StatusBarTint outdoor={outdoor} /> : null}

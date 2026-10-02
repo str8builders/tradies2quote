@@ -6,7 +6,14 @@ import { describe, expect, it } from "vitest";
 import { TextSizeControl } from "@/components/ui/text-size-control";
 import {
   TEXT_SIZES,
+  TEXT_SIZE_AUTO_COOKIE,
   TEXT_SIZE_COOKIE,
+  autoTextSizeCookieString,
+  hasPickedTextSize,
+  pickedTextSize,
+  resolveTextSize,
+  textSizeForPhoneBody,
+  textSizeFromCookies,
   TEXT_SIZE_LABELS,
   TEXT_SIZE_SCALE,
   applyTextSizeAttribute,
@@ -44,15 +51,53 @@ describe("the stored setting", () => {
     expect(parseTextSizeCookie(null)).toBe("normal");
   });
 
-  it("writes a year-long cookie for Large and Extra large and clears it for Normal", () => {
+  it("writes a year-long cookie for every size picked, Normal included", () => {
     expect(textSizeCookieString("large", true)).toBe(`${TEXT_SIZE_COOKIE}=large; Max-Age=31536000; Path=/; SameSite=Lax; Secure`);
     expect(textSizeCookieString("xlarge", false)).toBe(`${TEXT_SIZE_COOKIE}=xlarge; Max-Age=31536000; Path=/; SameSite=Lax`);
-    expect(textSizeCookieString("normal", true)).toBe(`${TEXT_SIZE_COOKIE}=; Max-Age=0; Path=/; SameSite=Lax; Secure`);
+    // Normal is kept too: once picked in the app, the phone's own text size no longer decides.
+    expect(textSizeCookieString("normal", true)).toBe(`${TEXT_SIZE_COOKIE}=normal; Max-Age=31536000; Path=/; SameSite=Lax; Secure`);
     for (const size of TEXT_SIZES) expect(parseTextSizeCookie(textSizeCookieString(size, false).split(";")[0])).toBe(size);
   });
 
   it("renders no attribute for Normal", () => {
     expect([TEXT_SIZES.map(textSizeAttributeValue)]).toEqual([[undefined, "large", "xlarge"]]);
+  });
+});
+
+describe("the phone's own text size", () => {
+  it("maps the iPhone body size: one step up is Large, two or more is Extra large", () => {
+    for (const px of [null, Number.NaN, 14, 15, 16, 17]) expect(textSizeForPhoneBody(px)).toBeNull();
+    expect(textSizeForPhoneBody(19)).toBe("large");
+    expect(textSizeForPhoneBody(20)).toBe("large");
+    for (const px of [21, 23, 28, 33, 40, 47, 53]) expect(textSizeForPhoneBody(px)).toBe("xlarge");
+  });
+
+  it("a size picked in the app always wins; else the phone's; else Normal", () => {
+    expect(resolveTextSize(undefined, undefined)).toBe("normal");
+    expect(resolveTextSize(undefined, "large")).toBe("large");
+    expect(resolveTextSize(undefined, "xlarge")).toBe("xlarge");
+    expect(resolveTextSize("normal", "xlarge")).toBe("normal");
+    expect(resolveTextSize("large", "xlarge")).toBe("large");
+    expect(resolveTextSize("junk", "large")).toBe("large");
+    expect(resolveTextSize(undefined, "normal")).toBe("normal");
+    expect(pickedTextSize("normal")).toBe("normal");
+    expect(pickedTextSize("")).toBeNull();
+  });
+
+  it("reads both cookies, on the server and from document.cookie", () => {
+    const store = (values: Record<string, string>) => ({ get: (name: string) => (name in values ? { value: values[name] } : undefined) });
+    expect(textSizeFromCookies(store({}))).toBe("normal");
+    expect(textSizeFromCookies(store({ [TEXT_SIZE_AUTO_COOKIE]: "xlarge" }))).toBe("xlarge");
+    expect(textSizeFromCookies(store({ [TEXT_SIZE_AUTO_COOKIE]: "xlarge", [TEXT_SIZE_COOKIE]: "normal" }))).toBe("normal");
+    expect(parseTextSizeCookie(`a=1; ${TEXT_SIZE_AUTO_COOKIE}=large`)).toBe("large");
+    expect(parseTextSizeCookie(`${TEXT_SIZE_AUTO_COOKIE}=large; ${TEXT_SIZE_COOKIE}=normal`)).toBe("normal");
+    expect(hasPickedTextSize(`${TEXT_SIZE_AUTO_COOKIE}=large`)).toBe(false);
+    expect(hasPickedTextSize(`${TEXT_SIZE_COOKIE}=normal`)).toBe(true);
+  });
+
+  it("keeps the phone's size in its own cookie, or clears it", () => {
+    expect(autoTextSizeCookieString("large", true)).toBe(`${TEXT_SIZE_AUTO_COOKIE}=large; Max-Age=31536000; Path=/; SameSite=Lax; Secure`);
+    expect(autoTextSizeCookieString(null, false)).toBe(`${TEXT_SIZE_AUTO_COOKIE}=; Max-Age=0; Path=/; SameSite=Lax`);
   });
 });
 
@@ -128,7 +173,7 @@ describe("the layout hooks in globals.css", () => {
     }
   };
   walk(join(process.cwd(), "src"));
-  const hooks = [...new Set([...css.matchAll(/\[data-text\] \[(data-[a-z-]+)\]/g)].map((m) => m[1]))];
+  const hooks = [...new Set([...css.matchAll(/\[data-text(?:="[a-z]+")?\] \[(data-[a-z-]+)\]/g)].map((m) => m[1]))];
 
   it("covers the headings, rows, tiles, chips and bottom bar that need room at a bigger size", () => {
     for (const hook of [
@@ -141,6 +186,8 @@ describe("the layout hooks in globals.css", () => {
       "data-text-stack",
       "data-filter-chips",
       "data-text-wrap",
+      "data-text-clamp",
+      "data-rail-odd",
     ]) {
       expect(hooks, hook).toContain(hook);
     }

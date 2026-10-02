@@ -56,7 +56,10 @@ export function TopBar({
             </Link>
           ) : null)}
         <div className={cx("min-w-0 flex-1", !leading && !back && "pl-2")}>
-          <h1 className="ui-title truncate text-ui-lg text-ui-text">{title}</h1>
+          {/* data-text-clamp: up to two lines once the Text size is bigger (globals.css). */}
+          <h1 data-text-clamp className="ui-title truncate text-ui-lg text-ui-text">
+            {title}
+          </h1>
           {subtitle ? <p className="truncate text-ui-sm text-ui-muted">{subtitle}</p> : null}
         </div>
         {action ? <div className="shrink-0">{action}</div> : null}

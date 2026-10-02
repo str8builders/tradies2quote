@@ -331,15 +331,43 @@
 
 /* With bigger words the tab heading (TabTopBar) gets a line to itself, the
    photo and the weather sharing the row above it. Beside them "Timesheet" was
-   cut short on a small phone. Normal is untouched. */
-[data-text] [data-tab-bar-row] {
-  flex-wrap: wrap;
-  justify-content: space-between;
-  row-gap: 0.5rem;
+   cut short on a small phone. Phone widths only (under 40rem): a tablet or a
+   computer has the room to keep them side by side. Normal is untouched. */
+@media (max-width: 39.99rem) {
+  [data-text] [data-tab-bar-row] {
+    flex-wrap: wrap;
+    justify-content: space-between;
+    row-gap: 0.5rem;
+  }
+  [data-text] [data-tab-bar-title] {
+    order: 1;
+    flex: 1 1 100%;
+  }
 }
-[data-text] [data-tab-bar-title] {
-  order: 1;
-  flex: 1 1 100%;
+
+/* The job progress rail (StatusRail): every other label drops to a second row
+   in a narrow box, so "Accepted" and "Booked" can't run into each other. The
+   labels grow with the Text size, so the box they need grows too (20rem at
+   Normal, by the same 15% / 30%), and the second row sits a full line lower. */
+@container (max-width: 23rem) {
+  [data-text="large"] [data-rail-odd] {
+    margin-top: var(--text-ui-xs--line-height);
+  }
+}
+@container (max-width: 26rem) {
+  [data-text="xlarge"] [data-rail-odd] {
+    margin-top: var(--text-ui-xs--line-height);
+  }
+}
+
+/* A one-line screen title in the kit TopBar (the job's name, "A few quick
+   questions") gets up to two lines once the words are bigger, then "…". */
+[data-text] [data-text-clamp] {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  overflow: hidden;
 }
 
 /* The bottom bar keeps its label size: five tabs share the width, and
@@ -352,26 +380,28 @@
 
 /* A list row's value (the amount on a job) drops under the text, so the job and
    client names keep the row's width instead of wrapping in a sliver. The
-   chevron stays on the first line, at the right. */
-[data-text] [data-list-row] {
-  flex-wrap: wrap;
-  row-gap: 0.25rem;
-}
-[data-text] [data-list-row-chevron] {
-  order: 1;
-}
-[data-text] [data-list-row-trailing] {
-  order: 2;
-  flex: 1 1 100%;
+   chevron stays on the first line, at the right. Tiles that sit side by side
+   (Home's two money tiles) stack, so an amount like $12,460.00 has the whole
+   width. Phone widths only, like the tab heading above. */
+@media (max-width: 39.99rem) {
+  [data-text] [data-list-row] {
+    flex-wrap: wrap;
+    row-gap: 0.25rem;
+  }
+  [data-text] [data-list-row-chevron] {
+    order: 1;
+  }
+  [data-text] [data-list-row-trailing] {
+    order: 2;
+    flex: 1 1 100%;
+  }
+  [data-text] [data-text-stack] {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
-/* Tiles that sit side by side (Home's two money tiles) stack once the words are
-   bigger, so an amount like $12,460.00 has the whole width. The job filter
-   chips go from three across to two, so "Waiting 1" is not squeezed (three
-   again from a tablet's width up). */
-[data-text] [data-text-stack] {
-  grid-template-columns: minmax(0, 1fr);
-}
+/* The job filter chips go from three across to two, so "Waiting 1" is not
+   squeezed (three again from a tablet's width up). */
 [data-text] [data-filter-chips] {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }

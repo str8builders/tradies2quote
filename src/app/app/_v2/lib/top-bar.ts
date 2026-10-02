@@ -10,7 +10,7 @@ import { getCachedAuthUser } from "@/lib/supabase/auth";
 import { getCachedTopBarProfile } from "@/lib/supabase/profile";
 import { getNewLookState } from "@/lib/ui/newLook";
 import { OUTDOOR_COOKIE, isOutdoorCookieValue } from "@/lib/ui/outdoor";
-import { TEXT_SIZE_COOKIE, parseTextSizeValue, type TextSize } from "@/lib/ui/text-size";
+import { textSizeFromCookies, type TextSize } from "@/lib/ui/text-size";
 import { isWeatherImpactEnabled } from "@/lib/weather-impact/feature-flag";
 import { businessTimeZone, greetingFor, type Greeting } from "./dates";
 
@@ -89,7 +89,7 @@ export const loadTopBarData = cache(async (): Promise<TopBarData> => {
     email,
     businessName: profile.businessName,
     outdoor: isOutdoorCookieValue(cookieStore.get(OUTDOOR_COOKIE)?.value),
-    textSize: parseTextSizeValue(cookieStore.get(TEXT_SIZE_COOKIE)?.value),
+    textSize: textSizeFromCookies(cookieStore),
     t2qcal: shouldOfferT2QCAL({ nativeShell, appStoreUrl: process.env.NEXT_PUBLIC_T2QCAL_APPSTORE_URL, isOwner }),
     isOwner,
     canChooseLook: look.canChoose,

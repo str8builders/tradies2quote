@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
-import { TEXT_SIZE_COOKIE, parseTextSizeValue, textSizeAttributeValue } from "@/lib/ui/text-size";
+import { PhoneTextSize } from "@/app/_components/PhoneTextSize";
+import { textSizeAttributeValue, textSizeFromCookies } from "@/lib/ui/text-size";
 
 /**
  * Auth route-group layout. Each page (`/login`, `/signup`,
@@ -23,7 +24,7 @@ export default async function AuthLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const textSize = parseTextSizeValue((await cookies()).get(TEXT_SIZE_COOKIE)?.value);
+  const textSize = textSizeFromCookies(await cookies());
   return (
     <div
       className="studio-public studio-auth-pages"
@@ -31,6 +32,8 @@ export default async function AuthLayout({
       data-text={textSizeAttributeValue(textSize)}
     >
       {children}
+      {/* iPhone app: no size picked yet? Follow the phone's own text size. */}
+      <PhoneTextSize />
     </div>
   );
 }

@@ -20,7 +20,7 @@ import { LEGACY_SETTINGS_HREF } from "../_newlook/hub";
 import { NotificationsSetting } from "../_newlook/NotificationsSetting";
 import { OutdoorSetting } from "../_newlook/OutdoorSetting";
 import { TextSizeControl } from "@/components/ui/text-size-control";
-import { TEXT_SIZE_COOKIE, parseTextSizeValue } from "@/lib/ui/text-size";
+import { textSizeFromCookies } from "@/lib/ui/text-size";
 import { SettingsScreen } from "../_newlook/SettingsScreen";
 
 export const metadata: Metadata = {
@@ -62,7 +62,7 @@ export default async function AccountSettingsPage() {
     cookies(),
   ]);
   const outdoorOn = isOutdoorCookieValue(cookieStore.get(OUTDOOR_COOKIE)?.value);
-  const textSize = parseTextSizeValue(cookieStore.get(TEXT_SIZE_COOKIE)?.value);
+  const textSize = textSizeFromCookies(cookieStore);
   const aiConsentedAt = native ? await readAiConsent(user.id) : null;
 
   return (

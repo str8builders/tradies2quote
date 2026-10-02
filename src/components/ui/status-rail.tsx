@@ -39,7 +39,9 @@ export interface StatusRailProps {
  *
  * The end dots sit on the edges so the middle labels get the most room
  * ("Accepted" and "Booked" are the widest neighbours); in a box narrower than
- * 20rem every other label drops to a second row rather than colliding.
+ * 20rem every other label drops to a second row rather than colliding. With
+ * a bigger Text size the labels are wider, so that happens in a wider box too
+ * (globals.css, "Text size", on data-rail-odd).
  */
 export function StatusRail({
   position,
@@ -92,6 +94,7 @@ export function StatusRail({
               ) : null}
             </span>
             <span
+              data-rail-odd={i % 2 === 1 ? "" : undefined}
               className={cx(
                 "text-ui-xs whitespace-nowrap",
                 LABEL[state],
