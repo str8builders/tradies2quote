@@ -83,7 +83,8 @@ struct T2QClockLiveActivity: Widget {
 /// A count-up timer from `startedAt`, as digits ("12:04", then "2:14:09" past
 /// the hour). It uses `Text(timerInterval:)`: `Text(date, style: .timer)` on a
 /// past date came out as words ("2 hours, 14 minutes") on iOS 26. The interval
-/// is twelve hours long, past the 8 hours iOS lets an activity run. A fixed
+/// is a day long: the page starts one for a shift up to 16 hours old, and iOS
+/// lets it run 8 hours more, so the count never stops early. A fixed
 /// frame and monospaced digits keep it from jumping about or taking the whole
 /// width: a timer text grows to fill whatever it is given.
 @available(iOS 16.1, *)
@@ -92,7 +93,7 @@ private struct ElapsedTimer: View {
     let font: Font
 
     var body: some View {
-        Text(timerInterval: startedAt...startedAt.addingTimeInterval(12 * 60 * 60), pauseTime: nil, countsDown: false, showsHours: true)
+        Text(timerInterval: startedAt...startedAt.addingTimeInterval(24 * 60 * 60), pauseTime: nil, countsDown: false, showsHours: true)
             .font(font)
             .monospacedDigit()
             .multilineTextAlignment(.trailing)

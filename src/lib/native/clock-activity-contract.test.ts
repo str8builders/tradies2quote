@@ -7,6 +7,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { MAX_ACTIVITY_AGE_MS } from "./clock-activity";
 import { SHORTCUT_PATHS } from "./shortcuts";
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
@@ -63,7 +64,9 @@ describe("what the Lock Screen can see", () => {
   });
 
   it("the timer is the system's own, so it counts with the app closed", () => {
-    expect(widget).toMatch(/Text\(timerInterval: startedAt\.\.\.startedAt\.addingTimeInterval\(12 \* 60 \* 60\), pauseTime: nil, countsDown: false, showsHours: true\)/);
+    expect(widget).toMatch(/Text\(timerInterval: startedAt\.\.\.startedAt\.addingTimeInterval\(24 \* 60 \* 60\), pauseTime: nil, countsDown: false, showsHours: true\)/);
+    // A day: longer than the oldest shift the page starts one for (16 h) plus the 8 h iOS allows.
+    expect(24).toBeGreaterThanOrEqual(MAX_ACTIVITY_AGE_MS / 3_600_000 + 8);
     const code = widget.split("\n").filter((line) => !line.trim().startsWith("//")).join("\n");
     expect(code).not.toMatch(/style: \.timer\)/); // on a past date it came out as words on iOS 26
   });
