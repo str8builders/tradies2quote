@@ -22,7 +22,37 @@
 		7A1PRIV0000000000000001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 7A1PRIV0000000000000002 /* PrivacyInfo.xcprivacy */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		T2QCLKP00000000000000001 /* T2QClockActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = T2QCLKP00000000000000002 /* T2QClockActivityPlugin.swift */; };
+		T2QCLKA00000000000000001 /* T2QClockActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = T2QCLKA00000000000000002 /* T2QClockActivityAttributes.swift */; };
+		T2QCLKA00000000000000003 /* T2QClockActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = T2QCLKA00000000000000002 /* T2QClockActivityAttributes.swift */; };
+		T2QWDGT00000000000000001 /* T2QWidgetsBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = T2QWDGT00000000000000002 /* T2QWidgetsBundle.swift */; };
+		T2QWDGT00000000000000003 /* T2QClockLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = T2QWDGT00000000000000004 /* T2QClockLiveActivity.swift */; };
+		T2QEXT0000000000000000001 /* T2QWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = T2QEXT0000000000000000002 /* T2QWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		T2QEXT0000000000000000008 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = T2QEXT0000000000000000003;
+			remoteInfo = T2QWidgets;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		T2QEXT0000000000000000007 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				T2QEXT0000000000000000001 /* T2QWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		T2QMAIN000000000000000002 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
@@ -43,6 +73,12 @@
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		T2QCLKP00000000000000002 /* T2QClockActivityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T2QClockActivityPlugin.swift; sourceTree = "<group>"; };
+		T2QCLKA00000000000000002 /* T2QClockActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T2QClockActivityAttributes.swift; sourceTree = "<group>"; };
+		T2QWDGT00000000000000002 /* T2QWidgetsBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T2QWidgetsBundle.swift; sourceTree = "<group>"; };
+		T2QWDGT00000000000000004 /* T2QClockLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = T2QClockLiveActivity.swift; sourceTree = "<group>"; };
+		T2QWDGT00000000000000005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		T2QEXT0000000000000000002 /* T2QWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = T2QWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -54,6 +90,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		T2QEXT0000000000000000005 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -62,14 +105,35 @@
 			children = (
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
+				T2QGRP0000000000000000001 /* Shared */,
+				T2QGRP0000000000000000002 /* T2QWidgets */,
 				504EC3051FED79650016851F /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		T2QGRP0000000000000000001 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				T2QCLKA00000000000000002 /* T2QClockActivityAttributes.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		T2QGRP0000000000000000002 /* T2QWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				T2QWDGT00000000000000002 /* T2QWidgetsBundle.swift */,
+				T2QWDGT00000000000000004 /* T2QClockLiveActivity.swift */,
+				T2QWDGT00000000000000005 /* Info.plist */,
+			);
+			path = T2QWidgets;
 			sourceTree = "<group>";
 		};
 		504EC3051FED79650016851F /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				T2QEXT0000000000000000002 /* T2QWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -85,6 +149,7 @@
 				T2QCALE000000000000000002 /* T2QCalendarPlugin.swift */,
 				T2QCONT000000000000000002 /* T2QContactsPlugin.swift */,
 				T2QHAPT000000000000000002 /* T2QHapticsPlugin.swift */,
+				T2QCLKP00000000000000002 /* T2QClockActivityPlugin.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				7A1ENTS0000000000000003 /* App.entitlements */,
@@ -107,10 +172,12 @@
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
+				T2QEXT0000000000000000007 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				T2QEXT0000000000000000009 /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -119,6 +186,23 @@
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
+		};
+		T2QEXT0000000000000000003 /* T2QWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = T2QEXT000000000000000000A /* Build configuration list for PBXNativeTarget "T2QWidgets" */;
+			buildPhases = (
+				T2QEXT0000000000000000004 /* Sources */,
+				T2QEXT0000000000000000005 /* Frameworks */,
+				T2QEXT0000000000000000006 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = T2QWidgets;
+			productName = T2QWidgets;
+			productReference = T2QEXT0000000000000000002 /* T2QWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -132,6 +216,10 @@
 					504EC3031FED79650016851F = {
 						CreatedOnToolsVersion = 9.2;
 						LastSwiftMigration = 1100;
+						ProvisioningStyle = Automatic;
+					};
+					T2QEXT0000000000000000003 = {
+						CreatedOnToolsVersion = 14.1;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -153,6 +241,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				T2QEXT0000000000000000003 /* T2QWidgets */,
 			);
 		};
 /* End PBXProject section */
@@ -172,6 +261,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		T2QEXT0000000000000000006 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -186,10 +282,30 @@
 				T2QCALE000000000000000001 /* T2QCalendarPlugin.swift in Sources */,
 				T2QCONT000000000000000001 /* T2QContactsPlugin.swift in Sources */,
 				T2QHAPT000000000000000001 /* T2QHapticsPlugin.swift in Sources */,
+				T2QCLKP00000000000000001 /* T2QClockActivityPlugin.swift in Sources */,
+				T2QCLKA00000000000000001 /* T2QClockActivityAttributes.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		T2QEXT0000000000000000004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				T2QWDGT00000000000000001 /* T2QWidgetsBundle.swift in Sources */,
+				T2QWDGT00000000000000003 /* T2QClockLiveActivity.swift in Sources */,
+				T2QCLKA00000000000000003 /* T2QClockActivityAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		T2QEXT0000000000000000009 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = T2QEXT0000000000000000003 /* T2QWidgets */;
+			targetProxy = T2QEXT0000000000000000008 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
@@ -366,6 +482,52 @@
 			};
 			name = Release;
 		};
+		T2QEXT000000000000000000B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = T2QWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.str8builders.tradies2quote.clock;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		T2QEXT000000000000000000C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = T2QWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.str8builders.tradies2quote.clock;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -383,6 +545,15 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		T2QEXT000000000000000000A /* Build configuration list for PBXNativeTarget "T2QWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				T2QEXT000000000000000000B /* Debug */,
+				T2QEXT000000000000000000C /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

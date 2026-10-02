@@ -458,6 +458,10 @@ final class T2QLocationEngine: NSObject, CLLocationManagerDelegate {
             store.removeObject(forKey: Key.pendingEnter)
         }
         onSiteEvent?()
+        // Leaving ends an automatic clock-in, so the island's timer stops now
+        // (an activity can be ended with the app in the background; it can't
+        // be started there).
+        if type == "exit" { T2QClockActivityController.shared.endNow() }
 
         let name = sites().first(where: { $0.id == clientId })?.name ?? "the job"
         let time = clockTime(Date())

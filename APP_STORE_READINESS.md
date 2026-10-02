@@ -144,6 +144,19 @@ Research verdict (Apple guidelines current as of July 2026):
       a capability with no code behind it is its own rejection risk). If built
       later: add a Capacitor biometric plugin + LocalAuthentication flow FIRST,
       then re-declare the string.
+- [x] **Dynamic Island / Lock Screen "Clocked in"** (3 Oct 2026): a Live
+      Activity with a count-up timer while a time entry is open. Local only (no
+      push, so no paid-team entitlement): `ios/App/T2QWidgets` (the widget
+      extension, `com.str8builders.tradies2quote.clock`, iOS 16.2+; the app still
+      supports iOS 15, where it simply never starts one), `T2QClockActivityPlugin.swift`,
+      the shared `ios/App/Shared/T2QClockActivityAttributes.swift`, and
+      `src/lib/native/clock-activity.ts` (driven by `LocationBridge`). It carries
+      only the start time (no client or job name on a Lock Screen). Tapping it opens
+      the Timesheet through `t2q://timesheet`. iOS asks "Allow Live Activities?" once
+      and later "Always Allow?". An activity can only start while the app is open, so
+      an automatic clock-in made with the app closed shows on the island at the next
+      open; leaving a job site ends it at once. Interactive buttons (a Clock out
+      button) and remote updates need push or an App Intent: not built.
 - [ ] **Native offline screen** — reviewers Airplane-Mode-test; a browser error
       page = wrapper rejection. (The PWA deliberately has no offline mode;
       handle it at the shell level.)

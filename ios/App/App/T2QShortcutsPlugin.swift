@@ -21,6 +21,15 @@ final class T2QShortcuts {
         "com.str8builders.tradies2quote.supplier-quote": "/app/materials/capture",
     ]
 
+    /// Where a link into the app (t2q://<host>) opens. The clock-in Live Activity
+    /// (Dynamic Island and Lock Screen) links to t2q://timesheet. Only these
+    /// hosts, and only these pages: a link never carries a page of its own, so
+    /// another app or a website that opens one can't send anyone anywhere else.
+    static let linkScheme = "t2q"
+    static let linkPaths: [String: String] = [
+        "timesheet": "/app/timesheet",
+    ]
+
     /// An action waits this long for the page to ask for it (a stale one, say
     /// from a launch that stopped at the sign-in screen, is dropped).
     static let maxAge: TimeInterval = 60
@@ -34,6 +43,18 @@ final class T2QShortcuts {
     @discardableResult
     func handle(_ item: UIApplicationShortcutItem) -> Bool {
         guard let path = Self.paths[item.type] else { return false }
+        pending = (path, Date())
+        DispatchQueue.main.async { self.onShortcut?() }
+        return true
+    }
+
+    /// Remember a link into the app (the Live Activity's tap). False when it
+    /// isn't one of ours, so the caller can hand it on.
+    @discardableResult
+    func handle(link url: URL) -> Bool {
+        guard url.scheme?.lowercased() == Self.linkScheme,
+              let host = url.host?.lowercased(),
+              let path = Self.linkPaths[host] else { return false }
         pending = (path, Date())
         DispatchQueue.main.async { self.onShortcut?() }
         return true

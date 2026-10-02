@@ -11,7 +11,7 @@
 import { Capacitor } from "@capacitor/core";
 import { isNativeIOSApp } from "@/lib/native-app";
 
-export type NativeModule = "T2QShortcuts" | "T2QCalendar" | "T2QContacts" | "T2QHaptics";
+export type NativeModule = "T2QShortcuts" | "T2QCalendar" | "T2QContacts" | "T2QHaptics" | "T2QClockActivity";
 
 /** Inside the iPhone app, and this build has `name`. */
 export function hasNativeModule(name: NativeModule): boolean {

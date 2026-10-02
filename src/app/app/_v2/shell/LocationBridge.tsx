@@ -21,6 +21,7 @@ import {
   type SiteEvent,
 } from "@/lib/location/device";
 import { flushRoutePoints, registerRouteFlusher } from "@/lib/location/route-flush";
+import { endClockActivity, syncClockActivity } from "@/lib/native/clock-activity";
 import {
   clockIn,
   clockOut,
@@ -75,7 +76,11 @@ function writeSession(key: string, value: string): void {
  * - In a browser: while clocked in with location on and the page open,
  *   sends the route once a minute (a browser can't in the background).
  * - Before any Finish (see route-flush), the route still waiting is sent.
- * - Signing out stops the phone's tracking and forgets its key.
+ * - In the iPhone app, the Dynamic Island / Lock Screen "Clocked in" timer
+ *   follows the open entry (src/lib/native/clock-activity.ts): started when
+ *   the page reads that you're clocked in, ended when you're not.
+ * - Signing out stops the phone's tracking, forgets its key and ends the
+ *   "Clocked in" timer.
  * - The phone's or browser's time zone is offered as the business's (the
  *   server keeps it only when it's in the business's country).
  * - Location off: everything stops.
@@ -175,6 +180,9 @@ export function LocationBridge() {
       }
       if (stopped()) return false;
       state = next;
+      // The Dynamic Island's "Clocked in" follows the open entry, whether or
+      // not location is on (a tapped Start work needs no location).
+      if (native) void syncClockActivity(next.open);
       if (native) await configureNative(next);
       else if (next.consent.granted && next.open && document.visibilityState === "visible") startWeb();
       else stopWeb();
@@ -265,8 +273,10 @@ export function LocationBridge() {
       const action = event.submitter?.getAttribute("formaction") ?? form.getAttribute("action");
       if (!isSignOutAction(action, window.location.href)) return;
       signedOut = true;
-      if (native) void stopNativeTracking();
-      else stopWeb();
+      if (native) {
+        void stopNativeTracking();
+        void endClockActivity();
+      } else stopWeb();
     };
 
     const onVisible = () => {

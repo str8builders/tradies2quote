@@ -12,6 +12,7 @@ class MainViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(T2QCalendarPlugin())
         bridge?.registerPluginInstance(T2QContactsPlugin())
         bridge?.registerPluginInstance(T2QHapticsPlugin())
+        bridge?.registerPluginInstance(T2QClockActivityPlugin())
     }
 
     /// The page draws right up under the clock (contentInset "never"), on
