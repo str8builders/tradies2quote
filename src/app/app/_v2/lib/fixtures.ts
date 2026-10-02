@@ -78,6 +78,7 @@ export const TOP_BAR_FIXTURE = {
   email: "sam@example.test",
   businessName: "Sam's Building",
   outdoor: false,
+  textSize: "normal",
   t2qcal: true,
   isOwner: false,
   canChooseLook: false,

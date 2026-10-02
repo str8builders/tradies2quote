@@ -249,7 +249,7 @@ function MoneyTile({
 /** Owed to you (sent and overdue invoices) and paid this month. */
 export function MoneyTiles({ owed, paidThisMonth }: { owed: MoneyTotal; paidThisMonth: MoneyTotal }) {
   return (
-    <section aria-label="Money" data-testid="money-tiles" className="grid grid-cols-2 gap-3">
+    <section aria-label="Money" data-testid="money-tiles" data-text-stack className="grid grid-cols-2 gap-3">
       <MoneyTile
         kind="owed"
         href={jobsHref("unpaid")}

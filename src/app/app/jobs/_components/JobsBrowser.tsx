@@ -127,7 +127,11 @@ function isDeletedRow(row: JobRow | DeletedJobRow): row is DeletedJobRow {
 function RowDetails({ row }: { row: JobRow | DeletedJobRow }) {
   return (
     <>
-      {row.job ? <span className="block truncate">{row.job}</span> : null}
+      {row.job ? (
+        <span data-text-wrap className="block truncate">
+          {row.job}
+        </span>
+      ) : null}
       <span className="mt-1.5 flex flex-wrap items-center gap-2">
         <StatusPill tone={row.pill.tone}>{row.pill.text}</StatusPill>
         {row.archived ? <span className="text-ui-xs text-ui-muted">Archived</span> : null}

@@ -23,22 +23,28 @@ export interface TabTopBarProps {
  * beside it, and the weather on the right (when weather impact is on for
  * the account). On Home the heading is the greeting: "Good morning,"
  * over your name, or just "Good morning" when there's no name to use.
- * Holds the page's one h1.
+ * Holds the page's one h1. With a bigger Text size the heading drops to a line
+ * of its own under the photo and the weather (globals.css, "Text size"), since
+ * a long word ("Timesheet") no longer fits beside them on a small phone.
  */
 export function TabTopBar({ data, title, description, weatherPreview }: TabTopBarProps) {
   const greeting = !title;
   return (
     <header data-testid="tab-top-bar" className={cx("space-y-2", UI_TEXT)}>
-      <div className="flex items-center gap-3">
+      <div data-tab-bar-row className="flex items-center gap-3">
         <AccountButton data={data} />
-        <div className="min-w-0 flex-1">
+        <div data-tab-bar-title className="min-w-0 flex-1">
           {greeting && data.name ? (
             <h1 className="leading-tight">
               <span className="block text-ui-sm text-ui-muted">{data.greeting},</span>
-              <span className="ui-heading block truncate text-ui-xl text-ui-text">{data.name}</span>
+              <span data-text-wrap className="ui-heading block truncate text-ui-xl text-ui-text">
+                {data.name}
+              </span>
             </h1>
           ) : (
-            <h1 className="ui-heading truncate text-ui-2xl text-ui-text">{greeting ? data.greeting : title}</h1>
+            <h1 data-text-wrap className="ui-heading truncate text-ui-2xl text-ui-text">
+              {greeting ? data.greeting : title}
+            </h1>
           )}
         </div>
         {data.weather ? <WeatherButton preview={weatherPreview} accountKey={data.email} /> : null}

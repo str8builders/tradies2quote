@@ -8,6 +8,7 @@ import {
   contrastAttributeValue,
   isOutdoorCookieValue,
 } from "@/lib/ui/outdoor";
+import { TEXT_SIZE_COOKIE, parseTextSizeValue, textSizeAttributeValue } from "@/lib/ui/text-size";
 import { MobileAppMenu } from "./_components/MobileAppMenu";
 import { OnboardingTourGate } from "./_components/OnboardingTourGate";
 import { TopProgressBar } from "./_components/TopProgressBar";
@@ -95,6 +96,8 @@ export default async function AppLayout({
   // first paint is already right. Only ui- tokens react to it, so existing
   // screens look the same either way (see src/lib/ui/outdoor.ts).
   const outdoor = isOutdoorCookieValue(cookieStore.get(OUTDOOR_COOKIE)?.value);
+  // Per-device text size (Normal, Large, Extra large), rendered the same way.
+  const textSize = parseTextSizeValue(cookieStore.get(TEXT_SIZE_COOKIE)?.value);
   if (await isNewLookOn()) {
     // The short new-look welcome, only when this device hasn't seen it lately
     // (the client then applies the same route rules as the old one).
@@ -102,6 +105,7 @@ export default async function AppLayout({
     return (
       <NewLookShell
         outdoor={outdoor}
+        textSize={textSize}
         inApp={await isNativeShellRequest()}
         build={getBuildIdentity().commitSha?.slice(0, 10) ?? null}
         welcome={welcome}
@@ -119,6 +123,7 @@ export default async function AppLayout({
       data-theme="dark"
       data-contrast-root=""
       data-contrast={contrastAttributeValue(outdoor)}
+      data-text={textSizeAttributeValue(textSize)}
       className="studio-app t2q-app-canvas min-h-dvh w-full max-w-full overflow-x-clip lg:grid lg:grid-cols-[24px_1fr_24px]"
     >
       {/*

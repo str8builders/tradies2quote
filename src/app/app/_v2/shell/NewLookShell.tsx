@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { cx } from "@/components/ui/cx";
 import { OUTDOOR_SHELL_CLASS, contrastAttributeValue } from "@/lib/ui/outdoor";
+import { textSizeAttributeValue, type TextSize } from "@/lib/ui/text-size";
 import { BetaNoticeBanner } from "../../_components/BetaNoticeBanner";
 import { TopProgressBar } from "../../_components/TopProgressBar";
 import { TrialBanner } from "../../_components/TrialBanner";
@@ -46,12 +47,15 @@ const SETTLE_KIT_MOTION =
  */
 export function NewLookShell({
   outdoor,
+  textSize = "normal",
   inApp = false,
   build = null,
   welcome,
   children,
 }: {
   outdoor: boolean;
+  /** The t2q-text cookie (Normal, Large, Extra large); globals.css scales the text inside. */
+  textSize?: TextSize;
   /** This request comes from the iPhone app (isNativeShellRequest). */
   inApp?: boolean;
   /** The live commit this page came from (as /api/health reports it). */
@@ -68,6 +72,7 @@ export function NewLookShell({
         data-look="new"
         data-contrast-root=""
         data-contrast={contrastAttributeValue(outdoor)}
+        data-text={textSizeAttributeValue(textSize)}
         className={cx(
           "studio-app t2q-app-canvas min-h-dvh w-full max-w-full overflow-x-clip bg-ui-bg!",
           // The phone's own controls (tick boxes, date and dropdown pickers)

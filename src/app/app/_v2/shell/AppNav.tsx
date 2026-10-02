@@ -96,6 +96,7 @@ export function AppNav() {
     <nav
       aria-label="Main"
       data-testid="app-nav"
+      data-app-nav
       data-focused={focused ? "true" : undefined}
       className={cx(
         "fixed right-0 bottom-0 left-0 z-40 border-t border-ui-line bg-ui-bg pb-[env(safe-area-inset-bottom)]",

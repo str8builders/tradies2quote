@@ -52,6 +52,7 @@ export function FilterChips({
       role="radiogroup"
       aria-label="Show"
       data-testid="jobs-filters"
+      data-filter-chips
       className={cx("grid grid-cols-3 gap-2 sm:grid-cols-6", UI_TEXT)}
     >
       {JOB_FILTERS.map((filter, index) => {

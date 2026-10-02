@@ -46,6 +46,8 @@ export function ListRow({
     interactive && cx("ui-focus-ring cursor-pointer hover:bg-ui-surface-2 active:bg-ui-surface-2", TAP),
     className,
   );
+  // The data-list-row* hooks are for globals.css "Text size": with bigger
+  // words the value drops under the text so the text keeps the row's width.
   const content = (
     <>
       {icon ? <IconTile icon={icon} tone={iconTone} /> : null}
@@ -54,27 +56,38 @@ export function ListRow({
         {subtitle ? <span className="block text-ui-sm text-ui-muted">{subtitle}</span> : null}
       </span>
       {trailing ? (
-        <span className="shrink-0 text-right font-semibold text-ui-text">{trailing}</span>
+        <span data-list-row-trailing className="shrink-0 text-right font-semibold text-ui-text">
+          {trailing}
+        </span>
       ) : null}
       {showChevron ? (
-        <CaretRight aria-hidden="true" weight="bold" className="shrink-0 text-[1.25rem] text-ui-faint" />
+        <CaretRight
+          aria-hidden="true"
+          weight="bold"
+          data-list-row-chevron
+          className="shrink-0 text-[1.25rem] text-ui-faint"
+        />
       ) : null}
     </>
   );
 
   if (href) {
     return (
-      <Link href={href} className={classes}>
+      <Link href={href} data-list-row className={classes}>
         {content}
       </Link>
     );
   }
   if (onClick) {
     return (
-      <button type="button" onClick={onClick} className={classes}>
+      <button type="button" onClick={onClick} data-list-row className={classes}>
         {content}
       </button>
     );
   }
-  return <div className={classes}>{content}</div>;
+  return (
+    <div data-list-row className={classes}>
+      {content}
+    </div>
+  );
 }

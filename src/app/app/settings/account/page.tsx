@@ -19,6 +19,8 @@ import { FirstNameField } from "../_newlook/FirstNameField";
 import { LEGACY_SETTINGS_HREF } from "../_newlook/hub";
 import { NotificationsSetting } from "../_newlook/NotificationsSetting";
 import { OutdoorSetting } from "../_newlook/OutdoorSetting";
+import { TextSizeControl } from "@/components/ui/text-size-control";
+import { TEXT_SIZE_COOKIE, parseTextSizeValue } from "@/lib/ui/text-size";
 import { SettingsScreen } from "../_newlook/SettingsScreen";
 
 export const metadata: Metadata = {
@@ -60,6 +62,7 @@ export default async function AccountSettingsPage() {
     cookies(),
   ]);
   const outdoorOn = isOutdoorCookieValue(cookieStore.get(OUTDOOR_COOKIE)?.value);
+  const textSize = parseTextSizeValue(cookieStore.get(TEXT_SIZE_COOKIE)?.value);
   const aiConsentedAt = native ? await readAiConsent(user.id) : null;
 
   return (
@@ -78,6 +81,10 @@ export default async function AccountSettingsPage() {
       <Card as="section" padding="lg" className="space-y-2" aria-labelledby="look-title">
         <SectionTitle id="look-title">How the app looks</SectionTitle>
         <OutdoorSetting initialOn={outdoorOn} />
+        <div data-testid="settings-text-size" className="pt-2">
+          <TextSizeControl initial={textSize} />
+          <p className="mt-2 text-ui-sm text-ui-muted">Makes the words bigger everywhere. Only changes this device.</p>
+        </div>
       </Card>
 
       {newLook.canChoose ? (

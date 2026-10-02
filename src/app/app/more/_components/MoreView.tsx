@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ListRow } from "@/components/ui/list-row";
 import { OutdoorModeToggle } from "@/components/ui/outdoor-mode-toggle";
+import { TextSizeControl } from "@/components/ui/text-size-control";
 import { Screen } from "@/components/ui/screen";
 import { SectionTitle } from "@/components/ui/section-title";
 import type { TopBarData } from "../../_v2/lib/top-bar";
@@ -75,6 +76,7 @@ export function MoreView({ bar, isOwner, outdoor, canChooseLook }: MoreViewProps
             <Card className="mt-2">
               <OutdoorModeToggle initialOn={outdoor} compact />
               <p className="text-ui-sm text-ui-muted">High contrast for bright sun</p>
+              <TextSizeControl initial={bar.textSize} className="mt-4" />
             </Card>
           </section>
 

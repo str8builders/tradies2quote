@@ -10,6 +10,7 @@ import { cx } from "@/components/ui/cx";
 import { ListRow } from "@/components/ui/list-row";
 import { OutdoorModeToggle } from "@/components/ui/outdoor-mode-toggle";
 import { PRESS, TAP } from "@/components/ui/styles";
+import { TextSizeControl } from "@/components/ui/text-size-control";
 import { MORE_ICON } from "../../more/_components/more-icons";
 import { NewLookRow } from "../../more/_components/NewLookRow";
 import { MORE_TONE, accountMenuSections, ownerMenu, type MoreItem } from "../../more/_lib/menu";
@@ -20,7 +21,7 @@ import { T2QCALRow } from "./T2QCALLauncher";
 
 type AccountData = Pick<
   TopBarData,
-  "name" | "letter" | "avatarUrl" | "email" | "businessName" | "outdoor" | "t2qcal" | "isOwner" | "canChooseLook"
+  "name" | "letter" | "avatarUrl" | "email" | "businessName" | "outdoor" | "textSize" | "t2qcal" | "isOwner" | "canChooseLook"
 >;
 
 /** Who's signed in, big. */
@@ -137,6 +138,9 @@ export function AccountButton({ data }: { data: AccountData }) {
           <li className="px-4 py-3">
             <OutdoorModeToggle initialOn={data.outdoor} compact />
             <p className="text-ui-sm text-ui-muted">High contrast for bright sun</p>
+          </li>
+          <li className="px-4 py-3">
+            <TextSizeControl initial={data.textSize} />
           </li>
           {data.canChooseLook ? (
             <li>

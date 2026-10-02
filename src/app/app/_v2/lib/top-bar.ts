@@ -10,6 +10,7 @@ import { getCachedAuthUser } from "@/lib/supabase/auth";
 import { getCachedTopBarProfile } from "@/lib/supabase/profile";
 import { getNewLookState } from "@/lib/ui/newLook";
 import { OUTDOOR_COOKIE, isOutdoorCookieValue } from "@/lib/ui/outdoor";
+import { TEXT_SIZE_COOKIE, parseTextSizeValue, type TextSize } from "@/lib/ui/text-size";
 import { isWeatherImpactEnabled } from "@/lib/weather-impact/feature-flag";
 import { businessTimeZone, greetingFor, type Greeting } from "./dates";
 
@@ -28,6 +29,8 @@ export interface TopBarData {
   businessName: string | null;
   /** The t2q-outdoor cookie, so the sheet's switch paints right first time. */
   outdoor: boolean;
+  /** The t2q-text cookie (Normal, Large, Extra large), so the sheet's control paints right first time. */
+  textSize: TextSize;
   /** Show the "Open T2QCAL" buttons (see shouldOfferT2QCAL). */
   t2qcal: boolean;
   /** The owner's tools go in the photo menu. */
@@ -86,6 +89,7 @@ export const loadTopBarData = cache(async (): Promise<TopBarData> => {
     email,
     businessName: profile.businessName,
     outdoor: isOutdoorCookieValue(cookieStore.get(OUTDOOR_COOKIE)?.value),
+    textSize: parseTextSizeValue(cookieStore.get(TEXT_SIZE_COOKIE)?.value),
     t2qcal: shouldOfferT2QCAL({ nativeShell, appStoreUrl: process.env.NEXT_PUBLIC_T2QCAL_APPSTORE_URL, isOwner }),
     isOwner,
     canChooseLook: look.canChoose,

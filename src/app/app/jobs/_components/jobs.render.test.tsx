@@ -81,7 +81,7 @@ describe("JobsBrowser", () => {
   it("each row: client, job in one line, a plain status pill, amount", () => {
     const out = html(<JobsBrowser rows={board()} />);
     expect(out).toContain(">Ben Walker</span>");
-    expect(out).toMatch(/<span class="block truncate">Fence repair<\/span>/);
+    expect(out).toMatch(/<span [^>]*class="block truncate"[^>]*>Fence repair<\/span>/);
     expect(out).toContain(">9 days late</span>");
     expect(out).toContain(">Waiting for Mere</span>");
     expect(out).toContain(">Booked Tue 29 Sept</span>");
