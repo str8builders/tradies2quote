@@ -14,7 +14,7 @@ import { HOUSE_DPR, SITE_DPR, type CanvasProps } from "./types";
  * sawhorse phone's waveform, the floating phone). "full" adds shadows,
  * antialiasing and sharper rendering; "lite" is the phone version.
  */
-export default function JobSiteCanvas({ level, layer, flash, onReady, onLost }: CanvasProps) {
+export default function JobSiteCanvas({ level, layer, flash, onReady, onLost, onFail }: CanvasProps) {
   useEffect(() => () => onLost(), [onLost]);
   // Inside the house only the small floating phone is drawn, so draw it
   // sharp. (A prop, not setDpr: the Canvas re-applies its dpr prop on every render.)
@@ -29,6 +29,12 @@ export default function JobSiteCanvas({ level, layer, flash, onReady, onLost }: 
       style={{ position: "absolute", inset: 0 }}
       onCreated={({ gl }) => {
         gl.toneMappingExposure = 1.15;
+        // iOS drops WebGL contexts under memory pressure or after the tab
+        // sits in the background; a dead canvas would leave a blank layer.
+        gl.domElement.addEventListener("webglcontextlost", (e) => {
+          e.preventDefault();
+          onFail();
+        });
       }}
     >
       <CameraRig level={level} layer={layer} flash={flash} onReady={onReady} />

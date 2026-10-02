@@ -29,14 +29,25 @@ describe("chooseLevel — how much 3D a device gets", () => {
     expect(chooseLevel({ ...desktop, deviceMemory: undefined, effectiveType: undefined, coarsePointer: true, viewportWidth: 393 })).toBe("lite");
   });
 
-  it("stills when motion is unwanted, data is precious, 3D is off or the device is low-end", () => {
-    expect(chooseLevel({ ...desktop, reducedMotion: true })).toBe("still");
+  it("stills when motion is paused, data is precious, 3D is off or the device is low-end", () => {
     expect(chooseLevel({ ...desktop, motionPaused: true })).toBe("still");
     expect(chooseLevel({ ...desktop, saveData: true })).toBe("still");
     expect(chooseLevel({ ...desktop, webgl: false })).toBe("still");
     expect(chooseLevel({ ...desktop, effectiveType: "2g" })).toBe("still");
     expect(chooseLevel({ ...desktop, effectiveType: "slow-2g" })).toBe("still");
     expect(chooseLevel({ ...desktop, deviceMemory: 2 })).toBe("still");
-    expect(chooseLevel({ ...desktop, cores: 2 })).toBe("still");
+  });
+
+  it("Reduce Motion plays the site, capped at lite (calm handles the extras)", () => {
+    expect(chooseLevel({ ...desktop, reducedMotion: true })).toBe("lite");
+    // The owner's own iPhone: Reduce Motion on, no Chromium-only hints.
+    expect(
+      chooseLevel({ ...desktop, reducedMotion: true, deviceMemory: undefined, effectiveType: undefined, coarsePointer: true, viewportWidth: 393 }),
+    ).toBe("lite");
+  });
+
+  it("a low hardwareConcurrency reading alone demotes to lite, never to still (iOS Safari underreports)", () => {
+    expect(chooseLevel({ ...desktop, cores: 2 })).toBe("lite");
+    expect(chooseLevel({ ...desktop, cores: 2, deviceMemory: undefined, effectiveType: undefined, coarsePointer: true, viewportWidth: 393 })).toBe("lite");
   });
 });

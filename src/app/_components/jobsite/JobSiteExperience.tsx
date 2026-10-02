@@ -1,8 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { readMotionPaused, subscribeMotionPaused } from "../wallpaper/motion";
+import { Component, useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { reportClientError } from "@/lib/observability/clientReport";
+import { readMotionPausedChoice, subscribeMotionPaused } from "../wallpaper/motion";
 import { chooseLevel, readLevelInput, type Level } from "./level";
 import { JobSiteNav } from "./JobSiteNav";
 import { siteLevel } from "./site-level";
@@ -11,8 +12,30 @@ import { siteLevel } from "./site-level";
 // on devices that get 3D, and only once the page itself is usable.
 const JobSiteCanvas = dynamic(() => import("./canvas/JobSiteCanvas"), { ssr: false });
 
-const levelNow = (): Level => chooseLevel(readLevelInput(readMotionPaused()));
+// The explicit "Pause background motion" choice only: OS Reduce Motion
+// calms the story (level.ts) rather than stopping it.
+const levelNow = (): Level => chooseLevel(readLevelInput(readMotionPausedChoice()));
 const stillOnServer = (): Level => "still";
+
+/**
+ * Anything the 3D throws (renderer creation, a chunk that won't load on a
+ * flaky connection, a shader WebKit rejects) drops to the still site
+ * instead of the app-wide error page. The story itself is plain HTML and
+ * never depended on the canvas.
+ */
+class CanvasBoundary extends Component<{ onFail: () => void; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(error: unknown) {
+    reportClientError(error, "boundary");
+    this.props.onFail();
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
 
 type IdleWindow = Window & {
   requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
@@ -26,7 +49,11 @@ type IdleWindow = Window & {
  * flash into the phone and the fade at the end of the tunnel.
  */
 export function JobSiteExperience() {
-  const level = useSyncExternalStore(subscribeMotionPaused, levelNow, stillOnServer);
+  const chosen = useSyncExternalStore(subscribeMotionPaused, levelNow, stillOnServer);
+  // Once WebGL has failed on this page, stay on the still site: retrying a
+  // lost context on iOS tends to fail the same way and flicker.
+  const [failed, setFailed] = useState(false);
+  const level: Level = failed ? "still" : chosen;
   const threeD = level !== "still";
   const [armed, setArmed] = useState(false);
   const [ready, setReady] = useState(false);
@@ -34,6 +61,10 @@ export function JobSiteExperience() {
   const flash = useRef<HTMLDivElement>(null);
   const onReady = useCallback(() => setReady(true), []);
   const onLost = useCallback(() => setReady(false), []);
+  const onFail = useCallback(() => {
+    setReady(false);
+    setFailed(true);
+  }, []);
 
   useEffect(() => {
     if (!threeD) return;
@@ -94,13 +125,16 @@ export function JobSiteExperience() {
     <>
       {live ? (
         <div ref={layer} className="jobsite-layer" aria-hidden="true">
-          <JobSiteCanvas
-            level={level === "full" ? "full" : "lite"}
-            layer={layer}
-            flash={flash}
-            onReady={onReady}
-            onLost={onLost}
-          />
+          <CanvasBoundary onFail={onFail}>
+            <JobSiteCanvas
+              level={level === "full" ? "full" : "lite"}
+              layer={layer}
+              flash={flash}
+              onReady={onReady}
+              onLost={onLost}
+              onFail={onFail}
+            />
+          </CanvasBoundary>
         </div>
       ) : null}
       <div ref={flash} className="jobsite-flash" aria-hidden="true" />

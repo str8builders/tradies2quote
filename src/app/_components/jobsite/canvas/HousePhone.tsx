@@ -13,7 +13,9 @@ import {
   type WebGLRenderer,
 } from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { isCalm } from "../calm";
 import { blendSlots, containIn, walkAt, type Box } from "../house-walk";
+import { screenHeight } from "../svh";
 import { STUDIO } from "../layout";
 import { BODY, BODY_ASPECT, buildPhone, type PhoneModel } from "./phone-model";
 import { sceneState } from "./scene-state";
@@ -171,7 +173,7 @@ export function HousePhone({
     // Where the rooms are, and where this frame's phone slot is.
     const walk = walkAt(
       r.rooms.map((el) => el.getBoundingClientRect().top),
-      window.innerHeight,
+      screenHeight(),
     );
     const slot = blendSlots(
       r.slots.map((el, i) => (i === 0 || walk.enter[i] > 0 ? boxOf(el) : NOWHERE)),
@@ -215,10 +217,17 @@ export function HousePhone({
       r.spin = null;
       prepare(want);
     }
+    const calm = isCalm();
     if (want !== r.want) {
       r.want = want;
       prepare(want);
-      if (!r.spin) r.spin = { start: t, dir: want > r.shown ? 1 : -1, swapped: false };
+      // Calm: no turn — the screen simply changes to the new step.
+      if (calm) r.shown = want;
+      else if (!r.spin) r.spin = { start: t, dir: want > r.shown ? 1 : -1, swapped: false };
+    }
+    if (calm && r.spin) {
+      r.spin = null;
+      r.shown = r.want;
     }
     let turn = 0;
     let facingAway = false;
@@ -249,11 +258,19 @@ export function HousePhone({
     r.model.screen.map = r.screens.texture(r.clips[r.shown]);
 
     // The float: a slow bob and sway, turned a little towards the words.
-    const yaw = REST_YAW + Math.sin(t * 0.5) * 0.08 + turn;
-    r.model.body.rotation.set(-0.05 + Math.sin(t * 0.77 + 1.2) * 0.03, yaw, 0.03 + Math.sin(t * 0.61 + 0.4) * 0.018);
-    r.model.body.position.y = Math.sin(t * 1.1) * 0.014;
+    // Calm: held still at its resting angle.
+    const sway = calm ? 0 : 1;
+    const yaw = REST_YAW + Math.sin(t * 0.5) * 0.08 * sway + turn;
+    r.model.body.rotation.set(
+      -0.05 + Math.sin(t * 0.77 + 1.2) * 0.03 * sway,
+      yaw,
+      0.03 + Math.sin(t * 0.61 + 0.4) * 0.018 * sway,
+    );
+    r.model.body.position.y = Math.sin(t * 1.1) * 0.014 * sway;
     r.model.shade.scale.x = 0.55 + 0.45 * Math.abs(Math.cos(yaw));
-    invalidate();
+    // Keep drawing while something moves on its own; a calm, idle phone
+    // only redraws when the page scrolls (CameraRig invalidates on scroll).
+    if (!calm || r.spin || r.screens.playing) invalidate();
   });
 
   return <group ref={root} position={STUDIO.centre} visible={false} />;

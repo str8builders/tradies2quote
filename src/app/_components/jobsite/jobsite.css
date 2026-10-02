@@ -35,6 +35,10 @@
   position: fixed; inset: 0; z-index: 5; pointer-events: none; opacity: 0;
   background: radial-gradient(120% 90% at 50% 55%, #fff7ec 0%, #ffe0c2 45%, #ff9d62 100%);
 }
+/* Reduce Motion: the same hand-over into the phone, as a dark fade, not a bright flash. */
+@media (prefers-reduced-motion: reduce) {
+  .jobsite-flash { background: radial-gradient(120% 90% at 50% 55%, #1a1410 0%, #0a0a0a 70%); }
+}
 
 /* ── Header ─────────────────────────────────────────────────────────── */
 .jobsite-header {

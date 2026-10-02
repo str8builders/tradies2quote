@@ -43,6 +43,22 @@ export function readMotionPaused() {
   });
 }
 
+/**
+ * The visitor's own "Pause background motion" choice, WITHOUT the OS
+ * Reduce Motion term. The job-site story is scroll-driven, so Reduce
+ * Motion calms it rather than stopping it (see jobsite/level.ts); only an
+ * explicit pause stops it. Decorative surfaces (wallpaper, DemoReel,
+ * Reveal) keep using readMotionPaused, where the OS preference wins.
+ */
+export function readMotionPausedChoice() {
+  return resolveMotionPaused({ reducedMotion: false, sessionChoice, stored: readStored() });
+}
+
+/** The OS Reduce Motion preference by itself (client only). */
+export function readReducedMotion() {
+  return window.matchMedia(REDUCED_MOTION_QUERY).matches;
+}
+
 export function subscribeMotionPaused(callback: () => void) {
   const media = window.matchMedia(REDUCED_MOTION_QUERY);
   const onStorage = (event: StorageEvent) => {

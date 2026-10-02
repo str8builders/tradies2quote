@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { ArrowUpRight, Check } from "@phosphor-icons/react";
 import { walkAt } from "./house-walk";
+import { screenHeight } from "./svh";
 import { useSiteLevel } from "./site-level";
 import { COMING_SOON, EXAMPLE_LABEL, FEATURES, FILMED_ON, ROOMS, T2QCAL_STOP, type Room } from "./story";
 
@@ -119,7 +120,7 @@ export function HouseWalk({ nativeShell }: { nativeShell: boolean }) {
     let active = -1;
     const read = () => {
       frame = 0;
-      const vh = window.innerHeight;
+      const vh = screenHeight();
       const tops = rooms.map((el) => el.getBoundingClientRect().top);
       // No room plays until you've walked into one (active is -1 before).
       const { enter, active: now } = walkAt(tops, vh);
@@ -139,7 +140,12 @@ export function HouseWalk({ nativeShell }: { nativeShell: boolean }) {
           if (!v) return;
           if (i === active) {
             // Arriving (again): walk the room from the start, then hold.
-            v.currentTime = 0;
+            // Before metadata, iOS can throw on a seek; the clip starts at 0 anyway.
+            try {
+              v.currentTime = 0;
+            } catch {
+              /* not seekable yet */
+            }
             v.play().catch(() => {
               /* Autoplay refused (e.g. low-power mode): the poster stays. */
             });

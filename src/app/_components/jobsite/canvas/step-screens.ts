@@ -96,8 +96,19 @@ export class StepScreens {
       clip.hasFrame = true;
       this.onChange();
     });
+    // A clip that can't load or decode (network, codec) shows the finished screen.
+    video.addEventListener("error", () => this.block(id, clip));
     this.clips.set(id, clip);
     return clip;
+  }
+
+  private block(id: ClipId, clip: Clip): void {
+    if (clip.blocked) return;
+    clip.blocked = true;
+    clip.last ??= this.picture(lastFrameSrc(id), () => {
+      clip.lastReady = true;
+    });
+    this.onChange();
   }
 
   /** Start fetching a step's clip (its room is the one you're in, or the next). */
@@ -108,15 +119,17 @@ export class StepScreens {
   /** Play a step's clip from the start; it holds on its last frame. */
   play(id: ClipId): void {
     const clip = this.clip(id);
-    clip.video.currentTime = 0;
+    try {
+      clip.video.currentTime = 0;
+    } catch {
+      /* Not seekable before metadata (iOS); it starts at 0 anyway. */
+    }
     clip.video.play().catch((err: unknown) => {
-      // A pause before playback started is fine; a refusal means no autoplay.
-      if (!(err instanceof DOMException) || err.name !== "NotAllowedError") return;
-      clip.blocked = true;
-      clip.last ??= this.picture(lastFrameSrc(id), () => {
-        clip.lastReady = true;
-      });
-      this.onChange();
+      // A pause before playback started (AbortError) is fine. Anything else —
+      // autoplay refused (iPhone Low Power Mode), or a clip WebKit can't
+      // play — shows the finished screen instead of a black one.
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      this.block(id, clip);
     });
   }
 

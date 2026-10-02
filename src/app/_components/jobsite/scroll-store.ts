@@ -1,3 +1,4 @@
+import { screenHeight } from "./svh";
 import { SCENES, locate, type Located, type SceneBox, type SceneId } from "./timeline";
 
 /**
@@ -15,7 +16,7 @@ const listeners = new Set<() => void>();
 const isScene = (id: string | undefined): id is SceneId => SCENES.includes(id as SceneId);
 
 function update() {
-  current = locate(window.scrollY, window.innerHeight, boxes);
+  current = locate(window.scrollY, screenHeight(), boxes);
   listeners.forEach((fn) => fn());
 }
 

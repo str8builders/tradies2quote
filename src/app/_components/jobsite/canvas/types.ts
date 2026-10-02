@@ -18,4 +18,6 @@ export type CanvasProps = {
   onReady: () => void;
   /** The canvas went away (level changed or motion paused). */
   onLost: () => void;
+  /** WebGL died (context lost, e.g. iOS reclaiming the GPU): fall back to the still site. */
+  onFail: () => void;
 };
