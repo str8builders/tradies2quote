@@ -14,8 +14,8 @@ import { SYSTEM_PROMPT } from "./prompt";
 export const SHEET_READ_TIMEOUT_MS = 240_000;
 
 export type SheetCall = {
-  /** The page(s) as a small PDF (pdf-lib split). */
-  pdf: Uint8Array;
+  /** The page(s) as a small PDF (pdf-lib split); null sends the words alone. */
+  pdf: Uint8Array | null;
   /** The instructions + numbered text runs (prompt.ts). */
   prompt: string;
 };
@@ -29,20 +29,25 @@ export type SheetCallOptions = {
   model?: string;
   system?: string;
   schema?: Record<string, unknown>;
+  /** Leave out the server-side fallback routing (beta header and `fallbacks`). */
+  plain?: boolean;
 };
 
 export async function readSheetWithAi(call: SheetCall, opts: SheetCallOptions = {}): Promise<SheetCallResult> {
+  const content: unknown[] = [];
+  if (call.pdf) content.push(pdfDocumentBlock(call.pdf));
+  content.push({ type: "text", text: call.prompt });
   const reply = await callAnthropic({
     apiKey: opts.apiKey ?? process.env.ANTHROPIC_API_KEY,
     fetchImpl: opts.fetchImpl,
-    headers: { "anthropic-beta": "server-side-fallback-2026-07-01" },
+    headers: opts.plain ? undefined : { "anthropic-beta": "server-side-fallback-2026-07-01" },
     body: {
       model: opts.model ?? aiModel("planSet"),
       max_tokens: 16000,
       system: opts.system ?? SYSTEM_PROMPT,
-      fallbacks: "default",
+      ...(opts.plain ? {} : { fallbacks: "default" }),
       output_config: { effort: "high", format: { type: "json_schema", schema: opts.schema ?? SHEET_READING_SCHEMA } },
-      messages: [{ role: "user", content: [pdfDocumentBlock(call.pdf), { type: "text", text: call.prompt }] }],
+      messages: [{ role: "user", content }],
     },
     timeoutMs: SHEET_READ_TIMEOUT_MS,
     maxAttempts: 2,

@@ -8,7 +8,7 @@ import "server-only";
 // A sheet that fails is reported, never fatal.
 // ─────────────────────────────────────────────────────────────────────────
 
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, type PDFPage } from "pdf-lib";
 import { captureError } from "@/lib/observability";
 import type { AiUsage } from "@/lib/ai/anthropic";
 import type { Evidence, TextItem } from "../types";
@@ -16,8 +16,9 @@ import type { SheetFacts } from "../sheetFacts";
 import type { SheetKind } from "../sheet/classify";
 import type { Register } from "../sheet/register";
 import type { BuildingModel } from "../model/types";
-import { readSheetWithAi } from "./call";
 import { aiModel } from "@/lib/ai/models";
+import { readSheetResilient, type ResilientCall, type Rung } from "./resilient";
+import { RUN_ENDING, classifyRejection, describeRejection, type Rejection } from "./rejection";
 import { SCAN_READING_SCHEMA, SCAN_SYSTEM_PROMPT, agreeScans, parseScan, scanPrompt, type ScanOpening, type ScanSheet } from "./scan";
 import type { Fact, ModelOpening } from "../model/types";
 import { sheetPrompt } from "./prompt";
@@ -116,6 +117,20 @@ async function pagesPdf(src: PDFDocument, pages: number[]): Promise<Uint8Array> 
   return out.save();
 }
 
+/** What a page needs to be drawn and read; everything else a PDF can hang on a page (annotations, thumbnails, tags, actions) is left behind. */
+const PAGE_KEYS = new Set(["Type", "Parent", "Contents", "Resources", "MediaBox", "CropBox", "Rotate", "UserUnit", "Group"]);
+
+/** The same pages as `pagesPdf`, stripped to the essentials and written without object streams: the plainest PDF the page can be. */
+export async function cleanPagesPdf(src: PDFDocument, pages: number[]): Promise<Uint8Array> {
+  const out = await PDFDocument.create();
+  const copied: PDFPage[] = await out.copyPages(src, pages.map((p) => p - 1));
+  for (const page of copied) {
+    for (const key of page.node.keys()) if (!PAGE_KEYS.has(key.decodeText())) page.node.delete(key);
+    out.addPage(page);
+  }
+  return out.save({ useObjectStreams: false });
+}
+
 export async function interpretPlanSet(input: InterpretInput): Promise<InterpretResult> {
   const skip = (reason: string): InterpretResult => ({
     model: {
@@ -133,9 +148,24 @@ export async function interpretPlanSet(input: InterpretInput): Promise<Interpret
   const src = await PDFDocument.load(input.pdf, { ignoreEncryption: true, updateMetadata: false });
   const readings: SheetReadingAt[] = [];
   let kept = 0, dropped = 0, inTok = 0, outTok = 0, failures = 0;
+  // How the reads that didn't go through first time were saved, and what stopped the run, if anything.
+  const rungs: Record<Rung, number> = { full: 0, again: 0, plain: 0, clean: 0, text: 0 };
+  const failedWhy = new Map<Rejection | "other-error", number>();
+  let halted: Rejection | null = null;
   const addUsage = (u: AiUsage) => {
     inTok += u.inputTokens + u.cacheCreationTokens + u.cacheReadTokens;
     outTok += u.outputTokens;
+  };
+  const stepDown = (name: string) => (info: { from: Rung; to: Rung; why: Rejection; detail: string }) =>
+    console.warn(`[planset] ${name}: ${info.why} at ${info.from} (${info.detail.slice(0, 160)}); trying ${info.to}`);
+  /** A sheet that couldn't be read at all: counted, logged once per reason, and a run-ending reason stops the rest. */
+  const failed = (e: unknown, route: string, name: string) => {
+    failures++;
+    const why = classifyRejection(e);
+    failedWhy.set(why ?? "other-error", (failedWhy.get(why ?? "other-error") ?? 0) + 1);
+    const repeat = why !== null && RUN_ENDING.has(why) && halted === why;
+    if (why !== null && RUN_ENDING.has(why)) halted ??= why;
+    if (!repeat) captureError(e, { route, extra: { sheet: name, why } });
   };
 
   type Job = { name: string; pages: number[]; kind: SheetKind; sheetId: string | null; title: string | null; text: TextItem[]; evidence: (ids: number[]) => Evidence[] };
@@ -178,9 +208,12 @@ export async function interpretPlanSet(input: InterpretInput): Promise<Interpret
   const scanJobs: ScanJob[] = scans.map((f) => ({ page: f.page, name: f.title.sheetId ?? `page ${f.page}` }));
   const readScan = async (job: ScanJob) => {
     const pdf = await pagesPdf(src, [job.page]);
-    const call = { pdf, prompt: scanPrompt({ page: job.page, name: job.name }) };
-    const opts = { system: SCAN_SYSTEM_PROMPT, schema: SCAN_READING_SCHEMA };
-    const [a, b] = await Promise.all([readSheetWithAi(call, { ...opts, model: aiModel("planSet") }), readSheetWithAi(call, { ...opts, model: aiModel("planSetCheck") })]);
+    // No words to fall back on: a scan is read from the page or not at all.
+    const call: ResilientCall = { pdf, clean: () => cleanPagesPdf(src, [job.page]), prompt: scanPrompt({ page: job.page, name: job.name }) };
+    const opts = { system: SCAN_SYSTEM_PROMPT, schema: SCAN_READING_SCHEMA, onStepDown: stepDown(job.name) };
+    const [a, b] = await Promise.all([readSheetResilient(call, { ...opts, model: aiModel("planSet") }), readSheetResilient(call, { ...opts, model: aiModel("planSetCheck") })]);
+    rungs[a.rung]++;
+    rungs[b.rung]++;
     addUsage(a.usage);
     addUsage(b.usage);
     const { agreed, kept: k, dropped: d } = agreeScans(parseScan(a.json), parseScan(b.json));
@@ -197,28 +230,35 @@ export async function interpretPlanSet(input: InterpretInput): Promise<Interpret
   let next = 0;
   let nextScan = 0;
   const worker = async () => {
-    while (nextScan < scanJobs.length) {
+    while (!halted && nextScan < scanJobs.length) {
       const job = scanJobs[nextScan++];
       try {
         await readScan(job);
       } catch (e) {
-        failures++;
-        captureError(e, { route: "plansets/interpret:scan" });
+        failed(e, "plansets/interpret:scan", job.name);
       }
     }
-    while (next < jobs.length) {
+    while (!halted && next < jobs.length) {
       const job = jobs[next++];
       try {
-        const pdf = await pagesPdf(src, job.pages);
-        const res = await readSheetWithAi({ pdf, prompt: sheetPrompt({ sheetId: job.sheetId, title: job.title, kind: job.kind, text: job.text }) });
+        // A page that can't be cut out of the set is still read from its words.
+        const pdf = await pagesPdf(src, job.pages).catch((e) => {
+          console.warn(`[planset] ${job.name}: couldn't cut the page out (${e instanceof Error ? e.message.slice(0, 120) : "unknown"}); reading its words only`);
+          return null;
+        });
+        const sheet = { sheetId: job.sheetId, title: job.title, kind: job.kind, text: job.text };
+        const res = await readSheetResilient(
+          { pdf, clean: () => cleanPagesPdf(src, job.pages), prompt: sheetPrompt(sheet), textPrompt: sheetPrompt({ ...sheet, textOnly: true }) },
+          { onStepDown: stepDown(job.name) },
+        );
+        rungs[res.rung]++;
         addUsage(res.usage);
         const v = verifyReading(res.reading, job.text);
         kept += v.kept;
         dropped += v.dropped;
         readings.push({ name: job.name, evidence: job.evidence, reading: v.reading });
       } catch (e) {
-        failures++;
-        captureError(e, { route: "plansets/interpret" });
+        failed(e, "plansets/interpret", job.name);
       }
     }
   };
@@ -226,12 +266,34 @@ export async function interpretPlanSet(input: InterpretInput): Promise<Interpret
 
   let model = mergeReadings(input.model, readings);
   model = markScanned(addScanOpenings(model, scanOpenings), scannedPages);
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  const notStarted = Math.max(0, jobs.length - next) + Math.max(0, scanJobs.length - nextScan);
+  const flags = [...model.flags];
+  if (halted) {
+    flags.push({
+      id: "ai-halted",
+      level: "info",
+      topic: "other",
+      message: `The AI reading stopped early: ${describeRejection(halted)}. ${plural(readings.length, "sheet was", "sheets were")} read first, ${plural(failures + notStarted, "was", "were")} not. Reading these plans again later should pick up the rest.`,
+      evidence: [],
+    });
+  } else if (failures) {
+    const reasons = [...failedWhy.keys()].map((why) => (why === "other-error" ? "the AI didn't answer properly" : describeRejection(why)));
+    flags.push({ id: "ai-failures", level: "info", topic: "other", message: `${plural(failures, "sheet", "sheets")} couldn't be read by the AI this time (${reasons.join("; ")}); the rest were.`, evidence: [] });
+  }
+  if (rungs.text) {
+    flags.push({
+      id: "ai-words-only",
+      level: "info",
+      topic: "other",
+      message: `${plural(rungs.text, "sheet was", "sheets were")} read from the printed text alone, because the AI service couldn't open the page itself. Lines, hatches and symbols on ${rungs.text === 1 ? "it weren't" : "them weren't"} looked at.`,
+      evidence: [],
+    });
+  }
   model = {
     ...model,
     ai: { sheetsRead: readings.length, itemsKept: kept, itemsDropped: dropped, skipped: null },
-    flags: failures
-      ? [...model.flags, { id: "ai-failures", level: "info", topic: "other", message: `${failures} sheet${failures === 1 ? "" : "s"} couldn't be read by the AI this time; the rest were.`, evidence: [] }]
-      : model.flags,
+    flags,
   };
   const usd = (inTok * USD_IN + outTok * USD_OUT) / 1e6;
   if (scannedPages.size) {
@@ -243,5 +305,9 @@ export async function interpretPlanSet(input: InterpretInput): Promise<Interpret
       evidence: [...scannedPages].map((page) => ({ page, method: "ai" as const })),
     });
   }
-  return { model, usage: { sheets: readings.length, scans: scannedPages.size, failures, inputTokens: inTok, outputTokens: outTok, usd: Math.round(usd * 100) / 100 }, sheetTitles };
+  return {
+    model,
+    usage: { sheets: readings.length, scans: scannedPages.size, failures, stoppedBy: halted, steppedDown: { again: rungs.again, plain: rungs.plain, clean: rungs.clean, text: rungs.text }, inputTokens: inTok, outputTokens: outTok, usd: Math.round(usd * 100) / 100 },
+    sheetTitles,
+  };
 }

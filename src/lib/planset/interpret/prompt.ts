@@ -39,13 +39,41 @@ const KIND_HINT: Partial<Record<SheetKind, string>> = {
   cover: "This is the cover: zones and any project-wide specs.",
 };
 
-/** The sheet's text as numbered runs, reading order, compact. */
-export function formatRuns(text: readonly TextItem[]): string {
-  return text.map((t) => `${t.id} | ${t.s.replace(/\s+/g, " ")} | ${Math.round(t.x)},${Math.round(t.y)}`).join("\n");
+/** Words-only reads (no page attached) keep the prompt well inside the model's context. */
+export const TEXT_ONLY_MAX_CHARS = 300_000;
+
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+
+/** A text run as one safe line: one space between words; no control characters or broken surrogate pairs (invalid JSON for the API). */
+export function cleanRunText(s: string): string {
+  return s.replace(LONE_SURROGATE, "\uFFFD").replace(CONTROL, "").replace(/\s+/g, " ");
 }
 
-export function sheetPrompt(input: { sheetId: string | null; title: string | null; kind: SheetKind; text: readonly TextItem[] }): string {
+/** The sheet's text as numbered runs, reading order, compact. Past `maxChars` the rest is left out. */
+export function formatRuns(text: readonly TextItem[], maxChars = Number.POSITIVE_INFINITY): string {
+  const lines: string[] = [];
+  let used = 0;
+  for (const t of text) {
+    const line = `${t.id} | ${cleanRunText(t.s)} | ${Math.round(t.x)},${Math.round(t.y)}`;
+    if (used + line.length + 1 > maxChars) {
+      lines.push("(the rest of the text runs were left out: too long)");
+      break;
+    }
+    lines.push(line);
+    used += line.length + 1;
+  }
+  return lines.join("\n");
+}
+
+/**
+ * The instructions plus the numbered text runs. `textOnly`: the page itself
+ * isn't attached (the service couldn't open it), so the model reads the words
+ * alone and the prompt says so.
+ */
+export function sheetPrompt(input: { sheetId: string | null; title: string | null; kind: SheetKind; text: readonly TextItem[]; textOnly?: boolean }): string {
   const head = `Sheet ${input.sheetId ?? "(no number)"}${input.title ? ` — ${input.title}` : ""}.`;
   const hint = KIND_HINT[input.kind] ?? "Read everything the rules allow.";
-  return `${head}\n${hint}\n\nText runs:\n${formatRuns(input.text)}`;
+  const note = input.textOnly ? "\nThe page itself is not attached this time: work from the text runs below alone, and report only what they state.\n" : "";
+  return `${head}\n${hint}\n${note}\nText runs:\n${formatRuns(input.text, input.textOnly ? TEXT_ONLY_MAX_CHARS : undefined)}`;
 }
