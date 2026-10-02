@@ -1,4 +1,5 @@
-import { MONTHS_SHORT, NZ_TIME_ZONE, datePartsInZone } from "./format-date";
+// Explicit extension: the video render worker runs this file straight under Node (scripts/quote-video-worker.mjs).
+import { MONTHS_SHORT, NZ_TIME_ZONE, datePartsInZone } from "./format-date.ts";
 import type { QuoteProfile } from "./quote-types";
 
 /**
