@@ -17,12 +17,9 @@ type Props = {
   /** How far children slide toward the cursor. 0.25 ≈ Emergent default. */
   strength?: number;
   className?: string;
-  /** Stretch across the row instead of shrinking to the child (a full-width button). */
-  fill?: boolean;
 };
 
-export function Magnetic({ children, strength = 0.25, className = "", fill = false }: Props) {
-  const display = fill ? "block w-full" : "inline-block";
+export function Magnetic({ children, strength = 0.25, className = "" }: Props) {
   const wrapRef = useRef<HTMLSpanElement>(null);
   const innerRef = useRef<HTMLSpanElement>(null);
 
@@ -47,11 +44,11 @@ export function Magnetic({ children, strength = 0.25, className = "", fill = fal
       ref={wrapRef}
       onPointerMove={onMove}
       onPointerLeave={onLeave}
-      className={`${display} ${className}`}
+      className={`inline-block ${className}`}
     >
       <span
         ref={innerRef}
-        className={`${display} will-change-transform`}
+        className="inline-block will-change-transform"
         style={{ transition: "transform 240ms cubic-bezier(.21,.6,.27,1)" }}
       >
         {children}

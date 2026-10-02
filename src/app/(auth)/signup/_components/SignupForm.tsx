@@ -5,7 +5,6 @@ import { rememberEmail, restoreEmailInto } from "../../_components/remembered-em
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { ArrowRight, Envelope, Lock } from "@phosphor-icons/react";
-import { Magnetic } from "../../../_components/landing/Magnetic";
 import { AuthBanner } from "../../_components/AuthCard";
 import { AuthField } from "../../_components/AuthField";
 import { signupAction } from "../actions";
@@ -13,10 +12,11 @@ import { signupAction } from "../actions";
 /**
  * Client-side form for /signup.
  *
- * Owns the magnetic CTA wrap (the password's Show / Hide button lives in
- * <AuthField>). Submits to the unchanged Supabase `signupAction` server action
- * with `email` + `password` only — those are the only fields the action reads
- * today.
+ * The password's Show / Hide button lives in <AuthField>. The main button
+ * stays still under the pointer (no magnetic effect): a full-width button that
+ * slid with the mouse was a moving target. Submits to the unchanged Supabase
+ * `signupAction` server action with `email` + `password` only — those are the
+ * only fields the action reads today.
  *
  * The Emergent visual design also includes decorative fields for "Your
  * name", "Business name", and a "Trade" selector. Those are intentionally
@@ -83,11 +83,9 @@ export function SignupForm({ error, next, native = false }: Props) {
         hint="At least 8 characters."
       />
 
-      <Magnetic strength={0.18} fill>
-        <PendingSubmit data-testid="signup-submit" pendingLabel="Creating your account…">
-          {native ? "Create account" : "Start 7-day trial"} <ArrowRight aria-hidden="true" size={22} weight="bold" />
-        </PendingSubmit>
-      </Magnetic>
+      <PendingSubmit data-testid="signup-submit" pendingLabel="Creating your account…">
+        {native ? "Create account" : "Start 7-day trial"} <ArrowRight aria-hidden="true" size={22} weight="bold" />
+      </PendingSubmit>
 
       <p data-auth-fine>
         {native

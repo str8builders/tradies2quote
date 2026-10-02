@@ -100,10 +100,12 @@ describe("the forms", () => {
     expect(html).toContain("By signing up you agree to our terms · no card needed");
   });
 
-  it("the main button goes the full width of the form", () => {
-    const html = renderToStaticMarkup(<LoginForm />);
-    expect(html).toMatch(/<span class="block w-full[^"]*"><span class="block w-full/);
-    expect(html).toMatch(/<button type="submit" data-auth-submit/);
+  it("the main button is the plain full-width submit, standing still under the pointer", () => {
+    for (const html of [renderToStaticMarkup(<LoginForm />), renderToStaticMarkup(<SignupForm />)]) {
+      expect(html).toMatch(/<button type="submit" data-auth-submit/);
+      // No magnetic wrapper: a full-width button sliding with the mouse is a moving target.
+      expect(html).not.toContain("will-change-transform");
+    }
   });
 });
 

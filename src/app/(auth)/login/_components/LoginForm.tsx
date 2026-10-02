@@ -5,7 +5,6 @@ import { PendingSubmit } from "../../_components/PendingSubmit";
 import { rememberEmail, restoreEmailInto } from "../../_components/remembered-email";
 import { useEffect, useRef } from "react";
 import { ArrowRight, Envelope, Lock } from "@phosphor-icons/react";
-import { Magnetic } from "../../../_components/landing/Magnetic";
 import { AuthBanner } from "../../_components/AuthCard";
 import { AuthField } from "../../_components/AuthField";
 import { loginAction, resendConfirmationAction } from "../actions";
@@ -13,10 +12,12 @@ import { loginAction, resendConfirmationAction } from "../actions";
 /**
  * Client-side form for /login.
  *
- * Owns the magnetic CTA wrap (the password's Show / Hide button lives in
- * <AuthField>). Submits to `loginAction` (server action defined in
- * `actions.ts`) — the same action that has been in production since the auth
- * flow shipped, with unchanged inputs (`email`, `password`, optional `next`).
+ * The password's Show / Hide button lives in <AuthField>. The main button
+ * stays still under the pointer (no magnetic effect): a full-width button that
+ * slid with the mouse was a moving target. Submits to `loginAction` (server
+ * action defined in `actions.ts`) — the same action that has been in
+ * production since the auth flow shipped, with unchanged inputs (`email`,
+ * `password`, optional `next`).
  *
  * Error/notice state is rendered by the parent server page from
  * `searchParams` so a failed action redirect lights up the right banner
@@ -82,11 +83,9 @@ export function LoginForm({ next, error, message, native = false }: Props) {
         toggleTestId="login-password-toggle"
       />
 
-      <Magnetic strength={0.18} fill>
-        <PendingSubmit data-testid="login-submit" pendingLabel="Signing in…">
-          Sign in <ArrowRight aria-hidden="true" size={22} weight="bold" />
-        </PendingSubmit>
-      </Magnetic>
+      <PendingSubmit data-testid="login-submit" pendingLabel="Signing in…">
+        Sign in <ArrowRight aria-hidden="true" size={22} weight="bold" />
+      </PendingSubmit>
 
       <div className="flex flex-col items-start">
         <Link href="/forgot-password" data-auth-link="quiet" data-testid="login-forgot">
