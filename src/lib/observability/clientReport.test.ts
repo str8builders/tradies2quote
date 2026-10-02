@@ -3,6 +3,7 @@ import { reportClientError } from "./clientReport";
 
 type StubOptions = {
   htmlClasses?: string[];
+  lang?: string;
   appleDataDetectors?: boolean;
   grammarly?: boolean;
   sendBeacon?: ((url: string, data: Blob) => boolean) | false;
@@ -11,7 +12,7 @@ type StubOptions = {
 function stubBrowser(opts: StubOptions = {}) {
   const classes = new Set(opts.htmlClasses ?? []);
   vi.stubGlobal("document", {
-    documentElement: { classList: { contains: (c: string) => classes.has(c) } },
+    documentElement: { lang: opts.lang ?? "en", classList: { contains: (c: string) => classes.has(c) } },
     querySelector: (sel: string) =>
       opts.appleDataDetectors && sel === "[x-apple-data-detectors]" ? {} : null,
     body: {
@@ -80,7 +81,17 @@ describe("reportClientError — page-rewrite flags", () => {
     const { sendBeacon } = stubBrowser();
     reportClientError(new Error("boom"), "error");
     const payload = await payloadFrom(sendBeacon as ReturnType<typeof vi.fn>);
-    expect(payload.flags).toEqual({ translated: false, appleDataDetectors: false, grammarly: false });
+    expect(payload.flags).toEqual({ translated: false, langChanged: false, appleDataDetectors: false, grammarly: false });
+  });
+
+  it("flag a page whose language was changed (Safari and Edge translate), but not an English variant", async () => {
+    for (const [lang, expected] of [["zh-CN", true], ["mi", true], ["fr", true], ["en", false], ["en-NZ", false], ["", false]] as const) {
+      const { sendBeacon } = stubBrowser({ lang });
+      reportClientError(new Error("boom"), "error");
+      const payload = await payloadFrom(sendBeacon as ReturnType<typeof vi.fn>);
+      expect([lang, payload.flags.langChanged]).toEqual([lang, expected]);
+      vi.unstubAllGlobals();
+    }
   });
 
   it("flag Chrome's translate rewrite", async () => {

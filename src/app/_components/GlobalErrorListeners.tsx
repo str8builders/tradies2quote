@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { reportClientError } from "@/lib/observability/clientReport";
+import { pageRewriteFlags, reportClientError, type PageRewriteFlags } from "@/lib/observability/clientReport";
 import { isStaleDeployError } from "@/lib/stale-deploy";
 import { maybeRecoverFromStaleDeploy } from "@/lib/staleDeploy";
 
@@ -31,6 +31,25 @@ export function isNoiseErrorEvent(event: {
   if (!event.error && OPAQUE_NOISE_PATTERN.test(event.message ?? "")) return true;
   if (event.filename && EXTENSION_URL_PATTERN.test(event.filename)) return true;
   return false;
+}
+
+// React's "server HTML didn't match the browser" errors (#418 text, #423, #425).
+const HYDRATION_PATTERN = /Minified React error #(?:418|423|425)\b|Hydration failed|hydrating/i;
+
+/**
+ * A hydration error on a page the visitor's own browser rewrote before React
+ * finished loading it (automatic translation, iOS data detectors, an
+ * extension). React recovers by drawing the page again and the visitor sees
+ * it correctly, and nothing in our code can stop their browser doing it, so
+ * it isn't reported. The same error on a page nothing rewrote is still ours
+ * to look at, and is reported.
+ */
+export function isRewrittenPageHydrationError(
+  message: string | null | undefined,
+  flags: PageRewriteFlags | undefined,
+): boolean {
+  if (!HYDRATION_PATTERN.test(message ?? "")) return false;
+  return Boolean(flags && (flags.translated || flags.langChanged || flags.appleDataDetectors || flags.grammarly));
 }
 
 /**
@@ -69,6 +88,7 @@ export function GlobalErrorListeners() {
 
     const onError = (event: ErrorEvent) => {
       if (isNoiseErrorEvent(event)) return;
+      if (isRewrittenPageHydrationError(event.error instanceof Error ? event.error.message : event.message, pageRewriteFlags())) return;
       const key = `e:${event.message}`;
       // A page from before the last deploy: it reloads itself below, and
       // there's nothing to fix, so it isn't reported.

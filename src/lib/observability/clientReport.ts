@@ -28,13 +28,24 @@ const MAX_STACK = 3500;
  * bug. See the root layout's `formatDetection` fix for the most common of
  * these (iOS Safari's own phone/date/email/address detection).
  */
-function pageRewriteFlags(): { translated: boolean; appleDataDetectors: boolean; grammarly: boolean } | undefined {
+export type PageRewriteFlags = {
+  translated: boolean;
+  /** The page's language changed from the English the server sent (a phone's translate feature does this). */
+  langChanged: boolean;
+  appleDataDetectors: boolean;
+  grammarly: boolean;
+};
+
+export function pageRewriteFlags(): PageRewriteFlags | undefined {
   try {
     if (typeof document === "undefined") return undefined;
     const html = document.documentElement;
+    const lang = typeof html.lang === "string" ? html.lang : "";
     return {
       // Chrome's built-in translate feature marks the page once it rewrites it.
       translated: html.classList.contains("translated-ltr") || html.classList.contains("translated-rtl"),
+      // Safari's and Edge's translate change the page's lang instead of adding a class.
+      langChanged: lang !== "" && !/^en(?:-|$)/i.test(lang),
       // iOS Safari's data detectors wrap matched text (phone/date/address/…) in these.
       appleDataDetectors: document.querySelector("[x-apple-data-detectors]") != null,
       // Grammarly's extension marks the body once it attaches.

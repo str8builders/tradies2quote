@@ -73,7 +73,7 @@ export interface ClientErrorReport {
   flags?: unknown;
 }
 
-const FLAG_KEYS = ["translated", "appleDataDetectors", "grammarly"] as const;
+const FLAG_KEYS = ["translated", "langChanged", "appleDataDetectors", "grammarly"] as const;
 
 /** Keeps only the known boolean flags; drops anything else (untrusted input). */
 function sanitizeFlags(raw: unknown): Record<string, boolean> | null {

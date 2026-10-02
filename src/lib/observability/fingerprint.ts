@@ -169,7 +169,14 @@ export function buildErrorRow(
       ? error
       : new Error(typeof error === "string" ? error : "Non-error thrown");
   const name = err.name || "Error";
-  const rawMessage = err.message || "";
+  // An AiError holds the provider's own explanation (clipped, secrets scrubbed
+  // when it was made), e.g. "invalid_request_error: output_config.format.schema:
+  // …". Logging only "bad request (HTTP 400)" left a 400 unexplainable, so it
+  // goes in the message. Only AiError: other errors' `detail` (a Postgres
+  // "Key (email)=(…) already exists") can hold customer values.
+  const detail = (err as Error & { detail?: unknown }).detail;
+  const aiDetail = name === "AiError" && typeof detail === "string" ? detail : "";
+  const rawMessage = [err.message || "", aiDetail].filter(Boolean).join(": ");
   const normalizedMessage = normalizeMessage(rawMessage);
   const frames = extractTopFrame(err.stack);
   const surface = ctx.surface ?? "api";

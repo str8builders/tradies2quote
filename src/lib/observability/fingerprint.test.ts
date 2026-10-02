@@ -107,3 +107,39 @@ describe("buildErrorRow — bounded, PII-free, groups repeats", () => {
     expect(r.request_id).toBe("vrcl-1");
   });
 });
+
+describe("buildErrorRow — what the provider said", () => {
+  it("an AI error's own explanation is in the logged message, so a 400 isn't a mystery", async () => {
+    const { AiError } = await import("@/lib/ai/errors");
+    const e = new AiError({
+      kind: "bad_request",
+      provider: "anthropic",
+      status: 400,
+      detail: "invalid_request_error: output_config.format.schema: Schema is too complex for compilation",
+    });
+    const r = buildErrorRow(e, { route: "plansets/interpret" });
+    expect(r.message).toBe("Anthropic bad request (HTTP 400): invalid_request_error: output_config.format.schema: Schema is too complex for compilation");
+    expect(r.title).toContain("Schema is too complex");
+  });
+
+  it("a different explanation is a different group, the same one with other numbers is the same", async () => {
+    const { AiError } = await import("@/lib/ai/errors");
+    const make = (detail: string) => buildErrorRow(new AiError({ kind: "bad_request", provider: "anthropic", status: 400, detail }), { route: "plansets/interpret" });
+    expect(make("invalid_request_error: prompt is too long: 213456 tokens > 200000 maximum").fingerprint).toBe(
+      make("invalid_request_error: prompt is too long: 201111 tokens > 200000 maximum").fingerprint,
+    );
+    expect(make("invalid_request_error: prompt is too long: 213456 tokens > 200000 maximum").fingerprint).not.toBe(
+      make("invalid_request_error: fallbacks: Extra inputs are not permitted").fingerprint,
+    );
+  });
+
+  it("never copies another kind of error's detail (a database error's can hold customer values)", () => {
+    const e = Object.assign(new Error("duplicate key value violates unique constraint"), {
+      detail: "Key (email)=(sam@example.invalid) already exists.",
+    });
+    const r = buildErrorRow(e, { route: "r" });
+    expect(r.message).toBe("duplicate key value violates unique constraint");
+    expect(JSON.stringify(r)).not.toContain("sam@");
+  });
+});
+
