@@ -1,15 +1,26 @@
 import "server-only";
 import { adminClient } from "@/lib/supabase/admin";
 import { tryStripe } from "@/lib/stripe-client";
+import { isOwnerEmail } from "@/lib/owner";
+import { isCompedEmail } from "@/lib/reviewer";
+import {
+  EMPTY_ACTIVATION,
+  buildActivation,
+  type ActivationQuote,
+  type ActivationSection,
+  type ActivationUser,
+} from "./activation";
 import { buildConnectorCards, type ConnectorCard } from "./connectors";
 
 /**
  * Admin overview — the single aggregate the owner Ops dashboard reads.
  *
- * Three sections:
+ * Four sections:
  *   • money   — Stripe truth (revenue, subs, balance, recent payments)
  *   • growth  — our own Supabase DB truth (users, trials, the
  *               "expiring soon" running-out feed, quote volume)
+ *   • activation — how far each sign-up got, and who stopped where
+ *               (see activation.ts)
  *   • connectors — per-service health + budget (see connectors.ts)
  *
  * Every external call is wrapped so one failing provider degrades its
@@ -73,15 +84,24 @@ export interface AdminOverview {
   generatedAt: string;
   money: MoneySection;
   growth: GrowthSection;
+  activation: ActivationSection;
   connectors: ConnectorCard[];
+}
+
+type UserRow = ActivationUser;
+
+/** Run once, however many sections ask: growth and activation share the user list. */
+function once<T>(fn: () => Promise<T>): () => Promise<T> {
+  let started: Promise<T> | undefined;
+  return () => (started ??= fn());
 }
 
 /** Pull every auth user (paginated). Founder MVP fits one page; we loop
  *  for safety so it keeps working as the base grows. */
 async function listAllUsers(
   admin: ReturnType<typeof adminClient>,
-): Promise<{ id: string; email: string | null; createdAt: Date }[]> {
-  const out: { id: string; email: string | null; createdAt: Date }[] = [];
+): Promise<UserRow[]> {
+  const out: UserRow[] = [];
   let page = 1;
   const perPage = 1000;
   // Hard stop at 20 pages (20k users) so a pagination bug can't loop forever.
@@ -101,7 +121,7 @@ async function listAllUsers(
   return out;
 }
 
-async function buildGrowth(now: Date): Promise<GrowthSection> {
+async function buildGrowth(now: Date, users: () => Promise<UserRow[]>): Promise<GrowthSection> {
   const empty: GrowthSection = {
     totalUsers: 0,
     newUsers7d: 0,
@@ -116,8 +136,8 @@ async function buildGrowth(now: Date): Promise<GrowthSection> {
   try {
     const admin = adminClient();
 
-    const [users, profileRes, subRes] = await Promise.all([
-      listAllUsers(admin),
+    const [userRows, profileRes, subRes] = await Promise.all([
+      users(),
       // trial_started_at is the Wave 39 reset anchor; not in generated
       // types, so the select is cast and the rows narrowed by hand.
       admin.from("profiles").select("id, trial_started_at" as never),
@@ -147,7 +167,7 @@ async function buildGrowth(now: Date): Promise<GrowthSection> {
     let inTrial = 0;
     const expiringSoon: ExpiringTrial[] = [];
 
-    for (const u of users) {
+    for (const u of userRows) {
       const created = u.createdAt.getTime();
       if (created >= sevenDaysAgo) newUsers7d += 1;
       if (created >= thirtyDaysAgo) newUsers30d += 1;
@@ -190,7 +210,7 @@ async function buildGrowth(now: Date): Promise<GrowthSection> {
     ]);
 
     return {
-      totalUsers: users.length,
+      totalUsers: userRows.length,
       newUsers7d,
       newUsers30d,
       inTrial,
@@ -204,6 +224,50 @@ async function buildGrowth(now: Date): Promise<GrowthSection> {
     return {
       ...empty,
       error: err instanceof Error ? err.message : "Growth metrics failed.",
+    };
+  }
+}
+
+/** Every live quote's owner and progress (paginated, like the users). */
+async function listActivationQuotes(admin: ReturnType<typeof adminClient>): Promise<ActivationQuote[]> {
+  const out: ActivationQuote[] = [];
+  const pageSize = 1000;
+  // Hard stop at 20 pages (20k quotes) so a pagination bug can't loop forever.
+  for (let page = 0; page < 20; page += 1) {
+    const { data, error } = await admin
+      .from("quotes")
+      .select("user_id, status, created_at, sent_at, accepted_at")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: true })
+      .range(page * pageSize, page * pageSize + pageSize - 1);
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as unknown as ActivationQuote[];
+    out.push(...rows);
+    if (rows.length < pageSize) break;
+  }
+  return out;
+}
+
+async function buildActivationSection(users: () => Promise<UserRow[]>, now: Date): Promise<ActivationSection> {
+  try {
+    const admin = adminClient();
+    const [userRows, profileRes, quotes] = await Promise.all([
+      users(),
+      admin.from("profiles").select("id, business_name"),
+      listActivationQuotes(admin),
+    ]);
+    if (profileRes.error) throw new Error(profileRes.error.message);
+    return buildActivation({
+      users: userRows,
+      profiles: profileRes.data ?? [],
+      quotes,
+      now,
+      isInternal: (email) => isOwnerEmail(email) || isCompedEmail(email),
+    });
+  } catch (err) {
+    return {
+      ...EMPTY_ACTIVATION,
+      error: err instanceof Error ? err.message : "Activation metrics failed.",
     };
   }
 }
@@ -296,18 +360,21 @@ async function buildMoney(): Promise<MoneySection> {
   return base;
 }
 
-/** Build the whole overview. All three sections run in parallel. */
+/** Build the whole overview. All four sections run in parallel. */
 export async function buildAdminOverview(): Promise<AdminOverview> {
   const now = new Date();
-  const [money, growth, connectors] = await Promise.all([
+  const users = once(() => listAllUsers(adminClient()));
+  const [money, growth, activation, connectors] = await Promise.all([
     buildMoney(),
-    buildGrowth(now),
+    buildGrowth(now, users),
+    buildActivationSection(users, now),
     buildConnectorCards(),
   ]);
   return {
     generatedAt: now.toISOString(),
     money,
     growth,
+    activation,
     connectors,
   };
 }

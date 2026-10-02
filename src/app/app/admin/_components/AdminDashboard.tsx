@@ -8,6 +8,7 @@ import {
   ArrowSquareOut,
   CheckCircle,
   CurrencyDollar,
+  Funnel,
   Plugs,
   TrendUp,
   Warning,
@@ -15,6 +16,7 @@ import {
 } from "@phosphor-icons/react";
 import type { AdminOverview } from "@/lib/admin/overview";
 import type { ConnectorCard } from "@/lib/admin/connectors";
+import { ActivationPanel } from "./ActivationPanel";
 
 /**
  * Owner Ops dashboard — client shell.
@@ -113,7 +115,7 @@ export function AdminDashboard({ initial }: Props) {
     };
   }, [refresh]);
 
-  const { money: m, growth: g, connectors } = data;
+  const { money: m, growth: g, activation, connectors } = data;
 
   return (
     <div className="space-y-10">
@@ -279,6 +281,12 @@ export function AdminDashboard({ initial }: Props) {
             </div>
           </>
         )}
+      </section>
+
+      {/* ── ACTIVATION ─────────────────────────────────────────── */}
+      <section data-testid="activation-section">
+        <SectionHeader icon={Funnel} title="Activation" tint="hivis" />
+        <ActivationPanel activation={activation} />
       </section>
 
       {/* ── CONNECTORS ─────────────────────────────────────────── */}
