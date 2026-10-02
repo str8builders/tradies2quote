@@ -102,6 +102,12 @@ describe("the job-site story is complete as plain HTML (search, screen readers, 
   it("answers every FAQ and keeps the FAQ search data", () => {
     for (const item of FAQS) expect(text).toContain(item.q);
     expect(html).toContain('"@type":"FAQPage"');
+  });
+
+  it("tells Google the site's name and logo, so results show Tradies2Quote and its icon", () => {
+    expect(html).toContain('"@type":"WebSite","@id":"https://tradies2quote.com/#website","name":"Tradies2Quote"');
+    expect(html).toContain('"logo":"https://tradies2quote.com/icon-512.png"');
+    expect(existsSync(join(process.cwd(), "public", "icon-512.png"))).toBe(true);
     expect(text).toContain("support@tradies2quote.com");
   });
 

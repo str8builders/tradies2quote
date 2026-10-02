@@ -9,7 +9,7 @@ import { Footer } from "../landing/Footer";
 import { AppStoreBadge } from "../AppStoreBadge";
 import { Logo } from "../landing/Logo";
 import { WorkflowExample } from "../landing/WorkflowExample";
-import { faqPageLd, softwareApplicationLd } from "../landing/structured-data";
+import { brandLd, faqPageLd, softwareApplicationLd } from "../landing/structured-data";
 import { DemoButton } from "./DemoButton";
 import { HouseWalk } from "./HouseWalk";
 import { JobSiteExperience } from "./JobSiteExperience";
@@ -229,6 +229,7 @@ export function JobSiteStory({ nativeShell }: { nativeShell: boolean }) {
 
       {nativeShell ? null : (
         <>
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(brandLd) }} />
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplicationLd) }} />
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqPageLd(FAQS)) }} />
         </>
