@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { followupsEnabled, reviewsEnabled } from "@/lib/engagement";
 import { createClient } from "@/lib/supabase/server";
+import { isNativeShellRequest } from "@/lib/native-shell";
 import { isNewLookOn } from "@/lib/ui/newLook";
 import { LEGACY_SETTINGS_HREF, SETTINGS_PATHS } from "../_newlook/hub";
 import { loadSettings } from "../_newlook/load";
@@ -53,7 +54,7 @@ export default async function RatesSettingsPage() {
     );
   }
   const profile = settings.profile;
-  const engagement = await loadEngagement(settings.user.id);
+  const [engagement, inApp] = await Promise.all([loadEngagement(settings.user.id), isNativeShellRequest()]);
   return (
     <SettingsScreen title="Rates and quotes" saveBar testId="settings-rates">
       <RatesForm
@@ -66,6 +67,7 @@ export default async function RatesSettingsPage() {
             appUrl={process.env.NEXT_PUBLIC_APP_URL ?? "https://tradies2quote.com"}
             hasBusinessName={Boolean(profile?.business_name?.trim())}
             hasLogo={Boolean(profile?.logo_url && /^https:\/\//i.test(profile.logo_url))}
+            inApp={inApp}
           />
         }
       />

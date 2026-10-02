@@ -19,6 +19,7 @@ import { SectionTitle } from "@/components/ui/section-title";
 import { useToast } from "@/components/ui/toast";
 import { STICKER_PATH } from "@/app/print/_lib/sticker";
 import { QR_CODE_PATH } from "../../_v2/lib/app-nav";
+import { ShareQrButton } from "../../qr-code/_components/ShareQrButton";
 import {
   disableQuoteRequestLink,
   enableQuoteRequestLink,
@@ -35,17 +36,25 @@ export function requestLinkUrl(appUrl: string, slug: string | null): string | nu
 /**
  * "Your request link" and its QR code, on the existing request-link actions:
  * turn on, get a new link (old QR codes stop working), turn off.
+ *
+ * In the iPhone app a web page can't print or download (WKWebView ignores
+ * both), so there the poster, sticker and download buttons give way to one
+ * Share button that hands the code to the share sheet (Print, Save Image,
+ * AirDrop), as the Your QR code page does.
  */
 export function RequestLinkCard({
   initialSlug,
   appUrl,
   hasBusinessName,
   hasLogo,
+  inApp = false,
 }: {
   initialSlug: string | null;
   appUrl: string;
   hasBusinessName: boolean;
   hasLogo: boolean;
+  /** The iPhone app (isNativeShellRequest on the server). */
+  inApp?: boolean;
 }) {
   const toast = useToast();
   const [slug, setSlug] = useState<string | null>(initialSlug);
@@ -140,57 +149,68 @@ export function RequestLinkCard({
             </p>
           </div>
 
-          <div className="space-y-2">
-            <ButtonLink
-              href="/print/request-poster"
-              variant="secondary"
-              fullWidth
-              icon={<Printer weight="bold" />}
-              data-testid="request-poster-link"
-            >
-              Print a poster
-            </ButtonLink>
-            <ButtonLink
-              href={STICKER_PATH}
-              variant="secondary"
-              fullWidth
-              icon={<Truck weight="bold" />}
-              data-testid="request-sticker-link"
-            >
-              Print van stickers
-            </ButtonLink>
-            <div className="grid grid-cols-2 gap-2">
-              <a
-                href={`/api/account/request-qr?download=1&format=png&size=1024${hasLogo ? "&logo=1" : ""}`}
-                data-testid="request-qr-png"
-                className={buttonClasses({ variant: "ghost" })}
-              >
-                <DownloadSimple aria-hidden="true" weight="bold" className="text-[1.15em]" />
-                <span>QR as PNG</span>
-              </a>
-              <a
-                href="/api/account/request-qr?download=1"
-                data-testid="request-qr-svg"
-                className={buttonClasses({ variant: "ghost" })}
-              >
-                <DownloadSimple aria-hidden="true" weight="bold" className="text-[1.15em]" />
-                <span>QR as SVG</span>
-              </a>
+          {inApp ? (
+            <div className="space-y-2" data-testid="request-qr-in-app">
+              <ShareQrButton href={`/api/account/request-qr?format=png&size=1024${hasLogo ? "&logo=1" : ""}`} />
+              <p className="text-ui-sm text-ui-muted">
+                Send the code to yourself or your sign-writer, or print it from the share sheet. The van sticker sheet
+                and the poster print from a computer or your phone&apos;s browser: sign in at tradies2quote.com and
+                open Your QR code.
+              </p>
             </div>
-            <p className="text-ui-sm text-ui-muted">
-              PNG for social posts and email, SVG for a sign writer.{" "}
-              {hasLogo ? (
-                "Your logo sits in the middle of the poster code and the PNG."
-              ) : (
-                <>
-                  <Link href={SETTINGS_PATHS.business} className="font-semibold text-ui-brand-text underline">
-                    Add your logo
-                  </Link>{" "}
-                  and it goes on the poster and in the middle of the code.
-                </>
-              )}
-            </p>
-          </div>
+          ) : (
+            <div className="space-y-2">
+              <ButtonLink
+                href="/print/request-poster"
+                variant="secondary"
+                fullWidth
+                icon={<Printer weight="bold" />}
+                data-testid="request-poster-link"
+              >
+                Print a poster
+              </ButtonLink>
+              <ButtonLink
+                href={STICKER_PATH}
+                variant="secondary"
+                fullWidth
+                icon={<Truck weight="bold" />}
+                data-testid="request-sticker-link"
+              >
+                Print van stickers
+              </ButtonLink>
+              <div className="grid grid-cols-2 gap-2">
+                <a
+                  href={`/api/account/request-qr?download=1&format=png&size=1024${hasLogo ? "&logo=1" : ""}`}
+                  data-testid="request-qr-png"
+                  className={buttonClasses({ variant: "ghost" })}
+                >
+                  <DownloadSimple aria-hidden="true" weight="bold" className="text-[1.15em]" />
+                  <span>QR as PNG</span>
+                </a>
+                <a
+                  href="/api/account/request-qr?download=1"
+                  data-testid="request-qr-svg"
+                  className={buttonClasses({ variant: "ghost" })}
+                >
+                  <DownloadSimple aria-hidden="true" weight="bold" className="text-[1.15em]" />
+                  <span>QR as SVG</span>
+                </a>
+              </div>
+              <p className="text-ui-sm text-ui-muted">
+                PNG for social posts and email, SVG for a sign writer.{" "}
+                {hasLogo ? (
+                  "Your logo sits in the middle of the poster code and the PNG."
+                ) : (
+                  <>
+                    <Link href={SETTINGS_PATHS.business} className="font-semibold text-ui-brand-text underline">
+                      Add your logo
+                    </Link>{" "}
+                    and it goes on the poster and in the middle of the code.
+                  </>
+                )}
+              </p>
+            </div>
+          )}
 
           <div className="space-y-2 border-t border-ui-line pt-4">
             <ButtonLink href="/app/requests" variant="ghost" fullWidth icon={<Tray weight="bold" />}>

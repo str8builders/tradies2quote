@@ -216,6 +216,25 @@ describe("Your request link", () => {
     expect(out).toContain("Turn the link off");
   });
 
+  it("in the iPhone app: one share button, none of the print or download buttons that can't work there", () => {
+    const out = withToasts(
+      <RequestLinkCard initialSlug="bayside-builders" appUrl="https://tradies2quote.com" hasBusinessName hasLogo inApp />,
+    );
+    // The link, the code and the guide stay.
+    expect(out).toContain("https://tradies2quote.com/r/bayside-builders");
+    expect(out).toContain('src="/api/account/request-qr?v=bayside-builders"');
+    expect(tagWith(out, 'data-testid="request-qr-guide"')).toContain('href="/app/qr-code"');
+    // WKWebView ignores window.print and file downloads, so they'd do nothing.
+    expect(out).toContain('data-testid="qr-share"');
+    expect(out).toContain("Share or print the QR code");
+    expect(out).not.toContain("request-poster-link");
+    expect(out).not.toContain("request-sticker-link");
+    expect(out).not.toContain("request-qr-png");
+    expect(out).not.toContain("request-qr-svg");
+    expect(out).not.toContain("download=1");
+    expect(out).not.toContain("/print/");
+  });
+
   it("off, with no business name yet: points to Business details first", () => {
     const out = withToasts(
       <RequestLinkCard initialSlug={null} appUrl="https://tradies2quote.com" hasBusinessName={false} hasLogo={false} />,

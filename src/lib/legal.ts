@@ -57,6 +57,6 @@ export const LEGAL: LegalConfig = {
   lastUpdatedDisplay: "18 July 2026",
   // Cookies section: names the UptimeWatch analytics host and what it
   // collects, and points at the footer's "Cookie settings" withdrawal control.
-  privacyLastUpdated: "2026-09-28",
-  privacyLastUpdatedDisplay: "28 September 2026",
+  privacyLastUpdated: "2026-10-02",
+  privacyLastUpdatedDisplay: "2 October 2026",
 };

@@ -206,6 +206,12 @@ export default function PrivacyPage() {
               adds to a quote request, are described by OpenAI.
             </li>
             <li>
+              <strong>Whole plan sets</strong> — if you upload a full set of
+              plans (a PDF, or photos of the pages), each page and the text
+              printed on it are sent to Anthropic&apos;s Claude to find the
+              sheets, schedules and notes it needs.
+            </li>
+            <li>
               <strong>Customer quote chat</strong> — when your client uses
               the chat on their quote page, their messages are answered by
               Anthropic&apos;s Claude. The chat is clearly labelled as AI, the
@@ -224,7 +230,9 @@ export default function PrivacyPage() {
             deleted when you delete the quote or close your account. Plan and
             site images you attach are stored with your account so your quotes
             keep their source documents; delete the quote (or your account) and
-            they go with it.
+            they go with it. A plan set you upload, and what was read from it,
+            stays with your account so you can come back to it; delete the plan
+            set (or your account) and it goes.
           </p>
         </LegalSection>
 

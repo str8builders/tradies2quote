@@ -323,14 +323,15 @@ const SECTIONS: ReadonlyArray<Section> = [
   },
   {
     id: "customer-chat",
-    title: "T2Q chat inside every quote",
+    title: "Questions from your client, answered on the quote",
     icon: ChatCircle,
     intro: (
       <>
         <p>
-          When the customer opens the quote link, they see an orange chat
-          bubble bottom-right. Tap it → a T2Q assistant that knows the
-          exact quote answers their questions in seconds:{" "}
+          When the customer opens the quote link, they see an orange
+          &ldquo;Ask about this quote&rdquo; button bottom-right. Tap it → an
+          assistant for your business that knows the exact quote answers their
+          questions in seconds:{" "}
           <em>&ldquo;what does line 3 mean?&rdquo;</em>,{" "}
           <em>&ldquo;can we use cheaper insulation?&rdquo;</em>,{" "}
           <em>&ldquo;when can you start?&rdquo;</em>.
@@ -341,7 +342,7 @@ const SECTIONS: ReadonlyArray<Section> = [
       {
         label: "Customer asks anything",
         body:
-          "T2Q uses the actual line items, totals, and your terms — never invents prices or warranties.",
+          "The assistant uses the actual line items, totals, and your terms — never invents prices or warranties.",
       },
       {
         label: "T2Q flags actionable items for you",
@@ -599,9 +600,9 @@ const SECTIONS: ReadonlyArray<Section> = [
           "Big green button. Tap → sign their name on a signature pad → tap Accept. Quote status flips to Accepted instantly and you get a quote_event logged.",
       },
       {
-        label: "Chat bubble",
+        label: "Ask about this quote",
         body:
-          "Bottom-right corner. T2Q assistant for asking questions. See the 'T2Q chat inside every quote' section above.",
+          "Bottom-right corner. The assistant for asking questions. See the 'Questions from your client, answered on the quote' section above.",
       },
       {
         label: "PDF download",
@@ -610,8 +611,8 @@ const SECTIONS: ReadonlyArray<Section> = [
       },
     ],
     tips: [
-      "The public quote view is the customer-facing surface. The Install button, your in-app navigation, and any owner-only features are all hidden — customers only see the quote.",
-      "Once a quote is accepted, the public view switches to an 'Accepted' view with the signed name and date. The chat bubble disappears.",
+      "The public quote view is the customer-facing surface. Your in-app navigation and any owner-only features are all hidden — customers only see the quote.",
+      "Once a quote is accepted, the public view switches to an 'Accepted' view with the signed name and date. The 'Ask about this quote' button disappears.",
     ],
   },
   {

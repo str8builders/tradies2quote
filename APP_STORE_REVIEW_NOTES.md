@@ -1,4 +1,4 @@
-# App Store Connect — submission pack (updated 2026-09-26)
+# App Store Connect — submission pack (updated 2026-10-02)
 
 Everything to enter in App Store Connect, in one place. The review notes
 block is the important part: login-gated apps get rejected fastest for "we
@@ -29,27 +29,27 @@ setting and AI consent off so the reviewer sees both consent flows.
 
 ```
 SIGN IN
-Use the demo account in the Sign-in fields (demo@tradies2quote.com). It is a New Zealand builder's account with data on every screen: jobs at each stage, an invoice, three clients with job sites, a price list and a week of timesheet hours.
+Use the demo account in the Sign-in fields (demo@tradies2quote.com): a New Zealand builder's account with data on every screen (jobs at each stage, an invoice, three clients with job sites, a price list, a week of timesheet hours).
 
 WHAT IT IS
 Tradies2Quote helps tradespeople quote, invoice and keep a timesheet. Describe a job by voice, typing or a photo of a plan; AI drafts the quote (materials, labour, GST) to check and send.
 
 GETTING AROUND
-Tabs: Home, Jobs, New (+), Prices, Timesheet. Your photo (top left) opens the menu: Your profile, Business details, Rates and quotes, Payments, Your QR code, Clients, Calendar, Team, Help, Take the tour, Send feedback, Privacy policy, Terms, Outdoor mode, Sign out. The weather (top right) opens "Weather impact". A short tour runs on first sign-in (replay: photo > Take the tour).
+Tabs: Home, Jobs, New (+), Prices, Timesheet. Your photo (top left) opens the menu: Your profile, Business details, Rates and quotes, Payments, Your QR code, Clients, Calendar, Team, Help, Take the tour, Send feedback, Privacy policy, Terms, Outdoor mode, Sign out. The weather (top right) opens "Weather impact". Team and Terms templates are team-plan features, off on this account. A short tour runs on first sign-in.
 
 TRY IT
 1. Jobs: open a job. More tools (the ... button) > "Download the PDF" opens the iOS share sheet (Save to Files, Mail).
 2. New (+): the AI consent screen first (below). Then Talk (microphone prompt), Type, or Photo of a plan (camera or photo library) > Write my quote.
 3. Prices: "Scan a supplier quote" (photo or PDF) and "Import a price list" (CSV, Excel, PDF or photo) read prices into the list.
-4. Timesheet: tap the Last week arrow for a week of hours across three clients. "Job location" on a day shows the site on a map, with where work started and finished. "Invoice this week" bills a client's hours.
+4. Timesheet: tap the Last week arrow for a week of hours across three clients. "Job location" on a day shows the site on a map. "Invoice this week" bills a client's hours.
 5. Start work, wait a minute or more, then Finish work (set Break to None). The hours land on today.
-6. Location: the gear on the Start work card. The sheet says what is kept. Turn on "Use my location for work" > Save: iOS asks for While Using. Turn on "Automatic clock-in at jobs" > Save: iOS asks for Always. The demo's job sites are in Tauranga, NZ, so arrival notifications ("Arrived at the Hemi Walker job") only fire there.
+6. Location: the gear on the Start work card. The sheet says what is kept. Turn on "Use my location for work" > Save: iOS asks for While Using. Turn on "Automatic clock-in at jobs" > Save: iOS asks for Always. The demo's job sites are in Tauranga, NZ, so arrival notifications only fire there.
 7. Weather (top right) > "Use my location": iOS asks for While Using.
 8. Photo > Your QR code: the code clients scan to send a job request. Share opens the iOS share sheet (Print, Save Image, AirDrop).
-9. Delete account: photo > Your profile > "Delete my account" (bottom) > type DELETE > "Delete forever". You land on the sign-in screen ("Your account has been deleted."). The demo account is only signed out, so you can sign in again.
+9. Delete account: photo > Your profile > "Delete my account" (bottom) > type DELETE > "Delete forever". You land on the sign-in screen. The demo account is only signed out, so you can sign in again.
 
 LOCATION
-Off until the person turns it on in the Timesheet. No background location mode is used. Automatic clock-in uses iOS region monitoring (up to 18 job sites) and acts only in the person's work hours. Travel kilometres: precise updates while the app is open; iOS significant-change updates in the background, only while clocked in with Always. Route points are deleted after 90 days. Weather rounds the location to about 1 km and doesn't save it.
+Off until the person turns it on in the Timesheet. No background location mode. Automatic clock-in uses iOS region monitoring (up to 18 job sites), only in the person's work hours. Travel kilometres: precise updates while the app is open; significant-change updates in the background, only while clocked in with Always. Route points are deleted after 90 days. Weather rounds the location to about 1 km and doesn't save it.
 
 AI CONSENT (5.1.2(i))
 Before anything is sent to AI the app names the providers (Anthropic, OpenAI) and asks: "I agree — continue" or "Not now". Until then the server refuses AI requests from the app. Withdraw any time: Your profile > AI features.
@@ -58,10 +58,10 @@ BUSINESS MODEL (3.1.3(f))
 The app is free: no in-app purchases, prices, plans, trials, upgrade prompts or purchase links. The server recognises the app and leaves them out of every page it sends.
 
 NATIVE FEATURES
-Location module (job-site arrival and leaving notifications, travel kilometres while clocked in); push notifications (Your profile > Quote notifications); share sheet and Files for PDFs; offline screen; microphone and camera.
+Location module (job-site arrival and leaving notifications, travel kilometres while clocked in); push notifications (Your profile > Quote notifications); share sheet and Files; offline screen; microphone and camera.
 
 PRIVACY
-Photo menu > Privacy policy and Terms (also on the sign-in and sign-up screens). No analytics or tracking, no cookie banner: essential cookies only.
+Photo menu > Privacy policy and Terms (also on the sign-in and sign-up screens). No advertising, analytics tools, tracking or cookie banner. The app keeps the person's own quote history and AI-run log to run the service (declared as Product Interaction).
 
 CUSTOMER CHAT (1.2)
 On a sent job, More tools > Customer chat: the client's AI chat about the quote, labelled as AI. Both sides go through a content filter; "Report chat" (reviewed within 24 hours) and "Turn chat off" are there.
@@ -110,6 +110,7 @@ Data collection: **Yes**, all linked to identity except crash data, **none used 
 | User Content → Audio Data | Yes | Yes | No | App Functionality |
 | User Content → Photos or Videos | Yes | Yes | No | App Functionality |
 | User Content → Other User Content (quotes, timesheet hours) | Yes | Yes | No | App Functionality |
+| Usage Data → Product Interaction (quote history, the log of AI runs: "quote generated", "PDF exported") | Yes | Yes | No | App Functionality |
 | Identifiers → User ID | Yes | Yes | No | App Functionality |
 | Location → Precise Location | Yes | **Yes** (only if the person turns location on: where they start and finish work, and their route while clocked in; route points deleted after 90 days) | No | App Functionality |
 | Diagnostics → Crash Data (our own error reports: scrubbed, no account ID) | Yes | **No** | No | App Functionality |
@@ -125,7 +126,21 @@ ads; the website's opt-in analytics script never loads in the app).
 
 ---
 
-## 4. Archive-day checklist (after the Apple Developer membership lands)
+## 4. Order of work (written 2026-10-02)
+
+Only the owner can do the first two; everything after them waits on them.
+
+**A. Today, owner:**
+1. Enrol in the Apple Developer Program (US$99/yr): Apple Developer app on the iPhone, or developer.apple.com/programs/enroll. A sole trader enrols as an Individual (usually about 2 days; the seller name shows as the person's own name). A registered company enrols as an Organization and needs a D-U-N-S number first (weeks). Free-app agreement only: no banking or tax forms.
+2. Make the review account: sign up demo@tradies2quote.com on tradies2quote.com (or in the app) with a password the owner chooses and keeps only for App Store Connect. If the sign-up asks for an email confirmation, the demo@ address must be able to receive it (set up a forward first). Then run the seed in section 1 on the VPS.
+3. Phone test copy: free-team builds stop opening after 7 days. Re-add the Apple ID in Xcode (Settings → Accounts) and run the app on the phone again.
+
+**B. When Apple approves the enrolment, owner and Claude:**
+4. App Store Connect → My Apps → New app (bundle com.str8builders.tradies2quote), then section 2 below.
+5. Developer portal → Keys: create an APNs key (.p8). Put APNS_TEAM_ID, APNS_KEY_ID, APNS_PRIVATE_KEY in /srv/t2q/app.env and restart (push goes live, so the native-features list in the notes is true).
+6. Archive-day checklist below.
+
+## 4b. Archive-day checklist (after the Apple Developer membership lands)
 
 1. Xcode → Signing: select the team (automatic signing).
 2. APNs: create the key (.p8) in the developer portal → put APNS_TEAM_ID /
