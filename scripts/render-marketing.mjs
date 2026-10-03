@@ -29,9 +29,11 @@
  *   npm run render:marketing -- --only=full-tour --props='{"voiceoverSrc":"./voice/full-tour.m4a"}'
  *   npm run render:marketing -- --only=social --props='{"voiceoverSrc":"./voice/social-15s.m4a"}'
  *
- * The sharing MP4s in marketing-media/ then carry the voice. The website
- * videos stay muted (they autoplay silently), so re-rendering them with a
- * voiceover changes nothing on the site.
+ * The sharing MP4s in marketing-media/ then carry the voice. The homepage
+ * demo (demo-wide, demo-tall) is the exception: it is narrated, with its
+ * voiceover made by scripts/make-demo-voiceover.mjs and picked up
+ * automatically, and its website copies keep the sound (AAC in the MP4,
+ * Opus in the WebM). The other website videos stay silent.
  *
  * Fonts come from Google Fonts at render time (@remotion/google-fonts), so a
  * render needs network access; it fails instead of falling back to system
@@ -62,24 +64,41 @@ const VIDEOS = "public/videos";
 const IMAGES = "public/images/marketing";
 const SHARE = "marketing-media";
 
+/** The homepage demo's narration (scripts/make-demo-voiceover.mjs). */
+const DEMO_VOICEOVER = "src/remotion/marketing/media/demo-voiceover.m4a";
 /**
- * What each target renders. Poster frames point at the end of the "Draft
- * builds itself" chapter (frames 180-359 in DEMO_TIMELINE), where the quote
- * total and the caption are both on screen; the hero poster is frame 0 so
- * playback starts without a jump.
+ * The demo's chapter lengths come from its narration, so its poster frame is
+ * worked out from the measured timing: half a second before the end of
+ * "Draft builds itself", where the quote and its total are on screen.
+ */
+const { VOICEOVER_TIMING } = await import(path.join(ROOT, "src/remotion/demo-voiceover-timing.ts"));
+const DEMO_POSTER_FRAME = (() => {
+  let seconds = 0;
+  for (const chapter of VOICEOVER_TIMING.chapters) {
+    seconds += chapter.seconds;
+    if (chapter.id === "draft") return Math.round((seconds - 0.5) * 30);
+  }
+  throw new Error("the demo voiceover has no draft chapter");
+})();
+
+/**
+ * What each target renders. The hero poster is frame 0 so playback starts
+ * without a jump.
  */
 const TARGETS = {
   "demo-wide": {
     composition: "DemoWide",
     web: { name: "demo-wide", mp4Crf: 30, webmCrf: 42, gop: 90 },
     share: "demo-wide.mp4",
-    poster: { file: "poster-demo-wide.webp", frame: 348, maxBytes: 160_000 },
+    poster: { file: "poster-demo-wide.webp", frame: DEMO_POSTER_FRAME, maxBytes: 160_000 },
+    voiceover: DEMO_VOICEOVER,
   },
   "demo-tall": {
     composition: "DemoTall",
     web: { name: "demo-tall", mp4Crf: 30, webmCrf: 42, gop: 90 },
     share: "demo-tall.mp4",
-    poster: { file: "poster-demo-tall.webp", frame: 348, maxBytes: 160_000 },
+    poster: { file: "poster-demo-tall.webp", frame: DEMO_POSTER_FRAME, maxBytes: 160_000 },
+    voiceover: DEMO_VOICEOVER,
   },
   "hero-loop": {
     composition: "HeroLoop",
@@ -223,17 +242,29 @@ async function main() {
   const publicDir = path.join(tmp, "public");
   fs.mkdirSync(publicDir, { recursive: true });
 
-  // A local voiceover file is copied next to the bundle and referenced by name.
-  const inputProps = { ...args.props };
-  if (typeof inputProps.voiceoverSrc === "string" && !/^(https?:|data:|blob:)/.test(inputProps.voiceoverSrc)) {
-    const source = path.resolve(process.cwd(), inputProps.voiceoverSrc);
-    if (!fs.existsSync(source)) throw new Error(`voiceoverSrc not found: ${source}`);
-    const name = `voiceover${path.extname(source) || ".m4a"}`;
+  // A local voiceover file is copied next to the bundle and referenced by
+  // name. --props wins; otherwise a target's own narration (the demo) is used.
+  const copied = new Map();
+  const localVoice = (src) => {
+    if (/^(https?:|data:|blob:)/.test(src)) return src;
+    const source = path.resolve(src.startsWith("./") || path.isAbsolute(src) ? process.cwd() : ROOT, src);
+    if (copied.has(source)) return copied.get(source);
+    if (!fs.existsSync(source)) throw new Error(`voiceover not found: ${source}`);
+    const name = `voiceover-${copied.size}${path.extname(source) || ".m4a"}`;
     fs.copyFileSync(source, path.join(publicDir, name));
-    inputProps.voiceoverSrc = name;
-    log("voiceover:", source);
-  }
-  const hasVoice = typeof inputProps.voiceoverSrc === "string" && inputProps.voiceoverSrc.length > 0;
+    copied.set(source, name);
+    log("voiceover:", path.relative(ROOT, source));
+    return name;
+  };
+  const propsFor = (target) => {
+    const props = { ...args.props };
+    const src = typeof props.voiceoverSrc === "string" ? props.voiceoverSrc : target.voiceover;
+    if (src) props.voiceoverSrc = localVoice(src);
+    return props;
+  };
+  const voiced = (props) => typeof props.voiceoverSrc === "string" && props.voiceoverSrc.length > 0;
+  // The bundle snapshots publicDir, so every voiceover must be in it first.
+  for (const id of selected) propsFor(TARGETS[id]);
 
   const browserExecutable = args.browser ?? process.env.T2Q_RENDER_BROWSER ?? null;
   if (!browserExecutable) await ensureBrowser();
@@ -295,6 +326,8 @@ async function main() {
         continue;
       }
 
+      const inputProps = propsFor(target);
+      const hasVoice = voiced(inputProps);
       const composition = await selectComposition({ serveUrl, id: target.composition, inputProps, ...common });
       log(`${target.composition}: ${composition.width}×${composition.height}, ${composition.durationInFrames} frames`);
 
@@ -337,10 +370,12 @@ async function main() {
       if (target.web) {
         const { name, mp4Crf, webmCrf, gop } = target.web;
         const mp4 = path.join(ROOT, VIDEOS, `${name}.mp4`);
-        await ff(["-y", "-i", master, "-an", ...WEB_COLOR, "-c:v", "libx264", "-preset", "veryslow", "-tune", "animation", "-crf", String(mp4Crf), "-profile:v", "high", "-g", String(gop), "-movflags", "+faststart", mp4]);
+        const mp4Audio = hasVoice ? ["-c:a", "aac", "-b:a", "128k"] : ["-an"];
+        const webmAudio = hasVoice ? ["-c:a", "libopus", "-b:a", "96k"] : ["-an"];
+        await ff(["-y", "-i", master, ...WEB_COLOR, "-c:v", "libx264", "-preset", "veryslow", "-tune", "animation", "-crf", String(mp4Crf), "-profile:v", "high", "-g", String(gop), "-movflags", "+faststart", ...mp4Audio, mp4]);
         assertFaststart(mp4);
         const webm = path.join(ROOT, VIDEOS, `${name}.webm`);
-        await ff(["-y", "-i", master, "-an", ...WEB_COLOR, "-c:v", "libvpx-vp9", "-crf", String(webmCrf), "-b:v", "0", "-row-mt", "1", "-tile-columns", "2", "-deadline", "good", "-cpu-used", "2", "-g", String(gop), webm]);
+        await ff(["-y", "-i", master, ...WEB_COLOR, "-c:v", "libvpx-vp9", "-crf", String(webmCrf), "-b:v", "0", "-row-mt", "1", "-tile-columns", "2", "-deadline", "good", "-cpu-used", "2", "-g", String(gop), ...webmAudio, webm]);
         written.push(mp4, webm);
         log(`${rel(mp4)}  ${mb(fs.statSync(mp4).size)}`);
         log(`${rel(webm)}  ${mb(fs.statSync(webm).size)}`);

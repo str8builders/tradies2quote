@@ -35,7 +35,7 @@ export function Hero() {
               className="studio-button studio-button-secondary"
               data-testid="hero-cta-how-it-works"
             >
-              <Play size={17} weight="fill" /> Watch the 30-second demo
+              <Play size={17} weight="fill" /> Watch the demo
             </a>
           </div>
           <ul className="studio-hero-assurances" aria-label="Why tradies trust it">

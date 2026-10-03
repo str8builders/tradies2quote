@@ -64,12 +64,14 @@ describe("marketing video script data", () => {
   });
 
   it("keeps the briefed durations", () => {
-    expect(DEMO_TIMELINE.durationInFrames / VIDEO_FPS).toBe(30);
+    // The demo is narrated: it lasts as long as its voiceover (demo-voiceover.test.ts checks the match).
+    expect(DEMO_TIMELINE.durationInFrames / VIDEO_FPS).toBeGreaterThan(45);
+    expect(DEMO_TIMELINE.durationInFrames / VIDEO_FPS).toBeLessThan(90);
     expect(SOCIAL_TIMELINE.durationInFrames / VIDEO_FPS).toBe(15);
     expect(TOUR_TIMELINE.durationInFrames / VIDEO_FPS).toBe(60);
     expect(HERO_LOOP_FRAMES / VIDEO_FPS).toBeGreaterThanOrEqual(8);
     expect(HERO_LOOP_FRAMES / VIDEO_FPS).toBeLessThanOrEqual(10);
-    expect(DEMO_TIMELINE.chapters.map((c) => c.id)).toEqual([...CORE_CHAPTERS]);
+    expect(DEMO_TIMELINE.chapters.map((c) => c.id)).toEqual(["intro", ...CORE_CHAPTERS, "end"]);
   });
 
   it("opens the social cut with the hook and ends every share cut on the offer", () => {
@@ -83,12 +85,14 @@ describe("marketing video script data", () => {
   it("exposes the website chapter list in order with matching start times", () => {
     expect(DEMO_CHAPTERS.map((c) => c.label)).toEqual(["Talk", "Draft", "Check", "Send", "Invoice"]);
     DEMO_CHAPTERS.forEach((chapter, i) => {
-      expect(chapter.startSec).toBe(DEMO_TIMELINE.chapters[i].from / VIDEO_FPS);
+      expect(chapter.startSec).toBe(DEMO_TIMELINE.chapters.find((c) => c.id === chapter.id)!.from / VIDEO_FPS);
       if (i > 0) expect(chapter.startSec).toBeGreaterThan(DEMO_CHAPTERS[i - 1].startSec);
     });
+    // The intro plays before Talk; the buttons treat it as part of Talk.
+    expect(DEMO_CHAPTERS[0].startSec).toBeGreaterThan(0);
     expect(demoChapterAt(0)).toBe("talk");
-    expect(demoChapterAt(6)).toBe("draft");
-    expect(demoChapterAt(29.9)).toBe("invoice");
+    expect(demoChapterAt(DEMO_CHAPTERS[1].startSec + 0.1)).toBe("draft");
+    expect(demoChapterAt(DEMO_TIMELINE.durationInFrames / VIDEO_FPS - 0.1)).toBe("invoice");
     expect(DEMO_TRANSCRIPT.every((c) => c.text.length > 0)).toBe(true);
   });
 

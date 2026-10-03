@@ -84,7 +84,7 @@ export function JobSiteStory({ nativeShell }: { nativeShell: boolean }) {
               <p className="jobsite-lede">{HERO.lede}</p>
               <div className="jobsite-actions">
                 <StartButton />
-                <DemoButton className="jobsite-secondary">Watch the 30-second demo</DemoButton>
+                <DemoButton className="jobsite-secondary">Watch the demo</DemoButton>
               </div>
               <p className="jobsite-assure">
                 <Check size={15} aria-hidden="true" /> {TRIAL_LINE}
@@ -118,7 +118,7 @@ export function JobSiteStory({ nativeShell }: { nativeShell: boolean }) {
               <p className="finished-trades">{tradesLine}</p>
               <div className="jobsite-actions" data-final-cta>
                 <StartButton />
-                <DemoButton className="jobsite-secondary">Watch the 30-second demo</DemoButton>
+                <DemoButton className="jobsite-secondary">Watch the demo</DemoButton>
                 {nativeShell ? null : (
                   <Link href="/t2qcal" className="jobsite-secondary">
                     Open T2QCAL

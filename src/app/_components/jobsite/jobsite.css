@@ -380,6 +380,41 @@
   color: #fff; background: rgba(255, 255, 255, 0.14);
 }
 .jobsite-demo video { display: block; border-radius: 6px; background: #000; }
+.jobsite-demo-frame { position: relative; }
+
+/* The demo button looks like a video: a frame of the film, a play badge, its length. */
+.jobsite-demo-button { gap: 12px; padding: 4px 16px 4px 4px; }
+.jobsite-demo-thumb {
+  position: relative; display: grid; place-items: center; flex: none; width: 44px; height: 44px;
+  overflow: hidden; border-radius: 3px; background: #000;
+}
+.jobsite-demo-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; opacity: 0.75; }
+.jobsite-demo-thumb svg {
+  position: relative; box-sizing: content-box; padding: 5px; border-radius: 50%;
+  color: var(--js-ink); background: var(--js-accent);
+}
+.jobsite-demo-length {
+  margin-left: 2px; padding: 3px 6px; border-radius: 3px; font: 500 12px/1 var(--font-mono, monospace);
+  letter-spacing: 0.08em; color: #ddd6cc; background: rgba(255, 255, 255, 0.1);
+}
+
+/* When the film ends: the trial and a replay, over its last frame. */
+.jobsite-demo-end {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; padding: 24px 16px; text-align: center; border-radius: 6px; background: rgba(10, 10, 10, 0.96);
+}
+.jobsite-demo-end-title {
+  margin: 0 0 14px; font-family: var(--font-display, inherit); font-size: clamp(26px, 5vw, 40px);
+  line-height: 1.05; text-transform: uppercase; color: var(--js-text);
+}
+.jobsite-demo-end .jobsite-assure { justify-content: center; }
+.jobsite-demo-replay {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin-top: 10px; padding: 0 14px;
+  border: 0; border-radius: 4px; cursor: pointer; font: 600 15px/1 var(--font-sans); color: var(--js-text); background: transparent;
+  text-decoration: underline; text-underline-offset: 4px;
+}
+.jobsite-demo-replay:focus-visible,
+.jobsite-demo-end .jobsite-start:focus-visible { outline: 2px solid var(--js-hivis); outline-offset: 3px; }
 .jobsite-demo-wide { width: 100%; max-height: 84svh; }
 .jobsite-demo-tall { height: 84svh; max-width: 92vw; }
 .jobsite-appstore { line-height: 0; }

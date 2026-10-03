@@ -10,6 +10,9 @@
  * names, usernames or real figures. Everything below is invented.
  */
 
+import { NARRATION } from "./demo-voiceover";
+import { VOICEOVER_TIMING } from "./demo-voiceover-timing";
+
 export const VIDEO_FPS = 30;
 
 export type LineType = "material" | "labour";
@@ -199,49 +202,31 @@ function buildTimeline(id: string, specs: readonly ChapterSpec[]): Timeline {
   return { id, fps: VIDEO_FPS, durationInFrames: cursor, chapters, captions };
 }
 
-/** DemoWide and DemoTall: the same 30-second story in two shapes. */
-export const DEMO_TIMELINE = buildTimeline("demo", [
-  {
-    id: "talk",
-    seconds: 6,
-    captions: [
-      [0.2, 3.3, "Walk the site and talk through the job."],
-      [3.3, 5.9, "Your words become the starting point."],
-    ],
-  },
-  {
-    id: "draft",
-    seconds: 6,
-    captions: [
-      [0.1, 3.3, "The draft quote builds itself."],
-      [3.3, 5.9, "Materials, labour and GST, line by line."],
-    ],
-  },
-  {
-    id: "check",
-    seconds: 6,
-    captions: [
-      [0.1, 3.3, "Check every line before it goes."],
-      [3.3, 5.9, "Change any rate. You have the final say."],
-    ],
-  },
-  {
-    id: "send",
-    seconds: 6,
-    captions: [
-      [0.1, 3.3, "Send it. Your client reads it on their phone,"],
-      [3.3, 5.9, "accepts, and signs with a finger."],
-    ],
-  },
-  {
-    id: "invoice",
-    seconds: 6,
-    captions: [
-      [0.1, 3.3, "Turn the yes into an invoice."],
-      [3.3, 5.9, "Mark it paid when the money lands."],
-    ],
-  },
-]);
+/**
+ * DemoWide and DemoTall: the narrated demo in two shapes. The chapters and
+ * captions come from the voiceover (./demo-voiceover.ts), timed from the
+ * measured audio (./demo-voiceover-timing.ts), so each caption shows while
+ * its line is spoken and each chapter lasts as long as its narration. A
+ * caption stays up until the next line starts.
+ */
+export const DEMO_TIMELINE = buildTimeline(
+  "demo",
+  NARRATION.map((chapter) => {
+    const timing = VOICEOVER_TIMING.chapters.find((c) => c.id === chapter.id);
+    if (!timing || timing.lines.length !== chapter.lines.length) {
+      throw new Error(`demo voiceover timing is stale for "${chapter.id}": run node scripts/make-demo-voiceover.mjs`);
+    }
+    return {
+      id: chapter.id,
+      seconds: timing.seconds,
+      captions: chapter.lines.map((line, i): CaptionSpec => {
+        const [start] = timing.lines[i];
+        const next = timing.lines[i + 1];
+        return [start, next ? next[0] : timing.seconds - 0.1, line.show];
+      }),
+    };
+  }),
+);
 
 /** SocialCut: 15-second vertical cut with a hook and an end card. */
 export const SOCIAL_TIMELINE = buildTimeline("social", [
@@ -341,9 +326,9 @@ export const DEMO_CHAPTERS: ReadonlyArray<{ id: DemoChapterId; label: string; st
     return { id, label: chapter.label, startSec: chapter.from / VIDEO_FPS };
   });
 
-/** Plain-text transcript of the demo captions, grouped by chapter. */
-export const DEMO_TRANSCRIPT: ReadonlyArray<{ id: DemoChapterId; title: string; text: string }> =
-  CORE_CHAPTERS.map((id) => ({
+/** Plain-text transcript of the demo's narration (its captions), grouped by chapter, intro and end included. */
+export const DEMO_TRANSCRIPT: ReadonlyArray<{ id: SceneId; title: string; text: string }> =
+  DEMO_TIMELINE.chapters.map(({ id }) => ({
     id,
     title: SCENE_COPY[id].title,
     text: DEMO_TIMELINE.captions

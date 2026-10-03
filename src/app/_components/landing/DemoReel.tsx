@@ -32,7 +32,7 @@ export function DemoReel() {
             </h2>
           </div>
           <p>
-            A 30-second look at the workflow, from talking the job to getting paid.
+            A one-minute look at the workflow, from talking the job to getting paid.
             <br />
             Example job and figures.
           </p>

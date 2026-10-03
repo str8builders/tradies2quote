@@ -79,7 +79,7 @@ const MEDIA: Record<Shape, { webm: string; mp4: string; poster: string; width: n
 export const PHONE_QUERY = "(max-width: 767px)";
 
 const DEMO_LABEL =
-  "Tradies2Quote walkthrough, 30 seconds, no sound: talk the job, the draft builds itself, check every line, send and get the yes, invoice and get paid. Example job and figures.";
+  "Tradies2Quote walkthrough, about a minute, narrated: talk the job, the draft builds itself, check every line, send and get the yes, invoice and get paid. Example job and figures.";
 const HERO_LABEL = "Tradies2Quote app: a spoken job becomes a quote draft, ready for review. Example job and figures.";
 
 function subscribeToQuery(callback: () => void) {

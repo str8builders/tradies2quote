@@ -33,6 +33,7 @@ import {
   type RigGeometry,
 } from "./stage";
 import { finalDevice, kf, storyShot, type Pace } from "./story";
+import { demoFinalDevice, demoShot, demoShotWide } from "./newlook-demo";
 import { HERO_BEATS } from "./beats";
 import { Push } from "./Push";
 import { C, FONT } from "./theme";
@@ -82,7 +83,19 @@ function TitleCard({ frame, timeline, id, orientation }: { frame: number; timeli
       </Fill>
     );
   }
-  const [first, second] = id === "end" && text.includes(" · ") ? text.split(" · ") : [text, ""];
+  // A chapter with several caption lines (the narrated demo's intro and end)
+  // shows its first line as the headline; the rest go in the end card's pill,
+  // or under the headline. One line keeps the original layout.
+  const lines = timeline.captions.filter((c) => c.chapter === id).map((c) => c.text);
+  const multi = lines.length > 1;
+  const [first, second] = multi
+    ? id === "end"
+      ? [lines[0], lines.slice(1).join(" ")]
+      : [lines[0], ""]
+    : id === "end" && text.includes(" · ")
+      ? text.split(" · ")
+      : [text, ""];
+  const sub = multi && id !== "end" ? lines.slice(1).join(" ") : "";
   return (
     <Fill>
       <Backdrop glowX="50%" glowY="50%" />
@@ -115,6 +128,22 @@ function TitleCard({ frame, timeline, id, orientation }: { frame: number; timeli
         >
           {first}
         </div>
+        {sub ? (
+          <div
+            style={{
+              marginTop: tall ? 44 : 32,
+              fontFamily: FONT.display,
+              fontSize: tall ? 50 : 44,
+              fontWeight: 600,
+              lineHeight: 1.22,
+              letterSpacing: "-0.02em",
+              color: "#d6d9d7",
+              maxWidth: tall ? 900 : 1300,
+            }}
+          >
+            {sub}
+          </div>
+        ) : null}
         {second ? (
           <div
             style={{
@@ -157,13 +186,18 @@ function PhonePeek() {
 
 const WIDE_RIG: RigGeometry = { width: 560, left: 1240, top: 70, windowTop: 0, windowBottom: 1080, slide: 240, anchor: 0.74 };
 
-function WideFrame({ frame, timeline, pace }: { frame: number; timeline: Timeline; pace: Pace }) {
+/** "new": the app's new look (the homepage demo); "old": the original screens (social cut, full tour). */
+type Look = "new" | "old";
+const shotFor = (look: Look, wide = false) => (look === "new" ? (wide ? demoShotWide : demoShot) : storyShot);
+const endFor = (look: Look) => (look === "new" ? demoFinalDevice : finalDevice);
+
+function WideFrame({ frame, timeline, pace, look = "old" }: { frame: number; timeline: Timeline; pace: Pace; look?: Look }) {
   const st = chapterAt(timeline, frame);
   const id = st.chapter.id;
   if (isTitleScene(id)) return <TitleCard frame={frame} timeline={timeline} id={id} orientation="wide" />;
-  const shot = storyShot(id, { p: st.p, frame, pace });
+  const shot = shotFor(look, true)(id, { p: st.p, frame, pace });
   if (!shot) return null;
-  const prevShot = st.prev && !isTitleScene(st.prev.id) ? storyShot(st.prev.id, { p: 1, frame: st.chapter.from - 1, pace }) : null;
+  const prevShot = st.prev && !isTitleScene(st.prev.id) ? shotFor(look, true)(st.prev.id, { p: 1, frame: st.chapter.from - 1, pace }) : null;
   const dur = st.chapter.durationInFrames;
   const textIn = Math.min(eseg(st.local, 1, 14), 1 - eseg(st.local, dur - 7, dur, easeInOut));
   const rigIn = st.prev && isTitleScene(st.prev.id) ? eseg(st.local, 0, 12) : 1;
@@ -195,7 +229,7 @@ function WideFrame({ frame, timeline, pace }: { frame: number; timeline: Timelin
         <PhoneRig
           shot={shot}
           g={WIDE_RIG}
-          prev={prevShot && st.prev ? finalDevice(prevShot, st.prev.id) : null}
+          prev={prevShot && st.prev ? endFor(look)(prevShot, st.prev.id) : null}
           enter={seg(st.local, 0, 12)}
           panBlend={eseg(st.local, 0, 18)}
         />
@@ -209,13 +243,13 @@ function WideFrame({ frame, timeline, pace }: { frame: number; timeline: Timelin
 
 const TALL_RIG: RigGeometry = { width: 900, left: 90, top: 276, windowTop: 258, windowBottom: 1540, slide: 360, anchor: 0.52 };
 
-function TallFrame({ frame, timeline, pace, captionSize }: { frame: number; timeline: Timeline; pace: Pace; captionSize: number }) {
+function TallFrame({ frame, timeline, pace, captionSize, look = "old" }: { frame: number; timeline: Timeline; pace: Pace; captionSize: number; look?: Look }) {
   const st = chapterAt(timeline, frame);
   const id = st.chapter.id;
   if (isTitleScene(id)) return <TitleCard frame={frame} timeline={timeline} id={id} orientation="tall" />;
-  const shot = storyShot(id, { p: st.p, frame, pace });
+  const shot = shotFor(look)(id, { p: st.p, frame, pace });
   if (!shot) return null;
-  const prevShot = st.prev && !isTitleScene(st.prev.id) ? storyShot(st.prev.id, { p: 1, frame: st.chapter.from - 1, pace }) : null;
+  const prevShot = st.prev && !isTitleScene(st.prev.id) ? shotFor(look)(st.prev.id, { p: 1, frame: st.chapter.from - 1, pace }) : null;
   const dur = st.chapter.durationInFrames;
   const textIn = Math.min(eseg(st.local, 1, 12), 1 - eseg(st.local, dur - 6, dur, easeInOut));
   const rigIn = st.prev && isTitleScene(st.prev.id) ? eseg(st.local, 0, 10) : 1;
@@ -243,7 +277,7 @@ function TallFrame({ frame, timeline, pace, captionSize }: { frame: number; time
         </div>
       </div>
       <Fill style={{ opacity: rigIn }}>
-        <PhoneRig shot={shot} g={TALL_RIG} prev={prevShot && st.prev ? finalDevice(prevShot, st.prev.id) : null} enter={seg(st.local, 0, 12)} panBlend={eseg(st.local, 0, 16)} />
+        <PhoneRig shot={shot} g={TALL_RIG} prev={prevShot && st.prev ? endFor(look)(prevShot, st.prev.id) : null} enter={seg(st.local, 0, 12)} panBlend={eseg(st.local, 0, 16)} />
       </Fill>
       <CaptionBand timeline={timeline} frame={frame} fontSize={captionSize} maxWidth={960} align="center" style={{ left: 60, right: 60, top: 1574 }} />
       <div style={{ position: "absolute", left: 0, right: 0, bottom: 44, textAlign: "center", fontFamily: FONT.mono, fontSize: 22, letterSpacing: "0.2em", color: "#6f7572" }}>
@@ -273,11 +307,11 @@ function StoryVideo({ timeline, render, voiceoverSrc }: { timeline: Timeline; re
 }
 
 export function DemoWide({ voiceoverSrc }: MarketingVideoProps) {
-  return <StoryVideo timeline={DEMO_TIMELINE} voiceoverSrc={voiceoverSrc} render={(f) => <WideFrame frame={f} timeline={DEMO_TIMELINE} pace="full" />} />;
+  return <StoryVideo timeline={DEMO_TIMELINE} voiceoverSrc={voiceoverSrc} render={(f) => <WideFrame frame={f} timeline={DEMO_TIMELINE} pace="full" look="new" />} />;
 }
 
 export function DemoTall({ voiceoverSrc }: MarketingVideoProps) {
-  return <StoryVideo timeline={DEMO_TIMELINE} voiceoverSrc={voiceoverSrc} render={(f) => <TallFrame frame={f} timeline={DEMO_TIMELINE} pace="full" captionSize={64} />} />;
+  return <StoryVideo timeline={DEMO_TIMELINE} voiceoverSrc={voiceoverSrc} render={(f) => <TallFrame frame={f} timeline={DEMO_TIMELINE} pace="full" captionSize={48} look="new" />} />;
 }
 
 export function SocialCut({ voiceoverSrc }: MarketingVideoProps) {
