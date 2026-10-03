@@ -3,19 +3,31 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowCounterClockwise, ArrowUpRight, Check, Play, X } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, ArrowUpRight, Check, Play, SpeakerHigh, X } from "@phosphor-icons/react";
 import { DEMO_TIMELINE } from "@/remotion/demo-script";
+import { useMotionPaused } from "../wallpaper/motion";
 import { TRIAL_LINE } from "./story";
 
 /**
  * Bumped when the demo is re-rendered under the same file names. Media is
  * cached for a day (then a week stale-while-revalidate), so without a new
  * address a returning visitor keeps the old film. 2: the narrated new-look
- * demo (3 Oct 2026).
+ * demo (3 Oct 2026). 3: the same, without the mid-chapter phone blink, plus
+ * the first-frame posters and the preview loop.
  */
-const DEMO_VERSION = 2;
+const DEMO_VERSION = 3;
 const v = `?v=${DEMO_VERSION}`;
-const POSTER = { tall: `/images/marketing/poster-demo-tall.webp${v}`, wide: `/images/marketing/poster-demo-wide.webp${v}` } as const;
+/**
+ * The dialog's poster is the film's own first frame, so pressing play
+ * continues from exactly what is on screen. (A frame from the middle, then
+ * the dark intro, read as a flicker on play.)
+ */
+const POSTER = {
+  tall: `/images/marketing/poster-demo-tall-start.webp${v}`,
+  wide: `/images/marketing/poster-demo-wide-start.webp${v}`,
+} as const;
+/** The silent phone-only loop on the hero card (scripts/render-marketing.mjs, demo-tall "preview"). */
+const PREVIEW = { video: `/videos/demo-preview.mp4${v}`, still: "/images/marketing/poster-demo-preview.webp" } as const;
 
 type Cut = keyof typeof POSTER;
 
@@ -43,11 +55,95 @@ const cutNow = (): Cut => (window.innerHeight > window.innerWidth ? "tall" : "wi
  * it reads as a video at a glance. When the film ends, the dialog offers the
  * trial (the same "Start your free trial" as the page) and a replay.
  */
-export function DemoButton({ className = "", children }: { className?: string; children: ReactNode }) {
+/**
+ * The hero card's thumbnail: a silent loop of the app while motion is on
+ * (and the card is on screen), the loop's first frame otherwise. With Reduce
+ * Motion or "Pause background motion" it never moves by itself.
+ */
+function PreviewThumb({ playing }: { playing: boolean }) {
+  const motionPaused = useMotionPaused();
+  const ref = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // iPhone Safari only autoplays a video that is muted as an attribute.
+    el.muted = true;
+    el.setAttribute("muted", "");
+    let visible = true;
+    const sync = () => {
+      if (visible && playing && !document.hidden) {
+        el.play().catch(() => {
+          /* Refused for now (see the retry below), or for good in Low Power Mode: the first frame stays. */
+        });
+      } else {
+        el.pause();
+      }
+    };
+    // WebKit refuses play() while the page is still settling (the 3D layout
+    // swaps in during the first second) and doesn't retry by itself. Keep
+    // asking, gently, for a few seconds while it should be playing.
+    let tries = 0;
+    const retry = window.setInterval(() => {
+      tries += 1;
+      if (tries > 15) window.clearInterval(retry);
+      else if (el.paused && visible && playing && !document.hidden) sync();
+    }, 1000);
+    const watch = new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting;
+      sync();
+    });
+    watch.observe(el);
+    document.addEventListener("visibilitychange", sync);
+    // WebKit refuses a play() made before the clip can play (NotAllowedError)
+    // and doesn't retry by itself: try again once it's ready.
+    el.addEventListener("canplay", sync);
+    sync();
+    return () => {
+      watch.disconnect();
+      document.removeEventListener("visibilitychange", sync);
+      el.removeEventListener("canplay", sync);
+      window.clearInterval(retry);
+      el.pause();
+    };
+  }, [playing, motionPaused]);
+
+  if (motionPaused) {
+    return <Image src={PREVIEW.still} alt="" width={240} height={342} sizes="80px" className="jobsite-demo-preview" />;
+  }
+  return (
+    <video
+      ref={ref}
+      className="jobsite-demo-preview"
+      src={PREVIEW.video}
+      poster={PREVIEW.still}
+      autoPlay={playing}
+      muted
+      loop
+      playsInline
+      preload="auto"
+      disablePictureInPicture
+      aria-hidden="true"
+    />
+  );
+}
+
+export function DemoButton({
+  className = "",
+  children,
+  variant = "compact",
+}: {
+  className?: string;
+  children: ReactNode;
+  /** "hero": the big card at the top of the page, with the moving preview. */
+  variant?: "compact" | "hero";
+}) {
   const dialog = useRef<HTMLDialogElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const [cut, setCut] = useState<Cut | null>(null);
   const [ended, setEnded] = useState(false);
+  const [watching, setWatching] = useState(false);
+  const motionPaused = useMotionPaused();
 
   // Pick the cut once the page knows the screen's shape, and follow a turn
   // of the phone while the dialog is closed.
@@ -73,6 +169,7 @@ export function DemoButton({ className = "", children }: { className?: string; c
 
   function open() {
     setEnded(false);
+    setWatching(true);
     dialog.current?.showModal();
     const v = video.current;
     if (!v) return;
@@ -94,17 +191,43 @@ export function DemoButton({ className = "", children }: { className?: string; c
 
   return (
     <>
-      <button type="button" className={`jobsite-demo-button ${className}`} onClick={open}>
-        <span className="jobsite-demo-thumb" aria-hidden="true">
-          <Image src="/images/marketing/poster-demo-tall.webp" alt="" width={44} height={44} sizes="44px" />
-          <Play size={16} weight="fill" />
-        </span>
-        <span>{children}</span>
-        <span className="jobsite-demo-length">
-          <span className="sr-only">, </span>
-          {DEMO_LENGTH}
-        </span>
-      </button>
+      {variant === "hero" ? (
+        <button
+          type="button"
+          className={`jobsite-demo-card${motionPaused ? "" : " is-moving"} ${className}`}
+          onClick={open}
+          data-testid="jobsite-demo-card"
+        >
+          <span className="jobsite-demo-card-thumb" aria-hidden="true">
+            <PreviewThumb playing={!watching} />
+            <span className="jobsite-demo-card-play">
+              <Play size={20} weight="fill" />
+            </span>
+          </span>
+          <span className="jobsite-demo-card-text">
+            <span className="jobsite-demo-card-title">{children}</span>
+            <span className="jobsite-demo-card-sub">See a quote made, start to finish.</span>
+            <span className="jobsite-demo-card-meta">
+              <span className="sr-only">Length </span>
+              {DEMO_LENGTH}
+              <span aria-hidden="true"> · </span>
+              <SpeakerHigh size={14} weight="fill" aria-hidden="true" /> Sound on
+            </span>
+          </span>
+        </button>
+      ) : (
+        <button type="button" className={`jobsite-demo-button ${className}`} onClick={open}>
+          <span className="jobsite-demo-thumb" aria-hidden="true">
+            <Image src="/images/marketing/poster-demo-tall.webp" alt="" width={44} height={44} sizes="44px" />
+            <Play size={16} weight="fill" />
+          </span>
+          <span>{children}</span>
+          <span className="jobsite-demo-length">
+            <span className="sr-only">, </span>
+            {DEMO_LENGTH}
+          </span>
+        </button>
+      )}
       <dialog
         ref={dialog}
         className="jobsite-demo"
@@ -112,6 +235,7 @@ export function DemoButton({ className = "", children }: { className?: string; c
         onClose={() => {
           video.current?.pause();
           setEnded(false);
+          setWatching(false);
         }}
         onClick={(e) => {
           if (e.target === dialog.current) dialog.current?.close();

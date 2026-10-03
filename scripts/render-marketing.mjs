@@ -82,6 +82,20 @@ const DEMO_POSTER_FRAME = (() => {
 })();
 
 /**
+ * The homepage's silent preview loop (the demo button's moving thumbnail):
+ * the phone from the tall demo, from "Writing your quote…" to the quote's
+ * lines, as a short muted clip.
+ */
+const DEMO_PREVIEW = (() => {
+  let start = 0;
+  for (const chapter of VOICEOVER_TIMINGS.demo.chapters) {
+    if (chapter.id === "draft") return { from: Math.round((start + chapter.seconds * 0.4) * 10) / 10, seconds: 6.5 };
+    start += chapter.seconds;
+  }
+  throw new Error("the demo voiceover has no draft chapter");
+})();
+
+/**
  * What each target renders. The hero poster is frame 0 so playback starts
  * without a jump.
  */
@@ -91,6 +105,7 @@ const TARGETS = {
     web: { name: "demo-wide", mp4Crf: 30, webmCrf: 42, gop: 90 },
     share: "demo-wide.mp4",
     poster: { file: "poster-demo-wide.webp", frame: DEMO_POSTER_FRAME, maxBytes: 160_000 },
+    startPoster: "poster-demo-wide-start.webp",
     voiceover: DEMO_VOICEOVER,
   },
   "demo-tall": {
@@ -98,6 +113,9 @@ const TARGETS = {
     web: { name: "demo-tall", mp4Crf: 30, webmCrf: 42, gop: 90 },
     share: "demo-tall.mp4",
     poster: { file: "poster-demo-tall.webp", frame: DEMO_POSTER_FRAME, maxBytes: 160_000 },
+    startPoster: "poster-demo-tall-start.webp",
+    // The phone's area in the tall cut (TALL_RIG in compositions.tsx).
+    preview: { name: "demo-preview", poster: "poster-demo-preview.webp", ...DEMO_PREVIEW, crop: "900:1282:90:258", width: 240 },
     voiceover: DEMO_VOICEOVER,
   },
   "hero-loop": {
@@ -339,6 +357,16 @@ async function main() {
         written.push(out);
         log(`${rel(out)}  ${kb(bytes)} (q${quality})`);
       }
+      if (target.startPoster) {
+        // The video's own first frame: shown while the film loads, so pressing
+        // play continues from exactly what is on screen (no poster-to-video flash).
+        const png = path.join(tmp, `${id}-start.png`);
+        await renderStill({ composition, serveUrl, output: png, frame: 0, inputProps, imageFormat: "png", ...common });
+        const out = path.join(ROOT, IMAGES, target.startPoster);
+        const { bytes, quality } = await toWebp(png, out, 60_000);
+        written.push(out);
+        log(`${rel(out)}  ${kb(bytes)} (q${quality})`);
+      }
 
       // One near-lossless master per composition; every delivery file is encoded from it.
       const master = path.join(tmp, `${id}-master.mp4`);
@@ -379,6 +407,21 @@ async function main() {
         written.push(mp4, webm);
         log(`${rel(mp4)}  ${mb(fs.statSync(mp4).size)}`);
         log(`${rel(webm)}  ${mb(fs.statSync(webm).size)}`);
+      }
+      if (target.preview) {
+        // Silent, small, phone-only: it autoplays on the homepage, so it must
+        // be cheap to download and carry no audio track at all.
+        const { name, from, seconds: len, crop, width, poster } = target.preview;
+        const out = path.join(ROOT, VIDEOS, `${name}.mp4`);
+        const vf = `crop=${crop},scale=${width}:-2:flags=lanczos`;
+        await ff(["-y", "-ss", String(from), "-t", String(len), "-i", master, "-an", "-vf", vf, "-c:v", "libx264", "-preset", "veryslow", "-crf", "30", "-profile:v", "high", "-pix_fmt", "yuv420p", "-g", "60", "-movflags", "+faststart", out]);
+        assertFaststart(out);
+        const png = path.join(tmp, `${name}-poster.png`);
+        await ff(["-y", "-ss", String(from), "-i", master, "-frames:v", "1", "-vf", vf, png]);
+        const still = path.join(ROOT, IMAGES, poster);
+        const { bytes } = await toWebp(png, still, 30_000);
+        written.push(out, still);
+        log(`${rel(out)}  ${kb(fs.statSync(out).size)} · ${rel(still)}  ${kb(bytes)}`);
       }
       if (target.share) {
         const out = path.join(ROOT, SHARE, target.share);

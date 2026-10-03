@@ -84,7 +84,7 @@ export function JobSiteStory({ nativeShell }: { nativeShell: boolean }) {
               <p className="jobsite-lede">{HERO.lede}</p>
               <div className="jobsite-actions">
                 <StartButton />
-                <DemoButton className="jobsite-secondary">Watch the demo</DemoButton>
+                <DemoButton variant="hero">Watch the demo</DemoButton>
               </div>
               <p className="jobsite-assure">
                 <Check size={15} aria-hidden="true" /> {TRIAL_LINE}

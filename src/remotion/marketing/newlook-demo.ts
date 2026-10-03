@@ -1,9 +1,11 @@
+import { createElement } from "react";
 import type { SceneId } from "../demo-script";
 import { VAN_SCAN_FRAMES } from "../screens/VanScanScreen";
 import { eseg } from "./anim";
 import { REQUEST_BEATS } from "./beats";
 import { FEATURE_FRAMES, REQUEST_FRAMES, featureScene, raw, type FeatureId } from "./feature-screen";
 import { newLookShot } from "./newlook-story";
+import { Push } from "./Push";
 import { STEP_IDS, type StepId } from "./step-screen";
 import { finalDevice, kf, storyShot, type DeviceShot, type ShotArgs, type StoryShot } from "./story";
 
@@ -98,11 +100,21 @@ export function demoShot(id: SceneId, args: ShotArgs): StoryShot | null {
   const shot = newLookShot(id, { p: args.p, frame: args.frame });
   const pages = PAGES[id];
   const focus = focusOf(id, args.p);
+  if (shot.b && pages.b && id !== "send") {
+    // A new page on the SAME phone (Talk → "Did I hear you right?", "Writing
+    // your quote…" → the job): push it in on that phone, as the app does.
+    // As a StoryShot `b` it would be a device swap, and the rig fades the
+    // whole phone out and a second one in: the phone blinked mid-chapter.
+    const m = Math.min(1, Math.max(0, shot.mix));
+    const screen = m <= 0 ? shot.a : m >= 1 ? shot.b : createElement(Push, { p: m, from: shot.a, to: shot.b });
+    return {
+      a: { finish: "graphite", page: m >= 0.5 ? pages.b : pages.a, screen, focus: focus.a + (focus.b - focus.a) * m },
+      mix: 0,
+    };
+  }
   const a: DeviceShot = { finish: "graphite", page: pages.a, screen: shot.a, focus: focus.a };
-  const b: DeviceShot | undefined =
-    shot.b && pages.b
-      ? { finish: id === "send" ? "silver" : "graphite", page: pages.b, screen: shot.b, focus: focus.b }
-      : undefined;
+  // The client's phone in Send is a real swap of phones (yours, then theirs).
+  const b: DeviceShot | undefined = shot.b && pages.b ? { finish: "silver", page: pages.b, screen: shot.b, focus: focus.b } : undefined;
   return { a, b, mix: b ? shot.mix : 0 };
 }
 
