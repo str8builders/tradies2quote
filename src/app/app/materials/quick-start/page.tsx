@@ -8,6 +8,7 @@ import { isNewLookOn } from "@/lib/ui/newLook";
 import { AppHeader } from "@/app/app/_components/AppHeader";
 import { QuickStartForm } from "./_components/QuickStartForm";
 import { QuickStartBody } from "./_newlook/QuickStartBody";
+import { starterTradeFrom } from "./_data";
 
 export const metadata: Metadata = {
   title: "Quick start your library",
@@ -15,7 +16,13 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function MaterialsQuickStartPage() {
+/** `?trade=plumber` (or electrician, builder) opens that trade's list first. */
+export default async function MaterialsQuickStartPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ trade?: string | string[] }>;
+}) {
+  const trade = starterTradeFrom((await searchParams).trade);
   const supabase = await createClient();
   const {
     data: { user },
@@ -38,7 +45,7 @@ export default async function MaterialsQuickStartPage() {
     return (
       <Screen data-testid="quick-start-screen">
         <AppHeader />
-        <QuickStartBody currency={currency} />
+        <QuickStartBody currency={currency} trade={trade} />
       </Screen>
     );
   }
@@ -72,7 +79,7 @@ export default async function MaterialsQuickStartPage() {
         </div>
 
         <section className="t2q-card-pro p-5 sm:p-6">
-          <QuickStartForm currency={currency} />
+          <QuickStartForm currency={currency} trade={trade} />
         </section>
       </main>
     </div>

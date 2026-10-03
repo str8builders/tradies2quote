@@ -6,7 +6,7 @@ import { round2 } from "@/lib/quote-defaults";
 import { createClient } from "@/lib/supabase/server";
 import { loadAllMaterials } from "@/lib/materials/loadLibrary";
 import { nameKey } from "@/lib/materials/priceList";
-import { STARTER_MATERIALS } from "./_data";
+import { ALL_STARTER_MATERIALS } from "./_data";
 
 export type QuickStartResult =
   | { ok: true; inserted: number; skipped: number }
@@ -32,7 +32,9 @@ export async function saveQuickStartMaterials(
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const rows = STARTER_MATERIALS.map((m) => {
+  // Prices for any trade's list: a plumber who also builds can price both and
+  // save once. Only the known starter items are read, never client-made rows.
+  const rows = ALL_STARTER_MATERIALS.map((m) => {
     const price = parsePrice(formData.get(`price_${m.slug}`));
     return price === null ? null : { name: m.name, unit: m.unit, category: m.category, default_unit_price: price };
   }).filter((r): r is NonNullable<typeof r> => r !== null);

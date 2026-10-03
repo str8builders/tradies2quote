@@ -1,5 +1,6 @@
 /**
- * Wave 41 Stage 4 — curated NZ starter materials.
+ * Curated NZ starter materials, one list per trade (Builder, Plumber,
+ * Electrician). The builder list is Wave 41 Stage 4's original twelve.
  *
  * The 12 items below are the materials a typical NZ tradie touches
  * on most jobs across decks, fences, framing, GIB lining, concrete
@@ -26,7 +27,7 @@ export interface StarterMaterial {
   trade_hint: string;
 }
 
-export const STARTER_MATERIALS: StarterMaterial[] = [
+const BUILDER: StarterMaterial[] = [
   {
     slug: "framing-90x45-h12-48",
     name: "Framing 90x45 H1.2 4.8m",
@@ -119,3 +120,61 @@ export const STARTER_MATERIALS: StarterMaterial[] = [
     trade_hint: "Long-run iron roofing",
   },
 ];
+
+/**
+ * Everyday plumbing supplies. Materials only: every non-labour quote line
+ * takes the materials markup (computeQuoteTotals), so a call-out fee or an
+ * all-in "supplied and installed" price saved here would be marked up and
+ * could get labour added on top. Those need a no-markup line type first.
+ */
+const PLUMBER: StarterMaterial[] = [
+  { slug: "pex-pipe-16mm-m", name: "PEX pipe 16mm", unit: "m", category: "Plumbing", trade_hint: "Hot and cold water supply" },
+  { slug: "pex-pipe-20mm-m", name: "PEX pipe 20mm", unit: "m", category: "Plumbing", trade_hint: "Mains and larger runs" },
+  { slug: "copper-pipe-15mm-m", name: "Copper pipe 15mm", unit: "m", category: "Plumbing", trade_hint: "Exposed and cylinder runs" },
+  { slug: "pvc-dwv-pipe-50mm-3m", name: "PVC DWV pipe 50mm 3m length", unit: "length", category: "Drainage", trade_hint: "Waste pipe" },
+  { slug: "pvc-dwv-pipe-100mm-6m", name: "PVC DWV pipe 100mm 6m length", unit: "length", category: "Drainage", trade_hint: "Soil and stormwater" },
+  { slug: "mixer-tap-kitchen", name: "Kitchen sink mixer tap", unit: "each", category: "Tapware", trade_hint: "Kitchen tap swaps" },
+  { slug: "mixer-tap-basin", name: "Basin mixer tap", unit: "each", category: "Tapware", trade_hint: "Bathroom tap swaps" },
+  { slug: "toilet-suite", name: "Toilet suite with cistern", unit: "each", category: "Sanitaryware", trade_hint: "Toilet replacements" },
+  { slug: "isolation-valve-15mm", name: "Isolation valve 15mm", unit: "each", category: "Valves", trade_hint: "Isolating fixtures" },
+  { slug: "tempering-valve-15mm", name: "Tempering valve 15mm", unit: "each", category: "Valves", trade_hint: "Hot water to bathrooms" },
+  { slug: "hot-water-cylinder-180l", name: "Electric hot water cylinder 180L", unit: "each", category: "Hot water", trade_hint: "Cylinder replacements" },
+  { slug: "flexible-tap-connector-300mm", name: "Braided flexible tap connector 300mm", unit: "each", category: "Fittings", trade_hint: "Tap and toilet connections" },
+];
+
+/** Everyday electrical supplies. Materials only, as for the plumber list. */
+const ELECTRICIAN: StarterMaterial[] = [
+  { slug: "tps-cable-2-5mm-m", name: "TPS cable 2.5mm twin and earth", unit: "m", category: "Cable", trade_hint: "Power circuits" },
+  { slug: "tps-cable-1-5mm-m", name: "TPS cable 1.5mm twin and earth", unit: "m", category: "Cable", trade_hint: "Lighting circuits" },
+  { slug: "double-power-point", name: "Double power point", unit: "each", category: "Fittings", trade_hint: "General power outlets" },
+  { slug: "double-power-point-usb", name: "Double power point with USB", unit: "each", category: "Fittings", trade_hint: "Kitchen and bedside outlets" },
+  { slug: "light-switch-1-gang", name: "Light switch 1 gang", unit: "each", category: "Fittings", trade_hint: "Lighting control" },
+  { slug: "led-downlight", name: "LED downlight", unit: "each", category: "Lighting", trade_hint: "Ceiling lights" },
+  { slug: "rcd-40a-30ma", name: "RCD 2 pole 40A 30mA", unit: "each", category: "Switchboard", trade_hint: "Circuit protection" },
+  { slug: "mcb-20a", name: "MCB circuit breaker 20A", unit: "each", category: "Switchboard", trade_hint: "Power circuit breakers" },
+  { slug: "smoke-alarm-10yr", name: "Smoke alarm photoelectric 10 year battery", unit: "each", category: "Safety", trade_hint: "Smoke alarm installs" },
+  { slug: "bathroom-extractor-fan", name: "Bathroom extractor fan", unit: "each", category: "Ventilation", trade_hint: "Bathroom ventilation" },
+  { slug: "conduit-20mm-4m", name: "Conduit 20mm 4m length", unit: "length", category: "Cable management", trade_hint: "Exposed and outdoor runs" },
+  { slug: "junction-box", name: "Junction box", unit: "each", category: "Fittings", trade_hint: "Cable joins" },
+];
+
+export type StarterTrade = "builder" | "plumber" | "electrician";
+
+export const STARTER_TRADES: ReadonlyArray<{ id: StarterTrade; label: string; items: readonly StarterMaterial[] }> = [
+  { id: "builder", label: "Builder", items: BUILDER },
+  { id: "plumber", label: "Plumber", items: PLUMBER },
+  { id: "electrician", label: "Electrician", items: ELECTRICIAN },
+];
+
+/** Every starter item across the trades (the save action reads prices for any of them). */
+export const ALL_STARTER_MATERIALS: readonly StarterMaterial[] = STARTER_TRADES.flatMap((t) => t.items);
+
+/** The builder list, under its original name. */
+export const STARTER_MATERIALS: StarterMaterial[] = BUILDER;
+
+/** A trade from a URL (?trade=plumber); anything unknown is the builder list. */
+export function starterTradeFrom(raw: string | string[] | null | undefined): StarterTrade {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  const found = STARTER_TRADES.find((t) => t.id === value?.toLowerCase().trim());
+  return found ? found.id : "builder";
+}

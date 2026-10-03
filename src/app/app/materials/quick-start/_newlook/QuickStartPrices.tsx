@@ -7,8 +7,9 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
 import { Card } from "@/components/ui/card";
 import { currencySymbol } from "@/components/ui/lib/number-input";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { NumberField } from "@/components/ui/text-field";
-import { STARTER_MATERIALS } from "../_data";
+import { STARTER_TRADES, type StarterTrade } from "../_data";
 import { saveQuickStartMaterials, type QuickStartResult } from "../actions";
 
 const INITIAL: QuickStartResult = { ok: true, inserted: 0, skipped: 0 };
@@ -19,37 +20,48 @@ export function perUnit(unit: string): string {
 }
 
 /**
- * The starter list in the new look: one price box per everyday item, the
- * same field names and save action as the old form. Only rows with a price
- * are saved; the action then goes to Home.
+ * The starter lists in the new look: pick your trade, then one price box per
+ * everyday item, the same field names and save action as the old form. Every
+ * trade's boxes stay in the form (only the chosen trade's are shown), so a
+ * price typed under one trade is kept when you look at another. Only rows
+ * with a price are saved; the action then goes to Prices.
  */
-export function QuickStartPrices({ currency }: { currency: string }) {
+export function QuickStartPrices({ currency, trade: initialTrade = "builder" }: { currency: string; trade?: StarterTrade }) {
   const [state, formAction] = useActionState(saveQuickStartMaterials, INITIAL);
   const [prices, setPrices] = useState<Record<string, string>>({});
+  const [trade, setTrade] = useState<StarterTrade>(initialTrade);
   const symbol = currencySymbol(currency);
 
   return (
     <form action={formAction} className="space-y-6" data-testid="quick-start-form">
-      <Card padding="none" className="overflow-hidden">
-        <ul className="divide-y divide-ui-line">
-          {STARTER_MATERIALS.map((m) => (
-            <li key={m.slug} data-testid={`row-${m.slug}`} className="px-4 py-4">
-              <NumberField
-                label={m.name}
-                hint={`${m.category} · ${m.trade_hint}`}
-                name={`price_${m.slug}`}
-                aria-label={`Price for ${m.name}`}
-                prefix={symbol}
-                suffix={perUnit(m.unit)}
-                placeholder="0.00"
-                value={prices[m.slug] ?? ""}
-                onValueChange={(value) => setPrices((current) => ({ ...current, [m.slug]: value }))}
-                data-testid={`price-${m.slug}`}
-              />
-            </li>
-          ))}
-        </ul>
-      </Card>
+      <SegmentedControl
+        label="Your trade"
+        options={STARTER_TRADES.map((t) => ({ value: t.id, label: t.label }))}
+        value={trade}
+        onChange={setTrade}
+      />
+      {STARTER_TRADES.map((t) => (
+        <Card key={t.id} padding="none" className="overflow-hidden" hidden={t.id !== trade} data-testid={`quick-start-list-${t.id}`}>
+          <ul className="divide-y divide-ui-line">
+            {t.items.map((m) => (
+              <li key={m.slug} data-testid={`row-${m.slug}`} className="px-4 py-4">
+                <NumberField
+                  label={m.name}
+                  hint={`${m.category} · ${m.trade_hint}`}
+                  name={`price_${m.slug}`}
+                  aria-label={`Price for ${m.name}`}
+                  prefix={symbol}
+                  suffix={perUnit(m.unit)}
+                  placeholder="0.00"
+                  value={prices[m.slug] ?? ""}
+                  onValueChange={(value) => setPrices((current) => ({ ...current, [m.slug]: value }))}
+                  data-testid={`price-${m.slug}`}
+                />
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ))}
 
       {"error" in state && state.error ? (
         <div role="alert" data-testid="quick-start-error">

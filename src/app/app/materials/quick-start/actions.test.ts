@@ -37,7 +37,7 @@ vi.mock("@/lib/supabase/server", () => ({
   },
 }));
 
-import { STARTER_MATERIALS } from "./_data";
+import { STARTER_MATERIALS, STARTER_TRADES } from "./_data";
 import { saveQuickStartMaterials } from "./actions";
 
 const writes = (action: FakeOp["action"]) => env.ops.filter((o) => o.table === "materials" && o.action === action);
@@ -89,6 +89,25 @@ describe("saveQuickStartMaterials — duplicates are reported, never silently ad
       saveQuickStartMaterials({ ok: true, inserted: 0, skipped: 0 }, form([[first, "10"]])),
     ).rejects.toThrow("NEXT_REDIRECT /app/materials?started=0&already=1");
     expect(writes("insert")).toEqual([]);
+  });
+
+  it("a plumber's and an electrician's prices are saved as materials like the builder's", async () => {
+    const pipe = STARTER_TRADES.find((t) => t.id === "plumber")!.items[0];
+    const cable = STARTER_TRADES.find((t) => t.id === "electrician")!.items[0];
+    await expect(
+      saveQuickStartMaterials({ ok: true, inserted: 0, skipped: 0 }, form([[pipe, "6.5"], [cable, "2.4"]])),
+    ).rejects.toThrow("NEXT_REDIRECT /app/materials?started=2");
+    expect(rowsOf(writes("insert")[0])).toEqual([
+      expect.objectContaining({ name: pipe.name, unit: "m", default_unit_price: 6.5, price_source: "user_library" }),
+      expect.objectContaining({ name: cable.name, unit: "m", default_unit_price: 2.4, price_source: "user_library" }),
+    ]);
+  });
+
+  it("only known starter items are read: a made-up field is ignored", async () => {
+    const f = form([[STARTER_MATERIALS[0], "10"]]);
+    f.set("price_free-money", "999");
+    await expect(saveQuickStartMaterials({ ok: true, inserted: 0, skipped: 0 }, f)).rejects.toThrow("NEXT_REDIRECT /app/materials?started=1");
+    expect(rowsOf(writes("insert")[0])).toHaveLength(1);
   });
 
   it("nothing already there: the redirect carries no &already= at all", async () => {

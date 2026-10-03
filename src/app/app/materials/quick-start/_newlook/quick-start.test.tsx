@@ -29,7 +29,7 @@ import MaterialsQuickStartPage from "../page";
 import { AppHeader } from "@/app/app/_components/AppHeader";
 import { Screen } from "@/components/ui/screen";
 import { QuickStartForm } from "../_components/QuickStartForm";
-import { STARTER_MATERIALS } from "../_data";
+import { ALL_STARTER_MATERIALS, STARTER_MATERIALS, STARTER_TRADES, starterTradeFrom } from "../_data";
 import { QUICK_START_INTRO, QuickStartBody } from "./QuickStartBody";
 import { perUnit } from "./QuickStartPrices";
 
@@ -53,6 +53,8 @@ const tagWith = (markup: string, fragment: string) => {
   return markup.slice(markup.lastIndexOf("<", at), markup.indexOf(">", at) + 1);
 };
 
+const NO_PARAMS = { searchParams: Promise.resolve({}) };
+
 beforeEach(() => {
   env.on = false;
   env.user = { id: "user-1" };
@@ -60,7 +62,7 @@ beforeEach(() => {
 
 describe("/app/materials/quick-start switch", () => {
   it("off: the old page with its own Back link and form", async () => {
-    const tree = (await MaterialsQuickStartPage()) as ReactElement<{ className: string }>;
+    const tree = (await MaterialsQuickStartPage(NO_PARAMS)) as ReactElement<{ className: string }>;
     expect(tree.props.className).toBe("min-h-screen text-white");
     expect(findAll(tree, QuickStartForm).map((el) => el.props.currency)).toEqual(["GBP"]);
     expect(findAll(tree, QuickStartBody)).toHaveLength(0);
@@ -71,18 +73,27 @@ describe("/app/materials/quick-start switch", () => {
 
   it("on: the new body under the shared top bar, no second Back link", async () => {
     env.on = true;
-    const tree = (await MaterialsQuickStartPage()) as ReactElement;
+    const tree = (await MaterialsQuickStartPage(NO_PARAMS)) as ReactElement;
     expect(tree.type).toBe(Screen);
     expect(findAll(tree, AppHeader)).toHaveLength(1);
     expect(findAll(tree, QuickStartBody).map((el) => el.props.currency)).toEqual(["GBP"]);
     expect(renderToStaticMarkup(tree)).not.toContain('data-testid="quick-start-back"');
   });
 
+  it("?trade=plumber opens the plumber list first; anything else is the builder list", async () => {
+    env.on = true;
+    const plumber = (await MaterialsQuickStartPage({ searchParams: Promise.resolve({ trade: "Plumber" }) })) as ReactElement;
+    expect(findAll(plumber, QuickStartBody).map((el) => el.props.trade)).toEqual(["plumber"]);
+    env.on = false;
+    const odd = (await MaterialsQuickStartPage({ searchParams: Promise.resolve({ trade: "astronaut" }) })) as ReactElement;
+    expect(findAll(odd, QuickStartForm).map((el) => el.props.trade)).toEqual(["builder"]);
+  });
+
   it("signed out goes to the login page either way", async () => {
     env.user = null;
-    await expect(MaterialsQuickStartPage()).rejects.toThrow("NEXT_REDIRECT /login");
+    await expect(MaterialsQuickStartPage(NO_PARAMS)).rejects.toThrow("NEXT_REDIRECT /login");
     env.on = true;
-    await expect(MaterialsQuickStartPage()).rejects.toThrow("NEXT_REDIRECT /login");
+    await expect(MaterialsQuickStartPage(NO_PARAMS)).rejects.toThrow("NEXT_REDIRECT /login");
   });
 });
 
@@ -116,6 +127,31 @@ describe("QuickStartBody (new look)", () => {
 
   it("uses the new look only", () => {
     expect(html).not.toMatch(/t2q-|font-mono|uppercase|bg-ink-|text-white|\/\/ /);
+  });
+
+  it("every trade's list is in the form; only the chosen trade's is shown", () => {
+    for (const t of STARTER_TRADES) {
+      const list = tagWith(html, `data-testid="quick-start-list-${t.id}"`);
+      if (t.id === "builder") expect(list).not.toMatch(/\shidden=""/);
+      else expect(list).toMatch(/\shidden=""/);
+    }
+    for (const m of ALL_STARTER_MATERIALS) expect(html).toContain(`name="price_${m.slug}"`);
+    const plumberFirst = renderToStaticMarkup(<QuickStartBody currency="NZD" trade="plumber" />);
+    expect(tagWith(plumberFirst, 'data-testid="quick-start-list-plumber"')).not.toMatch(/\shidden=""/);
+    expect(tagWith(plumberFirst, 'data-testid="quick-start-list-builder"')).toMatch(/\shidden=""/);
+    expect(plumberFirst).toContain(">per m<");
+  });
+
+  it("the trade lists: unique item ids, no suggested prices, sensible units", () => {
+    const slugs = ALL_STARTER_MATERIALS.map((m) => m.slug);
+    expect(new Set(slugs).size).toBe(slugs.length);
+    for (const m of ALL_STARTER_MATERIALS) {
+      expect(m).not.toHaveProperty("price");
+      expect(["each", "m", "length", "sheet", "pack", "box", "bag"]).toContain(m.unit);
+    }
+    expect(STARTER_TRADES.map((t) => t.id)).toEqual(["builder", "plumber", "electrician"]);
+    expect(starterTradeFrom(["electrician"])).toBe("electrician");
+    expect(starterTradeFrom(undefined)).toBe("builder");
   });
 
   it("units read as words", () => {
