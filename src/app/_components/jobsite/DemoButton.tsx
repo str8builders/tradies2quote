@@ -7,7 +7,15 @@ import { ArrowCounterClockwise, ArrowUpRight, Check, Play, X } from "@phosphor-i
 import { DEMO_TIMELINE } from "@/remotion/demo-script";
 import { TRIAL_LINE } from "./story";
 
-const POSTER = { tall: "/images/marketing/poster-demo-tall.webp", wide: "/images/marketing/poster-demo-wide.webp" } as const;
+/**
+ * Bumped when the demo is re-rendered under the same file names. Media is
+ * cached for a day (then a week stale-while-revalidate), so without a new
+ * address a returning visitor keeps the old film. 2: the narrated new-look
+ * demo (3 Oct 2026).
+ */
+const DEMO_VERSION = 2;
+const v = `?v=${DEMO_VERSION}`;
+const POSTER = { tall: `/images/marketing/poster-demo-tall.webp${v}`, wide: `/images/marketing/poster-demo-wide.webp${v}` } as const;
 
 type Cut = keyof typeof POSTER;
 
@@ -88,7 +96,7 @@ export function DemoButton({ className = "", children }: { className?: string; c
     <>
       <button type="button" className={`jobsite-demo-button ${className}`} onClick={open}>
         <span className="jobsite-demo-thumb" aria-hidden="true">
-          <Image src={POSTER.tall} alt="" width={44} height={44} sizes="44px" />
+          <Image src="/images/marketing/poster-demo-tall.webp" alt="" width={44} height={44} sizes="44px" />
           <Play size={16} weight="fill" />
         </span>
         <span>{children}</span>
@@ -127,8 +135,8 @@ export function DemoButton({ className = "", children }: { className?: string; c
               onEnded={() => setEnded(true)}
               onPlay={() => setEnded(false)}
             >
-              <source src={`/videos/demo-${cut}.mp4`} type="video/mp4" />
-              <source src={`/videos/demo-${cut}.webm`} type="video/webm" />
+              <source src={`/videos/demo-${cut}.mp4${v}`} type="video/mp4" />
+              <source src={`/videos/demo-${cut}.webm${v}`} type="video/webm" />
             </video>
             {ended ? (
               <div className="jobsite-demo-end" role="group" aria-label="After the demo">
