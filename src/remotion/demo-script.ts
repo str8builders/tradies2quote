@@ -10,8 +10,8 @@
  * names, usernames or real figures. Everything below is invented.
  */
 
-import { NARRATION } from "./demo-voiceover";
-import { VOICEOVER_TIMING } from "./demo-voiceover-timing";
+import { NARRATIONS, type VoiceoverId } from "./demo-voiceover";
+import { VOICEOVER_TIMINGS } from "./demo-voiceover-timing";
 
 export const VIDEO_FPS = 30;
 
@@ -133,7 +133,7 @@ export const CORE_CHAPTERS = ["talk", "draft", "check", "send", "invoice"] as co
 export type DemoChapterId = (typeof CORE_CHAPTERS)[number];
 
 /** Every scene a composition can contain (core chapters plus extras). */
-export type SceneId = DemoChapterId | "hook" | "intro" | "request" | "calculator" | "end";
+export type SceneId = DemoChapterId | "hook" | "intro" | "request" | "calculator" | "supplier" | "timesheet" | "end";
 
 export const SCENE_COPY: Record<SceneId, { label: string; title: string }> = {
   talk: { label: "Talk", title: "Talk the job" },
@@ -143,6 +143,8 @@ export const SCENE_COPY: Record<SceneId, { label: string; title: string }> = {
   invoice: { label: "Invoice", title: "Invoice and get paid" },
   request: { label: "Request", title: "The job comes to you" },
   calculator: { label: "Measure", title: "Measured, not guessed" },
+  supplier: { label: "Prices", title: "Scan a supplier's quote" },
+  timesheet: { label: "Hours", title: "Hours on the job" },
   hook: { label: "Hook", title: "Quote the job before you leave the site" },
   intro: { label: "Intro", title: "One job, start to finish" },
   end: { label: "Start", title: "Try it on your next job" },
@@ -203,103 +205,42 @@ function buildTimeline(id: string, specs: readonly ChapterSpec[]): Timeline {
 }
 
 /**
- * DemoWide and DemoTall: the narrated demo in two shapes. The chapters and
- * captions come from the voiceover (./demo-voiceover.ts), timed from the
- * measured audio (./demo-voiceover-timing.ts), so each caption shows while
- * its line is spoken and each chapter lasts as long as its narration. A
- * caption stays up until the next line starts.
+ * A narrated video's timeline. Its chapters and captions come from the
+ * voiceover (./demo-voiceover.ts), timed from the measured audio
+ * (./demo-voiceover-timing.ts), so each caption shows while its line is
+ * spoken and each chapter lasts as long as its narration. A caption stays
+ * up until the next line starts.
  */
-export const DEMO_TIMELINE = buildTimeline(
-  "demo",
-  NARRATION.map((chapter) => {
-    const timing = VOICEOVER_TIMING.chapters.find((c) => c.id === chapter.id);
-    if (!timing || timing.lines.length !== chapter.lines.length) {
-      throw new Error(`demo voiceover timing is stale for "${chapter.id}": run node scripts/make-demo-voiceover.mjs`);
-    }
-    return {
-      id: chapter.id,
-      seconds: timing.seconds,
-      captions: chapter.lines.map((line, i): CaptionSpec => {
-        const [start] = timing.lines[i];
-        const next = timing.lines[i + 1];
-        return [start, next ? next[0] : timing.seconds - 0.1, line.show];
-      }),
-    };
-  }),
-);
+function narratedTimeline(video: VoiceoverId): Timeline {
+  const timing = VOICEOVER_TIMINGS[video];
+  return buildTimeline(
+    video,
+    NARRATIONS[video].map((chapter) => {
+      const measured = timing.chapters.find((c) => c.id === chapter.id);
+      if (!measured || measured.lines.length !== chapter.lines.length) {
+        throw new Error(`${video} voiceover timing is stale for "${chapter.id}": run node scripts/make-demo-voiceover.mjs`);
+      }
+      return {
+        id: chapter.id,
+        seconds: measured.seconds,
+        captions: chapter.lines.map((line, i): CaptionSpec => {
+          const [start] = measured.lines[i];
+          const next = measured.lines[i + 1];
+          return [start, next ? next[0] : measured.seconds - 0.1, line.show];
+        }),
+      };
+    }),
+  );
+}
 
-/** SocialCut: 15-second vertical cut with a hook and an end card. */
-export const SOCIAL_TIMELINE = buildTimeline("social", [
-  { id: "hook", seconds: 2.2, captions: [[0, 2.2, "Quote the job before you leave the site."]] },
-  { id: "talk", seconds: 2.4, captions: [[0, 2.4, "Talk the job on site."]] },
-  { id: "draft", seconds: 2.4, captions: [[0, 2.4, "The quote drafts itself."]] },
-  { id: "check", seconds: 2.0, captions: [[0, 2.0, "You check every line."]] },
-  { id: "send", seconds: 2.6, captions: [[0, 2.6, "Your client signs on their phone."]] },
-  { id: "invoice", seconds: 1.8, captions: [[0, 1.8, "Invoice it. Get paid."]] },
-  { id: "end", seconds: 1.6, captions: [[0, 1.6, "tradies2quote.com · 7 days free"]] },
-]);
+/** DemoWide and DemoTall: the narrated homepage demo in two shapes. */
+export const DEMO_TIMELINE = narratedTimeline("demo");
 
-/** FullTour: one job from the first enquiry to the paid invoice. */
-export const TOUR_TIMELINE = buildTimeline("tour", [
-  { id: "intro", seconds: 3, captions: [[0.3, 2.9, "One job, from the first enquiry to a paid invoice."]] },
-  {
-    id: "request",
-    seconds: 8,
-    captions: [
-      [0.2, 4.4, "Clients scan your QR code and describe the job."],
-      [4.4, 7.9, "It lands in your app as a draft, ready for you."],
-    ],
-  },
-  {
-    id: "talk",
-    seconds: 7,
-    captions: [
-      [0.1, 3.9, "On site, talk through the job."],
-      [3.9, 6.9, "Your words become the starting point."],
-    ],
-  },
-  {
-    id: "draft",
-    seconds: 7,
-    captions: [
-      [0.1, 3.9, "The draft quote builds itself."],
-      [3.9, 6.9, "Materials, labour and GST, line by line."],
-    ],
-  },
-  {
-    id: "calculator",
-    seconds: 7,
-    captions: [
-      [0.1, 3.9, "Measure the deck in the T2QCAL calculator."],
-      [3.9, 6.9, "The measured result becomes the quote line."],
-    ],
-  },
-  {
-    id: "check",
-    seconds: 7,
-    captions: [
-      [0.1, 3.9, "Check every line before it goes."],
-      [3.9, 6.9, "Change any rate. You have the final say."],
-    ],
-  },
-  {
-    id: "send",
-    seconds: 8,
-    captions: [
-      [0.1, 4.4, "Send it. Your client reads it on their phone,"],
-      [4.4, 7.9, "accepts, and signs with a finger."],
-    ],
-  },
-  {
-    id: "invoice",
-    seconds: 7,
-    captions: [
-      [0.1, 3.9, "Turn the yes into an invoice."],
-      [3.9, 6.9, "Mark it paid when the money lands."],
-    ],
-  },
-  { id: "end", seconds: 6, captions: [[0.3, 5.8, "Try it free for 7 days at tradies2quote.com"]] },
-]);
+/** SocialCut: the short narrated vertical cut, a hook to an end card. */
+export const SOCIAL_TIMELINE = narratedTimeline("social");
+
+/** FullTour: one job from the first enquiry to the paid invoice, with the extra features. */
+export const TOUR_TIMELINE = narratedTimeline("tour");
 
 /** All caption text of one chapter, joined (title scenes show it large). */
 export function chapterCaptionText(timeline: Timeline, chapter: SceneId): string {

@@ -37,7 +37,7 @@ const FPS = 30;
 export const FEATURE_SCREEN = { width: SCREEN_W * SCALE, height: SCREEN_H * SCALE } as const;
 
 /** Frames of the request story after the van scan: the form, the requests, the draft. */
-const REQUEST_FRAMES = 204;
+export const REQUEST_FRAMES = 204;
 /** Frames each feature runs (30 fps). */
 export const FEATURE_FRAMES: Record<FeatureId, number> = {
   request: VAN_SCAN_FRAMES + REQUEST_FRAMES,
@@ -48,6 +48,20 @@ export const featureMetadata: CalculateMetadataFunction<FeatureScreenProps> = ({
   durationInFrames: FEATURE_FRAMES[props.feature],
 });
 
+/**
+ * How a scene's screens are framed. The website clips draw each screen as
+ * its own 2× Screen; the narrated tour hands the raw 390 × 844 content to
+ * its phone rig, which frames it (pass `raw`).
+ */
+export type Wrap = (content: ReactNode, opts?: { background?: string }) => ReactNode;
+const twoX: Wrap = (content, opts) => (
+  <Screen scale={SCALE} background={opts?.background}>
+    {content}
+  </Screen>
+);
+export const raw: Wrap = (content, opts) =>
+  opts?.background ? <div style={{ position: "absolute", inset: 0, background: opts.background }}>{content}</div> : content;
+
 type Tap = { x: number; y: number; p: number } | null;
 const tapAt = (p: number, a: number, b: number, x: number, y: number): Tap => (p > a && p < b ? { x, y, p: seg(p, a, b) } : null);
 const pressAt = (p: number, a: number, b: number) => {
@@ -55,29 +69,29 @@ const pressAt = (p: number, a: number, b: number) => {
   return t > 0 && t < 1 ? Math.sin(Math.min(1, t / 0.6) * Math.PI) : 0;
 };
 
-function supplier(frame: number): ReactNode {
+function supplier(frame: number, wrap: Wrap): ReactNode {
   const p = frame / (FEATURE_FRAMES.supplier - 1);
   const t = frame / FPS;
   const pricesTap = tapAt(p, 0.02, 0.08, 195, 324);
   const captureTap = tapAt(p, 0.16, 0.22, 195, 511) ?? tapAt(p, 0.28, 0.34, 195, 618);
   const checkTap = tapAt(p, 0.86, 0.93, 113, 711);
-  const prices = (
-    <Screen scale={SCALE}>
+  const prices = wrap(
+    <>
       <PricesScreen press={pressAt(p, 0.02, 0.08)} />
       {pricesTap ? <TapMark {...pricesTap} /> : null}
-    </Screen>
+    </>,
   );
-  const capture = (
-    <Screen scale={SCALE}>
+  const capture = wrap(
+    <>
       <SupplierCaptureScreen shell="new" t={t} photo={seg(p, 0.22, 0.26)} reading={p >= 0.34} press={pressAt(p, 0.28, 0.34)} />
       {captureTap ? <TapMark {...captureTap} /> : null}
-    </Screen>
+    </>,
   );
-  const check = (
-    <Screen scale={SCALE}>
+  const check = wrap(
+    <>
       <SupplierScanScreen shell="new" shown={seg(p, 0.6, 0.76) * 3} press={pressAt(p, 0.86, 0.93)} />
       {checkTap ? <TapMark {...checkTap} /> : null}
-    </Screen>
+    </>,
   );
   return p < 0.5 ? <Push p={eseg(p, 0.08, 0.14)} from={prices} to={capture} /> : <Push p={eseg(p, 0.5, 0.57)} from={capture} to={check} />;
 }
@@ -112,9 +126,12 @@ function timesheet(frame: number): ReactNode {
   );
 }
 
-export function FeatureScreen({ feature }: FeatureScreenProps) {
-  const frame = useCurrentFrame();
-  let screen: ReactNode;
+/**
+ * One feature's scene at `frame` (0 … FEATURE_FRAMES[feature] - 1). The
+ * website clip frames it at 2× (the default); the narrated tour passes
+ * `raw` and lets its phone rig frame it.
+ */
+export function featureScene(feature: FeatureId, frame: number, wrap: Wrap = twoX): ReactNode {
   if (feature === "request") {
     // The client scans the sticker on the van, fills in the request form
     // (the public page, unchanged), then the tradie's "Client requests" in
@@ -124,40 +141,34 @@ export function FeatureScreen({ feature }: FeatureScreenProps) {
     const T = REQUEST_BEATS;
     const shot = storyShot("request", { p, frame: f, pace: "full" });
     if (!shot) return null;
-    const form = <Screen scale={SCALE}>{shot.a.screen}</Screen>;
-    const scan = (
-      <Screen scale={SCALE} background="#000">
-        <VanScanScreen frame={frame} />
-      </Screen>
-    );
+    const form = wrap(shot.a.screen);
+    const scan = wrap(<VanScanScreen frame={frame} />, { background: "#000" });
     const banner = Math.min(eseg(p, T.banner[0], T.banner[1]), 1 - eseg(p, T.banner[2], T.banner[3]));
     const openTap = tapAt(p, T.open[0], T.open[1], 195, 462);
-    const requests = (
-      <Screen scale={SCALE}>
+    const requests = wrap(
+      <>
         <ClientRequestsScreen arrive={eseg(p, T.arrive[0], T.arrive[1])} press={pressAt(p, T.open[0], T.open[1])}>
           <PushBanner title="New quote request" body={`${EXAMPLE.client}: new timber deck, about 24 m²`} enter={banner} />
         </ClientRequestsScreen>
         {openTap ? <TapMark {...openTap} /> : null}
-      </Screen>
+      </>,
     );
-    const draft = (
-      <Screen scale={SCALE}>
-        <JobScreen stage="draft" />
-      </Screen>
+    const draft = wrap(<JobScreen stage="draft" />);
+    return frame < VAN_SCAN_FRAMES ? (
+      <Push p={eseg(frame, VAN_SCAN_BEATS.push[0], VAN_SCAN_BEATS.push[1])} from={scan} to={form} />
+    ) : p < T.open[1] ? (
+      <Push p={eseg(p, T.swap[0], T.swap[1])} from={form} to={requests} />
+    ) : (
+      <Push p={eseg(p, T.open[1], 1)} from={requests} to={draft} />
     );
-    screen =
-      frame < VAN_SCAN_FRAMES ? (
-        <Push p={eseg(frame, VAN_SCAN_BEATS.push[0], VAN_SCAN_BEATS.push[1])} from={scan} to={form} />
-      ) : p < T.open[1] ? (
-        <Push p={eseg(p, T.swap[0], T.swap[1])} from={form} to={requests} />
-      ) : (
-        <Push p={eseg(p, T.open[1], 1)} from={requests} to={draft} />
-      );
-  } else if (feature === "supplier") {
-    screen = supplier(frame);
-  } else {
-    screen = <Screen scale={SCALE}>{timesheet(frame)}</Screen>;
   }
+  if (feature === "supplier") return supplier(frame, wrap);
+  return wrap(timesheet(frame));
+}
+
+export function FeatureScreen({ feature }: FeatureScreenProps) {
+  const frame = useCurrentFrame();
+  const screen = featureScene(feature, frame);
   return (
     <AbsoluteFill style={{ background: "#0c0f0f" }}>
       <div style={{ position: "relative", width: FEATURE_SCREEN.width, height: FEATURE_SCREEN.height, overflow: "hidden" }}>{screen}</div>

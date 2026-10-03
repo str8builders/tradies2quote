@@ -48,7 +48,9 @@ describe("marketing video script data", () => {
   });
 
   it.each(ALL)("%s: each chapter's midpoint shows a fully faded-in caption", (_name, timeline) => {
-    for (const chapter of timeline.chapters) {
+    // Hook, intro and end are drawn as title cards (every line at once), not
+    // through the timed caption band, so a line starting mid-card is fine.
+    for (const chapter of timeline.chapters.filter((c) => !["hook", "intro", "end"].includes(c.id))) {
       const mid = chapter.from + Math.floor(chapter.durationInFrames / 2);
       const caption = timeline.captions.find((c) => mid >= c.from && mid < c.to);
       expect(caption, `${chapter.id} @ ${mid}`).toBeDefined();
@@ -67,19 +69,22 @@ describe("marketing video script data", () => {
     // The demo is narrated: it lasts as long as its voiceover (demo-voiceover.test.ts checks the match).
     expect(DEMO_TIMELINE.durationInFrames / VIDEO_FPS).toBeGreaterThan(45);
     expect(DEMO_TIMELINE.durationInFrames / VIDEO_FPS).toBeLessThan(90);
-    expect(SOCIAL_TIMELINE.durationInFrames / VIDEO_FPS).toBe(15);
-    expect(TOUR_TIMELINE.durationInFrames / VIDEO_FPS).toBe(60);
+    // Narrated too: short enough for Reels/Shorts, and a tour under two minutes.
+    expect(SOCIAL_TIMELINE.durationInFrames / VIDEO_FPS).toBeLessThan(30);
+    expect(TOUR_TIMELINE.durationInFrames / VIDEO_FPS).toBeLessThan(120);
     expect(HERO_LOOP_FRAMES / VIDEO_FPS).toBeGreaterThanOrEqual(8);
     expect(HERO_LOOP_FRAMES / VIDEO_FPS).toBeLessThanOrEqual(10);
     expect(DEMO_TIMELINE.chapters.map((c) => c.id)).toEqual(["intro", ...CORE_CHAPTERS, "end"]);
   });
 
   it("opens the social cut with the hook and ends every share cut on the offer", () => {
-    expect(SOCIAL_TIMELINE.captions[0]).toMatchObject({ chapter: "hook", from: 0, text: "Quote the job before you leave the site." });
-    expect(SOCIAL_TIMELINE.captions[0].to).toBeLessThanOrEqual(2 * VIDEO_FPS + 6);
-    expect(SOCIAL_TIMELINE.captions.at(-1)?.text).toBe("tradies2quote.com · 7 days free");
+    expect(SOCIAL_TIMELINE.captions[0]).toMatchObject({ chapter: "hook", text: "Quote the job before you leave the site." });
+    expect(SOCIAL_TIMELINE.chapters[0].durationInFrames).toBeLessThanOrEqual(3 * VIDEO_FPS);
+    expect(SOCIAL_TIMELINE.captions.at(-1)?.text).toBe("tradies2quote.com");
     expect(TOUR_TIMELINE.captions.at(-1)?.text).toContain("tradies2quote.com");
-    expect(TOUR_TIMELINE.chapters.map((c) => c.id)).toEqual(expect.arrayContaining(["request", "calculator", ...CORE_CHAPTERS]));
+    // The tour shows the features that are live in the app (calculators moved to the T2QCAL app).
+    expect(TOUR_TIMELINE.chapters.map((c) => c.id)).toEqual(expect.arrayContaining(["request", "supplier", "timesheet", ...CORE_CHAPTERS]));
+    expect(TOUR_TIMELINE.chapters.map((c) => c.id)).not.toContain("calculator");
   });
 
   it("exposes the website chapter list in order with matching start times", () => {

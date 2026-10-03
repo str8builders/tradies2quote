@@ -1,4 +1,8 @@
 import type { SceneId } from "../demo-script";
+import { VAN_SCAN_FRAMES } from "../screens/VanScanScreen";
+import { eseg } from "./anim";
+import { REQUEST_BEATS } from "./beats";
+import { FEATURE_FRAMES, REQUEST_FRAMES, featureScene, raw, type FeatureId } from "./feature-screen";
 import { newLookShot } from "./newlook-story";
 import { STEP_IDS, type StepId } from "./step-screen";
 import { finalDevice, kf, storyShot, type DeviceShot, type ShotArgs, type StoryShot } from "./story";
@@ -15,8 +19,10 @@ import { finalDevice, kf, storyShot, type DeviceShot, type ShotArgs, type StoryS
  * looks on the screen (`focus`, in screen px, 0–844) so the tall cut keeps
  * the part being tapped in view.
  *
- * Chapters without a new-look version (request, calculator, title cards)
- * fall through to the old story unchanged.
+ * The tour's extra chapters (request, supplier, timesheet) play the same
+ * new-look scenes as the website's "More in the app" stops
+ * (feature-screen.tsx), stretched over the chapter. Chapters without a
+ * new-look version (calculator, title cards) fall through to the old story.
  */
 
 const isStep = (id: SceneId): id is StepId => (STEP_IDS as readonly string[]).includes(id);
@@ -55,7 +61,39 @@ function focusOf(step: StepId, p: number): { a: number; b: number } {
   }
 }
 
+const FEATURES: readonly FeatureId[] = ["request", "supplier", "timesheet"];
+const isFeature = (id: SceneId): id is FeatureId => (FEATURES as readonly string[]).includes(id);
+
+/** A feature scene's frame at chapter progress p. */
+const featureFrame = (feature: FeatureId, p: number) => Math.round(Math.min(1, Math.max(0, p)) * (FEATURE_FRAMES[feature] - 1));
+
+function featureShot(feature: FeatureId, p: number): StoryShot {
+  const frame = featureFrame(feature, p);
+  if (feature === "request") {
+    // The client's phone while they scan the van and fill in the form, then
+    // the tradie's as the request arrives (the scene's own push, as a swap of phones).
+    const swapAt = VAN_SCAN_FRAMES + Math.round(REQUEST_BEATS.swap[0] * (REQUEST_FRAMES - 25));
+    const swapEnd = VAN_SCAN_FRAMES + Math.round(REQUEST_BEATS.swap[1] * (REQUEST_FRAMES - 25));
+    const scanning = frame < VAN_SCAN_FRAMES;
+    return {
+      a: { finish: "silver", page: "nl-request-client", screen: featureScene("request", Math.min(frame, swapAt - 1), raw), focus: scanning ? 422 : 500 },
+      b: { finish: "graphite", page: "nl-requests", screen: featureScene("request", Math.max(frame, swapEnd), raw), focus: TOP },
+      mix: eseg(frame, swapAt, swapEnd),
+    };
+  }
+  if (feature === "supplier") {
+    const q = frame / (FEATURE_FRAMES.supplier - 1);
+    return { a: { finish: "graphite", page: "nl-prices", screen: featureScene("supplier", frame, raw), focus: kf(q, [[0, TOP], [0.14, TOP], [0.2, 520], [0.5, 520], [0.6, BAR]]) }, mix: 0 };
+  }
+  const q = frame / (FEATURE_FRAMES.timesheet - 1);
+  return {
+    a: { finish: "graphite", page: "nl-timesheet", screen: featureScene("timesheet", frame, raw), focus: kf(q, [[0, TOP], [0.2, TOP], [0.28, BAR], [0.56, BAR], [0.62, TOP], [0.76, TOP], [0.84, 520]]) },
+    mix: 0,
+  };
+}
+
 export function demoShot(id: SceneId, args: ShotArgs): StoryShot | null {
+  if (isFeature(id)) return featureShot(id, args.p);
   if (!isStep(id)) return storyShot(id, args);
   const shot = newLookShot(id, { p: args.p, frame: args.frame });
   const pages = PAGES[id];
@@ -74,7 +112,7 @@ export function demoShot(id: SceneId, args: ShotArgs): StoryShot | null {
  * each chapter ends, so only old chapters take the override.
  */
 export function demoFinalDevice(shot: StoryShot, id: SceneId): DeviceShot {
-  if (!isStep(id)) return finalDevice(shot, id);
+  if (!isStep(id) && !isFeature(id)) return finalDevice(shot, id);
   return shot.b && shot.mix >= 0.5 ? shot.b : shot.a;
 }
 
@@ -88,7 +126,7 @@ const WIDE_LOWER = 90;
 
 export function demoShotWide(id: SceneId, args: ShotArgs): StoryShot | null {
   const shot = demoShot(id, args);
-  if (!shot || !isStep(id)) return shot;
+  if (!shot || (!isStep(id) && !isFeature(id))) return shot;
   const lower = (d: DeviceShot): DeviceShot => ({ ...d, focus: d.focus + WIDE_LOWER });
   return { ...shot, a: lower(shot.a), b: shot.b ? lower(shot.b) : undefined };
 }

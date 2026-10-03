@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Makes the homepage demo's voiceover from src/remotion/demo-voiceover.ts.
+ * Makes the marketing videos' voiceovers (demo, social, tour) from
+ * src/remotion/demo-voiceover.ts.
  *
  *   node scripts/make-demo-voiceover.mjs            speak, measure, stitch, write
  *   node scripts/make-demo-voiceover.mjs --check    exit 1 if the timing file is stale
@@ -11,14 +12,14 @@
  * VoiceStudio's default engine (OmniVoice, non-commercial weights).
  *
  * Writes:
- *   src/remotion/demo-voiceover-timing.ts         each chapter's length and each line's start/end
- *   src/remotion/marketing/media/demo-voiceover.m4a   the whole narration, silence included
+ *   src/remotion/demo-voiceover-timing.ts         per video: each chapter's length and each line's start/end
+ *   src/remotion/marketing/media/<video>-voiceover.m4a   each whole narration, silence included
  * Spoken clips are cached in marketing-media/voiceover/ (git-ignored), keyed
  * by voice + text, so re-running after a small edit only speaks what changed.
  *
  * Then render the videos with it:
- *   npm run render:marketing -- --only=demo-wide,demo-tall
- * (the demo targets pick the voiceover up by themselves).
+ *   npm run render:marketing -- --only=demo-wide,demo-tall,social,full-tour
+ * (those targets pick their voiceover up by themselves).
  */
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -30,25 +31,33 @@ import path from "node:path";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(path.join(ROOT, "package.json"));
 const { RenderInternals } = require("@remotion/renderer");
-const { NARRATION, VOICE, VOICE_PACING, MIN_CHAPTER_SECONDS } = await import(path.join(ROOT, "src/remotion/demo-voiceover.ts"));
+const { NARRATIONS, VOICE, VOICE_PACING, minChapterSeconds } = await import(path.join(ROOT, "src/remotion/demo-voiceover.ts"));
 
 const FPS = 30;
 const RATE = 24000;
 const CACHE = path.join(ROOT, "marketing-media/voiceover");
 const TIMING_FILE = path.join(ROOT, "src/remotion/demo-voiceover-timing.ts");
-const AUDIO_FILE = path.join(ROOT, "src/remotion/marketing/media/demo-voiceover.m4a");
+const audioFile = (video) => path.join(ROOT, `src/remotion/marketing/media/${video}-voiceover.m4a`);
 const log = (...a) => console.log("[voiceover]", ...a);
 
-/** Changes whenever anything that affects the audio changes. */
-export function scriptHash() {
+/** Changes whenever anything that affects a video's audio changes (same recipe as demo-voiceover.test.ts). */
+function scriptHash(video) {
+  const chapters = NARRATIONS[video];
   const h = createHash("sha256");
-  h.update(JSON.stringify({ VOICE, VOICE_PACING, MIN_CHAPTER_SECONDS, say: NARRATION.map((c) => [c.id, c.lines.map((l) => l.say)]) }));
+  h.update(
+    JSON.stringify({
+      VOICE,
+      pacing: VOICE_PACING[video],
+      min: chapters.map((c) => minChapterSeconds(video, c.id)),
+      say: chapters.map((c) => [c.id, c.lines.map((l) => l.say)]),
+    }),
+  );
   return h.digest("hex").slice(0, 16);
 }
 
 if (process.argv.includes("--check")) {
   const current = fs.existsSync(TIMING_FILE) ? fs.readFileSync(TIMING_FILE, "utf8") : "";
-  const ok = current.includes(`"${scriptHash()}"`);
+  const ok = Object.keys(NARRATIONS).every((video) => current.includes(`"${scriptHash(video)}"`));
   console.log(ok ? "voiceover timing is up to date" : "voiceover timing is STALE: run node scripts/make-demo-voiceover.mjs");
   process.exit(ok ? 0 : 1);
 }
@@ -124,53 +133,53 @@ const silence = (s) => Buffer.alloc(Math.round(s * RATE) * 2);
 const round3 = (n) => Math.round(n * 1000) / 1000;
 
 fs.mkdirSync(CACHE, { recursive: true });
-const parts = [];
-const chapters = [];
-for (const chapter of NARRATION) {
-  const clips = [];
-  for (const line of chapter.lines) clips.push(await lineAudio(line.say));
-  const { leadIn, gap, tail } = VOICE_PACING;
-  const lines = [];
-  let t = leadIn;
-  for (const clip of clips) {
-    lines.push([round3(t), round3(t + seconds(clip))]);
-    t += seconds(clip) + gap;
+const timings = {};
+for (const [video, narration] of Object.entries(NARRATIONS)) {
+  const { leadIn, gap, tail } = VOICE_PACING[video];
+  const parts = [];
+  const chapters = [];
+  for (const chapter of narration) {
+    const clips = [];
+    for (const line of chapter.lines) clips.push(await lineAudio(line.say));
+    const lines = [];
+    let t = leadIn;
+    for (const clip of clips) {
+      lines.push([round3(t), round3(t + seconds(clip))]);
+      t += seconds(clip) + gap;
+    }
+    const spoken = t - gap + tail;
+    // Whole frames, so the audio and the timeline agree to the frame.
+    const length = Math.ceil(Math.max(minChapterSeconds(video, chapter.id), spoken) * FPS) / FPS;
+    const track = [silence(leadIn)];
+    clips.forEach((clip, i) => {
+      track.push(clip);
+      if (i < clips.length - 1) track.push(silence(gap));
+    });
+    const used = track.reduce((n, b) => n + b.length, 0);
+    track.push(Buffer.alloc(Math.max(0, Math.round(length * RATE) * 2 - used)));
+    parts.push(...track);
+    chapters.push({ id: chapter.id, seconds: round3(length), lines });
+    log(`${video} ${chapter.id}: ${length.toFixed(2)} s, ${clips.length} lines`);
   }
-  const spoken = t - gap + tail;
-  // Whole frames, so the audio and the timeline agree to the frame.
-  const length = Math.ceil(Math.max(MIN_CHAPTER_SECONDS[chapter.id], spoken) * FPS) / FPS;
-  const track = [silence(leadIn)];
-  clips.forEach((clip, i) => {
-    track.push(clip);
-    if (i < clips.length - 1) track.push(silence(gap));
-  });
-  const used = track.reduce((n, b) => n + b.length, 0);
-  track.push(Buffer.alloc(Math.max(0, Math.round(length * RATE) * 2 - used)));
-  parts.push(...track);
-  chapters.push({ id: chapter.id, seconds: round3(length), lines });
-  log(`${chapter.id}: ${length.toFixed(2)} s, ${clips.length} lines`);
+  const total = chapters.reduce((n, c) => n + c.seconds, 0);
+  const whole = path.join(CACHE, `${video}-voiceover.wav`);
+  fs.writeFileSync(whole, toWav(Buffer.concat(parts)));
+  const out = audioFile(video);
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  // Loudness-normalised for speech on the web, then AAC.
+  await ff(["-y", "-i", whole, "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", "-ar", "48000", "-c:a", "aac", "-b:a", "128k", "-f", "mp4", out]);
+  timings[video] = { scriptHash: scriptHash(video), totalSeconds: round3(total), chapters };
+  log(`${video}: ${total.toFixed(2)} s → ${path.relative(ROOT, out)} (${(fs.statSync(out).size / 1024).toFixed(0)} KB)`);
 }
-
-const total = chapters.reduce((n, c) => n + c.seconds, 0);
-const whole = path.join(CACHE, "demo-voiceover.wav");
-fs.writeFileSync(whole, toWav(Buffer.concat(parts)));
-fs.mkdirSync(path.dirname(AUDIO_FILE), { recursive: true });
-// Loudness-normalised for speech on the web, then AAC.
-await ff(["-y", "-i", whole, "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", "-ar", "48000", "-c:a", "aac", "-b:a", "128k", "-f", "mp4", AUDIO_FILE]);
 
 fs.writeFileSync(
   TIMING_FILE,
   `/**
  * GENERATED by scripts/make-demo-voiceover.mjs from ./demo-voiceover.ts. Do not edit.
- * Each chapter's length and each line's [start, end] in seconds from the
- * chapter's start, measured from the spoken audio (${VOICE.engine} ${VOICE.voice}).
+ * Per video: each chapter's length and each line's [start, end] in seconds
+ * from the chapter's start, measured from the spoken audio (${VOICE.engine} ${VOICE.voice}).
  */
-export const VOICEOVER_TIMING = {
-  scriptHash: "${scriptHash()}",
-  totalSeconds: ${round3(total)},
-  chapters: ${JSON.stringify(chapters, null, 2).replace(/\n/g, "\n  ")},
-} as const;
+export const VOICEOVER_TIMINGS = ${JSON.stringify(timings, null, 2)} as const;
 `,
 );
-log(`total ${total.toFixed(2)} s`);
-log(`wrote ${path.relative(ROOT, TIMING_FILE)} and ${path.relative(ROOT, AUDIO_FILE)} (${(fs.statSync(AUDIO_FILE).size / 1024).toFixed(0)} KB)`);
+log(`wrote ${path.relative(ROOT, TIMING_FILE)}`);

@@ -16,7 +16,7 @@
  *     the 3D phone's screen on the job-site website, 600 px wide, plus
  *     <step>-first.webp (its first frame) and <step>.webp (the finished screen)
  * Sharing files (marketing-media/, git-ignored):
- *   social-15s.mp4, full-tour.mp4, demo-wide.mp4, demo-tall.mp4
+ *   social-cut.mp4, full-tour.mp4, demo-wide.mp4, demo-tall.mp4 (all narrated)
  *
  * Re-rendering with the owner's voice
  * -----------------------------------
@@ -27,13 +27,13 @@
  * render; an https URL is used as is. Without it there is no audio track.
  *
  *   npm run render:marketing -- --only=full-tour --props='{"voiceoverSrc":"./voice/full-tour.m4a"}'
- *   npm run render:marketing -- --only=social --props='{"voiceoverSrc":"./voice/social-15s.m4a"}'
+ *   npm run render:marketing -- --only=social --props='{"voiceoverSrc":"./voice/social-cut.m4a"}'
  *
- * The sharing MP4s in marketing-media/ then carry the voice. The homepage
- * demo (demo-wide, demo-tall) is the exception: it is narrated, with its
- * voiceover made by scripts/make-demo-voiceover.mjs and picked up
- * automatically, and its website copies keep the sound (AAC in the MP4,
- * Opus in the WebM). The other website videos stay silent.
+ * The sharing MP4s in marketing-media/ then carry the voice. The demo,
+ * social cut and full tour are narrated already: their voiceovers are made
+ * by scripts/make-demo-voiceover.mjs and picked up automatically (--props
+ * still overrides), and the demo's website copies keep the sound (AAC in
+ * the MP4, Opus in the WebM). The other website videos stay silent.
  *
  * Fonts come from Google Fonts at render time (@remotion/google-fonts), so a
  * render needs network access; it fails instead of falling back to system
@@ -71,10 +71,10 @@ const DEMO_VOICEOVER = "src/remotion/marketing/media/demo-voiceover.m4a";
  * worked out from the measured timing: half a second before the end of
  * "Draft builds itself", where the quote and its total are on screen.
  */
-const { VOICEOVER_TIMING } = await import(path.join(ROOT, "src/remotion/demo-voiceover-timing.ts"));
+const { VOICEOVER_TIMINGS } = await import(path.join(ROOT, "src/remotion/demo-voiceover-timing.ts"));
 const DEMO_POSTER_FRAME = (() => {
   let seconds = 0;
-  for (const chapter of VOICEOVER_TIMING.chapters) {
+  for (const chapter of VOICEOVER_TIMINGS.demo.chapters) {
     seconds += chapter.seconds;
     if (chapter.id === "draft") return Math.round((seconds - 0.5) * 30);
   }
@@ -105,8 +105,8 @@ const TARGETS = {
     web: { name: "hero-loop", mp4Crf: 23, webmCrf: 33, gop: 270 },
     poster: { file: "poster-hero.webp", frame: 0, maxBytes: 120_000 },
   },
-  social: { composition: "SocialCut", share: "social-15s.mp4" },
-  "full-tour": { composition: "FullTour", share: "full-tour.mp4" },
+  social: { composition: "SocialCut", share: "social-cut.mp4", voiceover: "src/remotion/marketing/media/social-voiceover.m4a" },
+  "full-tour": { composition: "FullTour", share: "full-tour.mp4", voiceover: "src/remotion/marketing/media/tour-voiceover.m4a" },
   stills: {
     composition: "FeatureStill",
     stills: ["voice", "supplier-scan", "qr-request", "client-accept", "numbers", "invoices"],

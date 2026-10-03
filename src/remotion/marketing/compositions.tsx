@@ -38,6 +38,7 @@ import { HERO_BEATS } from "./beats";
 import { Push } from "./Push";
 import { C, FONT } from "./theme";
 import { CaptureScreen } from "../screens/CaptureScreen";
+import { TalkScreen } from "../screens/newlook/TalkScreens";
 import { QuoteReviewScreen } from "../screens/QuoteReviewScreen";
 
 export const WIDE = { width: 1920, height: 1080 } as const;
@@ -175,7 +176,7 @@ function PhonePeek() {
     <div style={{ width: 800 }}>
       <div style={{ borderRadius: 120, overflow: "hidden", border: "18px solid #1d1f21", boxShadow: "0 40px 100px rgba(0,0,0,0.7)" }}>
         <Screen scale={764 / SCREEN_W} height={844}>
-          <CaptureScreen state="idle" frame={0} idleMotion={0} />
+          <TalkScreen phase="idle" t={0} seconds={0} speaking={0} press={0} />
         </Screen>
       </div>
     </div>
@@ -186,7 +187,7 @@ function PhonePeek() {
 
 const WIDE_RIG: RigGeometry = { width: 560, left: 1240, top: 70, windowTop: 0, windowBottom: 1080, slide: 240, anchor: 0.74 };
 
-/** "new": the app's new look (the homepage demo); "old": the original screens (social cut, full tour). */
+/** "new": the app's new look (every narrated video); "old": the original screens. */
 type Look = "new" | "old";
 const shotFor = (look: Look, wide = false) => (look === "new" ? (wide ? demoShotWide : demoShot) : storyShot);
 const endFor = (look: Look) => (look === "new" ? demoFinalDevice : finalDevice);
@@ -315,11 +316,11 @@ export function DemoTall({ voiceoverSrc }: MarketingVideoProps) {
 }
 
 export function SocialCut({ voiceoverSrc }: MarketingVideoProps) {
-  return <StoryVideo timeline={SOCIAL_TIMELINE} voiceoverSrc={voiceoverSrc} render={(f) => <TallFrame frame={f} timeline={SOCIAL_TIMELINE} pace="fast" captionSize={70} />} />;
+  return <StoryVideo timeline={SOCIAL_TIMELINE} voiceoverSrc={voiceoverSrc} render={(f) => <TallFrame frame={f} timeline={SOCIAL_TIMELINE} pace="fast" captionSize={64} look="new" />} />;
 }
 
 export function FullTour({ voiceoverSrc }: MarketingVideoProps) {
-  return <StoryVideo timeline={TOUR_TIMELINE} voiceoverSrc={voiceoverSrc} render={(f) => <WideFrame frame={f} timeline={TOUR_TIMELINE} pace="full" />} />;
+  return <StoryVideo timeline={TOUR_TIMELINE} voiceoverSrc={voiceoverSrc} render={(f) => <WideFrame frame={f} timeline={TOUR_TIMELINE} pace="full" look="new" />} />;
 }
 
 /* ─── Hero loop ──────────────────────────────────────────────────────────── */
